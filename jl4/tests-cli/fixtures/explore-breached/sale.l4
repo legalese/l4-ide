@@ -1,0 +1,18 @@
+IMPORT prelude
+
+-- smucclaw/l4-ide#1087: the right side of a RAND is still being held to the
+-- events after the left side has been breached. `l4 run` on `(WAITUNTIL 3)`
+-- gives `BREACH BY Buyer`; on `(WAITUNTIL 3) (WAITUNTIL 6)` it gives
+-- `BREACH BY Buyer BY Seller`: the seller's deadline passing adds the seller's
+-- blame. The explorer used to stop at the first breach and never reach that.
+
+DECLARE Person IS ONE OF Buyer, Seller
+DECLARE Action IS ONE OF pay, deliver
+
+GIVETH A DEONTIC Person Action
+sale MEANS
+        (PARTY Buyer MUST pay WITHIN 2 HENCE FULFILLED LEST BREACH BY Buyer)
+  RAND  (PARTY Seller MUST deliver WITHIN 5 HENCE FULFILLED LEST BREACH BY Seller)
+
+#TRACE sale AT 0 WITH
+  PARTY Buyer DOES pay AT 0

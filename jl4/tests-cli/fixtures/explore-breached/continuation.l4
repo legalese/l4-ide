@@ -1,0 +1,23 @@
+IMPORT prelude
+
+-- smucclaw/l4-ide#1087: what the explorer cannot read. The seller's delivery
+-- has a continuation, an invoice due 3 after it. After the buyer's breach and
+-- the delivery at 4, the evaluator is waiting on the invoice, and a tick at 8
+-- adds the seller's blame (`l4 run` on `(WAITUNTIL 3) deliver AT 4
+-- (WAITUNTIL 8)` gives `BREACH BY Buyer BY Seller`). The invoice was armed
+-- after the breach, so the breached value, which keeps only its blame, never
+-- held it: the explorer names it as untried and does not call that state
+-- finished.
+
+DECLARE Person IS ONE OF Buyer, Seller
+DECLARE Action IS ONE OF pay, deliver, invoice
+
+GIVETH A DEONTIC Person Action
+sale MEANS
+        (PARTY Buyer MUST pay WITHIN 2 HENCE FULFILLED LEST BREACH BY Buyer)
+  RAND  (PARTY Seller MUST deliver WITHIN 5
+           HENCE (PARTY Seller MUST invoice WITHIN 3 HENCE FULFILLED LEST BREACH BY Seller)
+           LEST BREACH BY Seller)
+
+#TRACE sale AT 0 WITH
+  PARTY Buyer DOES pay AT 0

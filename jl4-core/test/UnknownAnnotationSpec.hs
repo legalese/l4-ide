@@ -332,6 +332,7 @@ spec = do
           , "@desc-- a comment", "@export default x", "@ref x", "@ref-src x"
           , "@ref-map x y", "@infix 5", "@infixl 5", "@infixr 5"
           , "@nonexhaustive", "@nonexhaustive x", "@nonassertable", "@nonassertable -- x"
+          , "@ends-because", "@ends-because each step is nearer the end"
           ] $ \line ->
       it (Text.unpack line <> " is lexed as the annotation it names") $ do
         let src = line <> "\n"
@@ -356,6 +357,7 @@ everyKnownAnnotation =
   , "@infixr 5"
   , "@nonexhaustive"
   , "@nonassertable"
+  , "@ends-because each step is nearer the end"
   , "@lang he"
   ]
 
@@ -379,4 +381,5 @@ heraldOf = \case
                         FixityNone  -> "infix"
   TNonexhaustive{} -> Just "nonexhaustive"
   TNonassertable   -> Just "nonassertable"
+  TEndsBecause {}  -> Just "ends-because"
   TLang {}         -> Just "lang"

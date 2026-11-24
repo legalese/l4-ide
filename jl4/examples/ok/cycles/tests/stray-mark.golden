@@ -1,0 +1,20 @@
+Parsing successful
+Typechecking successful
+stray-mark.l4:8:1-36:
+  @ends-because is above `late fee`, but I find no way for `late fee` to lead back to itself, so I see nothing for the mark to explain.
+  The mark goes above a rule that uses itself again, directly or through other rules, or whose HENCE or LEST starts it again.
+  I cannot see a loop that goes through a rule kept in a record or passed in as an input: if `late fee` leads back to itself that way, the mark is where it belongs, and if not, move it to the rule it explains.
+stray-mark.l4:8:1-36:
+  The @ends-because above `late fee` says why it comes to an end:
+  
+    it is only arithmetic
+  
+  I find no way for `late fee` to lead back to itself, so the mark changes nothing.
+  I cannot see a loop that goes through a rule kept in a record or passed in as an input.
+stray-mark.l4:14:1-58:
+  The @ends-because above `days left` says why it comes to an end:
+  
+    each step moves one day nearer the end date
+  
+  `days left` uses itself again, directly or through other rules, but not through a HENCE or LEST, and L4 gives no warning about whether a rule like that comes to an end.
+  So the mark changes nothing. That reason is what a reader should check.

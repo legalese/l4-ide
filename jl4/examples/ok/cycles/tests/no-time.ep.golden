@@ -1,0 +1,35 @@
+-- Rules that start themselves again with no time passing, beside the same
+-- rules with a deadline one day later, which L4 checks come to an end. Recursion-limit
+-- ruling L3 (2026-11-20) asks for a positive and a
+-- negative fixture for each shape a warning fires on, and ruling L4 says that
+-- @ends-because does not silence this warning. Both are described in
+-- doc/reference/regulative/rules-that-start-themselves-again.md, and the
+-- golden pins the text of each message.
+
+DECLARE Person IS ONE OF Alex, Sam
+DECLARE Action IS ONE OF `pay rent`
+
+-- Warns: WITHIN 0, so the time of each copy is up the moment it starts.
+GIVETH A DEONTIC Person Action
+`pay at once` MEANS
+    PARTY Alex
+    MUST `pay rent`
+    WITHIN 0
+    LEST `pay at once`
+
+-- No warning: WITHIN 1, so each copy waits a day before the next one starts.
+GIVETH A DEONTIC Person Action
+`pay within a day` MEANS
+    PARTY Alex
+    MUST `pay rent`
+    WITHIN 1
+    LEST `pay within a day`
+
+-- Warns, for a permission too, and the mark above it does not silence it.
+@ends-because Alex always takes the chance
+GIVETH A DEONTIC Person Action
+`chance at once` MEANS
+    PARTY Alex
+    MAY `pay rent`
+    WITHIN 0
+    LEST `chance at once`

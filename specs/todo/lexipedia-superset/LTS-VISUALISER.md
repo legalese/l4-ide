@@ -680,7 +680,8 @@ step log, the marking, the enabled set **and the rank/lane assignment** (§4.7) 
   through the residual's heap by `reifyExpr`, `:539`, so `Sign (EXACTLY t)` under an `EVERY`
   names the member); for every distinct live deadline, a tick to just past it (endpoint 24) — a
   `WAIT UNTIL`, the machine's own no-party event, stamped by `tickPast` (`:277`: one unit past, or
-  half-way to the next live deadline when nearer, because the machine expires on `stamp >
+  half-way to the next live deadline when nearer [since 2026-11-23, smucclaw/l4-ide#1081: half-way only when
+  the next is less than a unit away, so a deadline a unit further is not passed], because the machine expires on `stamp >
 deadline` and a tick AT the deadline reveals nothing); and a listed refusal, when the shape
   cannot be instantiated — a `WITHIN` that was never evaluated and is not a
   literal (`deadlineOf`, `:264`). Refusals are listed, not dropped: an enabled set that omitted

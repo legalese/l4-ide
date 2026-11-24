@@ -1,0 +1,23 @@
+Parsing successful
+Typechecking successful
+marks.l4:11:1-41:
+  The @ends-because above `monthly rent` says why it comes to an end:
+  
+    Alex stops renting one day
+  
+  `monthly rent` can start itself again, but I could check that it comes to an end: each new copy waits, for an event or for time to pass, so a run over a list of events reaches an answer.
+  So the mark changes nothing.
+marks.l4:22:1-49:
+  The @ends-because above `instalments` says why it comes to an end:
+  
+    n drops by one at every instalment
+  
+  `instalments` can start itself again, but I could check that it comes to an end: each time round, one of its inputs gets smaller, towards a stop.
+  So the mark changes nothing.
+marks.l4:32:1-58:
+  The @ends-because above `days left` says why it comes to an end:
+  
+    each step moves one day nearer the end date
+  
+  `days left` uses itself again, directly or through other rules, but not through a HENCE or LEST, and L4 gives no warning about whether a rule like that comes to an end.
+  So the mark changes nothing. That reason is what a reader should check.

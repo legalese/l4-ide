@@ -162,4 +162,4 @@ Residuals (1):
                  WHEN `Alice cancels the dinner` THEN COMMIT "dinners cancelled" IS `dinner for two` HENCE `the evening`)
         LEST FULFILLED
 
-Coverage: 13 states, 29 transitions; frontier exhausted; nothing refused; nothing untried; 62 acts passed over; 13 ticks past the clock bound not taken; no write-only cell dropped; time by regions (the instant of the last event, one between it and the next deadline, the deadline; the clock is not in the state), clock bounded at 75600
+Coverage: 13 states, 29 transitions; frontier exhausted; nothing refused; nothing untried; 62 acts passed over; 13 ticks past the clock bound not taken; no write-only cell dropped; time by regions (whole instants: the last event, the deadline, window openings, the ties between a deadline an act starts and one already live, and one between each; the clock is not in the state), clock bounded at 75600; instants: 91 acts tried at 273 instants (0 ties, 91 gaps)

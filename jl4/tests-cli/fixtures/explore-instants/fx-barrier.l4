@@ -1,0 +1,34 @@
+-- smucclaw/l4-ide#1081, found by an independent re-check: a lapse of a deadline
+-- FIXED at the outset, inside an EVERY (barrier). The tenants' deadline is 6
+-- from the outset; the landlord's refund is 2 after a miss (8). Pia's act starts
+-- Rex's deadline 3 after it, so Pia signing at 5 puts Rex's deadline on the
+-- refund at 8.
+IMPORT prelude
+DECLARE Actor IS ONE OF
+    Landlord HAS name IS A STRING
+    Tenant   HAS name IS A STRING
+DECLARE Action IS ONE OF
+    Sign    HAS signer IS AN Actor
+    Refund  HAS who    IS AN Actor
+
+lord  MEANS Landlord OF "Lord"
+rex   MEANS Landlord OF "Rex"
+pia   MEANS Landlord OF "Pia"
+bob   MEANS Tenant OF "Bob"
+carol MEANS Tenant OF "Carol"
+
+GIVETH A DEONTIC Actor Action
+fxbarrier MEANS
+       (EVERY Tenant t IN LIST bob, carol
+          MUST   Sign t
+          WITHIN 6
+          ONCE   ALL HAVE
+          HENCE  FULFILLED
+          LEST   (PARTY lord MUST Refund lord WITHIN 2 HENCE FULFILLED LEST BREACH BY lord))
+  RAND (PARTY pia MUST Sign pia WITHIN 9
+          HENCE (PARTY rex MUST Sign rex WITHIN 3 HENCE FULFILLED LEST BREACH BY rex)
+          LEST BREACH BY pia)
+
+#TRACE fxbarrier AT 0 WITH
+  PARTY pia DOES Sign pia AT 5
+  (WAITUNTIL 7)

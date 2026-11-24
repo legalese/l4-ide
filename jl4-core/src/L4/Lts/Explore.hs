@@ -69,13 +69,15 @@
 -- the finite constructors beside it still explored. No sample is ever
 -- tried in a refused constructor's place (§4.2, ruled R-L4).
 --
--- An act fires at a choice of instants (§4.5): the instant of the last
--- event, one instant strictly between it and the earliest live deadline,
--- and that deadline exactly. An act is never fired past a live deadline:
--- the machine would expire the deadline first and the edge would carry the
--- act's name for the deadline's effect, so a later instant is reached by the
--- tick past the deadline and then the act, which is the same position with
--- honest labels.
+-- An act fires at a choice of WHOLE instants (§4.5, T2: contract time is
+-- discrete): the instant of the last event, the earliest live deadline
+-- exactly, the instants where a window opens, the instants at which a
+-- deadline some chain of acts would start falls on one fixed in absolute
+-- time (a /tie/), and one instant between each of those. See
+-- 'instantsFor'. An act is never fired past a live deadline: the machine
+-- would expire the deadline first and the edge would carry the act's name for
+-- the deadline's effect, so a later instant is reached by the tick past the
+-- deadline and then the act, which is the same position with honest labels.
 module L4.Lts.Explore
   ( -- * Where an exploration starts
     Start (..)
@@ -97,12 +99,21 @@ module L4.Lts.Explore
   , LedgerCell (..)
   , Keep (..)
   , Coverage (..)
+  , InstantStats (..)
   , Stop (..)
   , Refusal (..)
   , UntriedNote (..)
   , explore
   , coverageComplete
   , replayPath
+  , positionAlong
+    -- * What tests hold the scheme to
+  , Explorer
+  , newExplorer
+  , rigFor
+  , liveDeadlines
+  , timeSignature
+  , keyText
   , withoutDirectives
   , decidesOf
     -- * Rendering
@@ -125,14 +136,18 @@ import qualified Base.Text as Text
 import Base.Text (textShow)
 import qualified Data.Aeson as Aeson
 import Data.Aeson ((.=))
+import Data.Char (isDigit)
+import Data.Ratio (denominator)
 import qualified Data.Sequence as Seq
 import Data.Sequence (Seq (..))
 import qualified Optics
 import Control.Exception (handle, throwIO)
 
 import L4.Annotation (emptyAnno, getAnno)
+import L4.Parser.SrcSpan (prettySrcRange)
 import L4.Evaluate.Ledger (LedgerEvent (..), LedgerStore (..), Provenance (..))
 import L4.Evaluate.ValueLazy hiding (Blame)
+import L4.EvaluateLazy.Machine (anchorInstant)
 import L4.EvaluateLazy
   ( EntityInfo
   , EvalDirectiveResult (..)
@@ -142,8 +157,9 @@ import L4.EvaluateLazy
   , prettyEvalException
   , prettyReductionOutcome
   )
+import L4.EvaluateLazy.DeonticStep (NormKey (..))
 import L4.EvaluateLazy.Exceptions (LimitStopped (..), isLimitStop)
-import L4.Lts.Marking (LiveNorm (..), RawObligation (..), liveObligations, renderLive)
+import L4.Lts.Marking (Bearer (..), Countdown (..), LiveNorm (..), RawObligation (..), liveObligations, renderLive)
 import L4.Lts.WhatIf
 import L4.Print (prettyLayout)
 import L4.Syntax
@@ -161,14 +177,24 @@ data Start = MkStart
     -- ^ the contract as written, for the reader
   , stContract :: !(Expr Resolved)
   , stAt       :: !(Expr Resolved)
+    -- ^ the @AT@ as written, for the reader
+  , stClock    :: !(Maybe Rational)
+    -- ^ the clock it is, once read ('explore' reads it): the replay is handed
+    -- this as a literal, so a start below 0, or one that is an expression
+    -- (@AT (10 + 5)@, @AT (DATE_SERIAL ...)@), is where the clock begins
   }
+
+-- | What the replay is told the start is: the clock when it is read, else the
+-- @AT@ as written.
+startExpr :: Start -> Expr Resolved
+startExpr s = maybe s.stAt (Lit emptyAnno . NumericLit emptyAnno) s.stClock
 
 -- | One start per distinct contract and @AT@ among the module's @#TRACE@s,
 -- in source order. The traces' events are not replayed: from the outset
 -- they are one path among those the exploration walks.
 startsOf :: Module Resolved -> [Start]
 startsOf m = nubOrdOn (\ s -> (s.stName, prettyLayout s.stAt))
-  [ MkStart {stName = prettyLayout tr.trContract, stContract = tr.trContract, stAt = tr.trStart}
+  [ MkStart {stName = prettyLayout tr.trContract, stContract = tr.trContract, stAt = tr.trStart, stClock = Nothing}
   | tr <- tracesOf m ]
 
 -- | A top-level rule with no inputs, at this @AT@. Unlike
@@ -182,6 +208,7 @@ startNamed (MkModule _ _ section) wanted at =
       { stName = wanted
       , stContract = Var emptyAnno (Ref n u n)
       , stAt = Lit emptyAnno (NumericLit emptyAnno at)
+      , stClock = Just at
       }
 
 -- | Every @DECIDE@ in a section and the sections under it.
@@ -209,19 +236,27 @@ data ExploreOptions = MkExploreOptions
   , eoMaxActs   :: !Int
     -- ^ the most acts one variable's type may enumerate to before the
     -- variable is refused as too large
+  , eoMaxInstants :: !Int
+    -- ^ the most instants one act is tried at in one state; more are not
+    -- tried, and the coverage says so
+  , eoChains    :: !Bool
+    -- ^ under 'Regions', search the ties that need a CHAIN of acts too (an
+    -- act starts a deadline, the next act's tie is in reach only if this one
+    -- was early enough). Off, they are not searched, and the coverage says
+    -- how many (state, act) pairs they would have added instants to
   }
 
 -- | How the instant an act fires at is chosen (§4.5).
 data TimeScheme
   = Regions
-    -- ^ the instant of the last event, one instant strictly before the
-    -- earliest live deadline, and that deadline; the clock is not in the
-    -- state
+    -- ^ whole instants where something can change, chosen by 'instantsFor';
+    -- the clock is not in the state
   | Grid !Rational
-    -- ^ the instant of the last event and the next multiple of this step
-    -- after it, never past the earliest live deadline; the clock is in the
-    -- state. For a guard that reads the clock arithmetically, on the
-    -- condition that every event time and deadline is a multiple of the step
+    -- ^ the instant of the last event and every multiple of this step from
+    -- the first instant the act's window is open to the earliest live
+    -- deadline; the clock is in the state. For a guard that reads the clock
+    -- arithmetically, on the condition that every event time, deadline and
+    -- opening is a multiple of the step, which is checked ('offGrid')
   deriving stock (Eq, Show)
 
 defaultExploreOptions :: ExploreOptions
@@ -231,6 +266,8 @@ defaultExploreOptions = MkExploreOptions
   , eoUntil = Nothing
   , eoTime = Regions
   , eoMaxActs = 4096
+  , eoMaxInstants = 256
+  , eoChains = False
   }
 
 ----------------------------------------------------------------------------
@@ -393,6 +430,8 @@ data Coverage = MkCoverage
   , cvAnswersByForm :: ![Text]
     -- ^ ledger-reading rules with no inputs whose answer has no literal
     -- form, compared by its printed form
+  , cvInstants     :: !InstantStats
+    -- ^ how many acts were tried at how many instants, and why those
   }
 
 data Stop
@@ -566,8 +605,17 @@ data StateKey = MkStateKey
   deriving stock (Eq, Ord, Show)
 
 data ClockKey
-  = ClockDropped ![Bool]
-    -- ^ for each live deadline whose instant is known: has the clock passed it
+  = ClockDropped ![Bool] ![Maybe Int] ![Maybe Int]
+    -- ^ for each live deadline whose instant is known: has the clock passed it;
+    -- and the rank of each live deadline and each window opening among one
+    -- another ('ranksOf'), ties equal. The clock itself is not kept, and a
+    -- clock AT a deadline is the same state as one before it (the contract
+    -- does not say them apart, and a deadline that is not in the residual's
+    -- text, being anchored (@WITHIN 3 OF THE DEADLINE@), prints the same at
+    -- every clock). But which of two deadlines comes first is part of where
+    -- the position stands, and the printed residual does not say it for an
+    -- anchored one: two positions that differ only in that were one state
+    -- (smucclaw/l4-ide, the explorer's X1)
   | ClockKept !Rational
   deriving stock (Eq, Ord, Show)
 
@@ -592,16 +640,42 @@ data Explorer = MkExplorer
   , exActionType :: !(Either Text (Type' Resolved))
   , exAnchors    :: !(IORef (Map Text (Maybe Rational)))
     -- ^ closed anchors already evaluated ('resolveAnchor')
+  , exHint       :: !(Map Text (Set Rational, Set Rational))
+    -- ^ per act (as its edge is labelled), what the acts that can FOLLOW it
+    -- were found to do in an earlier pass over the same contract: the sums of
+    -- the offsets by which they start deadlines along the paths of acts that
+    -- follow it ('pathPools'), and the instants fixed in absolute time that
+    -- their positions held. With 'eoChains', ties are searched over all of
+    -- them ('regionInstants'); without, they are only counted
+    -- ('chainsLeftOut')
+  , exRecords    :: !(IORef [ActRecord])
+    -- ^ every act whose instants were chosen, newest first
+  }
+
+-- | One act in one state, as its instants were chosen, and what its probes
+-- showed about time.
+data ActRecord = MkActRecord
+  { arState   :: !Int
+  , arLabel   :: !Text
+  , arClock   :: !Rational
+  , arLimit   :: !(Maybe Rational)
+  , arTried   :: !(Set Rational)
+  , arFixed   :: ![Rational]
+    -- ^ the instants the position held when the act was tried
+  , arOffsets :: ![Rational]
+    -- ^ the offsets by which the act started deadlines
+  , arLearnedFixed :: ![Rational]
+    -- ^ the instants fixed in absolute time that its successors held
   }
 
 -- | The rig and trace that replay this path.
 rigFor :: Explorer -> [Expr Resolved] -> (Rig, Trace)
 rigFor ex events =
-  let directive = Contract emptyAnno ex.exStart.stContract ex.exStart.stAt events
+  let directive = Contract emptyAnno ex.exStart.stContract (startExpr ex.exStart) events
       MkModule a uri (MkSection sa sn saka sg decls) = ex.exRig.rigModule
       m' = MkModule a uri (MkSection sa sn saka sg (decls <> [Directive emptyAnno directive]))
   in ( ex.exRig {rigModule = m'}
-     , MkTrace {trDirective = directive, trContract = ex.exStart.stContract, trStart = ex.exStart.stAt, trEvents = events} )
+     , MkTrace {trDirective = directive, trContract = ex.exStart.stContract, trStart = startExpr ex.exStart, trEvents = events} )
 
 -- | A module with no directives: the explorer adds the one it replays.
 withoutDirectives :: Module Resolved -> Module Resolved
@@ -628,10 +702,15 @@ stateKey ex pos = do
       WHNF v -> answerText v
       WHNFWhen _ v _ _ -> answerText v
   deadlines <- liveDeadlines ex pos
-  let clock = case ex.exOptions.eoTime of
-        Regions -> ClockDropped [ pos.posClock > d | (_, Just (Right d)) <- deadlines ]
+  openings <- for (obligationsOf pos) (openingOf pos.posClock)
+  let (dueRanks, openRanks) = ranksOf [ d | (_, d) <- deadlines ] openings
+      clock = case ex.exOptions.eoTime of
+        Regions -> ClockDropped [ pos.posClock > d | (_, Just (Right d)) <- deadlines ] dueRanks openRanks
         Grid _  -> ClockKept pos.posClock
-  pure ( MkStateKey {skResidual = residual, skLedger = cells, skCafs = map (second fst) cafs, skClock = clock}
+      -- a breached position holds on to what it still waits on: two that blame
+      -- the same party are not one state when one has a sibling pending
+      waiting = waitingLines True pos [ d | (_, d) <- deadlines ] openings
+  pure ( MkStateKey {skResidual = residual <> waitingText waiting, skLedger = cells, skCafs = map (second fst) cafs, skClock = clock}
        , MkKeyNotes
            { knMergedByName = merged
            , knDropped = dropped
@@ -647,6 +726,120 @@ stateKey ex pos = do
       ValROp{}        -> pure (prettyLayout v, True)
       ValQuantified{} -> pure (prettyLayout v, True)
       _               -> valueText v
+
+-- | The state key as text: two positions with the same text are one state.
+keyText :: Explorer -> Position -> IO Text
+keyText ex pos = textShow . fst <$> stateKey ex pos
+
+-- | A position up to time: what it IS, with the countdowns taken out and
+-- the ORDER of its instants kept. It is what a graph built on a sample of
+-- instants is held to, against every instant (the key itself holds the
+-- remaining @WITHIN@ numbers, which a sample cannot reproduce for an
+-- instant it did not try). It is NOT a bisimulation: two positions with the
+-- same signature but different gaps between their deadlines have different
+-- futures (an act that starts a deadline of 2 puts it on one and not the
+-- other), which is why 'instantsFor' chooses instants by the chains of acts
+-- that can follow and not only by the order of what is live now. A test that
+-- finds every signature at depth @d@ tells nothing about depth @d + 1@.
+--
+-- Its parts: the standing, or the residual with each live obligation's
+-- remaining due and opening taken out; the ledgers as the state keeps them;
+-- whether the clock has passed each deadline, and the rank of every known
+-- deadline and of every known opening among one another, ties equal.
+timeSignature :: Explorer -> Position -> IO Text
+timeSignature ex pos = do
+  (residual, _) <- case pos.posResidual of
+    Just v  -> canonResidual pos.posReplayScope (withoutTimes v)
+    Nothing -> pure (standingText pos.posResult, [])
+  (cells, _, _) <- projectLedger ex.exSites pos.posResult.ledger
+  deadlines <- liveDeadlines ex pos
+  openings <- for (obligationsOf pos) (openingOf pos.posClock)
+  let (dueRanks, openRanks) = ranksOf [ d | (_, d) <- deadlines ] openings
+  pure (Text.unlines
+    [ residual <> waitingText (waitingLines False pos [ d | (_, d) <- deadlines ] openings)
+    , textShow cells
+    , "passed " <> textShow [ pos.posClock > d | (_, Just (Right d)) <- deadlines ]
+    , "opening ranks " <> textShow openRanks
+    , "deadline ranks " <> textShow dueRanks
+    ])
+  where
+    withoutTimes = \ case
+      ValObligation env p a _ _ f l -> ValObligation env p a (Left Nothing) (Left Nothing) f l
+      ValROp env op l r -> ValROp env op (side l) (side r)
+      other -> other
+    side = \ case
+      Left e  -> Left e
+      Right x -> Right (withoutTimes x)
+
+-- | The rank of every known deadline and of every known opening among one
+-- another (dense, ties equal); 'Nothing' for one whose instant is not known.
+-- The clock is not among them.
+ranksOf :: [Maybe (Either Text Rational)] -> [Maybe (Either Text Rational)] -> ([Maybe Int], [Maybe Int])
+ranksOf dues opens = (map (>>= rank) dueOf, map (>>= rank) openOf)
+  where
+    known x = either (const Nothing) Just =<< x
+    dueOf = map known dues
+    openOf = map known opens
+    instants = sort (nubOrd (catMaybes dueOf <> catMaybes openOf))
+    rank x = fmap fst (find ((== x) . snd) (zip [0 :: Int ..] instants))
+
+-- | What a BREACHED position still waits on, one line each, in a fixed order:
+-- who, what, and (when the key is to keep it) how long is left. The line has to
+-- say which obligations are still standing and nothing about the ones that are
+-- gone; the explorer does not know what the right side's continuation, armed
+-- after the breach, holds, and says that too ('posUnread'), so that a state
+-- with one waiting is not taken for a state with none.
+waitingLines :: Bool -> Position -> [Maybe (Either Text Rational)] -> [Maybe (Either Text Rational)] -> [Text]
+waitingLines withTimes pos dues opens = sort (carried <> unread)
+  where
+    own = length (maybe [] liveObligations pos.posResidual)
+    carried =
+      [ Text.unwords (catMaybes
+          [ Just (bearerWord live.lnBearer), Just (modalWord' live.lnModal), Just live.lnAction
+          , if withTimes then within due else Nothing
+          , if withTimes then opening open else Nothing ])
+      | (p, due, open) <- zip3 pos.posPending (drop own dues <> repeat Nothing) (drop own opens <> repeat Nothing)
+      , let live = renderLive pos.posContext p.pdRaw ]
+    unread = [ unreadLine k | k <- pos.posUnread ]
+    within = \ case
+      Just (Right d) -> Just ("WITHIN " <> prettyRatio (d - pos.posClock))
+      Just (Left _)  -> Just "WITHIN (not known here)"
+      Nothing        -> Nothing
+    opening = \ case
+      Just (Right o) | o > pos.posClock -> Just ("AFTER " <> prettyRatio (o - pos.posClock))
+      _                                 -> Nothing
+
+waitingText :: [Text] -> Text
+waitingText [] = ""
+waitingText ls = "\n  [still waiting on: " <> Text.intercalate "; " ls <> "]"
+
+bearerWord :: Bearer -> Text
+bearerWord = \ case
+  KnownParty t    -> t
+  UnforcedParty t -> t
+
+modalWord' :: DeonticModal -> Text
+modalWord' = \ case
+  DMust    -> "MUST"
+  DMay     -> "MAY"
+  DMustNot -> "SHANT"
+  DDo      -> "DO"
+
+firstJust :: [Maybe a] -> Maybe a
+firstJust = listToMaybe . catMaybes
+
+-- | A norm the log shows waiting behind a breach that the explorer holds no
+-- obligation for: who, what kind, and where in the source it is written
+-- (the file's name and the range, not its path).
+unreadLine :: NormKey -> Text
+unreadLine k = Text.unwords
+  [ "(unread)"
+  , fromMaybe "(party not yet known)" (firstJust [k.nkBearerName, k.nkBearer, fmap (<> " (as written)") k.nkBearerSource])
+  , modalWord' k.nkModal
+  , case k.nkSite of
+      Just r  -> "(at " <> prettySrcRange r <> ")"
+      Nothing -> "(no location)"
+  ]
 
 -- | What a result that is not a residual says, for a state key.
 standingText :: EvalDirectiveResult -> Text
@@ -751,7 +944,7 @@ projectLedger sites store = do
 -- WhatIf's 'deadlineOf' first; an anchor the residual holds unforced is then
 -- evaluated, when it is closed in the module ('resolveAnchor').
 liveDeadlines :: Explorer -> Position -> IO [(RawObligation NF, Maybe (Either Text Rational))]
-liveDeadlines ex pos = for (maybe [] liveObligations pos.posResidual) \ raw -> case raw.roDue of
+liveDeadlines ex pos = for (obligationsOf pos) \ raw -> case raw.roDue of
   Left Nothing -> pure (raw, Nothing)
   _ -> do
     d <- deadlineOf pos.posClock raw
@@ -816,24 +1009,332 @@ evalNumber ex e = do
           throwIO (LimitStopped ("working out a deadline's anchor: " <> Text.unwords (prettyEvalException exc)))
     _ -> pure Nothing
 
--- | The instants an act is fired at (§4.5), from the clock and the known
--- live deadlines.
-actInstants :: ExploreOptions -> Rational -> [Rational] -> [Rational]
-actInstants opts clock deadlines =
-  let ahead = [ d | d <- deadlines, d >= clock ]
-      limit = case (ahead, opts.eoUntil) of
-        ([], Nothing) -> Nothing
-        ([], Just u)  -> Just u
-        (ds, Nothing) -> Just (minimum ds)
-        (ds, Just u)  -> Just (min u (minimum ds))
-      within t = maybe True (t <=) limit
-  in nubOrd $ filter within $ case opts.eoTime of
-       Regions -> case limit of
-         Nothing -> [clock, clock + 1]
-         Just e
-           | e > clock -> [clock, (clock + e) / 2, e]
-           | otherwise -> [clock]
-       Grid n -> [clock, (fromIntegral (floor (clock / n) :: Integer) + 1) * n]
+-- | One @#EVAL@ of a closed expression in the module, read as an instant: a
+-- NUMBER as it is, a DATE by its serial (as the machine lowers an anchor).
+evalInstantIn :: Rig -> Expr Resolved -> IO (Maybe Rational)
+evalInstantIn rig e = do
+  let MkModule a uri (MkSection sa sn saka sg decls) = withoutDirectives rig.rigModule
+      m' = MkModule a uri (MkSection sa sn saka sg (decls <> [Directive emptyAnno (LazyEval emptyAnno e)]))
+  (_, results) <- execEvalModuleWithDeonticLog rig.rigConfig rig.rigEntityInfo rig.rigEnv m'
+  pure case results of
+    ((res, _) : _) | Reduction (Reduced (MkNF v)) <- res.result -> case v of
+      ValNumber r -> Just r
+      ValDate d   -> either (const Nothing) Just (anchorInstant (ValDate d))
+      _           -> Nothing
+    _ -> Nothing
+
+-- | The start with its clock read. A literal @AT@ is its own clock; any
+-- other is evaluated once, here, so that the replay is handed a number. A start
+-- that is neither a number nor a date is refused: the explorer would otherwise
+-- take it for 0 and explore a contract that had not begun where it says it did.
+resolveStart :: Rig -> Start -> IO (Either Text Start)
+resolveStart rig start = case start.stClock of
+  Just _ -> pure (Right start)
+  Nothing -> case start.stAt of
+    Lit _ (NumericLit _ r) -> pure (Right start {stClock = Just r})
+    e -> evalInstantIn rig e >>= \ case
+      Just r  -> pure (Right start {stClock = Just r})
+      Nothing -> pure (Left ("the start of the trace, `AT " <> prettyLayout e <> "`, is neither a number nor a date the explorer can read, so it cannot say where the clock begins"))
+
+----------------------------------------------------------------------------
+-- The instants an act is tried at
+----------------------------------------------------------------------------
+
+-- | What an act's instants are chosen from, at one position.
+data Window = MkWindow
+  { wnState      :: !Int
+    -- ^ the state the act is tried in
+  , wnLabel      :: !Text
+    -- ^ the act, as its edge is labelled
+  , wnClock      :: !Rational
+    -- ^ the instant of the last event: an act is never tried before it
+  , wnLimit      :: !(Maybe Rational)
+    -- ^ the earliest live deadline, or the clock bound if that is sooner: an
+    -- act is never tried past it, because the machine would expire the
+    -- deadline first and the edge would carry the act's name for the
+    -- deadline's effect. 'Nothing': no live deadline and no bound
+  , wnOpen       :: !(Maybe Rational)
+    -- ^ the instant the act's own window opens, when the obligation has an
+    -- opening edge and its instant is known: before it the act is a nullity
+  , wnFixed      :: ![Rational]
+    -- ^ the instants OTHER live obligations hold in absolute time: their
+    -- deadlines and openings. An act that starts a deadline of its own ties
+    -- with one of these at one instant
+  , wnOtherOpens :: ![Rational]
+    -- ^ the others' openings: an act that two obligations would take is
+    -- taken by one of them or both according to which side of its opening it
+    -- falls on
+  , wnHeld       :: ![Held]
+    -- ^ what the position holds now, by obligation: an obligation the act
+    -- leaves with the instant it had is fixed, which is not to be told from
+    -- one that moved by matching values across probes
+  }
+
+-- | What choosing the instants of one act came to.
+data Instants = MkInstants
+  { inRuns   :: ![(Rational, Tried)]
+    -- ^ every instant tried, in order, with what came of it
+  , inCuts   :: ![(Text, Text)]
+    -- ^ what could not be tried, as an untried candidate's (what, why)
+  , inStats  :: !InstantStats
+  }
+
+-- | How many acts were tried, at how many instants, and why those: the
+-- coverage's account of the scheme (an information clause: what was left out
+-- is in the untried ones).
+data InstantStats = MkInstantStats
+  { isActs     :: !Int
+  , isInstants :: !Int
+  , isTies     :: !Int
+    -- ^ instants chosen because a deadline the act starts meets another
+  , isGaps     :: !Int
+    -- ^ instants chosen to stand for the whole numbers between two others
+  }
+  deriving stock (Eq, Show)
+
+instance Semigroup InstantStats where
+  MkInstantStats a b c d <> MkInstantStats a' b' c' d' = MkInstantStats (a + a') (b + b') (c + c') (d + d')
+
+instance Monoid InstantStats where
+  mempty = MkInstantStats 0 0 0 0
+
+-- | The instants of one act, by the scheme the run was asked for. @probe@
+-- tries the act at one instant.
+--
+-- 'Regions' (§4.5): an act is tried at the instants where something can
+-- change, and at one whole instant in each gap between them. After an act at
+-- @t@ the live deadlines are of two kinds: instants fixed in absolute time
+-- (those already live, and those anchored to one) and those the act starts,
+-- which move with @t@. How @t@ orders against the fixed instants decides
+-- what happens next, and the tie @t + w = d@ is a case of its own: it is where
+-- two deadlines fall together, and a breach names both parties. So the
+-- instants are the clock; the limit; the act's own opening; every other
+-- opening between the clock and the limit; every tie; and one whole instant
+-- inside each gap between two of those that has one. Only whole instants
+-- are tried (contract time is discrete, T2).
+--
+-- The offsets @w@ and the fixed instants are READ from the replays, not from
+-- the text of the @HENCE@: the act is tried at the clock and at the limit,
+-- and the known deadlines and openings of the positions that come back are
+-- compared: a value that is found again, shifted by the difference of the
+-- two instants, moved with @t@ (an offset), and one that is found again as it
+-- was did not (a fixed instant). A value that matches both ways, or neither
+-- (the contract answered differently at the two instants), counts as both,
+-- which costs an instant and never a tie. The set is closed under what later
+-- replays show, within 'eoMaxInstants'.
+--
+-- 'Grid' n: the clock, and every multiple of n from the first instant the
+-- act's window is open to the limit. With no limit, only up to one step past
+-- that instant, which is said.
+instantsFor :: Explorer -> Window -> (Rational -> IO Tried) -> IO Instants
+instantsFor ex w probe = case ex.exOptions.eoTime of
+  Regions -> regionInstants ex w probe
+  Grid n  -> gridInstants ex n w probe
+
+isWhole :: Rational -> Bool
+isWhole x = denominator x == 1
+
+-- | The first instant the window is open: the opening, if it is after the clock.
+openFrom :: Window -> Rational
+openFrom w = maybe w.wnClock (max w.wnClock) w.wnOpen
+
+gridInstants :: Explorer -> Rational -> Window -> (Rational -> IO Tried) -> IO Instants
+gridInstants ex n w probe = do
+  let cap = ex.exOptions.eoMaxInstants
+      c = w.wnClock
+      firstMultiple = fromInteger (ceiling (openFrom w / n)) * n
+      multiples = case w.wnLimit of
+        Just l  -> takeWhile (<= l) (iterate (+ n) firstMultiple)
+        Nothing -> [firstMultiple, firstMultiple + n]
+      wanted = nubOrd (c : multiples)
+      (kept, cutOff) = splitAt cap wanted
+      noLimit = isNothing w.wnLimit
+  runs <- for kept \ t -> (t,) <$> probe t
+  pure MkInstants
+    { inRuns = runs
+    , inCuts =
+        [ ("at the grid points past the instant cap", "it needs more instants than the instant cap of " <> textShow cap <> "; the rest were not tried (--max-instants raises the bound)")
+        | not (null cutOff) ]
+        <> [ ("at the grid points past one step after its window opens", "there is no deadline and no --until, so the clock has no end to try up to (--until bounds it)")
+           | noLimit ]
+    , inStats = MkInstantStats {isActs = 1, isInstants = length runs, isTies = 0, isGaps = 0}
+    }
+
+regionInstants :: Explorer -> Window -> (Rational -> IO Tried) -> IO Instants
+regionInstants ex w probe = go Map.empty
+  where
+    c = w.wnClock
+    cap = ex.exOptions.eoMaxInstants
+    inRange t = t >= c && maybe True (t <=) w.wnLimit
+    lo = openFrom w
+    (hintSums, hintFixed) = Map.findWithDefault (Set.empty, Set.empty) w.wnLabel ex.exHint
+    -- the instants the position itself names
+    base = nubOrd (filter inRange ([c, lo] <> maybeToList w.wnLimit <> w.wnOtherOpens)
+                   <> [ lo + 1 | isNothing w.wnLimit ])
+
+    -- @tried@: each instant tried, what came of it, and what the position it
+    -- led to holds in absolute time
+    go :: Map Rational (Tried, [Held]) -> IO Instants
+    go tried = do
+      let seen = [ (t, th) | (t, (TriedEdge {}, th)) <- Map.toList tried ]
+          (learnedOffsets, learnedFixed) = shiftOrStay w.wnHeld seen
+      let -- the clock itself is an offset of 0: a deadline fixed in absolute
+          -- time that only the successor holds is a boundary at its own instant
+          own = nubOrd (0 : learnedOffsets)
+          offsets = chainOffsets own (if ex.exOptions.eoChains then Set.toList hintSums else [0])
+          fixedAll = nubOrd (learnedFixed <> w.wnFixed <> (if ex.exOptions.eoChains then Set.toList hintFixed else []) <> maybeToList w.wnLimit)
+          early = [ o | (TriedPassed _ (Just o), _) <- Map.elems tried ]
+          ties = tiesOf inRange fixedAll offsets
+          sumsTruncated = False
+          named = nubOrd (base <> filter inRange early <> ties)
+          (wholeNamed, notWhole) = partition (\ t -> t == c || isWhole t) named
+          critical = sort wholeNamed
+          gapReps =
+            [ rep
+            | (x, y) <- zip critical (drop 1 critical)
+            , y - x >= 2
+            , let rep = fromInteger (floor x + 1)
+            , rep < y
+            , not (any (\ t -> t > x && t < y) (Map.keys tried)) ]
+          wanted = filter (`Map.notMember` tried) (critical <> gapReps)
+          room = max 0 (cap - Map.size tried)
+          (now, cutOff) = splitAt room wanted
+      if null now
+        then settle tried learnedOffsets learnedFixed (Set.fromList critical) (Set.fromList ties) notWhole (length (take 100001 cutOff)) sumsTruncated
+        else do
+          ran <- for now \ t -> do
+            r <- probe t
+            th <- case r of
+              TriedEdge _ _ _ p -> thresholdsOf ex p
+              _                 -> pure []
+            pure (t, (r, th))
+          go (foldl' (\ m (t, r) -> Map.insert t r m) tried ran)
+
+    settle tried learnedOffsets learnedFixed critical ties notWhole cutN sumsTruncated = do
+      modifyIORef' ex.exRecords (MkActRecord
+        { arState = w.wnState, arLabel = w.wnLabel, arClock = c, arLimit = w.wnLimit
+        , arTried = Set.fromList (Map.keys tried), arFixed = nubOrd (w.wnFixed <> maybeToList w.wnLimit)
+        , arOffsets = learnedOffsets, arLearnedFixed = learnedFixed } :)
+      let runs = [ (t, r) | (t, (r, _)) <- Map.toList tried ]
+          ts = map fst runs
+          tieHits = length [ () | t <- ts, Set.member t ties, t `notElem` base ]
+          gapHits = length [ () | t <- ts, Set.notMember t critical ]
+      pure MkInstants
+        { inRuns = runs
+        , inCuts =
+            [ ("at instants that are not whole numbers"
+              , "an instant it needs (" <> prettyRatio (minimum notWhole) <> ") is not a whole number, and only whole instants are tried")
+            | not (null notWhole) ]
+            <> [ ("at the instants past the instant cap"
+                 , "it needs " <> (if cutN > 100000 then "more than 100000" else textShow cutN) <> " more instants than the instant cap of "
+                     <> textShow cap <> " allows; they were not tried (--max-instants raises the bound)")
+               | cutN > 0 ]
+            <> [ ("at the ties that chains of acts make"
+                 , "the chains of offsets it would add up are too many to list, so ties through them were not searched")
+               | sumsTruncated ]
+        , inStats = MkInstantStats {isActs = 1, isInstants = length runs, isTies = tieHits, isGaps = gapHits}
+        }
+
+-- | The sums by which a deadline can fall from the instant an act is done:
+-- the act's own offsets (and none) plus what follows it, one sum from each
+-- path of later acts ('pathPools'). A chain matters because an act is never
+-- tried past the earliest live deadline, and the deadline the first act
+-- starts is that one: a later act's tie is in reach only if the first act was
+-- done early enough, so the sum of both offsets is a boundary of the first
+-- act's instants. An act that starts no deadline adds no such boundary: what
+-- it leaves behind is a lower bound on the clock, so trying it early reaches
+-- everything trying it later does (the offset 0 stays bare, for a deadline
+-- fixed in absolute time that only its successor holds).
+chainOffsets :: [Rational] -> [Rational] -> [Rational]
+chainOffsets own following = nubOrd (own <> [ o + x | o <- own, o > 0, x <- following ])
+
+-- | The instants at which a deadline falls on a fixed one: @f - y@ for a
+-- fixed instant @f@ and a sum @y@, inside the window.
+tiesOf :: (Rational -> Bool) -> [Rational] -> [Rational] -> [Rational]
+tiesOf inRange fixeds sums = nubOrd [ x | f <- fixeds, y <- sums, let x = f - y, inRange x ]
+
+-- | An obligation in force at some position, by what identifies it across
+-- positions (its place in the contract, its bearer, its modal, its action,
+-- and which of several such it is), with an instant it holds.
+data Held = MkHeld
+  { heldNorm :: !LiveNorm
+  , heldNth  :: !Int
+  , heldKind :: !HeldKind
+  , heldAt   :: !Rational
+  }
+
+data HeldKind = HeldDeadline | HeldOpening
+  deriving stock (Eq)
+
+sameHeld :: Held -> Held -> Bool
+sameHeld a b = a.heldKind == b.heldKind && a.heldNth == b.heldNth && sameNorm a.heldNorm b.heldNorm
+
+-- | The same obligation, wherever it is met: its place in the contract, its
+-- modal and its action, and its bearer. The bearer is printed as the party's
+-- value once it has been forced and as the expression before, so a party
+-- forced between two positions is the same bearer; two printed alike in one
+-- form are the same, and one in each form is not told apart.
+sameNorm :: LiveNorm -> LiveNorm -> Bool
+sameNorm x y = (x.lnSite, x.lnModal, x.lnAction) == (y.lnSite, y.lnModal, y.lnAction) && sameBearer x.lnBearer y.lnBearer
+  where
+    sameBearer (KnownParty p) (KnownParty q) = p == q
+    sameBearer (UnforcedParty p) (UnforcedParty q) = p == q
+    sameBearer _ _ = True
+
+-- | The instants a position holds in absolute time, as far as they are
+-- known: its live deadlines and the openings of its windows, each with the
+-- obligation it belongs to.
+thresholdsOf :: Explorer -> Position -> IO [Held]
+thresholdsOf ex pos = do
+  deadlines <- liveDeadlines ex pos
+  openings <- for (obligationsOf pos) (openingOf pos.posClock)
+  let norms = [ renderLive pos.posContext raw | (raw, _) <- deadlines ]
+      nth i n = length [ () | n' <- take i norms, sameNorm n' n ]
+  pure
+    [ MkHeld {heldNorm = n, heldNth = nth i n, heldKind = kind, heldAt = at}
+    | (i, n, (_, due), open) <- zip4' [0 :: Int ..] norms deadlines (openings <> repeat Nothing)
+    , (kind, Just (Right at)) <- [(HeldDeadline, due), (HeldOpening, open)] ]
+  where
+    zip4' (a : as) (b : bs) (c' : cs) (d : ds) = (a, b, c', d) : zip4' as bs cs ds
+    zip4' _ _ _ _ = []
+
+-- | From the instants an act was tried at and what each position it led to
+-- holds: the offsets by which it starts deadlines (they moved with the
+-- instant) and the instants that were fixed (they did not), told apart FOR
+-- EACH OBLIGATION across the probes. An obligation seen at one probe only, or
+-- one whose instant did neither, may be either, and counts as both: that
+-- costs an instant and never a tie. Matching by obligation and not by value
+-- matters: two fixed deadlines a distance apart, seen at two probes that far
+-- apart, look like one deadline that moved.
+shiftOrStay :: [Held] -> [(Rational, [Held])] -> ([Rational], [Rational])
+shiftOrStay existing seen = (nubOrd (concat offs), nubOrd (concat fixs))
+  where
+    firsts = dedupe [ th | (_, ths) <- seen, th <- ths ]
+    dedupe = foldr (\ x acc -> x : filter (not . sameHeld x) acc) []
+    (offs, fixs) = unzip (map one firsts)
+    one th0 =
+      let obs = [ (t, th.heldAt) | (t, ths) <- seen, th <- ths, sameHeld th th0 ]
+          values = nubOrd (map snd obs)
+          shifts = nubOrd [ v - t | (t, v) <- obs ]
+          unchanged = [ e.heldAt | e <- existing, sameHeld e th0, [e.heldAt] == values ]
+          -- what the residual itself says of a deadline seen at one probe only:
+          -- one counting from now moves with the act, one anchored does not
+          written = case th0.heldNorm.lnDue of
+            UnforcedDeadline _ Nothing  -> Just True
+            UnforcedDeadline _ (Just _) -> Just False
+            _                           -> Nothing
+      in case (unchanged, length obs >= 2, values, shifts) of
+           -- the act left it where it was. The position already held it (it is in
+           -- 'wnFixed' for this act's own ties), and it is not new with the act, so
+           -- it is not carried upstream: a deadline an EARLIER act started is held
+           -- by every later position and moves with that earlier act, which is not
+           -- to be told from a fixed one by looking at the later act's probes alone
+           (_ : _, _, _, _)    -> ([], [])
+           (_, True, [_], _)   -> ([], values)
+           (_, True, _, [_])   -> (shifts, [])
+           _ | th0.heldKind == HeldDeadline, written == Just True  -> (shifts, [])
+             | th0.heldKind == HeldDeadline, written == Just False -> ([], values)
+           _                   -> (shifts, values)
 
 ----------------------------------------------------------------------------
 -- Exploring
@@ -844,15 +1345,26 @@ data Node = MkNode
   , ndDepth  :: !Int
   , ndEvents :: ![Expr Resolved]
   , ndPos    :: !Position
+  , ndRe     :: !Bool
+    -- ^ this position reached a state that was already known, at an EARLIER
+    -- clock than the one explored from: it is explored again, for the acts
+    -- and instants the later clock no longer allows. A key says nothing of
+    -- how far the clock is from a deadline that is anchored in absolute time,
+    -- so two positions with one key can differ in what is still possible; the
+    -- earlier clock allows all the later one does
   }
 
 -- | What one try of one candidate came to.
 data Tried
   = TriedEdge !Text !EdgeKind !(Expr Resolved) !Position
     -- ^ taken: the label, the event appended, the position it led to
-  | TriedPassed !Text
+  | TriedPassed !Text !(Maybe Rational)
+    -- ^ passed over; when the act came before its window opened, the
+    -- instant it opens
+  | TriedStats !InstantStats
+    -- ^ how many instants one act was tried at, and why those
   | TriedUntried !Text !Text
-  | TriedBeyond
+  | TriedBeyond !Text
     -- ^ a tick past the clock bound, not taken
   | TriedRefused !Refusal
 
@@ -866,38 +1378,192 @@ data Accum = MkAccum
     -- ^ newest first
   , acEdgeEvents :: !(Map (Int, Text, Int) (Expr Resolved))
   , acQueue      :: !(Seq Node)
-  , acPassed     :: !Int
-  , acBeyond     :: !Int
-  , acDepthCut   :: !Int
-  , acStatesCut  :: !Int
-  , acUntried    :: !(Map (Text, Text) Int)
+  , acPassedAt   :: !(Map Int (Set Text))
+    -- ^ per state, the acts some visit passed over; a state is visited again
+    -- when it is reached at an earlier clock ('ndRe'), and each tally below is
+    -- kept per STATE so that a second visit adds only what the first did not
+    -- find
+  , acFiredAt    :: !(Map Int (Set Text))
+    -- ^ per state, the acts some instant took: an act that was passed over at
+    -- one clock and taken at another is not passed over
+  , acBeyondAt   :: !(Map Int Int)
+    -- ^ per state, how many of its ticks fall past the clock bound: the most
+    -- any visit found (the same ticks are there at every clock, and the bound
+    -- takes some of them according to where the clock is)
+  , acDepthCutIds :: !(Set Int)
+    -- ^ the states at the depth bound with something left to try
+  , acCutKeys    :: !(Set StateKey)
+    -- ^ the states the state bound kept out, each once: what the line says is a
+    -- number of states, and a state reached by ten moves is one state
+  , acUntriedAt  :: !(Map (Int, Text) [Text])
+    -- ^ per state and label, the reasons its visits left ('mergeReasons'). Two
+    -- reasons for one label in one visit (the label may name the action and
+    -- not the party) are both kept; reasons that differ only in their numbers
+    -- (a cap's shortfall, the fraction a window holds) are one, the larger
   , acRefused    :: ![Refusal]
+  , acRefusedSeen :: !(Set (Int, (Text, Text, Maybe Text, Text)))
   , acDropped    :: !(Set (Text, Text))
   , acMerged     :: !(Set Text)
   , acUnspell    :: !Int
   , acByForm     :: !(Set Text)
+  , acInstants   :: !InstantStats
+  , acBest       :: !(Map Int Rational)
+    -- ^ per state, the earliest clock any position of it was queued at
   }
+
+-- | What one exploration shares, ready to explore or, for a test, to look at
+-- single positions through ('timeSignature', 'keyText', 'rigFor').
+newExplorer :: ExploreOptions -> ReadSites -> Rig -> Start -> IO Explorer
+newExplorer opts sites rig0 start = newExplorerWith Map.empty opts sites rig0 start
+
+newExplorerWith :: Map Text (Set Rational, Set Rational) -> ExploreOptions -> ReadSites -> Rig -> Start -> IO Explorer
+newExplorerWith hint opts sites rig0 start = do
+  anchors <- newIORef Map.empty
+  records <- newIORef []
+  pure MkExplorer
+    { exOptions = opts
+    , exSites = sites
+    , exRig = rig0 {rigModule = withoutDirectives rig0.rigModule}
+    , exStart = start
+    , exActionType = contractActionType rig0.rigEntityInfo start.stContract
+    , exAnchors = anchors
+    , exHint = hint
+    , exRecords = records
+    }
 
 -- | Explore a contract from its outset. 'Left' when the outset itself
 -- cannot be run, or when an evaluation the graph's instants depend on was
 -- stopped at a limit ('LimitStopped'): a graph built without it could be
 -- missing positions and still read as complete.
 explore :: ExploreOptions -> ReadSites -> Rig -> Start -> IO (Either Text Graph)
-explore opts sites rig0 start =
-  handle (\ (LimitStopped why) -> pure (Left ("the evaluator stopped at a limit " <> why)))
-    (exploreFrom opts sites rig0 start)
+explore opts sites rig0 start0 =
+  handle (\ (LimitStopped why) -> pure (Left ("the evaluator stopped at a limit " <> why))) $
+    resolveStart rig0 start0 >>= \ case
+      Left e      -> pure (Left e)
+      Right start -> exploreFrom opts sites rig0 start
 
+-- | 'explore' from a start whose clock is read.
 exploreFrom :: ExploreOptions -> ReadSites -> Rig -> Start -> IO (Either Text Graph)
-exploreFrom opts sites rig0 start = do
-  anchors <- newIORef Map.empty
-  let ex = MkExplorer
-        { exOptions = opts
-        , exSites = sites
-        , exRig = rig0 {rigModule = withoutDirectives rig0.rigModule}
-        , exStart = start
-        , exActionType = contractActionType rig0.rigEntityInfo start.stContract
-        , exAnchors = anchors
-        }
+exploreFrom opts sites rig0 start = case opts.eoTime of
+  Grid n | n <= 0 -> pure (Left "a grid needs a positive step")
+  Grid _ -> fmap fst <$> once Map.empty
+  Regions
+    | opts.eoChains -> passes Map.empty (3 :: Int)
+    | otherwise -> fmap fst <$> once Map.empty
+  where
+    once hint = do
+      ex <- newExplorerWith hint opts sites rig0 start
+      r <- exploreWith ex
+      case r of
+        Left e -> pure (Left e)
+        Right g -> do
+          records <- readIORef ex.exRecords
+          let (pools, cut) = pathPools g records
+              after = actPools g records pools
+              missing = (if opts.eoChains then [] else chainsLeftOut after)
+                <> [ MkUntriedNote "ties through chains of acts"
+                       "the sums of offsets along the paths of acts were too many to list (20000 for one state), so the ties through the ones left out were not searched" 1
+                   | cut ]
+          pure (Right (g {gCoverage = g.gCoverage {cvUntried = g.gCoverage.cvUntried <> missing}}, hintsOf after))
+    -- The ties an act is tried at depend on the offsets of the acts that can
+    -- follow it, which a state only learns by exploring them. So with
+    -- 'eoChains' the contract is explored again with what the last pass
+    -- learned, until a pass learns nothing new; a contract whose offsets keep
+    -- growing says so.
+    passes hint left = do
+      r <- once hint
+      case r of
+        Left e -> pure (Left e)
+        Right (g, learned)
+          | all (\ (l, (o, f)) -> maybe False (\ (o', f') -> o `Set.isSubsetOf` o' && f `Set.isSubsetOf` f') (Map.lookup l hint)) (Map.toList learned)
+              -> pure (Right g)
+          | left <= 1 -> pure (Right g
+              { gCoverage = g.gCoverage
+                  { cvUntried = g.gCoverage.cvUntried <>
+                      [ MkUntriedNote "ties through chains of acts"
+                          "the offsets by which acts start deadlines were still growing after three passes, so the last pass searched ties with what the one before had learned" 1 ] } })
+          | otherwise -> passes (Map.unionWith (\ (a, b) (c, d) -> (a <> c, b <> d)) hint learned) (left - 1)
+
+-- | For each state, what the acts that start there and after it were found to
+-- do: the sums of the offsets by which they start deadlines along each path of
+-- acts (every act on the path contributing its offset or nothing, and the
+-- empty path 0), and the instants fixed in absolute time their positions
+-- held. These are paths in the graph that was explored, not every sum of
+-- every offset: an offset repeats only where the graph loops. The sums are
+-- kept up to the furthest fixed instant and to 20000 values a state; the
+-- second component says that more were left out.
+pathPools :: Graph -> [ActRecord] -> (Map Int (Set Rational, Set Rational), Bool)
+pathPools g records = go start (0 :: Int) False
+  where
+    bound = maximum (0 : [ f - r.arClock | r <- records, f <- r.arFixed <> r.arLearnedFixed ])
+    leads = Map.fromListWith (<>) [ ((t.tnFrom, t.tnLabel), [t.tnTo]) | t <- g.gTransitions, t.tnFrom /= t.tnTo ]
+    recordsAt = Map.fromListWith (<>) [ (r.arState, [r]) | r <- records ]
+    start = Map.fromList [ (st.snId, (Set.singleton 0, Set.empty)) | st <- g.gStates ]
+    after pools r = followPool pools (Map.findWithDefault [] (r.arState, r.arLabel) leads)
+    step pools = Map.mapWithKey (\ st _ -> contribution pools st) pools
+    contribution pools st =
+      let rs = Map.findWithDefault [] st recordsAt
+          parts = [ (Set.fromList [ y | o <- 0 : r.arOffsets, x <- Set.toList xs, let y = o + x, y <= bound ]
+                    , Set.fromList r.arLearnedFixed <> fs)
+                  | r <- rs, let (xs, fs) = after pools r ]
+      in (Set.insert 0 (foldMap fst parts), foldMap snd parts)
+    go pools n cut
+      | pools' == pools = (pools, cut)
+      | n > 200 = (pools, True)
+      | otherwise = go capped (n + 1) (cut || trimmed)
+      where
+        pools' = step pools
+        trimmed = any ((> 20000) . Set.size . fst) (Map.elems pools')
+        capped = Map.map (\ (xs, fs) -> (Set.fromList (take 20000 (Set.toAscList xs)), fs)) pools'
+
+-- | For each act in each state, what the acts that can FOLLOW it were found to
+-- do: the paths and fixed instants of every state its edges lead to. Not the
+-- other acts of the same state, which are not after it.
+actPools :: Graph -> [ActRecord] -> Map Int (Set Rational, Set Rational) -> [(ActRecord, (Set Rational, Set Rational))]
+actPools g records pools = [ (r, pool r) | r <- records ]
+  where
+    leads = Map.fromListWith (<>) [ ((t.tnFrom, t.tnLabel), [t.tnTo]) | t <- g.gTransitions, t.tnFrom /= t.tnTo ]
+    pool r = followPool pools (Map.findWithDefault [] (r.arState, r.arLabel) leads)
+
+-- | What the states an act leads to hold, taken together.
+followPool :: Map Int (Set Rational, Set Rational) -> [Int] -> (Set Rational, Set Rational)
+followPool pools succs = foldMap (\ st -> Map.findWithDefault (Set.empty, Set.empty) st pools) (nubOrd succs)
+
+-- | What the acts that can follow each act were found to do, per act label.
+hintsOf :: [(ActRecord, (Set Rational, Set Rational))] -> Map Text (Set Rational, Set Rational)
+hintsOf after = Map.fromListWith (\ (a, b) (c, d) -> (a <> c, b <> d)) [ (r.arLabel, p) | (r, p) <- after ]
+
+-- | The acts whose instants a tie through a chain of acts would have added to,
+-- as an untried entry (none when 'eoChains' searched them), judged with what
+-- the acts that can follow each one do.
+chainsLeftOut :: [(ActRecord, (Set Rational, Set Rational))] -> [UntriedNote]
+chainsLeftOut after =
+  [ MkUntriedNote
+      ("ties through chains of acts, for " <> Text.intercalate ", " (take 3 acts) <> (if length acts > 3 then ", …" else ""))
+      ("an act that starts a deadline sets the limit the next act's tie must be inside, so the instants "
+         <> Text.intercalate ", " (map prettyRatio (take 4 instants))
+         <> (if length instants > 4 then ", …" else "")
+         <> " could put a tie in reach and were not tried; --chains tries them, at the cost of a larger graph."
+         <> " It does not reach a tie with an instant fixed in absolute time that the state does not count down"
+         <> " (an OF anchor, running or not, or the cure a lapse will arm),"
+         <> " nor one with the cure of a second lapse in a row, for an act done before the first lapse: --grid 1 tries every whole instant up to a deadline or --until")
+      (Set.size (Set.fromList [ st | (st, _, _) <- short ]))
+  | not (null short) ]
+  where
+    perRecord =
+      [ (r.arState, r.arLabel, [ t | t <- ties, isWhole t, Set.notMember t r.arTried ])
+      | (r, (sums, fixed)) <- after
+      , let inRange t' = t' >= r.arClock && maybe True (t' <=) r.arLimit
+            fixeds = nubOrd (r.arFixed <> r.arLearnedFixed <> Set.toList fixed <> maybeToList r.arLimit)
+            ties = tiesOf inRange fixeds (chainOffsets (0 : r.arOffsets) (Set.toList sums)) ]
+    short = [ r | r@(_, _, ts) <- perRecord, not (null ts) ]
+    acts = nubOrd [ l | (_, l, _) <- short ]
+    instants = nubOrd (sort (concatMap (\ (_, _, ts) -> ts) short))
+
+-- | One exploration, with the hint its 'Explorer' carries.
+exploreWith :: Explorer -> IO (Either Text Graph)
+exploreWith ex = do
+  let opts = ex.exOptions
       (rig, tr) = rigFor ex []
   mpos <- position rig tr
   case mpos of
@@ -910,7 +1576,7 @@ exploreFrom opts sites rig0 start = do
               <> ", so no act could fire and every property would hold of the one state"))
       Just _ -> do
         (key0, notes0) <- stateKey ex pos0
-        let node0 = MkNode {ndId = 0, ndDepth = 0, ndEvents = [], ndPos = pos0}
+        let node0 = MkNode {ndId = 0, ndDepth = 0, ndEvents = [], ndPos = pos0, ndRe = False}
             acc0 = noteKey notes0 MkAccum
               { acSeen = Map.singleton key0 0
               , acNodes = [stateNode 0 0 [] key0 pos0]
@@ -919,16 +1585,20 @@ exploreFrom opts sites rig0 start = do
               , acEdgeList = []
               , acEdgeEvents = Map.empty
               , acQueue = Seq.singleton node0
-              , acPassed = 0
-              , acBeyond = 0
-              , acDepthCut = 0
-              , acStatesCut = 0
-              , acUntried = Map.empty
+              , acPassedAt = Map.empty
+              , acFiredAt = Map.empty
+              , acBeyondAt = Map.empty
+              , acDepthCutIds = Set.empty
+              , acCutKeys = Set.empty
+              , acUntriedAt = Map.empty
               , acRefused = []
+              , acRefusedSeen = Set.empty
               , acDropped = Set.empty
               , acMerged = Set.empty
               , acUnspell = 0
               , acByForm = Set.empty
+              , acInstants = mempty
+              , acBest = Map.singleton 0 pos0.posClock
               }
         acc <- loop ex acc0
         pure (Right (finish ex acc))
@@ -940,10 +1610,31 @@ exploreFrom opts sites rig0 start = do
 -- 'StateNode''s 'snPath', or that path and one edge's event after it.
 replayPath :: Rig -> Start -> [Expr Resolved] -> IO (Maybe Position)
 replayPath rig start events = do
-  let directive = Contract emptyAnno start.stContract start.stAt events
+  let directive = Contract emptyAnno start.stContract (startExpr start) events
       MkModule a uri (MkSection sa sn saka sg decls) = withoutDirectives rig.rigModule
       rig' = rig {rigModule = MkModule a uri (MkSection sa sn saka sg (decls <> [Directive emptyAnno directive]))}
-  position rig' MkTrace {trDirective = directive, trContract = start.stContract, trStart = start.stAt, trEvents = events}
+  position rig' MkTrace {trDirective = directive, trContract = start.stContract, trStart = startExpr start, trEvents = events}
+
+-- | The position a path of events leads to, as the exploration holds it: each
+-- event replayed from the start, and what a breach on the way left standing
+-- carried from one position to the next ('carryBreach'). Unlike 'replayPath',
+-- which is the evaluator's own answer for the whole path and nothing more, this
+-- is what a state's key is made of, so it is what a test that recomputes a
+-- state's key from its path must use.
+positionAlong :: Explorer -> [Expr Resolved] -> IO (Maybe Position)
+positionAlong ex events = do
+  let (rig0, tr0) = rigFor ex []
+  start <- position rig0 tr0
+  go [] events start
+  where
+    go _ _ Nothing = pure Nothing
+    go _ [] mpos = pure mpos
+    go done (e : es) (Just parent) = do
+      let done' = done <> [e]
+          (rig, tr) = rigFor ex done'
+      position rig tr >>= \ case
+        Nothing    -> pure Nothing
+        Just child -> carryBreach parent child >>= go done' es . Just
 
 loop :: Explorer -> Accum -> IO Accum
 loop ex acc = case acc.acQueue of
@@ -955,30 +1646,39 @@ loop ex acc = case acc.acQueue of
         -- Listing the candidates replays nothing, so asking costs nothing.
         let (rig, tr) = rigFor ex node.ndEvents
         cands <- candidatesOf rig tr node.ndPos
-        loop ex if null cands
+        loop ex if null cands && null node.ndPos.posUnread
           then terminal node acc {acQueue = rest}
-          else acc {acQueue = rest, acDepthCut = acc.acDepthCut + 1}
+          else acc {acQueue = rest, acDepthCutIds = Set.insert node.ndId acc.acDepthCutIds}
     | otherwise -> do
         tried <- expand ex node
         acc' <- foldM (record ex node) acc {acQueue = rest} tried
         let fired = not (null [ () | TriedEdge {} <- tried ])
             blocked = not (null [ () | t <- tried, isBlocked t ])
-            acc'' = if fired || blocked then acc' else terminal node acc'
-            -- a pass-over counts once per state and act, and only if no
-            -- instant took the act
-            firedLabels = Set.fromList [ l | TriedEdge l _ _ _ <- tried ]
-            passed = Set.fromList [ l | TriedPassed l <- tried, not (Set.member l firedLabels) ]
-            -- an untried candidate counts once per state and reason
-            untriedHere = Set.fromList [ (l, why) | TriedUntried l why <- tried ]
-        loop ex acc''
-          { acPassed = acc''.acPassed + Set.size passed
-          , acUntried = foldl' (\ m k -> Map.insertWith (+) k 1 m) acc''.acUntried (Set.toList untriedHere)
-          , acRefused = foldl' mergeRefusal acc''.acRefused (nubOrdOn refusalKey [ r | TriedRefused r <- tried ])
-          }
+            -- what this visit found, merged into what the state's earlier
+            -- visits found: a pass-over counts once per state and act, and
+            -- only if no instant of any visit took the act; an untried
+            -- candidate and a refusal once per state and reason
+            firedHere = Set.fromList [ l | TriedEdge l _ _ _ <- tried ]
+            passedHere = Set.fromList [ l | TriedPassed l _ <- tried ]
+            -- once per state and label, whatever the clock of the visit
+            untriedHere = Map.map nubOrd (Map.fromListWith (flip (<>)) [ ((node.ndId, l), [why]) | TriedUntried l why <- tried ])
+            newRefused = [ r | r <- nubOrdOn refusalKey [ r | TriedRefused r <- tried ], not (Set.member (node.ndId, refusalKey r) acc'.acRefusedSeen) ]
+            beyondHere = length (nubOrd [ l | TriedBeyond l <- tried ])
+            acc'' = acc'
+              { acBeyondAt = Map.insertWith max node.ndId beyondHere acc'.acBeyondAt
+              , acFiredAt = Map.insertWith Set.union node.ndId firedHere acc'.acFiredAt
+              , acPassedAt = Map.insertWith Set.union node.ndId passedHere acc'.acPassedAt
+              , acUntriedAt = Map.unionWith mergeReasons untriedHere acc'.acUntriedAt
+              , acRefused = foldl' mergeRefusal acc'.acRefused newRefused
+              , acRefusedSeen = acc'.acRefusedSeen <> Set.fromList [ (node.ndId, refusalKey r) | r <- newRefused ]
+              }
+        -- a state is terminal by its first visit; a second one, at an earlier
+        -- clock, adds edges and states and leaves that standing
+        loop ex if node.ndRe || fired || blocked then acc'' else terminal node acc''
   where
     isBlocked = \ case
       TriedUntried {} -> True
-      TriedBeyond     -> True
+      TriedBeyond {}  -> True
       TriedRefused {} -> True
       _               -> False
     -- the one self-loop of §4.6, and the mark on the state
@@ -999,21 +1699,33 @@ record ex node acc = \ case
   TriedEdge label kind event pos' -> do
     (key, notes) <- stateKey ex pos'
     case Map.lookup key acc.acSeen of
-      Just j -> pure (addEdge (noteKey notes acc) (Just event) (MkTransition node.ndId label j kind))
+      Just j -> do
+        let acc1 = addEdge (noteKey notes acc) (Just event) (MkTransition node.ndId label j kind)
+            earlier = maybe False (pos'.posClock <) (Map.lookup j acc.acBest)
+        pure if not earlier then acc1
+          else if node.ndDepth + 1 < ex.exOptions.eoMaxDepth
+            then acc1
+              { acBest = Map.insert j pos'.posClock acc.acBest
+              , acQueue = acc.acQueue :|> MkNode {ndId = j, ndDepth = node.ndDepth + 1, ndEvents = node.ndEvents <> [event], ndPos = pos', ndRe = True} }
+            -- the earlier clock allows more than the later one did, and the bound
+            -- keeps it from being explored: a state at the bound with something
+            -- left to try ('finish' leaves out the ones that were terminal)
+            else acc1 {acDepthCutIds = Set.insert j acc1.acDepthCutIds}
       Nothing
         | Map.size acc.acSeen >= ex.exOptions.eoMaxStates ->
-            pure acc {acStatesCut = acc.acStatesCut + 1}
+            pure acc {acCutKeys = Set.insert key acc.acCutKeys}
         | otherwise -> do
             let j = acc.acNext
                 events = node.ndEvents <> [event]
-                new = MkNode {ndId = j, ndDepth = node.ndDepth + 1, ndEvents = events, ndPos = pos'}
+                new = MkNode {ndId = j, ndDepth = node.ndDepth + 1, ndEvents = events, ndPos = pos', ndRe = False}
             pure $ addEdge (noteKey notes acc
               { acSeen = Map.insert key j acc.acSeen
+              , acBest = Map.insert j pos'.posClock acc.acBest
               , acNodes = stateNode j (node.ndDepth + 1) events key pos' : acc.acNodes
               , acNext = j + 1
               , acQueue = acc.acQueue :|> new
               }) (Just event) (MkTransition node.ndId label j kind)
-  TriedBeyond -> pure acc {acBeyond = acc.acBeyond + 1}
+  TriedStats st -> pure acc {acInstants = acc.acInstants <> st}
   _ -> pure acc
 
 -- | An edge, once; the event it was first taken by is kept beside it.
@@ -1058,24 +1770,50 @@ finish ex acc = MkGraph
   , gCoverage = MkCoverage
       { cvStates = Map.size acc.acSeen
       , cvTransitions = Set.size acc.acEdges
-      , cvStops = [ StopDepth ex.exOptions.eoMaxDepth acc.acDepthCut | acc.acDepthCut > 0 ]
-               <> [ StopStates ex.exOptions.eoMaxStates acc.acStatesCut | acc.acStatesCut > 0 ]
+      , cvStops = [ StopDepth ex.exOptions.eoMaxDepth depthCut | depthCut > 0 ]
+               <> [ StopStates ex.exOptions.eoMaxStates (Set.size acc.acCutKeys) | not (Set.null acc.acCutKeys) ]
       , cvRefused = acc.acRefused
-      , cvUntried = [ MkUntriedNote what why n | ((what, why), n) <- Map.toList acc.acUntried ]
-      , cvPassedOver = acc.acPassed
+      , cvUntried = [ MkUntriedNote what why n
+                    | ((what, why), n) <- Map.toList (Map.fromListWith (+) [ ((l, why'), 1 :: Int) | ((_, l), whys) <- Map.toList acc.acUntriedAt, why' <- whys ]) ]
+      , cvPassedOver = sum [ Set.size (ps `Set.difference` Map.findWithDefault Set.empty i acc.acFiredAt) | (i, ps) <- Map.toList acc.acPassedAt ]
       , cvDropped = Set.toList acc.acDropped
       , cvTime = timeText ex.exOptions
-      , cvBeyondClock = acc.acBeyond
+      , cvBeyondClock = sum (Map.elems acc.acBeyondAt)
       , cvMergedByName = Set.toList acc.acMerged
       , cvUnspellable = acc.acUnspell
       , cvAnswersByForm = Set.toList acc.acByForm
+      , cvInstants = acc.acInstants
       }
   }
+  where
+    -- a state that was cut and then found to be terminal had nothing left to try
+    depthCut = Set.size (acc.acDepthCutIds `Set.difference` Set.fromList [ st.snId | st <- acc.acNodes, st.snTerminal ])
+
+-- | The reasons two visits of one state left under one label. A reason that
+-- differs only in its numbers from another (the shortfall of the instant cap,
+-- the fraction a window holds) is the same reason, and the one with the larger
+-- numbers is kept: whichever visit was first, the advice is then the one that
+-- clears the state wherever it was reached. The earlier clock's window is not
+-- always the wider (a relative deadline shifts it), so "the latest visit" is not
+-- the one that says the most.
+mergeReasons :: [Text] -> [Text] -> [Text]
+mergeReasons new old = Map.elems (Map.fromListWith larger [ (shape r, r) | r <- new <> old ])
+  where
+    -- a number is its digits and a minus sign directly before them: below 0 an
+    -- instant is negative, and (-3.5) is the same reason as (1.5)
+    shape r = Text.pack (squash (Text.unpack r))
+    squash ('-' : c : rest) | isDigit c = '#' : squash (dropWhile isDigit rest)
+    squash (c : rest)
+      | isDigit c = '#' : squash (dropWhile isDigit rest)
+      | otherwise = c : squash rest
+    squash [] = []
+    numbers r = [ read n :: Integer | n <- words (map (\ c -> if isDigit c then c else ' ') (Text.unpack r)) ]
+    larger a b = if numbers a >= numbers b then a else b
 
 timeText :: ExploreOptions -> Text
 timeText opts = Text.concat
   [ case opts.eoTime of
-      Regions -> "time by regions (the instant of the last event, one between it and the next deadline, the deadline; the clock is not in the state)"
+      Regions -> "time by regions (whole instants: the last event, the deadline, window openings, the ties between a deadline an act starts and one already live, and one between each; the clock is not in the state)"
       Grid n  -> "time on a grid of " <> prettyRatio n <> " (the clock is in the state)"
   , maybe "" (\ u -> ", clock bounded at " <> prettyRatio u) opts.eoUntil
   ]
@@ -1093,43 +1831,125 @@ expand ex node = do
   let lives :: [(LiveNorm, (RawObligation NF, Maybe (Either Text Rational)))]
       lives = [ (renderLive pos.posContext raw, (raw, due)) | (raw, due) <- deadlines ]
       known = nubOrd [ d | (_, Just (Right d)) <- deadlines ]
-      instants = actInstants ex.exOptions pos.posClock known
       offeredTicks = [ d | MkCandidate {cdKind = TickPast d _} <- cands ]
+      -- the stamp that reveals deadline d: one unit past it, or, on a grid,
+      -- the next point of the grid past it
+      -- (never earlier than the clock: a deadline the clock has already passed
+      -- is revealed by an event at the clock, and a tick that ran time
+      -- backwards reached positions no run of the contract reaches)
+      tickTime d = max pos.posClock case ex.exOptions.eoTime of
+        Regions -> tickPast known d
+        Grid n  -> (fromInteger (floor (d / n)) + 1) * n
+      retimed d cand = cand {cdHypothetical = Right (Tick (tickTime d))}
       run label kind cand = do
         (outcome, mpos) <- tryCandidateFrom rig tr pos cand
-        pure case outcome.ocVerdict of
-          Untried why  -> TriedUntried label why
-          PassedOver _ -> TriedPassed label
+        case outcome.ocVerdict of
+          Untried why  -> pure (TriedUntried label why)
+          PassedOver r -> pure (TriedPassed label (case r of TooEarly open -> Just open; _ -> Nothing))
           _ -> case (cand.cdHypothetical, mpos) of
-            (Right hyp, Just pos') | isJust pos'.posResidual -> TriedEdge label kind (hypotheticalExpr hyp) pos'
-            _ -> TriedUntried label "the replay produced no position"
-      tick label cand = case cand.cdHypothetical of
-        Right (Tick t) | Just u <- ex.exOptions.eoUntil, t > u -> pure [TriedBeyond]
-        _ -> pure <$> run label EdgeTick cand
-  fmap concat $ for cands \ cand -> case cand.cdKind of
-    TickPast d _ -> tick (tickLabel cand d) cand
-    NoTick live -> case snd <$> lookup live lives of
-      Just (Just (Right d))
-        | d `notElem` offeredTicks ->
-            let cand' = cand {cdKind = TickPast d [live], cdHypothetical = Right (Tick (tickPast known d))}
-            in tick (tickLabel cand' d) cand'
-        | otherwise -> pure []
-      _ -> pure [TriedUntried ("time runs out on " <> live.lnAction) (either id (const "") cand.cdHypothetical)]
-    ActBy live -> case fst <$> lookup live lives of
+            -- what a breach leaves standing is carried to the position it leads to
+            (Right hyp, Just pos') | isJust pos'.posResidual -> do
+              carried <- carryBreach pos pos'
+              pure (TriedEdge label kind (hypotheticalExpr hyp) carried)
+            _ -> pure (TriedUntried label "the replay produced no position")
+      -- a tick, and the instants a lapse it reveals arms (see 'tickRecord')
+      tick label d cand = case cand.cdHypothetical of
+        Right (Tick t) | Just u <- ex.exOptions.eoUntil, t > u -> pure ([TriedBeyond label], [])
+        Right (Tick t) -> do
+          r <- run label EdgeTick cand
+          armed <- case r of
+            TriedEdge _ _ _ pos' | Regions <- ex.exOptions.eoTime -> tickRecord label d t pos'
+            _ -> pure []
+          pure ([r], armed)
+        _ -> (\ r -> ([r], [])) <$> run label EdgeTick cand
+      -- A deadline started by a LAPSE (a LEST that arms a cure) is not started
+      -- by an act, so the act that led here never saw it move; it is read here,
+      -- at the tick that revealed the lapse, as an act's successor is read, and
+      -- kept as the offsets (relative to the deadline that lapsed, which the
+      -- act's own offset already reaches) and fixed instants that the paths
+      -- through this state carry ('pathPools'). The instants a lapse arms are
+      -- also returned, because they are a fact about THIS state that the acts
+      -- tried in it have to be tied with, whichever way the lapsed deadline
+      -- came to be: to them it is a deadline already running, and so fixed. An
+      -- act that starts a deadline of 3 at 5 puts it on a cure armed at 8 by a
+      -- deadline fixed at 6, and only the tick (6 and the cure's 2) says 8 is
+      -- there. The acts before this state learn it from their own state's tick,
+      -- where the same deadline is running, or, if the lapsed deadline is one
+      -- they started, as an offset from it.
+      tickRecord label d t pos' = do
+        before <- thresholdsOf ex pos
+        after <- thresholdsOf ex pos'
+        let new = [ h | h <- after, h.heldKind == HeldDeadline, not (any (sameHeld h) before) ]
+            anchoredH h = case h.heldNorm.lnDue of
+              UnforcedDeadline _ (Just _) -> True
+              _                           -> False
+            movesH h = case h.heldNorm.lnDue of
+              UnforcedDeadline _ (Just _) -> False
+              _                           -> True
+        modifyIORef' ex.exRecords (MkActRecord
+          { arState = node.ndId, arLabel = label, arClock = t, arLimit = Just t
+          , arTried = Set.singleton t, arFixed = []
+          , arOffsets = [ h.heldAt - d | h <- new, movesH h ]
+          , arLearnedFixed = [ h.heldAt | h <- new, anchoredH h || not (movesH h) ] } :)
+        pure [ h.heldAt | h <- new ]
+      tickMove cand = case cand.cdKind of
+        TickPast d _ -> let cand' = retimed d cand in tick (tickLabel cand' d) d cand'
+        NoTick live -> case snd <$> lookup live lives of
+          Just (Just (Right d))
+            | d `notElem` offeredTicks ->
+                let cand' = cand {cdKind = TickPast d [live], cdHypothetical = Right (Tick (tickTime d))}
+                in tick (tickLabel cand' d) d cand'
+            | otherwise -> pure ([], [])
+          _ -> pure ([TriedUntried ("time runs out on " <> live.lnAction) (either id (const "") cand.cdHypothetical)], [])
+        ActBy _ -> pure ([], [])
+  -- the ticks first, and each in its own place in the result: what a lapse
+  -- arms is a fact about this state that the acts tried in it are tied with
+  ticked <- for (zip [0 :: Int ..] cands) \ (i, cand) -> (i,) <$> tickMove cand
+  let lapseFixed = nubOrd (concatMap (snd . snd) ticked)
+  moves <- fmap concat $ for (zip [0 :: Int ..] cands) \ (i, cand) -> case cand.cdKind of
+    TickPast {} -> pure (maybe [] fst (lookup i ticked))
+    NoTick {} -> pure (maybe [] fst (lookup i ticked))
+    ActBy live -> case lookup live lives of
       Nothing -> pure [TriedUntried live.lnAction "the obligation could not be found in the residual again"]
-      Just raw -> do
+      Just (raw, _) -> do
         mparty <- partyOf raw
         acts <- actsOf ex pos raw cand
         case (mparty, acts) of
           (Nothing, _) -> pure [TriedUntried live.lnAction "the party was never forced and could not be read back"]
           (Just party, Left why) -> pure [TriedUntried (obligationText party raw) why]
           (Just party, Right (actions, refusals)) -> do
-            ran <- for [ (a, t) | a <- actions, t <- instants ] \ (a, t) ->
-              run (actLabel party a) EdgeAct cand
-                { cdHypothetical = Right Act {hyParty = party, hyAction = a, hyAt = t}
-                , cdBound = Nothing }
-            pure (ran <> map (TriedRefused . refusalFor party raw) refusals)
+            win0 <- windowOf ex node pos "" live lives raw
+            -- the instants a lapse arms are tied with by every act of the state,
+            -- the act whose own deadline lapses included. An instant tried on
+            -- account of the cure of its own lapse is a real run whatever the
+            -- cure's fate (the act's successor may arm the same deadline and the
+            -- same cure, and then the cure stands: a position that exists), and
+            -- the chain note keeps the cure too, for the same reason: a tie
+            -- through a chain of acts with it is real when the act's
+            -- continuation re-arms the lapse (a position `--chains` reaches),
+            -- and a note that is not needed when it is not (`--chains` clears
+            -- it) is a loud false alarm, which is chosen over a silent miss
+            let win = win0 {wnFixed = nubOrd (win0.wnFixed <> lapseFixed)}
+            ran <- for actions \ a -> do
+              let label = actLabel party a
+                  probe t = run label EdgeAct cand
+                    { cdHypothetical = Right Act {hyParty = party, hyAction = a, hyAt = t}
+                    , cdBound = Nothing }
+              ins <- instantsFor ex win {wnLabel = label} probe
+              pure (map snd ins.inRuns <> [TriedStats ins.inStats]
+                      <> [ TriedUntried (label <> " " <> what) why | (what, why) <- ins.inCuts ])
+            pure (concat ran <> map (TriedRefused . refusalFor party raw) refusals)
+  grid <- offGrid ex pos
+  pure (moves <> grid <> unreadTried)
   where
+    -- a norm waiting behind a breach that no obligation held before it
+    -- accounts for (usually one armed by the continuation of a sibling that was
+    -- taken; an EVERY member whose obligation the parent did not hold is
+    -- another) is in no residual the explorer can read; naming it is the least
+    -- it owes, because the breached position looks finished and is not
+    unreadTried = [ TriedUntried (unreadLine k)
+                      "it is waiting behind a breach and is not one the explorer held before it: usually armed after the breach, by the continuation of a part that was then taken (a breached value keeps only its blame), so what it asks and when cannot be read back"
+                  | k <- node.ndPos.posUnread ]
     tickLabel cand d = case cand.cdHypothetical of
       Right (Tick t) -> "time passes the deadline " <> prettyRatio d <> " (WAITUNTIL " <> prettyRatio t <> ")"
       _              -> "time passes the deadline " <> prettyRatio d
@@ -1142,6 +1962,50 @@ expand ex node = do
       , rfReason = why
       , rfStates = 1
       }
+
+-- | What the instants of one act are chosen from, at one position.
+windowOf
+  :: Explorer -> Node -> Position -> Text -> LiveNorm
+  -> [(LiveNorm, (RawObligation NF, Maybe (Either Text Rational)))]
+  -> RawObligation NF -> IO Window
+windowOf ex node pos label live lives own = do
+  let c = pos.posClock
+      ahead = [ d | (_, (_, Just (Right d))) <- lives, d >= c ]
+      limit = case (ahead, ex.exOptions.eoUntil) of
+        ([], Nothing) -> Nothing
+        ([], Just u)  -> Just u
+        (ds, Nothing) -> Just (minimum ds)
+        (ds, Just u)  -> Just (min u (minimum ds))
+      others = [ (raw, due) | (l, (raw, due)) <- lives, l /= live ]
+  held <- thresholdsOf ex pos
+  ownOpen <- openingOf c own
+  otherOpens <- for others \ (raw, _) -> openingOf c raw
+  let opens = [ o | Just (Right o) <- otherOpens ]
+  pure MkWindow
+    { wnState = node.ndId
+    , wnLabel = label
+    , wnClock = c
+    , wnLimit = limit
+    , wnOpen = case ownOpen of
+        Just (Right o) -> Just o
+        _              -> Nothing
+    , wnFixed = [ d | (_, Just (Right d)) <- others ] <> opens
+    , wnOtherOpens = filter (> c) opens
+    , wnHeld = held
+    }
+
+-- | On a grid, a position whose clock, deadline or window opening is not a
+-- multiple of the step cannot be explored by acts at the grid's points alone:
+-- the soundness condition of @--grid@ is checked here, not assumed.
+offGrid :: Explorer -> Position -> IO [Tried]
+offGrid ex pos = case ex.exOptions.eoTime of
+  Regions -> pure []
+  Grid n -> do
+    held <- map (.heldAt) <$> thresholdsOf ex pos
+    let off = [ x | x <- pos.posClock : held, denominator (x / n) /= 1 ]
+    pure [ TriedUntried ("acts between the points of the grid of " <> prettyRatio n)
+             ("the clock, a deadline or a window opening (" <> prettyRatio (minimum off) <> ") is off the grid of " <> prettyRatio n)
+         | not (null off) ]
 
 -- | @PARTY World MAY act@, for naming an obligation in the coverage.
 obligationText :: Expr Resolved -> RawObligation NF -> Text
@@ -1319,10 +2183,17 @@ coverageLine cv = "Coverage: " <> Text.intercalate "; " (filter (not . Text.null
   , if cv.cvUnspellable > 0 then count cv.cvUnspellable "ledger value" <> " compared by printed form" else ""
   , if null cv.cvAnswersByForm then "" else "answers compared by printed form: " <> Text.intercalate ", " (map (\ n -> "`" <> n <> "`") cv.cvAnswersByForm)
   , cv.cvTime
+  , instantsClause cv.cvInstants
   ])
   where
+    -- what the scheme tried, after everything else: an account, not a
+    -- verdict (what it could not try is among the untried above)
+    instantsClause st
+      | st.isActs == 0 = ""
+      | otherwise = "instants: " <> count st.isActs "act" <> " tried at " <> count st.isInstants "instant"
+          <> (if st.isTies + st.isGaps > 0 then " (" <> count st.isTies "tie" <> ", " <> count st.isGaps "gap" <> ")" else "")
     stopText = \ case
-      StopDepth b n  -> count n "state" <> " at the depth bound " <> textShow b <> " not expanded"
+      StopDepth b n  -> count n "state" <> " with a visit at the depth bound " <> textShow b <> " not expanded"
       StopStates b n -> count n "new state" <> " past the state bound " <> textShow b <> " not added"
     refusalShort r = "`" <> r.rfVariable <> "` of type " <> r.rfType
       <> maybe "" (\ c -> ", constructor `" <> c <> "`") r.rfConstructor
@@ -1376,6 +2247,12 @@ coverageJson cv = Aeson.object
   , "ledgerValuesComparedByPrintedForm" .= cv.cvUnspellable
   , "answersComparedByPrintedForm" .= cv.cvAnswersByForm
   , "time" .= cv.cvTime
+  , "instants" .= Aeson.object
+      [ "acts" .= cv.cvInstants.isActs
+      , "instants" .= cv.cvInstants.isInstants
+      , "ties" .= cv.cvInstants.isTies
+      , "gaps" .= cv.cvInstants.isGaps
+      ]
   , "line" .= coverageLine cv
   ]
   where

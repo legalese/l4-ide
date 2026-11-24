@@ -1,0 +1,11 @@
+Parsing successful
+Typechecking successful
+opens-after.l4:13:1-17:
+  `opens on day 2` can start itself again: a HENCE or LEST in it leads back to `opens on day 2`.
+  I could not check that this comes to an end, because one of its duties opens at a time counted from a fixed moment (AFTER … OF …), so its deadline is fixed too, and once that is past, each new copy is already late.
+  
+  If it does come to an end, say why on a line of its own above `opens on day 2`, like this:
+  
+    @ends-because <your reason>
+  
+  A reader can then check your reason, and L4 stops warning about it.

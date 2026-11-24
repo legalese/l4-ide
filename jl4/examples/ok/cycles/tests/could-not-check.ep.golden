@@ -1,0 +1,89 @@
+-- Rules that start themselves again where L4 could not check that this comes
+-- to an end, beside rules of the same shapes that it could check, and the
+-- @ends-because marks that answer the warning. Recursion-limit ruling
+-- L3 (2026-11-20) asks for a positive and a negative fixture for
+-- each shape a warning fires on; ruling L4 says where a mark counts. Both are
+-- described in doc/reference/regulative/rules-that-start-themselves-again.md,
+-- and the golden pins the text of each message.
+
+DECLARE Person IS ONE OF Alex, Sam
+DECLARE Action IS ONE OF `pay rent`, `pay a fee`
+
+-- Warns: the time allowed is `days`, not a number written out.
+GIVEN days IS A NUMBER
+GIVETH A DEONTIC Person Action
+`reminder` days MEANS
+    PARTY Alex
+    MUST `pay rent`
+    WITHIN days
+    LEST `reminder` (days DIVIDED BY 2)
+
+-- No warning: WITHIN 7 is a number written out, so each copy waits.
+GIVETH A DEONTIC Person Action
+`weekly reminder` MEANS
+    PARTY Alex
+    MUST `pay rent`
+    WITHIN 7
+    LEST `weekly reminder`
+
+-- No warning: the mark above it answers the warning, and leaves a note.
+@ends-because tries drops by one at every reminder, and at 0 there are no more reminders
+GIVEN tries IS A NUMBER
+GIVETH A DEONTIC Person Action
+`final reminders` tries MEANS
+    IF tries AT MOST 0
+    THEN BREACH
+    ELSE PARTY Alex
+         MUST `pay rent`
+         WITHIN tries TIMES 7
+         LEST `final reminders` (tries MINUS 1)
+
+-- Warns, on `first notice`, the first of the two in the file: the mark above
+-- `second notice` does not count, and the warning and its note say so.
+GIVEN days IS A NUMBER
+GIVETH A DEONTIC Person Action
+`first notice` days MEANS
+    PARTY Alex
+    MUST `pay rent`
+    WITHIN days
+    LEST `second notice` days
+
+@ends-because Sam pays before the second notice runs out
+GIVEN days IS A NUMBER
+GIVETH A DEONTIC Person Action
+`second notice` days MEANS
+    PARTY Sam
+    MUST `pay rent`
+    WITHIN days
+    LEST `first notice` days
+
+-- No warning: the mark above `call one` answers it; the one above `call two`
+-- does not count, and its note says that the first one answers the warning.
+@ends-because Alex pays by the third call
+GIVEN days IS A NUMBER
+GIVETH A DEONTIC Person Action
+`call one` days MEANS
+    PARTY Alex
+    MUST `pay rent`
+    WITHIN days
+    LEST `call two` days
+
+@ends-because Alex pays by the third call
+GIVEN days IS A NUMBER
+GIVETH A DEONTIC Person Action
+`call two` days MEANS
+    PARTY Alex
+    MUST `pay rent`
+    WITHIN days
+    LEST `call one` days
+
+-- Warns: besides its LEST, the rule uses itself directly, and `n EQUALS 0`
+-- is not a stop that `n MINUS 1` is sure to reach (marks.l4 has the same rule
+-- with `n AT MOST 0`, which L4 can check).
+GIVEN n IS A NUMBER
+GIVETH A DEONTIC Person Action
+`instalments` n MEANS
+    IF n EQUALS 0
+    THEN FULFILLED
+    ELSE (PARTY Alex MUST `pay rent` WITHIN 30 LEST `instalments` (n MINUS 1))
+         RAND `instalments` (n MINUS 1)

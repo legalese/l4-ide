@@ -334,12 +334,13 @@ ExcelYearFrac startDate endDate basis MEANS
     THEN LEFT "YEARFRAC basis must be between 0 and 4."
     ELSE
         IF Day startDate GREATER THAN Day endDate
-        THEN CONSIDER ExcelYearFrac endDate startDate basis
-             WHEN LEFT err THEN LEFT err
-             WHEN RIGHT value THEN RIGHT (0 MINUS value)
+        THEN RIGHT (0 MINUS dispatch basis)
         ELSE RIGHT (dispatch basis)
     WHERE
-        daysBetween MEANS Day endDate MINUS Day startDate
+        -- the two dates in order: a reversed pair gives the same fraction, negated
+        early MEANS IF Day startDate GREATER THAN Day endDate THEN endDate ELSE startDate
+        late  MEANS IF Day startDate GREATER THAN Day endDate THEN startDate ELSE endDate
+        daysBetween MEANS Day late MINUS Day early
         dispatch b MEANS
             IF    b EQUALS 0
             THEN  usDaysDivided DIVIDED BY 360
@@ -352,28 +353,28 @@ ExcelYearFrac startDate endDate basis MEANS
                             ELSE europeanDaysDivided DIVIDED BY 360
 
         usDaysDivided MEANS
-            CONSIDER ExcelDays360 startDate endDate FALSE
+            CONSIDER ExcelDays360 early late FALSE
             WHEN LEFT err THEN 0
             WHEN RIGHT v THEN v
         europeanDaysDivided MEANS
-            CONSIDER ExcelDays360 startDate endDate TRUE
+            CONSIDER ExcelDays360 early late TRUE
             WHEN LEFT err THEN 0
             WHEN RIGHT v THEN v
 
         actualActual MEANS
-            IF startDate's year EQUALS endDate's year
-            THEN daysBetween DIVIDED BY (`Days in year` startDate)
+            IF early's year EQUALS late's year
+            THEN daysBetween DIVIDED BY (`Days in year` early)
             ELSE
                 (firstYearPortion PLUS middleYears PLUS lastYearPortion)
                 WHERE
-                    startYearDays MEANS `Days in year` startDate
-                    startYearRemaining MEANS startYearDays MINUS dayOfYear startDate
-                    endYearDays MEANS `Days in year` endDate
-                    endYearElapsed MEANS dayOfYear endDate
+                    startYearDays MEANS `Days in year` early
+                    startYearRemaining MEANS startYearDays MINUS dayOfYear early
+                    endYearDays MEANS `Days in year` late
+                    endYearElapsed MEANS dayOfYear late
                     middleYears MEANS
-                        IF endDate's year MINUS startDate's year LESS THAN 1
+                        IF late's year MINUS early's year LESS THAN 1
                         THEN 0
-                        ELSE (endDate's year MINUS startDate's year MINUS 1)
+                        ELSE (late's year MINUS early's year MINUS 1)
                     firstYearPortion MEANS startYearRemaining DIVIDED BY startYearDays
                     lastYearPortion MEANS endYearElapsed DIVIDED BY endYearDays
 
@@ -467,7 +468,7 @@ GIVEN startDate IS A DATE
 GIVETH AN EITHER STRING NUMBER
 @nlg the number of weekdays, and weekend days listed in %holidays%, from %startDate% to %endDate% inclusive (negative if reversed)
 ExcelNetworkDays startDate endDate holidays MEANS
-    RIGHT (directionSign TIMES countBusiness minDate maxDate)
+    RIGHT (directionSign TIMES countBusiness minDate (Day maxDate MINUS Day minDate))
     WHERE
         startDay MEANS Day startDate
         endDay   MEANS Day endDate
@@ -476,10 +477,12 @@ ExcelNetworkDays startDate endDate holidays MEANS
         directionSign MEANS IF startDay AT MOST endDay THEN 1 ELSE -1
         holidayDays MEANS map Day holidays
 
-        countBusiness current target MEANS
-            IF Day current GREATER THAN Day target
+        -- `left` is how many days remain after `current`; it counts down to a
+        -- test from below, which L4 can see ends
+        countBusiness current left MEANS
+            IF left LESS THAN 0
             THEN 0
-            ELSE thisDay PLUS countBusiness (current PLUS 1) target
+            ELSE thisDay PLUS countBusiness (current PLUS 1) (left MINUS 1)
             WHERE
                 isWorkday MEANS (NOT `is weekend` current) AND (NOT containsDay (Day current) holidayDays)
                 thisDay MEANS IF isWorkday THEN 1 ELSE 0

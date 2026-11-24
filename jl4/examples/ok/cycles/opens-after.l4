@@ -1,0 +1,27 @@
+-- A rule that starts itself again, whose duty opens at a time counted from a
+-- fixed moment (AFTER ... OF ...): its deadline is then fixed too, so once it
+-- is past, each new copy is already late, and L4 could not check that this
+-- comes to an end. Beside it, the same rule with a window that opens a
+-- number of days after each copy starts, which L4 can check. Described in
+-- doc/reference/regulative/rules-that-start-themselves-again.md.
+
+DECLARE Person IS ONE OF Alex
+DECLARE Action IS ONE OF `pay rent`
+
+-- Warns: the duty opens at a time counted from a fixed moment.
+GIVETH A DEONTIC Person Action
+`opens on day 2` MEANS
+    PARTY Alex
+    MUST `pay rent`
+    AFTER 2 OF 0
+    WITHIN 1
+    LEST `opens on day 2`
+
+-- No warning: the window opens 2 days after each copy starts.
+GIVETH A DEONTIC Person Action
+`opens 2 days later` MEANS
+    PARTY Alex
+    MUST `pay rent`
+    AFTER 2
+    WITHIN 1
+    LEST `opens 2 days later`

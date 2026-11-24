@@ -127,6 +127,8 @@ library
     L4.Catala.Emit
     L4.Catala.Equivalence
     L4.Citations
+    L4.Cycles
+    L4.Cycles.Warning
     L4.Desugar
     L4.Diagnostic
     L4.DirectiveFilter
@@ -255,6 +257,7 @@ test-suite jl4-core-test
   other-modules:
     Paths_jl4_core
     LinearTime
+    CyclesSpec
     ImportResolutionSpec
     ModuleNameCaseSpec
     TemporalContextSpec
@@ -279,6 +282,7 @@ test-suite jl4-core-test
     ExportReadSetSpec
     ExportValidationSpec
     NonassertableSpec
+    EndsBecauseSpec
     CatalaLowerSpec
     ProveSmtSpec
     DisambiguationWarningsSpec

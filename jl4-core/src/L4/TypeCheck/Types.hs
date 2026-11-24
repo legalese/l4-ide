@@ -9,6 +9,7 @@ import Codec.Serialise (Serialise)
 #endif
 import qualified Optics
 import L4.Annotation (HasSrcRange(..), HasAnno(..), AnnoExtra, AnnoToken, annoExtra, emptyAnno)
+import L4.Cycles.Warning (CycleTrouble (..), CycleWarning (..), MarkNote (..))
 import L4.Lexer (PosToken, FixityDirection)
 import L4.Lint.NotReach (NotReachSite (..))
 import L4.Lint.SiblingReads (SiblingRead (..))
@@ -385,6 +386,22 @@ data CheckError =
     -- ^ An @\@nonassertable@ carried text after it that is not a comment.
     -- The mark takes no words: @\@nonassertable \`alpha\` MEANS TRUE@ would
     -- otherwise swallow the definition into the annotation and mark the next.
+  | EndsBecauseOnNonDefinition Text (Maybe Text) (Maybe SrcRange)
+    -- ^ An @\@ends-because@ annotation sits above something that is not a
+    -- definition: the first text says what (a declaration, an assumption, an
+    -- input, a section heading or its inputs, a directive, an import, a
+    -- timezone), the second names it when it has a name. Only a definition can
+    -- carry a reason for its recursion to end.
+  | EndsBecauseNeedsReason (Maybe Text) (Maybe SrcRange)
+    -- ^ An @\@ends-because@ with nothing after it, or only spaces. The text
+    -- names the definition it is above, when there is one in sight. The reason
+    -- is what a reader checks, so a mark without one is refused.
+  | EndsBecauseNoted MarkNote
+    -- ^ An @\@ends-because@ the checker accepted, its reason, and what it did
+    -- (silenced a "could not check" ('CycleAlarm'), or not, and why): an
+    -- information-level message, one per mark (recursion-limit ruling L4,
+    -- 2026-11-20: "each use emits one information-level message carrying its
+    -- reason"). Anchored on the mark. See 'L4.Cycles.cycleNotices'.
   | FixityAnnotationMalformed (Maybe SrcRange) Text
     -- ^ The payload of a fixity annotation ('@infixl' \/ '@infixr' \/
     -- '@infix') is not an integer between 1 and 9. Carries the annotation's
@@ -529,6 +546,15 @@ data CheckWarning
     -- the elaborations 'L4.Desugar.desugarSectionGivens' prepends for a
     -- section @GIVEN@ reach the same code and never draw it
     -- ('L4.Names.isSectionBinderElaboration').
+  | CycleAlarm CycleWarning
+    -- ^ smucclaw/l4-ide#1075: a rule whose HENCE or LEST leads back to
+    -- itself, and that is not shown to come to an end ("could not check"),
+    -- gives no time each time round ("no time"), or starts two or more
+    -- copies of itself at once ("multiplies"); or an @\@ends-because@ above
+    -- a rule the checker finds no way back to itself from. Rulings L3, L4 and the scope
+    -- ruling (ii), recorded in @specs\/todo\/GLOBAL-DEPENDENCY-GRAPH-SPEC.md@; which
+    -- finding draws which is 'L4.Cycles.cycleNotices'. Only on a module with
+    -- no error: a module that does not check has no findings to trust.
   | SiblingLedgerRead SiblingRead
     -- ^ smucclaw/l4-ide#1069: two operands of a @RAND@, @ROR@ or
     -- @EVERY … UPON EACH@ can reach a read and a write of one ledger cell
@@ -871,6 +897,7 @@ severity (MkCheckErrorWithContext e _) =
     SuspiciousBinderPattern {} -> SInfo
     SuspiciousClausePattern {} -> SInfo
     ActionPatternReference {}  -> SInfo
+    EndsBecauseNoted {}        -> SInfo
     _                          -> SError
 
 -- | The answers to @#CHECK@ directives among a module's diagnostics.
@@ -1005,6 +1032,10 @@ checkErrorCode = \ case
   NotReachesConnective {}         -> "check/not-reaches-connective"
   OpenedFieldCollisionAtRead {}   -> "check/opened-field-collision-at-read"
   OpenedFieldCollisionAtOpening {}-> "check/opened-field-collision-at-opening"
+  -- codes decided by Claude 2026-11-22, pending Meng's review
+  EndsBecauseOnNonDefinition {}   -> "check/ends-because-on-non-definition"
+  EndsBecauseNeedsReason {}       -> "check/ends-because-needs-reason"
+  EndsBecauseNoted {}             -> "lint/ends-because-noted"
   -- smucclaw/l4-ide#1078 (codes decided by Claude 2026-11-22, pending Meng's review)
   JsonDecodeAtTypeParameter {}       -> "check/jsondecode-at-type-parameter"
   JsonDecodePassedAtTypeParameter {} -> "check/jsondecode-passed-at-type-parameter"
@@ -1027,6 +1058,20 @@ checkWarningCode = \ case
   SiblingLedgerRead {}            -> "lint/sibling-ledger-read"
   DeprecatedExactly {}            -> "lint/deprecated-exactly"
   RenamedBuiltin {}               -> "lint/renamed-builtin"
+  -- codes decided by Claude 2026-11-22, pending Meng's review
+  CycleAlarm w                    -> cycleTroubleCode w.trouble
+
+-- | The code of each warning about a rule that starts itself again
+-- (smucclaw/l4-ide#1075; "L4.Cycles.Warning"). One code for each warning,
+-- so that a tool can tell the one an @\@ends-because@ silences from the two
+-- it never does. No wildcard, as in 'checkErrorCode' (codes decided by
+-- Claude 2026-11-22, pending Meng's review).
+cycleTroubleCode :: CycleTrouble -> Text
+cycleTroubleCode = \ case
+  CouldNotCheckThat {} -> "lint/not-shown-to-end"
+  GivesNoTime {}       -> "lint/starts-again-with-no-time"
+  StartsCopies {}      -> "lint/starts-copies-at-once"
+  NothingToExplain     -> "lint/ends-because-off-cycle"
 
 -- | Is this candidate still viable? Only 'SError'-severity diagnostics fail
 -- a candidate. Warnings and hints attached along the way must NOT influence
@@ -1130,6 +1175,9 @@ instance HasSrcRange CheckError where
   rangeOf (BeforeOnJoinLine d)              = rangeOf d
   rangeOf (FixityAnnotationMalformed mr _)  = mr
   rangeOf (NonassertableOnNonDefinition _ _ mr) = mr
+  rangeOf (EndsBecauseOnNonDefinition _ _ mr) = mr
+  rangeOf (EndsBecauseNeedsReason _ mr) = mr
+  rangeOf (EndsBecauseNoted n) = n.at
   rangeOf (FixityReassociationClash mr _ _) = mr
   rangeOf (CheckWarning (FixityIgnoredNonBinary _ mr)) = mr
   rangeOf (CheckWarning (LifecycleNounHidesName _ mr _ _)) = mr
@@ -1144,6 +1192,7 @@ instance HasSrcRange CheckError where
   rangeOf (CheckWarning (DeprecatedExactly info)) = info.range
   rangeOf (CheckWarning (RenamedBuiltin r _ _)) = Just r
   rangeOf (CheckWarning (SiblingLedgerRead w)) = w.compound
+  rangeOf (CheckWarning (CycleAlarm w)) = w.at
   rangeOf (CheckWarning (OpenedFieldShadowsDefinition s)) = rangeOf s.fieldRead
   rangeOf (SuspiciousBinderPattern b _)     = rangeOf b
   rangeOf (SuspiciousClausePattern _ _ b _) = rangeOf b
