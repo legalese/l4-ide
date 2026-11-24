@@ -19,6 +19,7 @@
   - [Every position a contract can reach: `l4 explore`](reference/regulative/explore.md)
   - [State graph and `--dominators`](reference/regulative/STATE-GRAPH.md)
   - [The instance ledger](reference/regulative/ledger.md)
+  - [Reading what became of a norm](reference/regulative/norm-log-read.md)
 - [Built-ins](reference/builtins/README.md)
 - [Libraries](reference/libraries/README.md)
 - [Patterns](tutorials/getting-started/common-patterns.md)
