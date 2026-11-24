@@ -675,7 +675,7 @@ The carrier now takes none, and `NormLogSpec` has the shape as a fixture.
 Two deliberately wrong writers show that the differential can go red.
 `JL4_TEST_NORM_LOG=mutant` also writes the official record, and fails 38 goldens (run in the first gate, not repeated since).
 `JL4_TEST_NORM_LOG=mutant-force` evaluates a party at arming, which is the writer the ruling cares about.
-It fails exactly one golden, `ok/every/run-lifecycle-values.l4` (run in the fourth gate, before the merge, and not repeated at the merge gate): the heap address of the unforced party moves, from `&1436@` to `&1432@` in the reviewers' run.
+It fails exactly one golden, `ok/every/run-lifecycle-values.l4` (run in the fourth gate, before the merge; repeated on the merged tree at the start of P2 and at P2's first-half head, §6.4): the heap address of the unforced party moves, from `&1436@` to `&1432@` in the reviewers' run.
 No corpus file's answer changes when a party is evaluated early, so the differential catches that writer by one printed address and by nothing else.
 An earlier version of this section said the golden differential alone would not catch it; the review of P1 showed that was wrong.
 The fixture where the answer does change stays: `NormLogSpec` carries a party that cannot be evaluated (a trace with no events, so nothing needs it), where the forcing writer's printed result differs from the writer-off result and the real writer's does not.
@@ -856,6 +856,24 @@ Run there with the same shim it gives ratios 4.0 and 4.0 (0.94 s and 3.72 s of C
 `jl4-test` with the writer forced on is 5,077 examples with no failure, in 1,351 s at a load of 1.0.
 `jl4-lsp-test` is 336 examples with no failure; `jl4-mlir-test` and `jl4-websessions-test` exited 0.
 The reader's own suites are `NormLog` and `NormLogRead`, 279 examples with no failure.
+
+**The runs P1's merge gate owed, made at P2's first-half head (2026-11-24, on `lhs`).**
+P1's merge gate did not repeat the forcing mutant or the allocation measurements, and the first half of P2 changed the machine again (the guard path, the barrier member's `neEnclosing`), so both were run at the head.
+`JL4_TEST_NORM_LOG=mutant-force` fails 5,077 examples with 1 failure, the same golden as before, `ok/every/run-lifecycle-values.l4`, whose heap address moves from `&1436@` to `&1432@`, in 1,323 s at a load of 1.0.
+The same run was made on the merged P1 tree on 2026-11-23, with the same one failure.
+The allocation figures are within one per cent of P1's, and the shapes do not change:
+
+| trace                    | P1's fourth gate      | P2's first-half head  |
+| ------------------------ | --------------------- | --------------------- |
+| `EVERY` of 800 members   | +191 MB               | +191 MB               |
+| `EVERY` of 3,200 members | +776 MB               | +778 MB               |
+| chain, 400 and 800       | +159 MB and +320 MB   | +159 MB and +320 MB   |
+| lest, 400 and 800        | +238 MB and +480 MB   | +238 MB and +480 MB   |
+| fork, 400 and 800        | +745 MB and +2,160 MB | +750 MB and +2,181 MB |
+| barrier, 400 and 800     | +341 MB and +1,067 MB | +344 MB and +1,077 MB |
+
+`fork` and `barrier` are still superlinear, as in §6.3, and nothing was done about it here; the barrier's extra prepend per member costs about 1 per cent.
+The whole-process ratios are within 0.002 of P1's: 1.06 on the `EVERY` files; at 400 norms 1.111, 1.165, 1.106 and 1.102 (chain, lest, fork, barrier); at 800, 1.115, 1.171, 1.115 and 1.143.
 
 ## 7. Probe — what a crude projection shows
 
