@@ -1,0 +1,14 @@
+-- l4 deploy of a file with one @export that can be sent and one that cannot
+-- (DEADWOOD): it is uploaded only to a service that says it leaves such an
+-- export out ("refused-exports"), and refused locally otherwise.
+
+@export Double a number
+GIVEN m IS A NUMBER
+GIVETH A NUMBER
+`double` m MEANS m * 2
+
+@export Apply twice
+GIVEN f IS A FUNCTION FROM NUMBER TO NUMBER
+      n IS A NUMBER
+GIVETH A NUMBER
+`apply twice` MEANS f (f n)

@@ -231,8 +231,12 @@ updatePath t name job =
 ----------------------------------------------------------------------------
 
 data ApiResponse = ApiResponse
-  { status :: Int
-  , body   :: BSL.ByteString
+  { status       :: Int
+  , body         :: BSL.ByteString
+  , capabilities :: [Text]
+    -- ^ What the service says it can do, from its @X-L4-Capabilities@ header
+    -- (jl4-service's @serviceCapabilities@); empty for a service, or a proxy,
+    -- that does not send it.
   }
 
 -- | A request to @baseUrl <> path@ with the target's credentials and no
@@ -264,7 +268,17 @@ send t req = do
         die ( t.label <> " answered with a redirect"
            <> maybe "" (\l -> " to " <> TE.decodeUtf8Lenient l) (lookup "Location" (responseHeaders resp))
            <> ". Not following it with your credentials; check the URL." )
-      pure ApiResponse { status = code, body = responseBody resp }
+      pure ApiResponse
+        { status = code
+        , body = responseBody resp
+        , capabilities =
+            [ c
+            | (k, v) <- responseHeaders resp
+            , k == "X-L4-Capabilities"
+            , c <- map Text.strip (Text.splitOn "," (TE.decodeUtf8Lenient v))
+            , not (Text.null c)
+            ]
+        }
 
 isSuccess :: ApiResponse -> Bool
 isSuccess r = r.status >= 200 && r.status < 300

@@ -67,7 +67,10 @@ import Data.Aeson (toJSON)
 import Data.Char (isDigit)
 import System.IO (hPutStr)
 import System.IO.Temp (withSystemTempDirectory)
-import Data.IORef (atomicModifyIORef', newIORef)
+import qualified Network.HTTP.Types as HTTP
+import qualified Network.Wai as Wai
+import Network.Wai.Handler.Warp (testWithApplication)
+import Data.IORef (IORef, atomicModifyIORef', newIORef, readIORef)
 import qualified Language.LSP.Protocol.Types as LSP
 
 ----------------------------------------------------------------------------
@@ -1329,9 +1332,37 @@ spec bin = do
         code `shouldBe` ExitFailure 1
         serr `shouldSatisfy` isInfixOf "Could not reach http://127.0.0.1:9"
         serr `shouldNotSatisfy` isInfixOf "doesn't typecheck"
-        -- and says, before the upload, which rule cannot be deployed and why
+
+    -- Whether it uploads depends on the service: only one that says it leaves
+    -- out a refused export ("refused-exports") gets the file. One that does
+    -- not say so rejects the whole file, or, built before the export check,
+    -- publishes the export unchecked, so the file is refused here as before.
+    -- 'withFakeService' stands in for jl4-service and counts the uploads.
+    let refusedEntry = fixtureDir </> "deploy-export-refused.l4"
+        server port = ["--server", "http://127.0.0.1:" <> show port]
+    it "uploads a file with an @export that cannot be sent to a service that leaves it out, and prints what it left out" $
+      withFakeService True \port uploads -> do
+        Output code sout serr <- runL4 bin (["deploy", refusedEntry] ++ server port)
+        readIORef uploads `shouldReturn` 1
+        code `shouldBe` ExitSuccess
         serr `shouldSatisfy` isInfixOf "These rules cannot be deployed, because their @export cannot be sent as JSON"
         serr `shouldSatisfy` isInfixOf "`apply twice` is published with @export, but its input `f` is a function"
+        let out = filter (/= '\r') sout
+        out `shouldSatisfy` isInfixOf "Deployed 'deploy-export-refused'"
+        out `shouldSatisfy` isInfixOf "Left out 1 function whose @export cannot be sent as JSON"
+        out `shouldSatisfy` isInfixOf "  apply twice\n"
+    it "refuses, before the upload, a file with an @export that cannot be sent to a service that does not say it leaves it out" $
+      withFakeService False \port uploads -> do
+        Output code _ serr <- runL4 bin (["deploy", refusedEntry] ++ server port)
+        readIORef uploads `shouldReturn` 0
+        code `shouldBe` ExitFailure 1
+        serr `shouldSatisfy` isInfixOf "does not say that it can leave out an @export that cannot be sent, so the file is not uploaded"
+        serr `shouldSatisfy` isInfixOf "doesn't typecheck; fix it before deploying (see `l4 check`)."
+    it "still uploads a file with no refused @export to a service that does not say it leaves one out" $
+      withFakeService False \port uploads -> do
+        Output code _ _ <- runL4 bin (["deploy", cleanImportEntry] ++ server port)
+        code `shouldBe` ExitSuccess
+        readIORef uploads `shouldReturn` 1
 
   -- The names a multi-clause group is compiled to are spelled so that no
   -- source can write them ('L4.Parser.generatedName'), and say what they are.
@@ -5361,3 +5392,46 @@ buildIdentitySpec = describe "etc/build-identity.sh" $ do
     code `shouldSatisfy` (/= ExitSuccess)
     out `shouldBe` ""
     err `shouldSatisfy` ("GITHUB_SHA" `isInfixOf`)
+
+-- | A stand-in for jl4-service, for `l4 deploy`: a new deployment's lookup is
+-- a 404, an upload is accepted as a job that is applied at once, and the
+-- deployment is then ready, naming `apply twice` as refused when the service
+-- says it can leave a refused export out. With @capable@, every response
+-- carries @X-L4-Capabilities: refused-exports@, as jl4-service's does. The
+-- action gets the port and the number of uploads so far.
+withFakeService :: Bool -> (Int -> IORef Int -> IO a) -> IO a
+withFakeService capable act = do
+  uploads <- newIORef (0 :: Int)
+  let caps = [("X-L4-Capabilities", "refused-exports") | capable]
+      reply code v = Wai.responseLBS code ((HTTP.hContentType, "application/json") : caps) (Aeson.encode v)
+      refused =
+        [ Aeson.object
+            [ "name" Aeson..= ("apply twice" :: T.Text)
+            , "file" Aeson..= ("deploy-export-refused.l4" :: T.Text)
+            , "reasons" Aeson..= ["`apply twice` is published with @export, but its input `f` is a function, and @export does not support that yet." :: T.Text]
+            ]
+        | capable ]
+      ready name = Aeson.object
+        [ "id" Aeson..= name
+        , "status" Aeson..= ("ready" :: T.Text)
+        , "metadata" Aeson..= Aeson.object
+            ( [ "functions" Aeson..= [Aeson.object ["name" Aeson..= ("double" :: T.Text)]]
+              , "version" Aeson..= ("v" :: T.Text)
+              , "createdAt" Aeson..= ("2026-11-24T00:00:00Z" :: T.Text)
+              ]
+              <> [ "refusedExports" Aeson..= refused | capable ] )
+        ]
+      app req respond = case (Wai.requestMethod req, Wai.pathInfo req) of
+        ("POST", ["deployments"]) -> do
+          _ <- Wai.strictRequestBody req
+          atomicModifyIORef' uploads (\n -> (n + 1, ()))
+          respond (reply HTTP.status202 (Aeson.object ["status" Aeson..= ("compiling" :: T.Text), "updateId" Aeson..= ("job1" :: T.Text)]))
+        ("GET", ["deployments", _, "updates", job]) ->
+          respond (reply HTTP.status200 (Aeson.object ["updateId" Aeson..= job, "status" Aeson..= ("applied" :: T.Text)]))
+        ("GET", ["deployments", name]) -> do
+          n <- readIORef uploads
+          if n == 0
+            then respond (Wai.responseLBS HTTP.status404 caps "")
+            else respond (reply HTTP.status200 (ready name))
+        _ -> respond (Wai.responseLBS HTTP.status404 caps "")
+  testWithApplication (pure app) \port -> act port uploads
