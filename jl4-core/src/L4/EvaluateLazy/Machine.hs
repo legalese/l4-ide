@@ -99,7 +99,6 @@ import qualified Base.Text as Text
 import qualified Base.Map as Map
 import qualified Base.Set as Set
 import qualified Data.IntMap.Strict as IntMap
-import qualified Data.Unique as DU
 import Data.IntMap.Strict (IntMap)
 import Control.Concurrent
 import System.Environment (lookupEnv)
@@ -449,6 +448,10 @@ data EvalState =
     { moduleUri  :: !NormalizedUri
     , stack      :: !(IORef Stack)
     , supply     :: !(IORef Int)   -- used for uniques and addresses
+    , instantSupply :: !(IORef Int)
+                                     -- ^ how many instant carriers (@THE INSTANT@, one per
+                                     -- guard evaluation) this evaluation has made; the
+                                     -- next one's index in 'instantCarrierAddress'
     , evalTrace  :: !(Maybe (IORef (DList EvalTraceAction)))
     , envLedger  :: !(IORef LedgerStore) -- append-only event store (M0 substrate, M4
                                          -- per-party + official record); always collected
@@ -985,8 +988,10 @@ newCarrier l origin observed = do
   -- listing prints (found by the forced-on jl4-test run on
   -- ok/every/run-lifecycle-values.l4). A negative address cannot clash.
   uri <- asks (.moduleUri)
+  address <- maybe (userException (UserError "the norm log made more parent-link carriers than an evaluation can number")) pure
+    (originCarrierAddress n)
   pointer <- liftIO (newIORef (WHNF (ValNumber (originKey l n))))
-  pure (MkReference (MkAddress uri (negate (n + 1))) pointer)
+  pure (MkReference (MkAddress uri address) pointer)
 
 -- | The environment a residual obligation keeps when its events run out. The
 -- parent link stays, because the residual descends from the same hand-off
@@ -1011,15 +1016,19 @@ withoutHandoffStamp env = asks (.deonticLog) >>= \ case
 -- being matched, already evaluated. Like the norm log's parent link, it takes
 -- no address from the evaluation's supply, because every printed party key
 -- that holds an unforced field names its address, and a guard that does not
--- mention @THE INSTANT@ must print what it printed before; the address is
--- negative and unique per carrier, so nothing that keys on an address can
--- mistake it for another reference.
+-- mention @THE INSTANT@ must print what it printed before. The address is the
+-- next of the instant carriers' half of the negative 32-bit range, counted per
+-- evaluation, so nothing that keys on an address can mistake it for another
+-- reference of the same evaluation ('instantCarrierAddress' says why).
 instantCarrier :: WHNF -> Eval Reference
 instantCarrier v = do
   uri <- asks (.moduleUri)
-  u <- liftIO DU.newUnique
+  counter <- asks (.instantSupply)
+  k <- liftIO (atomicModifyIORef' counter \ c -> (c + 1, c))
+  address <- maybe (userException (UserError "an evaluation read THE INSTANT in more guards than it can number")) pure
+    (instantCarrierAddress k)
   pointer <- liftIO (newIORef (WHNF v))
-  pure (MkReference (MkAddress uri (negate (1099511627776 + DU.hashUnique u))) pointer)
+  pure (MkReference (MkAddress uri address) pointer)
 
 -- | The origin a continuation's environment carries, if the writer is on and
 -- a hand-off bound one ('lifecycleOriginUnique').

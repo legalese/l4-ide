@@ -32,6 +32,10 @@ module L4.Evaluate.NormLog
   , normLogVerb
   , prettyNormEntry
   , fateText
+  , originCarrierAddress
+  , originCarrierLimit
+  , instantCarrierAddress
+  , instantCarrierLimit
   ) where
 
 import Base
@@ -310,3 +314,65 @@ originText o =
     -- where the parent was written, so a link that points at the wrong norm
     -- can be seen to (review of P1, L2)
     <> maybe "" (\ r -> " (line " <> Text.pack (show r.start.line) <> ")") o.noParent.nrSite
+
+-- | The addresses of the references the norm log makes for itself, which take
+-- no address from the evaluation's supply (NORM-LOG-SPEC N8 and N4, P1 and
+-- P2). Every printed party key that holds an unforced field names its
+-- address, so a writer that allocated from the supply would change what a
+-- ledger listing prints; the carriers sit at negative addresses instead, which
+-- the supply (counting up from zero) never reaches.
+--
+-- The plan for all of them is here, in one place, and it fits a 32-bit 'Int',
+-- because that is what an @Int@ is on the WASM target: the first half of P2
+-- wrote @negate (2^40 + ...)@ and did not compile there. Neither the native
+-- build nor the gate builds WASM; CI's WASM job found it.
+--
+-- The negative 32-bit range is split in two, 2^30 addresses each, and every
+-- carrier takes the next free address of its own half from a counter, so the
+-- halves cannot meet:
+--
+-- > supply:            0, 1, 2, ...                     (non-negative)
+-- > origin carriers:   -1 down to -(2^30 - 1)           ('originCarrierAddress')
+-- > instant carriers:  -2^30 down to -(2^31 - 1)        ('instantCarrierAddress')
+--
+-- The origin carriers are numbered by the log of one directive, as P1 numbered
+-- them (its entries, one log per directive), so two directives of a module may
+-- hand out the same address; the instant carriers are numbered by the
+-- evaluation (one counter in the evaluation's state, shared by its
+-- directives), so within an evaluation no two of them share an address.
+--
+-- Running out of a half is a loud error at the call site (the functions
+-- return 'Nothing'), never a wrap into the other half. 2^30 of either is more
+-- than an evaluation can hold in memory.
+--
+-- A counter that belonged to the process (@Data.Unique@'s, which the first
+-- half of P2 used) would not do: the service is long-lived, the counter keeps
+-- growing across requests, and a wrap into a window could land two live
+-- carriers on one address. The counters here start at zero for each
+-- evaluation, and two evaluations may reuse an address freely: an address
+-- also names its module's URI, and every table keyed by it belongs to one
+-- evaluation.
+
+-- | The address of the @n@th parent-link carrier of a directive's log, @n@
+-- counting from zero.
+originCarrierAddress :: Int -> Maybe Int
+originCarrierAddress n
+  | n < 0 || n >= originCarrierLimit = Nothing
+  | otherwise                        = Just (negate (n + 1))
+
+-- | How many parent-link carriers one log may make: 2^30 - 1, so the
+-- last one is at @-(2^30 - 1)@ and the instant carriers' half starts below.
+originCarrierLimit :: Int
+originCarrierLimit = 1073741823
+
+-- | The address of the @k@th instant carrier of an evaluation, @k@ counting
+-- from zero: one per guard evaluation (@THE INSTANT@).
+instantCarrierAddress :: Int -> Maybe Int
+instantCarrierAddress k
+  | k < 0 || k >= instantCarrierLimit = Nothing
+  | otherwise                         = Just (negate (1073741824 + k))
+
+-- | How many instant carriers an evaluation may make: 2^30, the last one at
+-- @-(2^31 - 1)@, which is inside a 32-bit 'Int'.
+instantCarrierLimit :: Int
+instantCarrierLimit = 1073741824

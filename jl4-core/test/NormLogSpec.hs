@@ -54,6 +54,7 @@ import qualified Data.Text.IO as TextIO
 import Control.Exception (evaluate)
 import Control.Monad (forM, when)
 import Data.Foldable (for_, toList)
+import Data.Int (Int32)
 import Data.List (findIndex, isSuffixOf, sort)
 import Data.Time (UTCTime (..), fromGregorian, secondsToDiffTime)
 import System.Directory (listDirectory)
@@ -1192,6 +1193,38 @@ spec = describe "the norm log writer (NORM-LOG-SPEC, P1)" do
 
     -- NORM-LOG-SPEC P2, the review of the first half (2026-11-24): the reader on
     -- real traces, with the writer on. The reviewer's probes, as fixtures.
+
+    describe "carrier addresses fit a 32-bit Int (the WASM target)" do
+      -- CI's WASM job found `negate (2^40 + h)` in the first half of P2: an Int
+      -- is 32 bits there, and neither the native build nor the gate builds it
+      let lo = toInteger (minBound :: Int32)
+          hi = toInteger (maxBound :: Int32)
+          fits a = lo <= toInteger a && toInteger a <= hi
+          originEdges  = [0, 1, 2, 1000, 1000000, originCarrierLimit - 2, originCarrierLimit - 1]
+          instantEdges = [0, 1, 2, 1000, 1000000, instantCarrierLimit - 2, instantCarrierLimit - 1]
+      it "every carrier address is a negative number inside an Int32" do
+        for_ originEdges \ n -> case originCarrierAddress n of
+          Just a  -> (n, fits a, a < 0) `shouldBe` (n, True, True)
+          Nothing -> expectationFailure ("no address for origin carrier " <> show n)
+        for_ instantEdges \ k -> case instantCarrierAddress k of
+          Just a  -> (k, fits a, a < 0) `shouldBe` (k, True, True)
+          Nothing -> expectationFailure ("no address for instant carrier " <> show k)
+      it "no instant carrier's address is an origin carrier's, and neither is a supply address" do
+        for_ originEdges \ n -> for_ instantEdges \ k ->
+          (originCarrierAddress n, instantCarrierAddress k) `shouldSatisfy` \ case
+            (Just o, Just i) -> i < o && o < 0
+            _                -> False
+      it "within one half, each index has its own address" do
+        [ originCarrierAddress n | n <- [0 .. 5] ] `shouldBe` map Just [-1, -2, -3, -4, -5, -6]
+        [ instantCarrierAddress k | k <- [0 .. 2] ] `shouldBe` map Just [-1073741824, -1073741825, -1073741826]
+      it "running out of a half is a refusal, never a wrap into the other half" do
+        originCarrierAddress originCarrierLimit `shouldBe` Nothing
+        originCarrierAddress (-1) `shouldBe` Nothing
+        instantCarrierAddress instantCarrierLimit `shouldBe` Nothing
+        instantCarrierAddress (-1) `shouldBe` Nothing
+        -- the last of each is the edge of its half
+        originCarrierAddress (originCarrierLimit - 1) `shouldBe` Just (-1073741823)
+        instantCarrierAddress (instantCarrierLimit - 1) `shouldBe` Just (-2147483647)
 
     describe "the reader on real traces (review of P2, first half)" do
       let tracePrologue = prologue4 <> ["GIVETH DEONTIC Person Action"]
