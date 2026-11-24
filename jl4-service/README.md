@@ -311,9 +311,9 @@ Name the value instead: the value you gave for the input, or a declared action.
 Rule source stays L4, backticks included: an action that carries a value, such as `say "pay now"`, and the reasoning tree and the graphviz source of a trace.
 
 Only a function whose result is a `DEONTIC` itself is a contract.
-A bundle is refused at deploy when an `@export` takes a `DEONTIC` as an input, or returns one inside a `MAYBE`, a `LIST` or an `EITHER`, or through a type you declared as another name for one, with the words `l4 check` uses: `` `the duty` is published with @export, but its result is a MAYBE whose value is a DEONTIC, a contract rule, and @export does not support that yet. ``
+An `@export` is left out at deploy when it takes a `DEONTIC` as an input, or returns one inside a `MAYBE`, a `LIST` or an `EITHER`, or through a type you declared as another name for one, and the deployment names it in `refusedExports` (above) with the words `l4 check` uses: `` `the duty` is published with @export, but its result is a MAYBE whose value is a DEONTIC, a contract rule, and @export does not support that yet. ``
 The same goes for any other input or result with no JSON form: an `EVENT`, a function, a type variable, or a record or a constructor with a field of one of those.
-Remove the `@export` from the rule, or return the `DEONTIC` itself, and the bundle deploys.
+Remove the `@export` from the rule, or return the `DEONTIC` itself, and the rule deploys; a bundle whose every `@export` is left out is refused.
 The rule still evaluates where it is written, with its `#EVAL` and `#EVALTRACE`, and [the errors reference](../doc/reference/errors/README.md) says what to do instead.
 
 Limits:

@@ -1174,8 +1174,10 @@ spec = describe "integration" do
         eventReason = "its input `e` is an EVENT, and @export does not support that yet"
         -- The refused exports a response names at a path: each name and its reasons.
         refusedAt :: Response LBS.ByteString -> [Aeson.Key] -> [(Text, [Text])]
-        refusedAt resp path = case wireAt resp path of
-          Right (Aeson.Array xs) ->
+        refusedAt resp path = either (const []) refusedOf (wireAt resp path)
+        refusedOf :: Aeson.Value -> [(Text, [Text])]
+        refusedOf = \case
+          Aeson.Array xs ->
             [ (n, [r | Aeson.String r <- reasons])
             | Aeson.Object o <- toList xs
             , Just (Aeson.String n) <- [Aeson.KeyMap.lookup "name" o]
@@ -1220,6 +1222,18 @@ spec = describe "integration" do
         status <- httpGet mgr (baseUrl <> "/deployments/refused-one")
         wireAt status ["status"] `shouldBe` Right (Aeson.String "ready")
         refusedAt status ["metadata", "refusedExports"] `shouldSatisfy` refusedAsEvent
+        -- and the list of deployments
+        list <- httpGet mgr (baseUrl <> "/deployments")
+        case Aeson.decode (responseBody list) :: Maybe [Aeson.Value] of
+          Just entries ->
+            [ refusedOf refused
+            | Aeson.Object o <- entries
+            , Aeson.KeyMap.lookup "id" o == Just (Aeson.String "refused-one")
+            , let refused = case Aeson.KeyMap.lookup "metadata" o of
+                    Just (Aeson.Object m) -> Maybe.fromMaybe Aeson.Null (Aeson.KeyMap.lookup "refusedExports" m)
+                    _ -> Aeson.Null
+            ] `shouldSatisfy` \case [one] -> refusedAsEvent one; _ -> False
+          Nothing -> expectationFailure "Failed to decode the list of deployments"
         listed <- httpGet mgr (baseUrl <> "/deployments/refused-one/functions")
         functionNames (responseBody listed) `shouldBe` ["big"]
         callBig baseUrl mgr "refused-one"
