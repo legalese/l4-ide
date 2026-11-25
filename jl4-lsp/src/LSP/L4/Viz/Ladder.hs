@@ -901,6 +901,8 @@ scanOr e = [e]
 -- NOT that @UNLESS@ stands for, which has no keyword, where its operand does.
 -- Anything else starts at the first element of its own annotation that is not
 -- a token handed down to it: an opening bracket, or a NOT and its optional OF.
+-- Where that element is a part of the expression (a call written with its
+-- first argument first), it starts where that part does.
 -- An operator whose first operand is written outside its own text (a
 -- parameter, read through) starts where its own text does.
 --
@@ -937,11 +939,23 @@ writtenStart e = case operands e of
     leading x = case operands x of
       Just (operand : _) -> leading operand
       _ -> takeWhile (\case AnnoCsn {} -> True; AnnoHole _ -> False) (getAnno x).payload
+    -- A hole is where a part of the expression is written, its brackets
+    -- included (a call written with its first argument first, @(b AND e)
+    -- `chk` c@): the part starts where its own first word is.
     ownStart = \case
-      AnnoHole r -> (.start) <$> r
+      AnnoHole r -> holeStart <$> r
       AnnoCsn r cluster
         | all handedDown cluster.payload.tokens -> Nothing
         | otherwise -> (.start) <$> r
+    holeStart hole =
+      case [ p
+           | part <- toListOf (gplate @(Expr Resolved)) e
+           , fmap (.start) (rangeOf part) == Just hole.start
+           , Just p <- [writtenStart part]
+           , hole.start <= p && p <= hole.end
+           ] of
+        p : _ -> p
+        [] -> hole.start
     handedDown t = t.payload `elem` [TSymbols TPOpen, TKeywords TKNot, TKeywords TKOf]
     isNot t = t.payload == TKeywords TKNot
 

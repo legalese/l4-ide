@@ -85,6 +85,19 @@ GIVETH A BOOLEAN
 DECIDE `a hurdle through a call` a b IF
     a AND `either` a b
 
+-- (13) The same through a call written between its arguments, its first
+--      argument in brackets: `(a AND b) `or else` c` means `(a AND b) OR c`,
+--      which `c` already entails. It is placed at the first word of that
+--      argument, not at either bracket before it.
+GIVEN x IS A BOOLEAN, y IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE x `or else` y IF x OR y
+
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN, c IS A BOOLEAN, d IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `a hurdle through an infix call` a b c d IF
+    c AND d AND ((a AND b) `or else` c)
+
 -- Not reported.
 
 -- (10) The redundant condition is in the test of a row. Every row after the

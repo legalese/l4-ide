@@ -6853,6 +6853,10 @@ spec bin = do
       startsWith "`a hurdle in an ELSE`" "x OR y)"
       startsWith "`a hurdle in an OTHERWISE`" "x OR y)"
       startsWith "`a hurdle through a call`" "`either` a b"
+      -- Before this was fixed, the call was placed at the bracket that opens
+      -- its first argument.
+      lookup "`a hurdle through an infix call`" found `shouldBe` Just [("vacuous-guard", "body.and[2]")]
+      startsWith "`a hurdle through an infix call`" "a AND b) `or else` c)"
       -- A condition whose first word is a parameter is placed in the local
       -- definition, where it is written, not at the argument of the call.
       [ round line :: Int
@@ -6861,13 +6865,15 @@ spec bin = do
         `shouldBe` [60, 60]
       Output _ text _ <- runL4 bin ["verify", verifyWrittenGuardsFixture]
       text `shouldSatisfy` ("[vacuous-guard] at body.or[0].and[1], written at 23:16" `isInfixOf`)
-      -- With --no-coalesce-atoms nothing is read through, so the call is an
+      -- With --no-coalesce-atoms nothing is read through, so each call is an
       -- atom of its own and adds a condition; the rest read the same.
       separate <- jsonEnvelope bin ["verify", verifyWrittenGuardsFixture, "--format", "json", "--no-coalesce-atoms"]
       let found' = findingSitesByDecision separate
+          throughCalls = ["`a hurdle through a call`", "`a hurdle through an infix call`"]
       lookup "`a hurdle through a call`" found' `shouldBe` Just []
-      filter ((/= "`a hurdle through a call`") . fst) found'
-        `shouldBe` filter ((/= "`a hurdle through a call`") . fst) found
+      lookup "`a hurdle through an infix call`" found' `shouldBe` Just []
+      filter ((`notElem` throughCalls) . fst) found'
+        `shouldBe` filter ((`notElem` throughCalls) . fst) found
 
     -- An alternative the others already cover adds nothing, and is reported
     -- where it is written, under a NOT too. Before the fix none of the three
