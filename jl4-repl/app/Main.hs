@@ -744,16 +744,23 @@ getImportPreamble st = do
 -- module it imports has errors. The line's own check is not enough to say so:
 -- the line's file is written to the directory the REPL was started in, where
 -- the loaded file's IMPORTs may find no module, and an IMPORT that finds no
--- module does not stop evaluation. A loaded file with errors of its own is
--- left to the line's check, which reports them, since the line's file holds
--- the loaded file's text.
+-- module does not stop evaluation. A loaded file with errors of its own, and
+-- no import with errors, is left to the line's check, which reports them,
+-- since the line's file holds the loaded file's text. One with an import
+-- with errors as well is refused: a file on a ring of imports is one, and
+-- its only error may be the one on its IMPORT, which the line's file, so
+-- placed, does not have.
 loadedFileRefusal :: ReplState -> FilePath -> IO (Maybe Text)
 loadedFileRefusal st contextFile = do
   let contextUri = normalizedFilePathToUri (toNormalizedFilePath contextFile)
   [mTc] <- shakeRunDatabase st.ideState.shakeDb [Shake.use Rules.SuccessfulTypeCheck contextUri]
   case mTc of
-    Just tc | tc.success, not (Rules.evaluable tc) -> Just <$> fileImportsHaveErrors st contextUri
-    _ -> pure Nothing
+    Just tc
+      | Rules.evaluable tc -> pure Nothing
+      | otherwise -> Just <$> fileImportsHaveErrors st contextUri
+    Nothing -> brokenImports st contextUri >>= \case
+      [] -> pure Nothing
+      _ -> Just <$> fileImportsHaveErrors st contextUri
 
 -- | Evaluate an expression in the context of a loaded file
 evalExpression :: ReplState -> FilePath -> Text -> IO Text

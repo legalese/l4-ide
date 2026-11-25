@@ -4972,6 +4972,16 @@ spec bin = do
       loadedOk `shouldSatisfy` T.isSuffixOf "File loaded successfully."
       take 1 rsOk `shouldBe` ["2"]
 
+    -- A file on a ring of imports has an error of its own, the one on its
+    -- IMPORT, and that error is all a line's file would carry; from another
+    -- directory its IMPORT finds no module, so a line used to be evaluated.
+    it "the REPL evaluates no line of a file on a ring of imports when started from another directory" $ withRepl \repl ->
+      withSystemTempDirectory "l4-repl-imports" \work -> do
+        createDirectoryIfMissing True (work </> "sub")
+        forM_ ["ra.l4", "rb.l4"] \f -> copyFile (fixtureDir </> "cycle-eval" </> f) (work </> "sub" </> f)
+        (_, rs) <- replSessionFor work repl (work </> "sub" </> "ra.l4") ["1 PLUS 1", ":trace 1 PLUS 1", ":traceascii 1 PLUS 1"]
+        rs `shouldBe` replicate 3 (fileMessageFor "`rb`, which is in a ring of imports: rb.l4 -> ra.l4 -> rb.l4")
+
     -- The controls.
     it "still evaluates a file whose import is clean" $ do
       o <- runL4 bin ["run", okDir </> "main.l4"]
