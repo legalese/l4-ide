@@ -204,6 +204,7 @@ it is where the text is.
 
 - **`l4 verify`**: strictly more findings, never fewer — R1 only removes opacity. The
   `nestedNotVisited` accounting stays, because §7 keeps genuinely nested _analysis_ out of scope.
+  Since 2026-11-25 that no longer holds for a redundant condition (smucclaw/l4-ide#1093): the copies of one condition that substitution puts in several places are judged as one, so `` `qualifies` a AND `qualifies` b `` with `` `qualifies` x MEANS x AND c `` is clean, as it is with `qualifies` at the top, but `a AND e AND e` with `e MEANS m AND n`, reported before at each copy of `m` and of `n`, is no longer reported (decided by Claude 2026-11-25, pending Meng's review; `jl4/tests-cli/fixtures/verify-local-helpers.l4`).
 - **The caveat text** in `Verify.hs` must be corrected in the same change. It currently implies
   top-level decisions are analysed whole; after this change they are, and before it they were not.
   Leaving the old wording would be a false statement in the tool's own output.

@@ -1,0 +1,127 @@
+§ `VerifyLocalHelpersFixture`
+
+-- A local definition with parameters, used twice. Reading the rule through
+-- puts a copy of the definition's body in place of each use, and the copies
+-- share every condition the body does not take from its parameters. One copy's
+-- `c` must not make the other's look redundant: the drafter wrote `c` once and
+-- cannot delete it. The rule must read as it does with the definition at the
+-- top, where each use is a call.
+
+-- Not reported: nothing in it is redundant.
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN, c IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `both qualify` a b c IF
+    `qualifies` a AND `qualifies` b
+  WHERE
+    GIVEN x IS A BOOLEAN
+    GIVETH A BOOLEAN
+    `qualifies` x MEANS x AND c
+
+-- Not reported: the same rule with the definition at the top, the control.
+GIVEN x IS A BOOLEAN, c IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `qualifies at the top` x c IF x AND c
+
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN, c IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `both qualify at the top` a b c IF
+    `qualifies at the top` a c AND `qualifies at the top` b c
+
+-- Reported, at each argument: the same use twice, so each use's argument is
+-- entailed by the other use.
+GIVEN a IS A BOOLEAN, c IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `the same use twice` a c IF
+    `qualifies` a AND `qualifies` a
+  WHERE
+    GIVEN x IS A BOOLEAN
+    GIVETH A BOOLEAN
+    `qualifies` x MEANS x AND c
+
+-- Reported, once for each use, at the definition: a condition of the body that
+-- the body's own conditions already entail.
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN, d IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `redundant inside the definition` a b d IF
+    `qualifies` a AND `qualifies` b
+  WHERE
+    GIVEN x IS A BOOLEAN
+    GIVETH A BOOLEAN
+    `qualifies` x MEANS x AND (x OR d)
+
+-- Reported: two conditions written separately, which are alike. Telling the
+-- copies of one written condition apart from these by where they start would
+-- hide these.
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN, c IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `written twice` a b c IF
+    c AND a AND ((c AND b) OR a)
+
+-- Reported, at the definition: a definition with no parameter used twice. Its
+-- body is one condition, which stands for each use; each use is entailed by
+-- the other.
+GIVEN a IS A BOOLEAN, m IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `a name used twice` a m IF
+    a AND e AND e
+  WHERE
+    e MEANS m
+
+-- Not reported: a definition with no parameter called from one with a
+-- parameter, which is used twice with different arguments. Each copy of `e`
+-- comes from a different use of `qualifies`.
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN, m IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `a name inside a definition` a b m IF
+    `qualifies` a AND `qualifies` b
+  WHERE
+    e MEANS m
+    GIVEN x IS A BOOLEAN
+    GIVETH A BOOLEAN
+    `qualifies` x MEANS x AND e
+
+-- Not reported: the dual. Each copy of `c` is an alternative of a different
+-- use.
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN, c IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `either qualifies` a b c IF
+    `qualifies` a OR `qualifies` b
+  WHERE
+    GIVEN x IS A BOOLEAN
+    GIVETH A BOOLEAN
+    `qualifies` x MEANS x OR c
+
+-- Not reported: one use in the test of an IF, one in what it gives. The test
+-- is drawn as a copy too, once as it is and once negated for the ELSE.
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN, c IS A BOOLEAN, d IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `a use in a test` a b c d IF
+    IF `qualifies` a THEN `qualifies` b ELSE d
+  WHERE
+    GIVEN x IS A BOOLEAN
+    GIVETH A BOOLEAN
+    `qualifies` x MEANS x AND c
+
+-- No redundant condition reported (the normal form's dead branches are):
+-- copies with a parameter in them differ from use to use, so each is forgotten
+-- as a condition of its own. Forgotten as one, the copy under the NOT and the
+-- copies beside it would contradict each other, and all would look entailed.
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN, c IS A BOOLEAN, d IS A BOOLEAN, e IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `copies of opposite sign` a b c d e IF
+    `h` a AND `h` b AND (NOT (`h` e))
+  WHERE
+    GIVEN x IS A BOOLEAN
+    GIVETH A BOOLEAN
+    `h` x MEANS c AND (x OR d)
+
+-- No redundant condition reported: the same, in the tests of a chain. The
+-- second row carries the first test negated and the second as it is.
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN, c IS A BOOLEAN, d IS A BOOLEAN, e IS A BOOLEAN, p IS A BOOLEAN, q IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `copies of opposite sign in a chain` a b c d e p q IF
+    IF `h` a THEN p ELSE IF `h` b THEN `h` e ELSE q
+  WHERE
+    GIVEN x IS A BOOLEAN
+    GIVETH A BOOLEAN
+    `h` x MEANS c AND (x OR d)
