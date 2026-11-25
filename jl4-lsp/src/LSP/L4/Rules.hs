@@ -1402,6 +1402,33 @@ copyInWords modName = \ case
   EmbeddedCandidate -> "the standard library's `" <> modName <> "`"
   FileCandidate lbl p -> fileInWords [lbl] p
 
+-- | Whether a module's directives are evaluated: it typechecked, and so did
+-- every module it imports, directly or not.
+--
+-- A module whose import has errors still typechecks against what that import
+-- did provide ('success' does not depend on 'importsOk'). The import itself is
+-- not evaluated ('GetLazyEvaluationDependenciesFile' needs its
+-- 'SuccessfulTypeCheck', and 'evaluateOn' leaves it out of the heap), so a
+-- name it supplied is not in scope at run time, and every directive that read
+-- one answered with an internal error that buried the error in the import
+-- (smucclaw/l4-ide#1025). So such a module is not evaluated, as a module with
+-- errors of its own is not: 'EvaluateLazy' has no result for it, and the
+-- commands that evaluate on top of its imports' heaps refuse it
+-- ('useEvaluableTypeCheck') as they refuse a module that does not typecheck
+-- (decided by Claude 2026-11-25, pending Meng's review).
+--
+-- 'GetLazyEvaluationDependenciesFile' is left as it was, and still builds such
+-- a module's heap without the import: jl4-service builds a deployed file's
+-- environment from it ("Backend.Jl4".typecheckAndEvalBundle), and reads the
+-- results of the call it wraps from it ("Backend.Jl4".evaluateModule).
+evaluable :: TypeCheckResult -> Bool
+evaluable tc = tc.success && tc.importsOk
+
+-- | The 'SuccessfulTypeCheck' of a module that is 'evaluable', and 'Nothing'
+-- for any other.
+useEvaluableTypeCheck :: NormalizedUri -> Action (Maybe TypeCheckResult)
+useEvaluableTypeCheck uri = (>>= \ tc -> if evaluable tc then Just tc else Nothing) <$> use SuccessfulTypeCheck uri
+
 -- | A type-checked module evaluated on top of its imports' heaps, under the
 -- configuration given: the work of 'GetLazyEvaluationDependenciesFile', which
 -- passes the rules' own. The REPL's @:trace@ and @:traceascii@ call it with a
@@ -1899,10 +1926,16 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
     tcRes   <- use_  SuccessfulTypeCheck f
     ([],) . Just <$> evaluateOn evalConfig imports tcRes
 
+  -- A module whose imports did not all typecheck is not evaluated, as a module
+  -- with errors of its own is not ('evaluable').
   define shakeRecorder $ \EvaluateLazy uri -> do
-    res  <- use_ (AttachCallStack [uri] GetLazyEvaluationDependencies) uri
-    let results = snd res
-    pure (mkSimpleFileDiagnostic uri . evalLazyResultToDiagnostic <$> results, Just results)
+    tc <- use_ SuccessfulTypeCheck uri
+    if not (evaluable tc)
+      then pure ([], Nothing)
+      else do
+        res  <- use_ (AttachCallStack [uri] GetLazyEvaluationDependencies) uri
+        let results = snd res
+        pure (mkSimpleFileDiagnostic uri . evalLazyResultToDiagnostic <$> results, Just results)
 
   define shakeRecorder $ \LexerSemanticTokens f -> do
     (tokens, _) <- use_ GetLexTokens f

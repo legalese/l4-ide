@@ -1,0 +1,19 @@
+-- A contract, an assertion and a decision that read `the answer` from lib,
+-- for the commands that evaluate on top of the imports: lts, explore, prove,
+-- coverage.
+IMPORT lib
+
+DECLARE Person IS ONE OF P
+DECLARE Action IS ONE OF a
+
+GIVETH A DEONTIC Person Action
+duty MEANS PARTY P MUST a WITHIN `the answer` HENCE FULFILLED LEST BREACH BY P
+
+#TRACE duty AT 0 WITH
+  PARTY P DOES a AT 2
+
+#ASSERT `the answer` EQUALS 42
+
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `is late` n IF n > `the answer`

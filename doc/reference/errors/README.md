@@ -38,6 +38,7 @@ Coming from another language? The [Cheat sheet](../cheat-sheet.md) shows the L4 
 - [Module not found](#module-not-found)
 - [A file passed over because of its capitals](#a-file-passed-over-because-of-its-capitals)
 - [Import cycle](#import-cycle)
+- [An imported module has errors](#import-module-has-errors)
 
 **Definitions and clauses**
 
@@ -718,8 +719,59 @@ When the file passed over is the file the `IMPORT` is in, as for `Math.l4` that 
 **Error:** `This IMPORT makes a ring of imports: a.l4 -> b.l4 -> a.l4.` or `A file cannot import itself.`
 
 Files import each other in a ring, directly or through other files. L4 checks the files a file imports before the file itself, so a ring can never be checked. The error is on the `IMPORT` that closes the ring. Files that import a file in the ring get an error on that `IMPORT` too.
+Nothing in a file on the ring, or in a file that imports one, is evaluated, as for [an imported module with errors](#import-module-has-errors).
 
 **How to fix it:** move what both files need into a new file that both import, or remove an `IMPORT` the file doesn't use.
+
+---
+
+<a id="import-module-has-errors"></a>
+
+### An imported module has errors
+
+**Error:** `The imported module lib has errors (line 3: The second input of PLUS is expected to be of type)`, or `The imported module mid imports a module with errors.`, or `The imported module lib could not be checked; see the errors in it.`
+
+The error is on an `IMPORT` line, and it points at an error in the module that line imports, or in one that module imports.
+That error is reported in the module that has it too, on its own line, and that is where you fix it.
+
+- The first form quotes the first line of the module's first error, and says which line of the module it is on.
+  When there is no line to quote, it stops at `The imported module lib has errors`.
+- The second form means that the module you import is fine itself, but a module it imports, directly or not, has errors.
+  Follow the `IMPORT` lines down until you reach the module with the error.
+- The third form means that the module could not be read as L4 at all, usually because it does not parse.
+
+**While this error is on an `IMPORT` in a file, nothing in the file is evaluated.**
+Its `#EVAL`, `#ASSERT` and `#TRACE` lines do not run, even a line that uses nothing from the broken module, such as `#EVAL 1 PLUS 1`.
+The same holds for every file that imports this one, directly or not, since its `IMPORT` gets the second form of the error.
+
+- `l4 run` prints the errors and no results, and exits with status 1.
+  `l4 check` fails as before.
+- `l4 trace` says that evaluation failed.
+  `l4 lts`, `l4 explore`, `l4 prove`, `l4 coverage` and `l4 batch` refuse the file, as they refuse a file that does not type-check, and print the errors.
+- The editor shows the errors and no new results for the file.
+  A results panel that was open keeps the last results it had, as it does while a file has an error of its own.
+  A decision graph of a rule in the file can still be drawn.
+  Where the rule calls another rule, answering the graph's questions makes it say that evaluation failed: `A module this file imports has errors, so nothing is evaluated; the error on its IMPORT names it.`
+- The REPL names the module when it loads the file, and again for each line you ask it to evaluate: ``This file imports `lib`, which has errors, so nothing is evaluated; `l4 check` on the file shows the errors.``
+- A module that `:import` added in the REPL stops every line in the same way, and the REPL says so: `` `:import` added `lib`, which has errors, so nothing is evaluated; `:imports` lists what `:import` added, and `:reset` removes it. ``
+
+What this does not cover:
+
+- An `IMPORT` that finds no module gets a different error, [Module not found](#import-module-not-found), and it does not stop evaluation.
+  The rest of that file is still evaluated, and so is a file that imports it.
+- `l4 export`, in every format, `l4 verify` and `l4 state-graph` still write their output over a module whose import has errors.
+  The error does not make them fail: each exits with status 0 on a file it can convert, as it does when the import is clean.
+  `l4 export` and `l4 verify` print the error, and `l4 state-graph` does not.
+  The test that comes from each `#EVAL` or `#ASSERT` in the Catala output then has no expected value, and `l4 export catala` says that L4 produced no value for it.
+- A bundle posted straight to a jl4-service you run yourself, as a zip of files sent to its `/deployments` endpoint, is still evaluated in one case.
+  When the only errors in a module its file imports are names that module reads and never declares, which the service takes as inputs, the service accepts the bundle and evaluates its functions: one that reads nothing from that module answers as usual, and one that reads a name from it answers `Internal error: ... is not in scope.`
+  `l4 deploy` and `l4 redeploy`, with or without `--server`, refuse such a file before they upload anything, as [Using the l4 CLI](../../tutorials/getting-started/l4-cli.md#deploy-update-list-remove) says of `l4 deploy`, and the editor's **Deploy** stays off for it, as [Deploy your rules](../../tutorials/deploying-rules/exporting-rules-for-deployment.md#step-3-deploy) says.
+
+Older versions of L4 evaluated the file without the broken module, and every line that used a name from it answered with an internal error, on four lines: `Internal error:`, the name, `is not in scope.`, and `Please report this as a bug.`
+If you see that beside this error, it is not a bug in your file: the error to read is the one in the imported module.
+
+**How to fix it:** fix the error in the imported module.
+The file's `#EVAL` lines run again once every module it imports, directly or not, checks.
 
 ---
 

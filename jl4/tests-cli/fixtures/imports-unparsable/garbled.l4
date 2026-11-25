@@ -1,0 +1,3 @@
+-- smucclaw/l4-ide#1025: a module that does not parse.
+DECLARE Garbled HAS
+  x WITH

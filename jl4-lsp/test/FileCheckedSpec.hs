@@ -265,6 +265,25 @@ spec = describe "l4/fileChecked" do
       (_, left) <- awaitChecked server "left" (\p -> "import/cycle" `elem` codes p)
       left.version `shouldBe` Just 1
 
+  -- smucclaw/l4-ide#1025: a file whose import has errors is not evaluated, as
+  -- a file with errors of its own is not. Its #EVAL was published as an
+  -- internal error ("`the answer` is not in scope") beside the error on the
+  -- IMPORT. Mending the import brings the result back.
+  it "has no directive results for a file whose import has errors" do
+    withServer \server -> do
+      let lib extra = "DECIDE `the answer` IS 42\n" <> extra
+      open server "lib" 1 (lib "\nDECIDE `broken` IS 1 PLUS TRUE\n")
+      _ <- awaitChecked server "lib" (ofVersion 1)
+      open server "main" 1 "IMPORT lib\n\n#EVAL `the answer`\n"
+      (earlier, checked) <- awaitChecked server "main" (ofVersion 1)
+      codes checked `shouldBe` ["import/module-has-errors"]
+      -- nor are directive results pushed for it, as they are not for a file
+      -- that does not type-check
+      filter (isFor server "main" . (.uri)) (mapMaybe directiveResults earlier) `shouldBe` []
+      change server "lib" 2 (lib "")
+      (_, mended) <- awaitChecked server "main" (\p -> messages p == ["42"])
+      mended.version `shouldBe` Just 1
+
   it "is sent for open files that import the edited one, directly or not" do
     withServer \server -> do
       let base rate = "DECIDE `the rate` IS " <> rate <> "\n"
@@ -286,6 +305,9 @@ spec = describe "l4/fileChecked" do
       change server "base" 3 (base "`nothing by that name`")
       (_, broken) <- awaitChecked server "top" (\p -> "import/module-has-errors" `elem` codes p)
       broken.version `shouldBe` Just 1
+      -- and top is not evaluated now (smucclaw/l4-ide#1025): neither the 10
+      -- of before nor an internal error is left beside the IMPORT's error
+      codes broken `shouldBe` ["import/module-has-errors"]
 
       -- An edit says nothing about the files the edited file imports.
       change server "top" 2 "IMPORT middle\n\n#EVAL 0\n"

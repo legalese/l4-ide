@@ -1,0 +1,5 @@
+-- smucclaw/l4-ide#1025: one traced directive over the lib with an error, for
+-- `l4 trace`, which must say that evaluation failed.
+IMPORT lib
+
+#EVALTRACE `the answer` PLUS 1

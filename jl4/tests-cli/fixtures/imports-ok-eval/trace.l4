@@ -1,0 +1,5 @@
+-- smucclaw/l4-ide#1025: one traced directive over the clean lib, for `l4 trace`;
+-- the twin of ../imports-error-eval/trace.l4.
+IMPORT lib
+
+#EVALTRACE `the answer` PLUS 1

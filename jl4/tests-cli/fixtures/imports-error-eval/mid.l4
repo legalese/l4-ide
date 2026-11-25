@@ -1,0 +1,4 @@
+-- Fine itself; lib, which it imports, has an error.
+IMPORT lib
+
+`mid answer` MEANS `the answer` PLUS 1

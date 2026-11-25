@@ -183,7 +183,7 @@ coverageWith opts evalConfig = do
   (errs, res) <- runOneshot evalConfig opts.covFile \nfp -> do
     let uri = normalizedFilePathToUri nfp
     _ <- Shake.addVirtualFileFromFS nfp
-    mtc <- Shake.use Rules.SuccessfulTypeCheck uri
+    mtc <- Rules.useEvaluableTypeCheck uri
     imports <- fromMaybe [] <$> Shake.use Rules.GetImports uri
     deps <- catMaybes <$> Shake.uses Rules.GetLazyEvaluationDependenciesFile (map (.moduleUri) imports)
     pure (mtc, mconcat (map fst deps))

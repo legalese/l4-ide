@@ -175,6 +175,10 @@ evaluatedOnce = describe "a module reached by more than one import path, when th
   -- Running the importer type-checks it, then evaluates it on top of the
   -- evaluated heaps of its imports. The evaluation of an import used to
   -- recurse under a call stack of its own, as the type check did.
+  --
+  -- An importer whose import has errors is not evaluated (smucclaw/l4-ide#1025),
+  -- so these two only type-check, as under 'Check'; they pin that a run does
+  -- not report the error once per path either.
   it "reports its type error once when two paths lead to it" $ do
     (diags, _) <- runTree "diamond-run" Run (diamond typeError) "top"
     length (about "bottom" "second input of PLUS" diags) `shouldBe` 1
@@ -182,6 +186,29 @@ evaluatedOnce = describe "a module reached by more than one import path, when th
   it "reports its type error once when 2^3 paths lead to it" $ do
     (diags, _) <- runTree "tour-run" Run (tour 5 typeError) "m5"
     length (about "m1" "multiple definitions for the identifier" diags) `shouldBe` 1
+
+  -- With no error anywhere, the run does evaluate the importer, on top of the
+  -- heaps of its imports, and its result reads from the module the two paths
+  -- share. This pins the value, and that a run evaluates at all, NOT that the
+  -- shared module is evaluated once: the importer is the entry file, so its
+  -- result is published once however its imports' heaps are built; a run of
+  -- the importer publishes nothing for the shared module (measured: none of
+  -- bottom's results); and the logs the run returns hold diagnostics, not the
+  -- rules it ran. Nothing here grows with the number of paths, so evaluating
+  -- the shared module once per path would pass. What keeps it to once is that
+  -- the rule which builds a module's heap, 'GetLazyEvaluationDependenciesFile',
+  -- is keyed by the file alone.
+  it "evaluates the importer over a module that two paths lead to (how often that module is evaluated is not guarded)" $ do
+    let files =
+          [ ("bottom", withEval)
+          , ("left", "IMPORT bottom\n\n" <> fun "lf" "base x PLUS 1")
+          , ("right", "IMPORT bottom\n\n" <> fun "rt" "base x PLUS 2")
+          , ("top", "IMPORT left\nIMPORT right\n\n" <> fun "tp" "lf x PLUS rt x" <> "#EVAL tp 1\n")
+          ]
+    (diags, mTc) <- runTree "diamond-eval" Run files "top"
+    isJust mTc `shouldBe` True
+    -- tp 1 = lf 1 PLUS rt 1, and each reads base: (101 PLUS 1) PLUS (101 PLUS 2)
+    length (about "top" "205" diags) `shouldBe` 1
 
 cyclesAndMissingModules :: Spec
 cyclesAndMissingModules = describe "what the change leaves as it was" $ do

@@ -1,0 +1,7 @@
+-- An exported rule that reads `the answer` from lib, for l4 batch.
+IMPORT lib
+
+@export default Adds the answer
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`add answer` n MEANS n PLUS `the answer`

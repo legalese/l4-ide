@@ -83,7 +83,7 @@ ltsWith opts evalConfig = do
   (errs, mRig) <- runOneshot evalConfig opts.ltsFile \nfp -> do
     let uri = normalizedFilePathToUri nfp
     _ <- Shake.addVirtualFileFromFS nfp
-    mTc <- Shake.use Rules.SuccessfulTypeCheck uri
+    mTc <- Rules.useEvaluableTypeCheck uri
     case mTc of
       Nothing -> pure Nothing
       Just tcRes -> do

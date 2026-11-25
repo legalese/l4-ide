@@ -1,0 +1,6 @@
+-- smucclaw/l4-ide#1025: imports lib, which has errors, and mid, which imports
+-- it, so the REPL names two modules.
+IMPORT lib
+IMPORT mid
+
+#EVAL 1 PLUS 1

@@ -1,0 +1,8 @@
+-- The clean twin of ../imports-error-eval/lib.l4: the same files import it,
+-- and are evaluated.
+
+`the answer` MEANS 42
+
+GIVEN x IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `lib agrees` x IF x
