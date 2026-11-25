@@ -63,7 +63,7 @@ ltsOptionsParser = LtsOptions
   <*> many (strOption
         ( long "contract"
         <> metavar "NAME"
-        <> help "List this top-level rule at its outset (as `#TRACE NAME AT 0 WITH` with no events) instead of the file's own #TRACE directives; repeatable"
+        <> help "List this rule, at the top level or under a § heading, at its outset (as `#TRACE NAME AT 0 WITH` with no events) instead of the file's own #TRACE directives; repeatable"
         ))
   <*> fixedNowParser
   <*> evalLimitsParserNoting ". These steps are units of work, not the entries of the step log that --steps prints"

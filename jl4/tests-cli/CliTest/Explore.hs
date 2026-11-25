@@ -36,11 +36,16 @@ breached = "tests-cli" </> "fixtures" </> "explore-breached"
 startFixtures :: FilePath
 startFixtures = "tests-cli" </> "fixtures" </> "explore-start"
 
+-- | The fixtures of smucclaw/l4-ide#1106, a rule under a § heading.
+sections :: FilePath
+sections = "tests-cli" </> "fixtures" </> "lts-sections"
+
 fixtures :: [FilePath]
 fixtures =
   [ brief </> f | f <- ["d1-naive.l4", "d2-reread.l4", "d3-atomic.l4", "refused-number.l4", "properties.l4"] ]
   <> [ instants </> f | f <- ["clocks.l4", "window.l4", "half.l4", "adjacent.l4", "open.l4", "flip3.l4", "room.l4", "lapse.l4", "merged.l4", "lapse-fixed.l4", "cap-re.l4", "own-lapse.l4", "frac-re.l4", "fx-fork.l4", "fx-barrier.l4", "succ2.l4", "hidden.l4", "succ4.l4", "cap-shift.l4", "frac-start.l4", "frac-wait.l4", "frac-stamp.l4"] ]
   <> [ breached </> f | f <- ["sale.l4", "resell.l4", "continuation.l4"] ]
+  <> [ sections </> f | f <- ["sectioned.l4", "two-sections.l4"] ]
 
 -- | The acceptance run of the fixtures' README: the clock bounded at
 -- closing, the cells the properties read kept.
@@ -778,6 +783,39 @@ spec bin = describe "l4 explore" $ do
       code `shouldBe` ExitFailure 2
       let occurrences needle hay = length [ () | i <- [0 .. length hay - length needle], needle `isPrefixOf` drop i hay ]
       occurrences "PARTY B DOES b at instants that are not whole numbers" (lastLine sout) `shouldBe` 1
+
+  -- smucclaw/l4-ide#1106: `l4 lts --contract` looked only at the top level
+  describe "a rule under a § heading (#1106)" $ do
+    it "sectioned.l4: l4 lts --contract finds the rule, as l4 explore --contract does" $ do
+      Output code sout serr <- runL4 bin ["lts", sections </> "sectioned.l4", "--contract", "pay on time"]
+      code `shouldBe` ExitSuccess
+      serr `shouldNotSatisfy` ("no top-level rule" `isInfixOf`)
+      sout `shouldSatisfy` ("`pay on time` \8212 before anything has happened" `isInfixOf`)
+      sout `shouldSatisfy` ("Next deadline: 10 (Alice: pay)" `isInfixOf`)
+      Output ecode esout _ <- runL4 bin ["explore", sections </> "sectioned.l4", "--contract", "pay on time"]
+      ecode `shouldBe` ExitSuccess
+      esout `shouldSatisfy` ("3 states, 4 transitions" `isInfixOf`)
+
+    it "two-sections.l4: of two rules called `the duty`, both take the first in the file, and l4 lts finds one two headings down" $ do
+      Output code sout _ <- runL4 bin ["lts", sections </> "two-sections.l4", "--contract", "the duty"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("Alice MUST pay \8212 due by 10 (10 from now)" `isInfixOf`)
+      sout `shouldNotSatisfy` ("ship" `isInfixOf`)
+      Output ecode esout _ <- runL4 bin ["explore", sections </> "two-sections.l4", "--contract", "the duty"]
+      ecode `shouldBe` ExitSuccess
+      esout `shouldSatisfy` ("time passes the deadline 10 (WAITUNTIL 11)" `isInfixOf`)
+      esout `shouldNotSatisfy` ("ship" `isInfixOf`)
+      Output ncode nsout _ <- runL4 bin ["lts", sections </> "two-sections.l4", "--contract", "the nested duty"]
+      ncode `shouldBe` ExitSuccess
+      nsout `shouldSatisfy` ("Alice MUST ship \8212 due by 30 (30 from now)" `isInfixOf`)
+
+    it "a name no section defines: both refuse it in the same words, and exit 1" $ do
+      Output code _ serr <- runL4 bin ["lts", sections </> "two-sections.l4", "--contract", "no such duty"]
+      code `shouldBe` ExitFailure 1
+      serr `shouldSatisfy` ("--contract: no rule named `no such duty` that takes no inputs" `isInfixOf`)
+      Output ecode _ eserr <- runL4 bin ["explore", sections </> "two-sections.l4", "--contract", "no such duty"]
+      ecode `shouldBe` ExitFailure 1
+      eserr `shouldSatisfy` ("--contract: no rule named `no such duty` that takes no inputs" `isInfixOf`)
   where
     liveness =
       [ "--eventually", "Alice has bought or stopped"

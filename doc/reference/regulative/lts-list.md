@@ -222,7 +222,13 @@ Two rules make it safe to switch on:
 
 ## `--contract NAME`
 
-A file with no `#TRACE` has nothing to list. `--contract NAME` lists the rule called `NAME` at its outset — before anything has happened — exactly as a `#TRACE NAME AT 0 WITH` with no events would, without editing the file. Write the name without its backticks (`--contract "the tenancy"`), repeat the option for several rules, and note that only a rule that takes no inputs can be listed this way. An unknown name is an error, not an empty list.
+A file with no `#TRACE` has nothing to list.
+`--contract NAME` lists the rule called `NAME` at its outset — before anything has happened — exactly as a `#TRACE NAME AT 0 WITH` with no events would, without editing the file.
+Write the name without its backticks (`--contract "the tenancy"`), repeat the option for several rules, and note that only a rule that takes no inputs can be listed this way.
+The rule can be at the top level or under a `§` heading, at any depth, and is found as [`l4 explore --contract`](explore.md) finds it.
+(Before 2026-11-25 `l4 lts` looked only at the top level, and a rule under a heading was refused as `no top-level rule named …`.)
+When two sections each have a rule of that name, the first in the file is the one listed, by both commands, and nothing says that there was another; give one of them another name to list it.
+An unknown name is an error, not an empty list: ``--contract: no rule named `NAME` that takes no inputs``, in `l4 explore`'s words, and the exit status is 1.
 
 ## Limits
 

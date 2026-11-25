@@ -36,7 +36,8 @@ The day it starts is read as the clock, whatever it is: negative (`AT -5`), a su
 A start that is neither a number nor a date is refused with exit 1 and says so.
 (Before 2026-11-23 the explorer read only a literal number, and took any other start for 0, and a start below 0 for 0 too: its clock began later than the contract's and every deadline was measured from the wrong place; one file among the 78 in the repository's examples and docs that carry a `#TRACE` explores a different graph for it, `every/run-anchors.l4` at `AT DATE_SERIAL (YMD 2026 7 1)`, from 2 states to 3.)
 (One exploration is made for each distinct contract and starting day among the file's traces.
-To explore a rule no trace names, give `--contract NAME`, with `--at T` for the day it starts, 0 if left out.)
+To explore a rule no trace names, give `--contract NAME`, with `--at T` for the day it starts, 0 if left out.
+The rule can be at the top level or under a `§` heading, and it is found as [`l4 lts --contract`](lts-list.md) finds it.)
 
 `l4 explore` does not read the time stamps of a trace's events.
 From a `#TRACE` it takes the contract and the start, as above, and it chooses the instants it tries itself.
@@ -500,6 +501,8 @@ These are all in the output, on the coverage line or the property's own line, an
   Under `l4 run`, a trace in which Bob's purchase is recorded while the payment is pending never records it (`taken` is absent from the official record), and one in which it is recorded after the payment does.
   So the graph of such a contract is the graph of a world in which Bob cannot buy while Alice owes the restaurant, and a property checked on it is checked on that world.
   Keep the recurring permission a `MAY` throughout, as the files on this page do.
+- **Two rules of one name.** When two sections each define a rule called `NAME`, `--contract NAME` explores the first in the file and says nothing about the other; `l4 lts --contract` lists the same one.
+  Give one of them another name to explore it.
 - **No `#TRACE` and no `--contract`.** `Nothing to explore: the file has no #TRACE directive.` is printed on standard output and the exit status is 0, so a script that reads only the status sees a green run in which nothing ran.
   When a property, `--emit` or `--fair` was asked for, the status is 1 instead, because none of them could be answered.
 - **An always-false guard.** An act whose guard never holds is passed over in every state, so it appears in no state and no arrow, and the only trace of it is the `acts passed over` count, which does not say which.

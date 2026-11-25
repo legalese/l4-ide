@@ -190,25 +190,21 @@ standingOf res = case res.result of
   Reduction o@(ReducedUndetermined _) -> NotEvaluated (prettyReductionOutcome o)
   Assertion _                    -> NotEvaluated "not a #TRACE"
 
--- | A @#TRACE name AT 0 WITH@ — no events — for a top-level rule the file
--- does not trace, so that a contract can be listed at its outset without
--- editing the file. The rule must be defined at the top level under
--- exactly that name and take no inputs; the directive is appended to the
--- module so the replay can find it ('replay' matches directives by
--- equality with the ones the module carries).
---
--- The name is matched as written, without backticks: @the tenancy@ finds
--- @`the tenancy` MEANS …@.
+-- | A @#TRACE name AT 0 WITH@ — no events — for a rule the file does not
+-- trace, so that a contract can be listed at its outset without editing the
+-- file. The rule is found as @l4 explore --contract@ finds it ('ruleNamed'):
+-- one that takes no inputs, at the top level or under a @§@ heading, its
+-- name written without backticks. The directive is appended to the module's
+-- top level so the replay can find it ('replay' matches directives by
+-- equality with the ones the module carries); it names the rule by its
+-- unique, so a rule under a heading resolves from there.
 freshTrace :: Module Resolved -> Text -> Either Text (Module Resolved, Trace)
-freshTrace (MkModule a uri (MkSection sa sn saka sg decls)) wanted =
-  case [ (u, n) | Decide _ (MkDecide _ _ (MkAppForm _ (Def u n) [] _) _) <- decls, nameToText n == wanted ] of
-    [] -> Left ("no top-level rule named `" <> wanted <> "` that takes no inputs")
-    ((u, n) : _) ->
-      let contract  = Var emptyAnno (Ref n u n)
-          start     = Lit emptyAnno (NumericLit emptyAnno 0)
-          directive = Contract emptyAnno contract start []
-          m' = MkModule a uri (MkSection sa sn saka sg (decls <> [Directive emptyAnno directive]))
-      in Right (m', MkTrace {trDirective = directive, trContract = contract, trStart = start, trEvents = []})
+freshTrace m@(MkModule a uri (MkSection sa sn saka sg decls)) wanted = do
+  contract <- ruleNamed m wanted
+  let start     = Lit emptyAnno (NumericLit emptyAnno 0)
+      directive = Contract emptyAnno contract start []
+      m' = MkModule a uri (MkSection sa sn saka sg (decls <> [Directive emptyAnno directive]))
+  Right (m', MkTrace {trDirective = directive, trContract = contract, trStart = start, trEvents = []})
 
 ----------------------------------------------------------------------------
 -- Text

@@ -62,6 +62,8 @@ module L4.Lts.WhatIf
     Rig (..)
   , Trace (..)
   , tracesOf
+  , decidesOf
+  , ruleNamed
     -- * The position: the trace as written, replayed
   , Position (..)
   , Pending (..)
@@ -169,6 +171,38 @@ tracesOf (MkModule _ _ section) = sectionTraces section
         [MkTrace {trDirective = d, trContract = c, trStart = t, trEvents = evs}]
       Section _ s -> sectionTraces s
       _ -> []
+
+-- | Every @DECIDE@ in a section and the sections under it, in source order.
+decidesOf :: Section Resolved -> [Decide Resolved]
+decidesOf (MkSection _ _ _ _ decls) = concatMap go decls
+  where
+    go = \ case
+      Decide _ d  -> [d]
+      Section _ s -> decidesOf s
+      _           -> []
+
+-- | The rule a @--contract NAME@ names, as a reference to it: a rule that takes
+-- no inputs, at the top level or under a @§@ heading at any depth. The name is
+-- matched as written, without backticks: @the tenancy@ finds @`the tenancy`
+-- MEANS …@. @l4 lts@ ("L4.Lts.List.freshTrace") and @l4 explore@
+-- ("L4.Lts.Explore.startNamed") both look a name up here, so they find the
+-- same rule, and refuse the same names in the same words
+-- (smucclaw/l4-ide#1106: until 2026-11-25 @l4 lts@ looked only at the top
+-- level and said "no top-level rule named …" of a rule under a @§@).
+--
+-- When rules in two sections share the name, the first in source order is
+-- the one taken, and nothing says that there was another: that is what
+-- @l4 explore@ did before the two shared this lookup, kept for both (decided
+-- by Claude 2026-11-25, pending Meng's review).
+--
+-- A rule under a @§@ whose heading has a @GIVEN@ is found too, and does take
+-- no inputs of its own: a section @GIVEN@ is an @ASSUME@ in that section
+-- ("L4.Desugar.desugarSectionGivens"), not an input the rule is applied to.
+ruleNamed :: Module Resolved -> Text -> Either Text (Expr Resolved)
+ruleNamed (MkModule _ _ section) wanted =
+  case [ (u, n) | MkDecide _ _ (MkAppForm _ (Def u n) [] _) _ <- decidesOf section, nameToText n == wanted ] of
+    [] -> Left ("no rule named `" <> wanted <> "` that takes no inputs")
+    ((u, n) : _) -> Right (Var emptyAnno (Ref n u n))
 
 -- | The trace as written, replayed: the residual and its marking, the steps
 -- the run logged, and the contract clock the residual is relative to.

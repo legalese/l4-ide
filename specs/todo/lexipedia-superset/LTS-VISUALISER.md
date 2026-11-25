@@ -3255,6 +3255,11 @@ listed at its outset. It is exactly the authored empty directive: `LtsListSpec.h
 that the two renderings are byte-identical up to the line number. A rule with inputs, or an
 unknown name, is refused with a message, not an empty list.
 
+**Amended 2026-11-25 (smucclaw/l4-ide#1106):** the rule is no longer looked for at the top level only.
+`freshTrace` and `l4 explore`'s `startNamed` now share one lookup, `ruleNamed` in `WhatIf.hs`, which walks every `§` heading at any depth (`decidesOf`), so `l4 lts --contract` finds a rule under a heading as `l4 explore --contract` always did.
+The refusal is explore's sentence, `no rule named NAME that takes no inputs`, where the list's was `no top-level rule named …`.
+When two sections each define a rule of the name, both take the first in source order and say nothing of the other, which is what `startNamed` did before the two shared the lookup (decided by Claude 2026-11-25, pending Meng's review); `LtsListSpec.hs` case 8 pins it.
+
 **The exact output for one contract** — `jl4/examples/ok/contracts.l4`, first `#TRACE`
 (`aContract`, three events, the last a `WAIT UNTIL 10`), as `l4 lts jl4/examples/ok/contracts.l4
 --steps` prints it and as `jl4/examples/lts/expected/contracts.txt:1-22` pins it:

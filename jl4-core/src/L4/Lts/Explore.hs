@@ -200,28 +200,19 @@ startsOf m = nubOrdOn (\ s -> (s.stName, prettyLayout s.stAt))
   [ MkStart {stName = prettyLayout tr.trContract, stContract = tr.trContract, stAt = tr.trStart, stClock = Nothing}
   | tr <- tracesOf m ]
 
--- | A top-level rule with no inputs, at this @AT@. Unlike
--- 'L4.Lts.List.freshTrace' this finds a rule under a @§@ heading too, since
--- a contract that is explored is usually written in sections.
+-- | A rule with no inputs, at this @AT@: at the top level or under a @§@
+-- heading, found as 'L4.Lts.List.freshTrace' finds it for @l4 lts@
+-- ('ruleNamed'), since a contract that is explored is usually written in
+-- sections.
 startNamed :: Module Resolved -> Text -> Rational -> Either Text Start
-startNamed (MkModule _ _ section) wanted at =
-  case [ (u, n) | MkDecide _ _ (MkAppForm _ (Def u n) [] _) _ <- decidesOf section, nameToText n == wanted ] of
-    [] -> Left ("no rule named `" <> wanted <> "` that takes no inputs")
-    ((u, n) : _) -> Right MkStart
-      { stName = wanted
-      , stContract = Var emptyAnno (Ref n u n)
-      , stAt = Lit emptyAnno (NumericLit emptyAnno at)
-      , stClock = Just at
-      }
-
--- | Every @DECIDE@ in a section and the sections under it.
-decidesOf :: Section Resolved -> [Decide Resolved]
-decidesOf (MkSection _ _ _ _ decls) = concatMap go decls
-  where
-    go = \ case
-      Decide _ d  -> [d]
-      Section _ s -> decidesOf s
-      _           -> []
+startNamed m wanted at = do
+  contract <- ruleNamed m wanted
+  Right MkStart
+    { stName = wanted
+    , stContract = contract
+    , stAt = Lit emptyAnno (NumericLit emptyAnno at)
+    , stClock = Just at
+    }
 
 ----------------------------------------------------------------------------
 -- Options
