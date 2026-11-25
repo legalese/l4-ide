@@ -1,0 +1,44 @@
+-- JSONDECODE reads a DATE, a TIME and a DATETIME in the forms TODATE, TOTIME
+-- and TODATETIME read, and in the forms jl4-service's direct path read with
+-- parsers of its own, among them the service's own answer for a DATETIME
+-- (assumed, not ruled; review of #779, 2026-11-21). A string with anything
+-- else after it is refused. TODATE itself is not changed.
+
+GIVEN s IS A STRING
+GIVETH AN EITHER STRING DATE
+`decode date` s MEANS JSONDECODE s
+
+GIVEN s IS A STRING
+GIVETH AN EITHER STRING TIME
+`decode time` s MEANS JSONDECODE s
+
+GIVEN s IS A STRING
+GIVETH AN EITHER STRING DATETIME
+`decode datetime` s MEANS JSONDECODE s
+
+GIVEN s IS A STRING
+GIVETH AN EITHER STRING STRING
+`zone of` s MEANS
+  CONSIDER `decode datetime` s
+  WHEN RIGHT w THEN RIGHT (DATETIME_TZ w)
+  WHEN LEFT e THEN LEFT e
+
+#EVAL `decode date` "\"2026-1-5\""
+#EVAL `decode date` "\"2026-01-31T10:30:00Z\""
+#EVAL `decode date` "\"2026-01-31 10:30\""
+#EVAL `decode time` "\"1:5\""
+#EVAL `decode time` "\"10:30:00Z\""
+#EVAL `decode time` "\"10:30:15.5 UTC\""
+#EVAL `decode time` "\"10:30:00+08:00\""
+#EVAL `decode time` "\"10:30:00 Asia/Singapore\""
+#EVAL `decode datetime` "\"2026-01-31 10:30:00 UTC\""
+#EVAL `decode datetime` "\"2026-01-31 10:30\""
+#EVAL `decode datetime` "\"2026-01-31T10:30:00.5\""
+#EVAL `decode datetime` "\"2026-01-31 10:30:00 Asia/Singapore\""
+#EVAL `zone of` "\"2026-01-31 10:30:00 Asia/Singapore\""
+#EVAL TODATE "2026-1-5"
+
+#EVAL `decode date` "\"2026-01-31xyz\""
+#EVAL `decode time` "\"10:30:00 xyz\""
+#EVAL `decode datetime` "\"2026-01-31 10:30 Asia/Singapore\""
+#EVAL `decode datetime` "\"2026-01-3110:30\""

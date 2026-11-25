@@ -61,11 +61,12 @@ import LSP.Logger
   , Recorder
   , WithPriority(..)
   , cfilter
-  , cmapWithPrio
-  , makeRefRecorder
+  , makeKeyedRefRecorder
   , pretty
   )
-import Language.LSP.Protocol.Types (NormalizedFilePath)
+import qualified LSP.Core.Shake as Shake
+import qualified Data.Set as Set
+import Language.LSP.Protocol.Types (NormalizedFilePath, NormalizedUri)
 import Development.IDE.Graph (Action)
 
 import L4.Lexer (LangTag(..), isLangTagChar)
@@ -232,15 +233,12 @@ runOneshot
   -> (NormalizedFilePath -> Action b)
   -> IO ([Text], b)
 runOneshot evalConfig fp act = do
-  (getLog, refRecorder) <- makeRefRecorder
-  let prettyRecorder = cmapWithPrio pretty refRecorder
-      -- Drop Debug-priority messages (very verbose Shake internals) but
-      -- keep Info/Warning/Error: real parse/type diagnostics come through
-      -- at Info priority via the LSP publishDiagnostics hook, so we can't
-      -- just filter by priority alone.  We scrub progress chatter out of
-      -- the rendered Text list below with `isProgressChatter`.
-      keep wp = wp.priority /= Debug
-      filteredRec = cfilter keep prettyRecorder
+  -- Debug-priority messages (very verbose Shake internals) are dropped, and
+  -- Info/Warning/Error kept: real parse/type diagnostics come through at Info
+  -- priority via the LSP publishDiagnostics hook, so we can't just filter by
+  -- priority alone.  We scrub progress chatter out of the rendered Text list
+  -- below with `isProgressChatter`.
+  (getLog, filteredRec) <- makeCliRecorder
   res <- oneshotL4Action filteredRec evalConfig fp act
   rawErrs <- getLog
   -- Post-filter: drop lines matching known progress-chatter prefixes.
@@ -260,17 +258,51 @@ runOneshotWithDiagnostics
   -> (NormalizedFilePath -> Action b)
   -> IO ([Text], [FileDiagnostic], b)
 runOneshotWithDiagnostics evalConfig fp act = do
-  (getLog, refRecorder) <- makeRefRecorder
-  let prettyRecorder = cmapWithPrio pretty refRecorder
-      keep wp = wp.priority /= Debug
-      filteredRec = cfilter keep prettyRecorder
+  (getLog, filteredRec) <- makeCliRecorder
   (diags, res) <- Oneshot.oneshotL4ActionWithDiags filteredRec evalConfig fp act
   rawErrs <- getLog
   pure (filter (not . isProgressChatter) rawErrs, diags, res)
 
+-- | The recorder a command collects the pipeline's log with, as text, without
+-- its Debug-priority messages.
+--
+-- With no editor to publish to, the pipeline logs every diagnostic of a file
+-- each time that file's diagnostics change ('Shake.LogDiagsDiffButNoLspEnv'),
+-- so a command that printed the log printed each diagnostic once for every
+-- later change to its file's diagnostics: @l4 run@ printed a type checker's
+-- warning three times and an error of the export check twice, and @l4 check@
+-- a type checker's warning twice (review of #779, 2026-11-21). Each list
+-- holds all of the file's diagnostics, so only the last one of each file is
+-- kept, where it falls in the log ('latestDiagnostics'); it is printed as it
+-- was.
+makeCliRecorder :: IO (IO [Text], Recorder (WithPriority Oneshot.Log))
+makeCliRecorder = do
+  (getLog, refRecorder) <- makeKeyedRefRecorder diagnosticsOf pretty
+  let keep wp = wp.priority /= Debug
+  pure (latestDiagnostics <$> getLog, cfilter keep refRecorder)
+ where
+  diagnosticsOf :: Oneshot.Log -> Maybe NormalizedUri
+  diagnosticsOf = \case
+    Oneshot.ShakeLog (Shake.LogDiagsDiffButNoLspEnv uri _) -> Just uri
+    -- the rules log the store's messages through their own recorder
+    Oneshot.RulesLog (Rules.ShakeLog (Shake.LogDiagsDiffButNoLspEnv uri _)) -> Just uri
+    _ -> Nothing
+
+-- | A log with each list of a file's diagnostics dropped that a later list of
+-- the same file's replaces; every other message is kept, in order.
+latestDiagnostics :: [(Maybe NormalizedUri, Text)] -> [Text]
+latestDiagnostics = snd . foldr step (Set.empty, [])
+ where
+  step (Nothing, t) (seen, kept) = (seen, t : kept)
+  step (Just uri, t) (seen, kept)
+    | uri `Set.member` seen = (seen, kept)
+    | otherwise = (Set.insert uri seen, t : kept)
+
 -- 'hasBlockingError' (re-exported) is the rule for whether a diagnostics set
 -- should make a CLI command exit non-zero. It lives in jl4-lsp so that the
--- editor's Deploy buttons refuse exactly what @l4 check@ and @l4 deploy@ do.
+-- editor's Deploy buttons refuse exactly what @l4 check@ does. @l4 deploy@
+-- uses it too, with one exception: an error from the export check does not
+-- stop its upload ("L4.Cli.Deploy".'bundle').
 -- It leaves out the evaluator's diagnostics (source @\"eval\"@): a failed
 -- @#ASSERT@ is one, at Error severity, and keeps @l4 run@ at exit 0. A
 -- directive that CRASHES does fail the run, but @l4 run@ decides that from the

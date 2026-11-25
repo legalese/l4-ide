@@ -79,7 +79,6 @@ executable jl4-schema
     jl4-lsp,
     aeson-pretty,
     bytestring,
-    containers,
     directory,
     lsp-types,
     optparse-applicative,
@@ -136,10 +135,13 @@ test-suite l4-cli-test
     directory,
     filepath,
     hspec,
+    http-types,
     lsp-types,
     process,
     temporary,
     text,
+    wai,
+    warp,
 
 test-suite l4-agreement-test
   import: defaults

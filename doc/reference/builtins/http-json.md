@@ -80,13 +80,19 @@ DECIDE `alice as JSON` IS JSONENCODE alice
 ## JSONDECODE
 
 `JSONDECODE text` reads JSON text. It gives `RIGHT value`, or `LEFT message` when the text is not valid JSON. JSON that is valid but does not fit the expected type, such as a record with a field missing or a string where a number belongs, stops the evaluation with an error naming the problem.
+The error shows the value it refused as JSON, compactly: `Expected JSON number but got: "abc"`.
+A value longer than 200 characters is cut there, and the message ends by saying how much of it is shown, such as `... (the first 200 of 1834 characters)`.
 
 The type you expect guides the decoding, so say it, with `GIVETH` or by the way the result is used:
 
 - A JSON object decodes to a record whose field names match its keys. Keys the record does not declare are ignored.
 - An array decodes to a LIST, a number to a NUMBER, a string to a STRING, `true` and `false` to a BOOLEAN.
 - `null` decodes to `NOTHING` for a MAYBE type; any other value decodes to `JUST` it.
-- A string with a constructor's name decodes to that constructor of an enumeration.
+- A DATE, a TIME and a DATETIME decode from a string. A DATE is written year first, `"2026-01-31"` or `"2026-1-5"`, or as `TODATE` reads one, such as `"31/01/2026"`, or as a date and a time, of which the date is taken as written. A TIME is `"14:30"`, `"14:30:00"` or `"14:30:15.5"`, which may be followed by `Z`, ` UTC`, an offset on either side of UTC, such as `+08:00` or `-05:00`, or the name of a zone, all of which are left out because a TIME has no zone. A DATETIME is a date and a time, with `T` or a space between them. Followed by nothing, `Z` or ` UTC`, the time is read in UTC; with seconds and an offset after it, `"2026-01-31T10:30:00+08:00"`, it is read as the instant that names; either way the value takes the document's timezone. With seconds and the name of a zone after it, `"2026-01-31 10:30:00 Asia/Singapore"`, it is that time in that zone, and takes that zone. A string in another form, or a value that is not a string, stops the evaluation with an error.
+- A string with a constructor's name decodes to that constructor of an enumeration. Any other value for an enumeration, a name it does not have, a number, `true` or `null`, stops the evaluation with an error naming the type and the strings it takes: ``Expected a `Party` written as one of the strings "Landlord", "Tenant", the names of its constructors, but got: "Lodger"``. A constructor that carries fields is an object keyed by its name, `{"Card": {"card fee": 2}}`, the form a deployed rule publishes; its bare name, or any other form, stops the evaluation with an error naming the type's constructors. `JSONENCODE` writes such a constructor without its name, so that form does not decode back.
+- A type with one constructor only, named like the type and carrying fields, such as ``DECLARE `Deposit Refund` IS ONE OF `Deposit Refund` HAS amount IS A NUMBER``, is a record: it decodes from its fields alone, `{"amount": 40}`, which is how `JSONENCODE` writes it and the form a deployed rule publishes.
+- `{"LEFT": [v]}` decodes to `LEFT v` and `{"RIGHT": [v]}` to `RIGHT v` for an EITHER type, the form a deployed rule publishes. Any other JSON for an EITHER, such as a bare `5` or an object with both keys, stops the evaluation with `Expected an EITHER written {"LEFT": [value]} or {"RIGHT": [value]}`, as a string for a NUMBER does. `JSONENCODE` writes an EITHER without the array, as `{"RIGHT": 5}`, so that form does not decode back: it stops with the same error.
+- A type that takes a type decodes as the type does, with what it is given in place of its parameters: with `DECLARE Box a HAS value IS AN a`, `{"value": 5}` decodes to a `Box OF NUMBER`, and with `DECLARE Pick a IS ONE OF Skip, Take HAS item IS AN a`, `"Skip"` and `{"Take": {"item": 5}}` decode to a `Pick OF NUMBER`.
 - A type declared as another name for a type (`DECLARE Year IS A NUMBER`) decodes as that type, and so does one for a MAYBE: with `DECLARE MaybeYear IS A MAYBE NUMBER`, `null` decodes to `NOTHING` and `2026` to `JUST 2026`.
 
 ```l4

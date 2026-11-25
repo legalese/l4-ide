@@ -5,6 +5,7 @@ import Control.Concurrent (ThreadId)
 import Data.Aeson (ToJSON(..), object, (.=))
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as Key
+import qualified Base.Map as Map
 import Data.Ratio (numerator, denominator)
 import qualified Data.Vector as Vector
 import Data.Time (Day, UTCTime)
@@ -297,6 +298,36 @@ instance ToJSON a => ToJSON (Value a) where
   toJSON (ValAssumed r)           = toJSON ("<assumed:" <> resolvedNameText r <> ">" :: Text)
   toJSON (ValEnvironment{})       = toJSON ("<environment>" :: Text)
   toJSON (ValBreached reason)     = object ["breached" .= toJSON reason]
+
+-- | A value as JSON, as the 'ToJSON' instance writes it, except that a
+-- constructor whose fields have names (in the map, by the constructor's
+-- unique) is written with them, @{"Injury": {"days off work": 3}}@, as
+-- jl4-service answers it, rather than positionally, @{"Injury": [3]}@. So an
+-- answer of a type with a constructor that carries data has the form an input
+-- of that type is read in. A constructor the map does not name, @LEFT@ and
+-- @RIGHT@ among them, is written positionally, as the instance writes it.
+nfToJsonWithFieldNames :: Map Unique [Text] -> NF -> Aeson.Value
+nfToJsonWithFieldNames fields = go
+ where
+  go = \case
+    Omitted -> Aeson.Null
+    MkNF v -> value v
+  value = \case
+    ValCons x xs -> Aeson.Array (Vector.fromList (go x : rest xs))
+    ValConstructor name [v]
+      | resolvedNameText name == "JUST" -> go v
+    ValConstructor name vs@(_ : _) ->
+      let cname = Key.fromText (resolvedNameText name)
+      in case Map.lookup (getUnique name) fields of
+           Just names | length names == length vs ->
+             object [ cname .= object [ Key.fromText n .= go v | (n, v) <- zip names vs ] ]
+           _ -> object [ cname .= map go vs ]
+    other -> toJSON other
+  -- the rest of a list, flattened; an improper tail is written as an element
+  rest = \case
+    MkNF ValNil -> []
+    MkNF (ValCons x xs) -> go x : rest xs
+    other -> [go other]
 
 instance ToJSON a => ToJSON (ReasonForBreach a) where
   toJSON (DeadlineMissed deadline now elapsed _party action limit) = object

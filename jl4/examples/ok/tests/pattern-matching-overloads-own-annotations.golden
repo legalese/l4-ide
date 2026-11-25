@@ -7,6 +7,9 @@ pattern-matching-overloads-own-annotations.l4:18:1-10:
   6
 pattern-matching-overloads-own-annotations.l4:19:1-10:
   TRUE
+pattern-matching-overloads-own-annotations.l4:23:1-28:
+  [export warning] `twice` is published with @export, but its input `b` has no written type.
+  Write one in the GIVEN, so that the schema says what to send.
 pattern-matching-overloads-own-annotations.l4:26:1-14:
   6
 pattern-matching-overloads-own-annotations.l4:27:1-17:

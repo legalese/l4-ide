@@ -1,10 +1,8 @@
 module L4.JsonSchema (
   generateJsonSchema,
-  typeToJsonSchema,
+  shapeToJsonSchema,
   JsonSchema (..),
   SchemaType (..),
-  SchemaContext (..),
-  emptyContext,
 ) where
 
 import Base
@@ -16,13 +14,7 @@ import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.Map.Strict as Map
 
 import L4.Export (ExportedFunction (..), ExportedParam (..))
-import L4.TypeSynonym (expandSynonyms)
-import L4.Syntax
-import L4.TypeCheck.Environment
-  ( booleanUnique, dateUnique, datetimeUnique, listUnique, maybeUnique
-  , numberUnique, stringUnique, timeUnique
-  )
-import Optics
+import L4.Export.Shape (JsonConstructor (..), JsonField (..), JsonShape (..), ShapeEnv, ShapeName (..), Unsendable, jsonShape)
 
 data JsonSchema = JsonSchema
   { schemaVersion :: !Text
@@ -48,19 +40,6 @@ data SchemaType
   | SAnyOf ![SchemaType] !(Maybe Text)
   | SStringFormat !Text !(Maybe Text)
   deriving stock (Eq, Show)
-
-data SchemaContext = SchemaContext
-  { ctxDeclares :: !(Map Text (Declare Resolved))
-  , ctxCollectedDefs :: !(Map Text SchemaType)
-  }
-  deriving stock (Show)
-
-emptyContext :: SchemaContext
-emptyContext =
-  SchemaContext
-    { ctxDeclares = Map.empty
-    , ctxCollectedDefs = Map.empty
-    }
 
 instance ToJSON JsonSchema where
   toJSON schema =
@@ -131,207 +110,136 @@ schemaTypeToFields = \case
   descField :: Maybe Text -> [(Aeson.Key, Aeson.Value)]
   descField = maybe [] (\d -> ["description" .= d])
 
-generateJsonSchema :: SchemaContext -> ExportedFunction -> JsonSchema
-generateJsonSchema ctx export =
-  let (paramSchema, finalDefs) = buildParamsSchema ctx export.exportParams
-   in JsonSchema
-        { schemaVersion = "https://json-schema.org/draft/2020-12/schema"
-        , schemaTitle = export.exportName
-        , schemaDescription =
-            if Text.null export.exportDescription
-              then Nothing
-              else Just export.exportDescription
-        , schemaType = paramSchema
-        , schemaDefs = finalDefs
-        }
-
-buildParamsSchema :: SchemaContext -> [ExportedParam] -> (SchemaType, Map Text SchemaType)
-buildParamsSchema ctx params =
-  let (props, defs) = foldr addParam ([], ctx.ctxCollectedDefs) params
-   in (SObject props Nothing, defs)
+-- | The JSON Schema of an exported rule's inputs, rendered from the shape the
+-- export check gives each of their types ('jsonShape'), so an @\@export@ that
+-- the check accepts is described as the check sees it. A declared type is
+-- written once, under @$defs@, and referred to wherever it is used. An input
+-- whose type has no shape has no schema: 'Left' names it and says why.
+generateJsonSchema :: ShapeEnv -> ExportedFunction -> Either (Text, Unsendable) JsonSchema
+generateJsonSchema env export = do
+  shapes <- traverse shapeOf export.exportParams
+  let (props, defs) = runState (traverse property shapes) Map.empty
+  pure
+    JsonSchema
+      { schemaVersion = "https://json-schema.org/draft/2020-12/schema"
+      , schemaTitle = export.exportName
+      , schemaDescription =
+          if Text.null export.exportDescription
+            then Nothing
+            else Just export.exportDescription
+      , schemaType = SObject props Nothing
+      , schemaDefs = defs
+      }
  where
-  addParam :: ExportedParam -> ([(Text, SchemaType, Bool)], Map Text SchemaType) -> ([(Text, SchemaType, Bool)], Map Text SchemaType)
-  addParam param (acc, defs) =
-    case param.paramType of
-      Nothing ->
-        ((param.paramName, SString param.paramDescription, param.paramRequired) : acc, defs)
-      Just ty ->
-        let (schema, newDefs) = typeToJsonSchema ctx{ctxCollectedDefs = defs} ty
-            schemaWithDesc = addDescription schema param.paramDescription
-         in ((param.paramName, schemaWithDesc, param.paramRequired) : acc, newDefs)
+  shapeOf param = case param.paramType of
+    Nothing -> Right (param, Nothing)
+    Just ty -> case jsonShape env ty of
+      Left why -> Left (param.paramName, why)
+      Right shape -> Right (param, Just shape)
 
-  addDescription :: SchemaType -> Maybe Text -> SchemaType
-  addDescription st Nothing = st
-  addDescription st (Just desc) = case st of
-    SRef refName _ -> SRef refName (Just desc)
-    SString _ -> SString (Just desc)
-    SNumber _ -> SNumber (Just desc)
-    SInteger _ -> SInteger (Just desc)
-    SBoolean _ -> SBoolean (Just desc)
-    SArray items _ -> SArray items (Just desc)
-    SObject props _ -> SObject props (Just desc)
-    SOneOf opts _ -> SOneOf opts (Just desc)
-    SEnum vals _ -> SEnum vals (Just desc)
-    SConst val _ -> SConst val (Just desc)
-    SAnyOf opts _ -> SAnyOf opts (Just desc)
-    SStringFormat fmt _ -> SStringFormat fmt (Just desc)
-    SNull -> SNull
+  -- An input with no written type is described as a string, and is required
+  -- as the rule's GIVEN says.
+  property (param, Nothing) =
+    pure (param.paramName, SString param.paramDescription, param.paramRequired)
+  property (param, Just shape) = do
+    schema <- shapeToJsonSchema shape
+    pure (param.paramName, withDescription param.paramDescription schema, not (isOptional shape))
 
-typeToJsonSchema :: SchemaContext -> Type' Resolved -> (SchemaType, Map Text SchemaType)
-typeToJsonSchema ctx = typeToJsonSchema' ctx . expandApplied
+  isOptional = \case
+    JOptional _ -> True
+    _ -> False
+
+-- | A shape as JSON Schema, with the declared types it reaches added to the
+-- @$defs@ it is given. A MAYBE may be @null@.
+shapeToJsonSchema :: JsonShape -> State (Map Text SchemaType) SchemaType
+shapeToJsonSchema = \case
+  JNumber -> pure (SNumber Nothing)
+  JString -> pure (SString Nothing)
+  JBool -> pure (SBoolean Nothing)
+  JDate -> pure (SStringFormat "date" Nothing)
+  JTime -> pure (SStringFormat "time" Nothing)
+  JDateTime -> pure (SStringFormat "date-time" Nothing)
+  JArray inner -> (`SArray` Nothing) <$> shapeToJsonSchema inner
+  JOptional inner -> (\s -> SAnyOf [s, SNull] Nothing) <$> shapeToJsonSchema inner
+  JEither left right -> eitherSchema <$> shapeToJsonSchema left <*> shapeToJsonSchema right
+  JEnum named constructors -> define named (pure (SEnum constructors named.shapeTypeDescription))
+  -- A constructor that carries fields is an object with its name as the one
+  -- key, {"Card": {"card fee": 2}}, and one that carries none is its name,
+  -- "Cash" (the wire-form bench, card J1, option A; HATBOX, Meng,
+  -- 2026-11-18). A type that has both is a oneOf of the names and of one object
+  -- for each constructor that carries fields (MULLET, Meng, 2026-11-18); one
+  -- object for each, with its key required, says that exactly one constructor
+  -- is there, which one object with every key optional would not (assumed, not
+  -- ruled).
+  JTagged named constructors ->
+    define named do
+      let bare = [c.constructorName | c <- constructors, null c.constructorFields]
+      tagged <- for [c | c <- constructors, not (null c.constructorFields)] \c -> do
+        props <- for c.constructorFields \f -> do
+          schema <- shapeToJsonSchema f.fieldShape
+          pure (f.fieldName, withDescription f.fieldDescription schema, f.fieldRequired)
+        pure (SObject [(c.constructorName, SObject props Nothing, True)] Nothing)
+      pure $ case [SEnum bare Nothing | not (null bare)] <> tagged of
+        [one] -> withDescription named.shapeTypeDescription one
+        members -> SOneOf members named.shapeTypeDescription
+  JRecord named fields ->
+    define named do
+      props <- for fields \f -> do
+        schema <- shapeToJsonSchema f.fieldShape
+        pure (f.fieldName, withDescription f.fieldDescription schema, f.fieldRequired)
+      pure (SObject props named.shapeTypeDescription)
+  -- A record that contains itself refers to its definition. One that contains
+  -- itself given a larger type (@Grows OF (LIST OF a)@ in @Grows a@) has a
+  -- definition for each size, and no finite schema: past the first, it is an
+  -- object, as the service writes it.
+  JRecursive named -> do
+    let key = defName named
+    known <- gets (Map.member key)
+    pure (if known then SRef key Nothing else SObject [] Nothing)
  where
-  -- A synonym with arguments is decided by what it stands for, as the decoder
-  -- does: its definition would hold the bare parameter. One without is kept
-  -- as a reference to its definition, which holds what it stands for.
-  expandApplied ty = case ty of
-    TyApp _ _ (_ : _) -> expandSynonyms ctx.ctxDeclares ty
-    _ -> ty
+  -- Each declared type is written once. The name is taken before its body is
+  -- written, so a type that contains itself refers to itself.
+  define named body = do
+    let key = defName named
+    known <- gets (Map.member key)
+    unless known do
+      modify' (Map.insert key (SObject [] Nothing))
+      schema <- body
+      modify' (Map.insert key schema)
+    pure (SRef key Nothing)
 
-typeToJsonSchema' :: SchemaContext -> Type' Resolved -> (SchemaType, Map Text SchemaType)
-typeToJsonSchema' ctx = \case
-  Type _ -> (SString Nothing, ctx.ctxCollectedDefs)
-  TyApp _ name args ->
-    -- Decide from the resolved type, not from its name. A name says nothing: a
-    -- module may declare, or import, its own `Text`, `Date` or `Time`, and each
-    -- of those is that record or enum, not a JSON string. The builtins have
-    -- uniques of their own, so only they reach these arms.
-    let typeName = resolvedToText name
-        unique = getUnique name
-     in case args of
-          [] | unique == numberUnique -> (SNumber Nothing, ctx.ctxCollectedDefs)
-             | unique == stringUnique -> (SString Nothing, ctx.ctxCollectedDefs)
-             | unique == booleanUnique -> (SBoolean Nothing, ctx.ctxCollectedDefs)
-             | unique == dateUnique -> (SStringFormat "date" Nothing, ctx.ctxCollectedDefs)
-             | unique == datetimeUnique -> (SStringFormat "date-time" Nothing, ctx.ctxCollectedDefs)
-             | unique == timeUnique -> (SStringFormat "time" Nothing, ctx.ctxCollectedDefs)
-          [inner]
-            | unique == listUnique ->
-                let (innerSchema, defs) = typeToJsonSchema ctx inner
-                 in (SArray innerSchema Nothing, defs)
-            | unique == maybeUnique ->
-                let (innerSchema, defs) = typeToJsonSchema ctx inner
-                 in (SAnyOf [innerSchema, SNull] Nothing, defs)
-          _ ->
-            case Map.lookup typeName ctx.ctxDeclares of
-              Just decl ->
-                if Map.member typeName ctx.ctxCollectedDefs
-                  then (SRef typeName Nothing, ctx.ctxCollectedDefs)
-                  else
-                    let placeholder = Map.insert typeName (SString Nothing) ctx.ctxCollectedDefs
-                        ctx' = ctx{ctxCollectedDefs = placeholder}
-                        (declSchema, defs) = declareToJsonSchema ctx' decl
-                        finalDefs = Map.insert typeName declSchema defs
-                     in (SRef typeName Nothing, finalDefs)
-              Nothing ->
-                (SRef typeName Nothing, ctx.ctxCollectedDefs)
-  Fun _ _ retTy ->
-    typeToJsonSchema ctx retTy
-  Forall _ _ inner ->
-    typeToJsonSchema ctx inner
-  InfVar _ _ _ ->
-    (SString Nothing, ctx.ctxCollectedDefs)
+-- | An EITHER, in the form the encoder writes it: one of @{"LEFT": [v]}@ and
+-- @{"RIGHT": [v]}@, the value in an array of one (the wire-form bench, card J3,
+-- option B, ruled by Meng on 2026-10-15).
+eitherSchema :: SchemaType -> SchemaType -> SchemaType
+eitherSchema left right =
+  SOneOf
+    [ SObject [("LEFT", SArray left Nothing, True)] Nothing
+    , SObject [("RIGHT", SArray right Nothing, True)] Nothing
+    ]
+    Nothing
 
-declareToJsonSchema :: SchemaContext -> Declare Resolved -> (SchemaType, Map Text SchemaType)
-declareToJsonSchema ctx (MkDeclare ann _ _ typeDecl) =
-  let desc = fmap getDesc (ann ^. annDesc)
-   in case typeDecl of
-        RecordDecl _ _ fields ->
-          let (props, defs) = foldr (addField ctx) ([], ctx.ctxCollectedDefs) fields
-           in (SObject props desc, defs)
-        EnumDecl _ constructors ->
-          enumToJsonSchema ctx desc constructors
-        SynonymDecl _ ty ->
-          let (schema, defs) = typeToJsonSchema ctx ty
-           in (addDescToSchema schema desc, defs)
- where
-  addField :: SchemaContext -> TypedName Resolved -> ([(Text, SchemaType, Bool)], Map Text SchemaType) -> ([(Text, SchemaType, Bool)], Map Text SchemaType)
-  addField ctx' (MkTypedName fieldAnn fieldName fieldTy _) (acc, defs) =
-    let fieldNameText = resolvedToText fieldName
-        fieldDesc = fmap getDesc (fieldAnn ^. annDesc)
-        (fieldSchema, newDefs) = typeToJsonSchema ctx'{ctxCollectedDefs = defs} fieldTy
-        schemaWithDesc = addDescToSchema fieldSchema fieldDesc
-        isRequired = not (isMaybeOrOptionalType ctx'.ctxDeclares fieldTy)
-     in ((fieldNameText, schemaWithDesc, isRequired) : acc, newDefs)
+-- | The name a declared type has under @$defs@: its own, and for a type with
+-- parameters the types it is given, as L4 writes them (@Box OF NUMBER@), since
+-- each of those has fields of its own.
+defName :: ShapeName -> Text
+defName named = case named.shapeTypeArgs of
+  [] -> named.shapeTypeName
+  args -> named.shapeTypeName <> " OF " <> Text.intercalate ", " args
 
-  addDescToSchema :: SchemaType -> Maybe Text -> SchemaType
-  addDescToSchema st Nothing = st
-  addDescToSchema st (Just d) = case st of
-    SRef refName _ -> SRef refName (Just d)
-    SString _ -> SString (Just d)
-    SNumber _ -> SNumber (Just d)
-    SInteger _ -> SInteger (Just d)
-    SBoolean _ -> SBoolean (Just d)
-    SArray items _ -> SArray items (Just d)
-    SObject props _ -> SObject props (Just d)
-    SOneOf opts _ -> SOneOf opts (Just d)
-    SEnum vals _ -> SEnum vals (Just d)
-    SConst val _ -> SConst val (Just d)
-    SAnyOf opts _ -> SAnyOf opts (Just d)
-    SStringFormat fmt _ -> SStringFormat fmt (Just d)
-    SNull -> SNull
-
-enumToJsonSchema :: SchemaContext -> Maybe Text -> [ConDecl Resolved] -> (SchemaType, Map Text SchemaType)
-enumToJsonSchema ctx desc constructors =
-  let hasPayloads = any hasFields constructors
-   in if hasPayloads
-        then enumWithPayloads ctx desc constructors
-        else enumSimple ctx desc constructors
- where
-  hasFields (MkConDecl _ _ fields) = not (null fields)
-
-enumSimple :: SchemaContext -> Maybe Text -> [ConDecl Resolved] -> (SchemaType, Map Text SchemaType)
-enumSimple ctx desc constructors =
-  let values = map (\(MkConDecl _ name _) -> resolvedToText name) constructors
-   in (SEnum values desc, ctx.ctxCollectedDefs)
-
-enumWithPayloads :: SchemaContext -> Maybe Text -> [ConDecl Resolved] -> (SchemaType, Map Text SchemaType)
-enumWithPayloads ctx' desc constructors =
-  let (options, defs) = foldr buildOption ([], ctx'.ctxCollectedDefs) constructors
-   in (SOneOf options desc, defs)
- where
-  buildOption :: ConDecl Resolved -> ([SchemaType], Map Text SchemaType) -> ([SchemaType], Map Text SchemaType)
-  buildOption (MkConDecl _ name fields) (acc, defs) =
-    let tagName = resolvedToText name
-        tagProp = ("tag", SConst tagName Nothing, True)
-        (fieldProps, newDefs) = foldr (addConField ctx'{ctxCollectedDefs = defs}) ([], defs) fields
-        allProps = tagProp : fieldProps
-        objSchema = SObject allProps Nothing
-     in (objSchema : acc, newDefs)
-
-  addConField :: SchemaContext -> TypedName Resolved -> ([(Text, SchemaType, Bool)], Map Text SchemaType) -> ([(Text, SchemaType, Bool)], Map Text SchemaType)
-  addConField ctx'' (MkTypedName fieldAnn fieldName fieldTy _) (acc, defs) =
-    let fieldNameText = resolvedToText fieldName
-        fieldDesc = fmap getDesc (fieldAnn ^. annDesc)
-        (fieldSchema, newDefs) = typeToJsonSchema ctx''{ctxCollectedDefs = defs} fieldTy
-        schemaWithDesc = case fieldDesc of
-          Nothing -> fieldSchema
-          Just d -> case fieldSchema of
-            SRef refName _ -> SRef refName (Just d)
-            SString _ -> SString (Just d)
-            SNumber _ -> SNumber (Just d)
-            SInteger _ -> SInteger (Just d)
-            SBoolean _ -> SBoolean (Just d)
-            SArray items _ -> SArray items (Just d)
-            SObject props _ -> SObject props (Just d)
-            SOneOf opts _ -> SOneOf opts (Just d)
-            SEnum vals _ -> SEnum vals (Just d)
-            SConst val _ -> SConst val (Just d)
-            SAnyOf opts _ -> SAnyOf opts (Just d)
-            SStringFormat fmt _ -> SStringFormat fmt (Just d)
-            SNull -> SNull
-     in ((fieldNameText, schemaWithDesc, not (isMaybeOrOptionalType ctx''.ctxDeclares fieldTy)) : acc, newDefs)
-
--- | Is this the builtin MAYBE, or a synonym for it, the types whose schema can
--- be null? Decided from the resolved, synonym-expanded type, as the decoder
--- decides whether a field may be left out: a type a module declares and calls
--- @Optional@ or @Maybe@ is a @$ref@ to that type, which cannot be null, so
--- leaving it out of @required@ would describe an input that may be omitted but
--- not be null.
-isMaybeOrOptionalType :: Map Text (Declare Resolved) -> Type' Resolved -> Bool
-isMaybeOrOptionalType declares ty = case expandSynonyms declares ty of
-  TyApp _ name [_] -> getUnique name == maybeUnique
-  _ -> False
-
-resolvedToText :: Resolved -> Text
-resolvedToText =
-  rawNameToText . rawName . getActual
+withDescription :: Maybe Text -> SchemaType -> SchemaType
+withDescription Nothing st = st
+withDescription (Just d) st = case st of
+  SRef refName _ -> SRef refName (Just d)
+  SString _ -> SString (Just d)
+  SNumber _ -> SNumber (Just d)
+  SInteger _ -> SInteger (Just d)
+  SBoolean _ -> SBoolean (Just d)
+  SArray items _ -> SArray items (Just d)
+  SObject props _ -> SObject props (Just d)
+  SOneOf opts _ -> SOneOf opts (Just d)
+  SEnum vals _ -> SEnum vals (Just d)
+  SConst val _ -> SConst val (Just d)
+  SAnyOf opts _ -> SAnyOf opts (Just d)
+  SStringFormat fmt _ -> SStringFormat fmt (Just d)
+  SNull -> SNull

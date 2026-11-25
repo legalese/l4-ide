@@ -23,7 +23,7 @@ Each row yields a result envelope; by default the envelopes stream out as NDJSON
 - Options: `BatchOptions` and `batchOptionsParser`; `OutputFormat` = `FmtNdjson | FmtJson | FmtCsv | FmtYaml`.
 - Driver: `batchCmd`; row loops `streamRows` and `bufferRows`; per-row `processRow`, whose first clause answers a refused CSV record.
 - Input: `BatchRow` and `RowSource`, `parseBatchInput`, `declareInputs` with `declaredInputs`, `expandSynonyms`, `throughMaybe`, `typeSynonyms`, `moduleDeclares`, `allDependencies`, `jsonNumber` and `jsonBool`, the CSV reader `CsvRow` and `csvRows` with `unclosedQuote`, and `inferCsvCell`.
-- `jl4-core/src/L4/EvaluateLazy/Machine.hs:1548-1577`: `expandTypeSynonyms` and `substituteTypeParams`, which `jsonValueToWHNFTyped` (`:1384-1546`) calls for a type and for each record field, so that a synonym decodes as what it stands for (#646).
+- `jl4-core/src/L4/EvaluateLazy/Machine.hs:1564-1593`: `expandTypeSynonyms` and `substituteTypeParams`, which `jsonValueToWHNFTyped` (`:1384-1546`) calls for a type and for each record field, so that a synonym decodes as what it stands for (#646).
 - Validation: `validateRow`, `primKind`, `unwrapMaybe`.
 - Output: `writeBuffered`, `encodeJsonArray`, `encodeCsv`, `orderedEnvCols`, `flattenEnvelope`.
 - Wrapper generation: `generateBatchWrapper` and helpers; the row's JSON is quoted into the wrapper by `escapeAsL4String`, which `cli-quoting.md` describes; entrypoint choice `findExportFunction`.
@@ -176,7 +176,7 @@ With `batch-declared-text.l4`: the cells `True` and `False` for a choice input a
        `l4 state-graph` labels (probed) are byte for byte the same on both, because the DOT writer already wrote a line break as `\n`.
      - `jl4-service` `reasoning.exampleCode` (probed, with `?trace=full`).
      - `jl4-service` `/query-plan` (probed): an atom's `label` is rule source, so a literal in it is escaped, and the atom's `atomId` (a UUID over the function name, the label and the input references, `jl4-core/src/L4/Viz/Ladder.hs:476-495`) changes when the label holds a line break, tab or carriage return inside a string literal; the `impactByAtomId` keys move with it. On `check s b MEANS s EQUALS "a\nb" AND b` the atom `s EQUALS "a\nb"` goes from `f4b0a98a-f1a8-5cf0-8abf-c9a3906139b8` on `main` to `7809d60b-0147-5d08-8d8b-3b934e5da3c4`, and the atom `b` keeps `07f78b9c-53af-58ac-947b-022366f8ee04` on both. No atom without such a literal changes its id.
-     - `jl4-service` for a function that returns a `DEONTIC` contract (probed): the contract in `explanation` (its `Result:` line prints the rule as source), each obligation's `action`, and the party, operands and deadline of an obligation that has not been evaluated (`Backend/Jl4.hs:1295`, `:1300`, `:1306`, read in code).
+     - `jl4-service` for a function that returns a `DEONTIC` contract (probed): the contract in `explanation` (its `Result:` line prints the rule as source), each obligation's `action`, and the party, operands and deadline of an obligation that has not been evaluated (`Backend/Jl4.hs:1311`, `:1300`, `:1306`, read in code).
      - Error text that prints an expression: type-check diagnostics such as "The expression being matched here is" (probed), and the evaluation error for an infinite loop (`L4/EvaluateLazy/Exceptions.hs:94`, read in code); the division-by-zero and non-integer errors print only the operator (`Print.hs:856-878`) and are unchanged.
      - Editor only (read in code): the ladder diagram's node labels (`jl4-lsp/src/LSP/L4/Viz/Ladder.hs:392`, `:450`) and the outline entry for a directive (`jl4-lsp/app/LSP/L4/Handlers.hs:559`).
    - Raw, as values:
@@ -193,7 +193,7 @@ With `batch-declared-text.l4`: the cells `True` and `False` for a choice input a
     A quote that opens a cell and is never closed is refused at the line where it opens, `line 2 of the CSV file is not valid CSV: a quote that opens a cell there is never closed`, and no row is run.
     `main` has a bug here: it reads `"abc` at the end of a file as the text `ab` with status `success`, and takes every row after an unclosed quote in the middle of a file into one cell with a `null` result, also `success`.
 12. **An input declared through a synonym without a type parameter is read, and validated, as the type it stands for (#646).**
-    With `DECLARE Year IS A NUMBER`, text that is no number for a `Year` is refused as for a NUMBER (`Expected JSON number but got: String "abc"`); `main` answered `Internal error: I encountered …` under `success`, and `--validate-only` called it `valid`.
+    With `DECLARE Year IS A NUMBER`, text that is no number for a `Year` is refused as for a NUMBER (`Expected JSON number but got: "abc"`, which the message wrote `String "abc"` until legalese/l4-ide#779); `main` answered `Internal error: I encountered …` under `success`, and `--validate-only` called it `valid`.
     A synonym for a `MAYBE NUMBER` given 25 is accepted; `main` refused it (`The value 25 reached a CONSIDER that has no branch for it`).
     This changes the JSON decoder in `jl4-core` (`Machine.hs`), which `main` shares with the service and with a program's own `JSONDECODE`: a type is expanded at its head, and so is a record field's before it is judged a `MAYBE`.
     A synonym that takes a type parameter is read by this decoder, but not by the CSV cell reader or `--validate-only`: see Limits.

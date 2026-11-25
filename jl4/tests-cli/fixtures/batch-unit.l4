@@ -1,0 +1,12 @@
+-- A type whose only constructor is named like it and carries no fields, read
+-- by l4 batch as its name, the form the schemas publish, and as {} (review of
+-- #779, 2026-11-19).
+
+DECLARE Unit IS ONE OF Unit
+
+@export default Takes a unit
+GIVEN u IS A Unit
+GIVETH A NUMBER
+`takes unit` MEANS
+  CONSIDER u
+  WHEN Unit THEN 1

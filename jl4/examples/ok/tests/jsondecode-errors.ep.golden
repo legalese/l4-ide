@@ -1,0 +1,56 @@
+-- JSONDECODE's errors show the value they refused as JSON, compactly, as the
+-- caller wrote it, and cut a long one at 200 characters, saying so (review of
+-- #779, 2026-11-20: they printed it in Haskell's notation, `Object (fromList
+-- [("card fee",Number 2.0)])`).
+
+DECLARE Payment IS ONE OF
+  Cash
+  Card HAS `card fee` IS A NUMBER
+
+DECLARE Pair HAS left IS A NUMBER, right IS A NUMBER
+
+-- a type whose only constructor is named like it is read as the string of its
+-- name when the constructor carries no fields, and as a record when it does
+DECLARE `Signed Waiver` IS ONE OF `Signed Waiver`
+
+DECLARE `Deposit Refund` IS ONE OF
+  `Deposit Refund` HAS amount IS A NUMBER
+
+GIVEN s IS A STRING
+GIVETH AN EITHER STRING Payment
+`decode payment` s MEANS JSONDECODE s
+
+GIVEN s IS A STRING
+GIVETH AN EITHER STRING (EITHER STRING NUMBER)
+`decode either` s MEANS JSONDECODE s
+
+GIVEN s IS A STRING
+GIVETH AN EITHER STRING NUMBER
+`decode number` s MEANS JSONDECODE s
+
+GIVEN s IS A STRING
+GIVETH AN EITHER STRING Pair
+`decode pair` s MEANS JSONDECODE s
+
+GIVEN s IS A STRING
+GIVETH AN EITHER STRING (LIST OF NUMBER)
+`decode list` s MEANS JSONDECODE s
+
+GIVEN s IS A STRING
+GIVETH AN EITHER STRING `Signed Waiver`
+`decode waiver` s MEANS JSONDECODE s
+
+GIVEN s IS A STRING
+GIVETH AN EITHER STRING `Deposit Refund`
+`decode refund` s MEANS JSONDECODE s
+
+#EVAL `decode payment` "{\"card fee\": 2}"
+#EVAL `decode payment` "\"Card\""
+#EVAL `decode either` "2000"
+#EVAL `decode number` "\"abc\""
+#EVAL `decode number` "true"
+#EVAL `decode pair` "[1, 2]"
+#EVAL `decode list` "{\"x\": 1}"
+#EVAL `decode waiver` "\"Unsigned\""
+#EVAL `decode refund` "\"Deposit Refund\""
+#EVAL `decode number` "{\"a long key that goes on and on\": [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60]}"

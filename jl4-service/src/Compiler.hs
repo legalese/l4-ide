@@ -8,9 +8,9 @@ import qualified Backend.Jl4 as Jl4
 import Backend.Jl4 (ModuleContext, buildCompiledFromShared, typecheckAndEvalBundle)
 import qualified L4.Evaluate.ValueLazy as EvalEnv (Environment)
 import Backend.Api (EvalBackend (..), FunctionDeclaration (..))
-import Shared (validateNoSanitizationCollisions)
+import Shared (sanitizePropertyName, validateNoSanitizationCollisions)
 import Backend.CodeGen (isDeonticType)
-import L4.FunctionSchema (Parameters (..), Parameter (..), typeToParameter, declaresFromModule)
+import L4.FunctionSchema (Parameters (..), Parameter (..), typeToParameter, uncheckedParameter, declaresFromModule)
 import L4.TypeCheck.Types (CheckErrorWithContext (..), CheckError (..), Severity (..))
 import L4.TypeCheck (prettyCheckErrorWithContext, severity)
 import Types
@@ -23,13 +23,15 @@ import Data.Aeson (toJSON)
 import Data.List (sortBy)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
-import Data.Ord (comparing)
 import qualified Data.Set as Set
+import Data.Ord (comparing)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text.Encoding
 import Data.Time (getCurrentTime)
 import L4.Export (ExportedFunction (..), ExportedParam (..), expandRequired, getExportedFunctions, enrichReturnTypes, extractImplicitAssumeParams)
+import qualified L4.Export as Export
+import qualified L4.Export.Shape as Shape
 import L4.Print (prettyTypeForDisplay)
 import L4.Syntax (Resolved, Declare(..), Type'(..), RawName(..), getActual, rawName, rawNameToText)
 import Logging (Logger, logInfo, logWarn)
@@ -127,18 +129,45 @@ compileBundle logger deployId sources = do
               ]
             pure (filepath, Left (Text.intercalate "\n" (("Typecheck failed: " <> Text.pack filepath) : why)))
 
-      let allFunctionsWithFile = [ (fp, fn) | (fp, Right fns) <- results, fn <- fns ]
+      let allFunctionsWithFile = [ (fp, fn) | (fp, Right (fns, _)) <- results, fn <- fns ]
           allFunctions = map snd allFunctionsWithFile
           errors = [err | (_, Left err) <- results]
+          -- A refused export whose name a served export also answers to (in
+          -- this file or another) is marked, so the status does not read as "this
+          -- name cannot be called" when a call by it is served. Matched as
+          -- 'DataPlane.requireFunction' matches a call: the exact name, or
+          -- the same sanitized name.
+          servedNames = Set.fromList [sanitizePropertyName fn.fnImpl.name | fn <- allFunctions]
+          refused =
+            [ r { reNameServed = sanitizePropertyName r.reName `Set.member` servedNames }
+            | (_, Right (_, rs)) <- results
+            , r <- rs
+            ]
 
-      -- Any file that failed to compile (typecheck errors, unsupported
-      -- @export inputs, …) fails the whole deploy. Previously this only
-      -- rejected when NO file produced functions, so a bundle with one broken
-      -- file and one good file would deploy the good half and silently drop
-      -- the error — and a single broken file would deploy a garbage schema
-      -- built from unresolved inference variables.
+      -- Any file that failed to compile (a parse or type error) fails the
+      -- whole deploy. Previously this only rejected when NO file produced
+      -- functions, so a bundle with one broken file and one good file would
+      -- deploy the good half and silently drop the error — and a single broken
+      -- file would deploy a garbage schema built from unresolved inference
+      -- variables.
+      --
+      -- An @export that the export check refuses is not such an error: the
+      -- deploy leaves it out, serves the file's other exports, and names it in
+      -- the metadata ('metaRefusedExports'). Only a deployment in which every
+      -- @export is refused fails, with the reasons, because it would serve
+      -- nothing (Meng, DEADWOOD, 2026-11-24).
       if not (null errors)
         then pure $ Left $ Text.intercalate "\n" errors
+        else if null allFunctions && not (null refused)
+        then do
+          logWarn logger "Deploy rejected: every @export has an input or result that cannot be sent"
+            [ ("deploymentId", toJSON deployId)
+            , ("refused", toJSON [r.reName | r <- refused])
+            ]
+          pure $ Left $ Text.intercalate "\n"
+            [ Text.intercalate "; " (concatMap (.reReasons) rs)
+            | (_, Right (_, rs@(_ : _))) <- results
+            ]
         else do
           let fnMap = Map.fromList [(fn.fnImpl.name, fn) | fn <- allFunctions]
 
@@ -158,6 +187,7 @@ compileBundle logger deployId sources = do
                 , metaDescription = Nothing
                 , metaServiceVersion = ""
                 , metaDeploymentVersion = ""
+                , metaRefusedExports = refused
                 }
 
           unless (null allFunctions) $
@@ -179,17 +209,48 @@ processTypecheckedFile
   -> ModuleContext
   -> Rules.TypeCheckResult
   -> Map FilePath EvalEnv.Environment  -- ^ Import environments from shared session
-  -> IO (FilePath, Either Text [ValidatedFunction])
+  -> IO (FilePath, Either Text ([ValidatedFunction], [RefusedExport]))
 processTypecheckedFile logger deployId filepath content moduleContext
   tcResult@Rules.TypeCheckResult{module' = resolvedModule, environment = env, entityInfo = ei, errors = tcErrors}
   evalMap = do
-    let exports = enrichReturnTypes ei $ getExportedFunctions resolvedModule
-        exportFnTypeErrs =
-          [ "Function type inputs are not supported for @export (parameter "
-              <> resolvedText paramName <> " of "
-              <> resolvedText fnName <> ")"
-          | MkCheckErrorWithContext{kind = ExportFunctionTypeInput fnName paramName} <- tcErrors
+    let allExports = enrichReturnTypes ei $ getExportedFunctions resolvedModule
+        -- What cannot cross the boundary of an @export, and the exports that
+        -- the editor refuses with the same words ('Export.checkExports'). A
+        -- missing type is a warning, which does not refuse anything.
+        shapeEnv = Shape.shapeEnvFromDeclares declaredTypes ei
+        exportErrs =
+          [ e
+          | e <- Export.checkExports shapeEnv resolvedModule
+          , Export.exportErrorSeverity e == SError
           ]
+        declaredTypes = foldMap (Shape.moduleDeclares . (.module')) (tcResult : Rules.transitiveDependencies tcResult)
+        -- The deploy publishes the exports the check does not refuse, and
+        -- names each one it refuses, with the words of each refusal.
+        exports = Export.withoutRefused exportErrs allExports
+        reasonOf e = Text.unwords (Export.prettyExportError e)
+        refusedExports =
+          [ RefusedExport ef.exportName (Text.pack filepath) (map reasonOf rs) False
+          | ef <- allExports
+          , let rs = Export.refusalsOf exportErrs ef
+          , not (null rs)
+          ]
+          -- A refusal of a rule that is not among the exports found (there
+          -- should be none) still names it, rather than vanish.
+          <> [ RefusedExport name (Text.pack filepath) reasons False
+             | (name, reasons) <- Map.toList $ Map.fromListWith (flip (<>))
+                 [ (rawNameToText (rawName (getActual (Export.exportErrorFunction e))), [reasonOf e])
+                 | e <- exportErrs
+                 , not (any (\ef -> e `elem` Export.refusalsOf exportErrs ef) allExports)
+                 ]
+             ]
+        logRefused =
+          unless (null refusedExports) $
+            logWarn logger "Deploy leaves out an @export that has an input or result that cannot be sent"
+              [ ("deploymentId", toJSON deployId)
+              , ("file", toJSON filepath)
+              , ("refused", toJSON [r.reName | r <- refusedExports])
+              , ("errors", toJSON (concatMap (.reReasons) refusedExports))
+              ]
         -- Genuine type errors that must block the deploy. We deliberately
         -- tolerate OutOfScopeError for a name an expression reads: it's
         -- repurposed by extractImplicitAssumeParams to derive implicit ASSUME
@@ -207,15 +268,7 @@ processTypecheckedFile logger deployId filepath content moduleContext
           , severity e == SError
           , not (isOutOfScope kind)
           ]
-    if not (null exportFnTypeErrs)
-      then do
-        logWarn logger "Deploy rejected: @export function has FUNCTION-typed input"
-          [ ("deploymentId", toJSON deployId)
-          , ("file", toJSON filepath)
-          , ("errors", toJSON exportFnTypeErrs)
-          ]
-        pure (filepath, Left (Text.intercalate "; " exportFnTypeErrs))
-      else if not (null blockingErrs)
+    if not (null blockingErrs)
       then do
         logWarn logger "Deploy rejected: module has type errors"
           [ ("deploymentId", toJSON deployId)
@@ -223,9 +276,16 @@ processTypecheckedFile logger deployId filepath content moduleContext
           , ("errors", toJSON blockingErrs)
           ]
         pure (filepath, Left (Text.intercalate "\n" blockingErrs))
+      -- Only a module that type-checks is asked what its exports take and give
+      -- back, as in the editor: on one that does not, an input or result may
+      -- still be an unsolved inference variable, and the type error already
+      -- says what is wrong.
       else if null exports
-      then pure (filepath, Right [])
+      then do
+        logRefused
+        pure (filepath, Right ([], refusedExports))
       else do
+        logRefused
         let implicitParams = extractImplicitAssumeParams tcErrors
             allDeclares = collectAllDeclares tcResult
             -- Look up the import environment from the shared session
@@ -251,7 +311,7 @@ processTypecheckedFile logger deployId filepath content moduleContext
               }
 
         fns <- forM exports $ \export -> do
-          let fnDecl = exportToFunction allDeclares implicitParams export
+          let fnDecl = exportToFunction shapeEnv allDeclares implicitParams export
               apiDecl = toDecl fnDecl
 
           let collisions = validateNoSanitizationCollisions fnDecl.name fnDecl.parameters
@@ -296,15 +356,21 @@ processTypecheckedFile logger deployId filepath content moduleContext
           , ("file", toJSON filepath)
           , ("exportCount", toJSON (length fns))
           ]
-        pure (filepath, Right fns)
+        pure (filepath, Right (fns, refusedExports))
 
 -- | Convert an ExportedFunction to our Function type.
-exportToFunction :: Map Text (Declare Resolved) -> [(Text, Type' Resolved)] -> ExportedFunction -> Function
-exportToFunction declares implicitParams export =
-  let baseParams = parametersFromExport declares export.exportParams
-      -- Merge implicit params, avoiding duplicates
+-- | What a deployment publishes for an @export: the schema of each input and
+-- of the result is the shape the export check gives its type ('typeToParameter').
+-- The deploy leaves out an @export the check refuses ('Export.withoutRefused'),
+-- so each one it publishes has one.
+exportToFunction :: Shape.ShapeEnv -> Map Text (Declare Resolved) -> [(Text, Type' Resolved)] -> ExportedFunction -> Function
+exportToFunction env declares implicitParams export =
+  let schemaOf ty = either (const uncheckedParameter) id (typeToParameter env ty)
+      baseParams = parametersFromExport env declares export.exportParams
+      -- Merge implicit params, avoiding duplicates. These are read from names
+      -- the module never declared, so the export check did not look at them.
       implicitParamMap = Map.fromList
-        [ (pname, (typeToParameter declares Set.empty ty) {parameterDescription = "", parameterAlias = Nothing})
+        [ (pname, (schemaOf ty) {parameterDescription = "", parameterAlias = Nothing})
         | (pname, ty) <- implicitParams
         , pname `Map.notMember` baseParams.parameterMap
         ]
@@ -324,16 +390,16 @@ exportToFunction declares implicitParams export =
       -- Build typed event schema using actual party/action types
       (partyParam, actionParam) = case export.exportReturnType of
         Just (TyApp _ _ [partyTy, actionTy]) ->
-          ( (typeToParameter declares Set.empty partyTy) { parameterDescription = "The party performing the action" }
-          , (typeToParameter declares Set.empty actionTy) { parameterDescription = "The action performed" }
+          ( (schemaOf partyTy) { parameterDescription = "The party performing the action" }
+          , (schemaOf actionTy) { parameterDescription = "The action performed" }
           )
-        _ -> ( Parameter "object" Nothing Nothing [] "The party performing the action" Nothing Nothing Nothing Nothing Nothing
-             , Parameter "object" Nothing Nothing [] "The action performed" Nothing Nothing Nothing Nothing Nothing
+        _ -> ( Parameter "object" Nothing Nothing [] "The party performing the action" Nothing Nothing Nothing Nothing Nothing Nothing
+             , Parameter "object" Nothing Nothing [] "The action performed" Nothing Nothing Nothing Nothing Nothing Nothing
              )
       finalParams = if isDeontic
         then mergedParams
           { parameterMap = mergedParams.parameterMap <> Map.fromList
-              [ ("startTime", Parameter "number" Nothing Nothing [] "Start time for contract simulation" Nothing Nothing Nothing Nothing Nothing)
+              [ ("startTime", Parameter "number" Nothing Nothing [] "Start time for contract simulation" Nothing Nothing Nothing Nothing Nothing Nothing)
               , ("events", Parameter
                   { parameterType = "array"
                   , parameterAlias = Nothing
@@ -351,15 +417,17 @@ exportToFunction declares implicitParams export =
                       , parameterProperties = Just $ Map.fromList
                           [ ("party", partyParam)
                           , ("action", actionParam)
-                          , ("at", Parameter "number" Nothing Nothing [] "Timestamp" Nothing Nothing Nothing Nothing Nothing)
+                          , ("at", Parameter "number" Nothing Nothing [] "Timestamp" Nothing Nothing Nothing Nothing Nothing Nothing)
                           ]
                       , parameterPropertyOrder = Just ["party", "action", "at"]
                       , parameterItems = Nothing
                       , parameterRequired = Just ["party", "action", "at"]
                       , parameterL4Type = Nothing
+                      , parameterOneOf = Nothing
                       }
                   , parameterRequired = Nothing
                   , parameterL4Type = Nothing
+                  , parameterOneOf = Nothing
                   })
               ]
           , required = mergedParams.required <> ["startTime", "events"]
@@ -369,7 +437,7 @@ exportToFunction declares implicitParams export =
       -- For DEONTIC functions the surface return shape is the simulation envelope,
       -- not the user's record type, so we leave the structured schema unset there.
       mReturnSchema = case export.exportReturnType of
-        Just retTy | not isDeontic -> Just (typeToParameter declares Set.empty retTy)
+        Just retTy | not isDeontic -> either (const Nothing) Just (typeToParameter env retTy)
         _ -> Nothing
   in Function
     { name = export.exportName
@@ -386,21 +454,21 @@ exportToFunction declares implicitParams export =
     }
 
 -- | Build Parameters from ExportedParam list.
-parametersFromExport :: Map Text (Declare Resolved) -> [ExportedParam] -> Parameters
-parametersFromExport declares params =
+parametersFromExport :: Shape.ShapeEnv -> Map Text (Declare Resolved) -> [ExportedParam] -> Parameters
+parametersFromExport env declares params =
   MkParameters
-    { parameterMap = Map.fromList [(param.paramName, paramToParameter declares param) | param <- params]
+    { parameterMap = Map.fromList [(param.paramName, paramToParameter env param) | param <- params]
     -- With every module's declarations, as for the record fields below, so
     -- that an input typed with an imported synonym for a MAYBE is optional.
     , required = [param.paramName | param <- map (expandRequired declares) params, param.paramRequired]
     }
 
 -- | Convert an ExportedParam to a Parameter.
-paramToParameter :: Map Text (Declare Resolved) -> ExportedParam -> Parameter
-paramToParameter declares param =
+paramToParameter :: Shape.ShapeEnv -> ExportedParam -> Parameter
+paramToParameter env param =
   let p0 = maybe
-              (Parameter "object" Nothing Nothing [] "" Nothing Nothing Nothing Nothing Nothing)
-              (typeToParameter declares Set.empty)
+              uncheckedParameter
+              (either (const uncheckedParameter) id . typeToParameter env)
               param.paramType
   in p0
     { parameterAlias = Nothing
@@ -435,10 +503,6 @@ extractDeonticTypeNames ty@(TyApp _ _ [partyTy, actionTy])
     typeName (TyApp _ n _) = rawNameToText (rawName (getActual n))
     typeName _ = "Unknown"
 extractDeonticTypeNames _ = Nothing
-
--- | Extract display text from a Resolved name.
-resolvedText :: Resolved -> Text
-resolvedText = rawNameToText . rawName . getActual
 
 -- | An OutOfScopeError for a name that an expression reads is not a
 -- deploy-blocking error: it's how the type checker reports references the

@@ -559,6 +559,19 @@ spec = describe "integration" do
           resp <- evalFunction baseUrl mgr "wire" (Text.replace " " "%20" fn) (Aeson.object ["arguments" Aeson..= args])
           resp `shouldCarry` expected
 
+      -- A pad of {} takes the wrapper, which reads its inputs with decodeArgs,
+      -- and a pad of 1 the direct path, which does not: so the wrapper rows
+      -- above test the wrapper. Its trace says so.
+      it "a pad of {} takes the wrapper, and a pad of 1 does not" \(baseUrl, mgr) -> do
+        let traced pad = do
+              req <- buildJsonPost (baseUrl <> "/deployments/wire/functions/twice/evaluation?trace=full")
+                (Aeson.object ["arguments" Aeson..= Aeson.object ["n" Aeson..= (5 :: Int), "pad" Aeson..= pad]])
+              httpLbs req mgr
+        throughWrapper <- traced (Aeson.object [])
+        onDirect <- traced (Aeson.Number 1)
+        map (Text.isInfixOf "decodeArgs" . Text.Encoding.decodeUtf8 . LBS.toStrict . responseBody) [throughWrapper, onDirect] `shouldBe` [True, False]
+        map statusCode' [throughWrapper, onDirect] `shouldBe` [200, 200]
+
       -- Under trace=full the wrapper's directive is #EVALTRACE rather than #EVAL.
       it "trace=full, wrapper path: cap and single" \(baseUrl, mgr) -> do
         let traced fn = do
@@ -621,12 +634,10 @@ spec = describe "integration" do
           declined <- call "2026/01/31" "2026-02-30"
           declined `shouldCarry` Refuses "Parameter 'd two': could not read \"2026-02-30\" as a DATE"
 
-      -- On batch a null takes the wrapper, which refuses "garbage" as a DATE.
-      -- The direct path would answer it as text, so an errored case shows the
-      -- wrapper ran. The case comes back with the wrapper's message as its
-      -- @error, where it used to be dropped and only counted. A single request
-      -- gets that message only on the wrapper path, with a {} in an input; with
-      -- this null it stays direct and answers "garbage".
+      -- A DATE that does not parse is refused before the request is routed
+      -- now (review of #779, 2026-11-21), where the wrapper refused it and the
+      -- direct path answered it as text. The case comes back with the message
+      -- as its @error, where it used to be dropped and only counted.
       it "returns a batch case the wrapper declines with its @error, and counts it" do
         withServiceFromSources "decline-batch" [("labels.l4", declineLabelsJL4)] \baseUrl mgr -> do
           req <- buildJsonPost (baseUrl <> "/deployments/decline-batch/functions/date%20first/evaluation/batch")
@@ -643,12 +654,12 @@ spec = describe "integration" do
           wireAt resp ["summary", "casesProcessed"] `shouldBe` Right (Aeson.Number 1)
           caseKeys resp ["@id", "@error", "value"] `shouldBe`
             Just [ [ Just (Aeson.Number 1)
-                   , Just (Aeson.String "Parameter 'end date': could not read \"garbage\" as a DATE")
+                   , Just (Aeson.String "Parameter 'end date': could not read \"garbage\" as a DATE, a string such as \"2026-01-31\"")
                    , Nothing ]
                  , [Just (Aeson.Number 2), Nothing, Just (Aeson.String "2026-01-31")] ]
           -- and a client decoding the body reads the same outcomes
           fmap (map (.outcome) . (.cases)) (Aeson.decode (responseBody resp) :: Maybe BatchResponse)
-            `shouldBe` Just [CaseErrored "Parameter 'end date': could not read \"garbage\" as a DATE", CaseAnswered]
+            `shouldBe` Just [CaseErrored "Parameter 'end date': could not read \"garbage\" as a DATE, a string such as \"2026-01-31\"", CaseAnswered]
 
       it "names a missing ASSUME as the direct path does" do
         withServiceFromSources "decline-assume" [("labels.l4", declineLabelsJL4)] \baseUrl mgr -> do
@@ -1134,6 +1145,316 @@ spec = describe "integration" do
               a2 `shouldBe` a1
               a3 `shouldBe` a1
             other -> expectationFailure ("Expected six cases, got " <> take 300 (show other))
+
+  -- One @export that cannot be sent no longer refuses its file: the deploy
+  -- serves the file's other exports, and names the refused one, with its
+  -- reasons, in the job, in the deployment's status and in the 404 that a call
+  -- to it gets (Meng, DEADWOOD, 2026-11-24). A deployment in which every
+  -- @export is refused still fails, with the reasons.
+  describe "an @export that cannot be sent" do
+    let eventExport = Text.unlines
+          [ "DECLARE Party IS ONE OF alice, bob"
+          , "DECLARE Act IS ONE OF ping, pong"
+          , ""
+          , "@export Who acted"
+          , "GIVEN e IS AN EVENT Party Act"
+          , "GIVETH A Party"
+          , "`who acted` MEANS"
+          , "  CONSIDER e"
+          , "  WHEN EVENT p a n THEN p"
+          ]
+        bigExport = Text.unlines
+          [ "@export Whether a number is big"
+          , "GIVEN n IS A NUMBER"
+          , "GIVETH A BOOLEAN"
+          , "DECIDE big IF n > 10"
+          ]
+        -- One file: one export that can be sent, one that cannot.
+        mixed = bigExport <> "\n" <> eventExport
+        eventReason = "its input `e` is an EVENT, and @export does not support that yet"
+        -- The refused exports a response names at a path: each name and its reasons.
+        refusedAt :: Response LBS.ByteString -> [Aeson.Key] -> [(Text, [Text])]
+        refusedAt resp path = either (const []) refusedOf (wireAt resp path)
+        refusedOf :: Aeson.Value -> [(Text, [Text])]
+        refusedOf = \case
+          Aeson.Array xs ->
+            [ (n, [r | Aeson.String r <- reasons])
+            | Aeson.Object o <- toList xs
+            , Just (Aeson.String n) <- [Aeson.KeyMap.lookup "name" o]
+            , let reasons = case Aeson.KeyMap.lookup "reasons" o of
+                    Just (Aeson.Array a) -> toList a
+                    _ -> []
+            ]
+          _ -> []
+        refusedAsEvent :: [(Text, [Text])] -> Bool
+        refusedAsEvent = \case
+          [("who acted", [reason])] -> eventReason `Text.isInfixOf` reason
+          _ -> False
+        -- A call to the refused export is not found, and says why.
+        callRefused baseUrl mgr deployId = do
+          resp <- evalFunction baseUrl mgr deployId "who%20acted"
+            (Aeson.object ["arguments" Aeson..= Aeson.object []])
+          statusCode' resp `shouldBe` 404
+          case wireAt resp ["error"] of
+            Right (Aeson.String e) -> do
+              e `shouldSatisfy` Text.isInfixOf "`who acted` was not deployed, because its @export is refused"
+              e `shouldSatisfy` Text.isInfixOf eventReason
+            other -> expectationFailure ("Expected an error naming the refusal, got " <> show other)
+        callBig baseUrl mgr deployId = do
+          resp <- evalFunction baseUrl mgr deployId "big"
+            (Aeson.object ["arguments" Aeson..= Aeson.object ["n" Aeson..= (11 :: Int)]])
+          assertSuccess resp \r ->
+            Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool True)
+        -- Each refused entry's fields other than its reasons.
+        refusedFields :: Either LBS.ByteString Aeson.Value -> [[(Aeson.Key, Aeson.Value)]]
+        refusedFields = \case
+          Right (Aeson.Array xs) ->
+            [ List.sortOn fst [(k, v) | (k, v) <- Aeson.KeyMap.toList o, k /= "reasons"]
+            | Aeson.Object o <- toList xs ]
+          _ -> []
+        absent :: Either LBS.ByteString Aeson.Value -> Bool
+        absent = either (const True) (const False)
+        -- The visibility headers a gateway sets for a caller that may see
+        -- nothing, or everything but the files.
+        hideAll = [("X-Include-Functions", "false"), ("X-Include-Files", "false"), ("X-Include-Evaluate", "false")]
+        hideFiles = [("X-Include-Files", "false")]
+        getWith mgr hs url = do
+          req <- parseRequest url
+          httpLbs req { requestHeaders = hs } mgr
+        mcpWith baseUrl mgr deployId hs method' params = do
+          req <- buildJsonPost (baseUrl <> "/deployments/" <> Text.unpack deployId <> "/.mcp") $ Aeson.object
+            [ "jsonrpc" Aeson..= ("2.0" :: Text), "id" Aeson..= (1 :: Int)
+            , "method" Aeson..= (method' :: Text), "params" Aeson..= params ]
+          httpLbs req { requestHeaders = hs <> requestHeaders req } mgr
+        callTool baseUrl mgr deployId hs name args =
+          mcpWith baseUrl mgr deployId hs "tools/call" $ Aeson.object
+            ["name" Aeson..= (name :: Text), "arguments" Aeson..= Aeson.object args]
+
+    it "deploys the file's other exports, and names the refused one in the job, the status and a call to it" do
+      withEmptyService \baseUrl mgr -> do
+        resp <- (`httpLbs` mgr) =<< buildMultipartRequest (baseUrl <> "/deployments") "refused-one"
+          (createZipBundle [("mixed.l4", mixed)])
+        statusCode' resp `shouldBe` 202
+        (st, err) <- pollUpdate baseUrl mgr "refused-one" resp
+        (st, err) `shouldBe` ("applied", Nothing)
+        -- the job, read again once it is applied
+        job <- case jobOutcome resp of
+          Just j -> httpGet mgr (baseUrl <> "/deployments/refused-one/updates/" <> Text.unpack j)
+          Nothing -> fail "the deploy named no job"
+        refusedAt job ["refusedExports"] `shouldSatisfy` refusedAsEvent
+        -- the deployment's status, as a later read returns it
+        status <- httpGet mgr (baseUrl <> "/deployments/refused-one")
+        wireAt status ["status"] `shouldBe` Right (Aeson.String "ready")
+        refusedAt status ["metadata", "refusedExports"] `shouldSatisfy` refusedAsEvent
+        refusedFields (wireAt status ["metadata", "refusedExports"])
+          `shouldBe` [[("file", Aeson.String "mixed.l4"), ("name", Aeson.String "who acted")]]
+        -- and the list of deployments
+        list <- httpGet mgr (baseUrl <> "/deployments")
+        case Aeson.decode (responseBody list) :: Maybe [Aeson.Value] of
+          Just entries ->
+            [ refusedOf refused
+            | Aeson.Object o <- entries
+            , Aeson.KeyMap.lookup "id" o == Just (Aeson.String "refused-one")
+            , let refused = case Aeson.KeyMap.lookup "metadata" o of
+                    Just (Aeson.Object m) -> Maybe.fromMaybe Aeson.Null (Aeson.KeyMap.lookup "refusedExports" m)
+                    _ -> Aeson.Null
+            ] `shouldSatisfy` \case [one] -> refusedAsEvent one; _ -> False
+          Nothing -> expectationFailure "Failed to decode the list of deployments"
+        listed <- httpGet mgr (baseUrl <> "/deployments/refused-one/functions")
+        functionNames (responseBody listed) `shouldBe` ["big"]
+        callBig baseUrl mgr "refused-one"
+        callRefused baseUrl mgr "refused-one"
+
+    it "answers an MCP call to the refused export with why, and names it under the tool list's _meta" do
+      withServiceFromSources "refused-mcp" [("mixed.l4", mixed)] \baseUrl mgr -> do
+        let rpc method' params = do
+              req <- buildJsonPost (baseUrl <> "/deployments/refused-mcp/.mcp") $ Aeson.object
+                [ "jsonrpc" Aeson..= ("2.0" :: Text), "id" Aeson..= (1 :: Int)
+                , "method" Aeson..= (method' :: Text), "params" Aeson..= params ]
+              httpLbs req mgr
+        called <- rpc "tools/call" $ Aeson.object
+          ["name" Aeson..= ("who-acted" :: Text), "arguments" Aeson..= Aeson.object []]
+        case wireAt called ["error", "message"] of
+          Right (Aeson.String m) -> do
+            m `shouldSatisfy` Text.isInfixOf "`who acted` was not deployed, because its @export is refused"
+            m `shouldSatisfy` Text.isInfixOf eventReason
+          other -> expectationFailure ("Expected an error naming the refusal, got " <> show other)
+        -- a name that is no export at all is still just unknown
+        unknown <- rpc "tools/call" $ Aeson.object
+          ["name" Aeson..= ("no-such-rule" :: Text), "arguments" Aeson..= Aeson.object []]
+        wireAt unknown ["error", "message"] `shouldBe` Right (Aeson.String "Unknown tool: no-such-rule")
+        listed <- rpc "tools/list" (Aeson.object [])
+        refusedAt listed ["result", "_meta", "l4/refusedExports"] `shouldSatisfy` refusedAsEvent
+        case wireAt listed ["result", "tools"] of
+          Right (Aeson.Array tools) ->
+            [n | Aeson.Object t <- toList tools, Just (Aeson.String n) <- [Aeson.KeyMap.lookup "name" t]]
+              `shouldSatisfy` notElem "who-acted"
+          other -> expectationFailure ("Expected a tool list, got " <> show other)
+
+    -- The refused exports name rules and quote their inputs, so they follow
+    -- the visibility headers as the functions and files do.
+    it "names no refused export to a caller that may not see functions, and no file to one that may not see files: status, list, job and a repeated POST" do
+      withEmptyService \baseUrl mgr -> do
+        let bundle = createZipBundle [("mixed.l4", mixed)]
+        resp <- (`httpLbs` mgr) =<< buildMultipartRequest (baseUrl <> "/deployments") "refused-vis" bundle
+        pollUpdate baseUrl mgr "refused-vis" resp `shouldReturn` ("applied", Nothing)
+        jobUrl <- case jobOutcome resp of
+          Just j -> pure (baseUrl <> "/deployments/refused-vis/updates/" <> Text.unpack j)
+          Nothing -> fail "the deploy named no job"
+        let statusUrl = baseUrl <> "/deployments/refused-vis"
+            listed hs = do
+              list <- getWith mgr hs (baseUrl <> "/deployments")
+              pure [ Aeson.KeyMap.lookup "refusedExports" m
+                   | Just entries <- [Aeson.decode (responseBody list) :: Maybe [Aeson.Value]]
+                   , Aeson.Object o <- entries
+                   , Aeson.KeyMap.lookup "id" o == Just (Aeson.String "refused-vis")
+                   , Just (Aeson.Object m) <- [Aeson.KeyMap.lookup "metadata" o] ]
+        -- nothing visible: no names anywhere
+        hidden <- getWith mgr hideAll statusUrl
+        wireAt hidden ["metadata", "refusedExports"] `shouldSatisfy` absent
+        BS8.unpack (LBS.toStrict (responseBody hidden)) `shouldNotContain` "who acted"
+        listed hideAll `shouldReturn` [Nothing]
+        hiddenJob <- getWith mgr hideAll jobUrl
+        wireAt hiddenJob ["refusedExports"] `shouldSatisfy` absent
+        again <- (`httpLbs` mgr) =<< (\r -> r { requestHeaders = hideAll <> requestHeaders r })
+          <$> buildMultipartRequest (baseUrl <> "/deployments") "refused-vis" bundle
+        wireAt again ["status"] `shouldBe` Right (Aeson.String "ready")
+        wireAt again ["metadata", "refusedExports"] `shouldSatisfy` absent
+        BS8.unpack (LBS.toStrict (responseBody again)) `shouldNotContain` "who acted"
+        -- functions visible, files not: the names, without their files
+        let nameOnly = [[("name", Aeson.String "who acted")]]
+        noFiles <- getWith mgr hideFiles statusUrl
+        refusedFields (wireAt noFiles ["metadata", "refusedExports"]) `shouldBe` nameOnly
+        refusedAt noFiles ["metadata", "refusedExports"] `shouldSatisfy` refusedAsEvent
+        map (refusedFields . maybe (Left "") Right) <$> listed hideFiles `shouldReturn` [nameOnly]
+        noFilesJob <- getWith mgr hideFiles jobUrl
+        refusedFields (wireAt noFilesJob ["refusedExports"]) `shouldBe` nameOnly
+
+    it "names no refused export under MCP's tools/list, and gives no reason for a call, to a caller that may not see functions" do
+      withServiceFromSources "refused-mcp-vis" [("mixed.l4", mixed)] \baseUrl mgr -> do
+        let rpc hs = mcpWith baseUrl mgr "refused-mcp-vis" hs
+        hidden <- rpc hideAll "tools/list" (Aeson.object [])
+        wireAt hidden ["result", "_meta"] `shouldSatisfy` absent
+        BS8.unpack (LBS.toStrict (responseBody hidden)) `shouldNotContain` "who acted"
+        called <- callTool baseUrl mgr "refused-mcp-vis" hideAll "who-acted" []
+        wireAt called ["error", "message"] `shouldBe` Right (Aeson.String "Unknown tool: who-acted")
+        -- functions visible, files not: named, without the file
+        noFiles <- rpc hideFiles "tools/list" (Aeson.object [])
+        map (filter ((/= "deployment") . fst)) (refusedFields (wireAt noFiles ["result", "_meta", "l4/refusedExports"]))
+          `shouldBe` [[("name", Aeson.String "who acted")]]
+        withFiles <- rpc [] "tools/list" (Aeson.object [])
+        map (lookup "file") (refusedFields (wireAt withFiles ["result", "_meta", "l4/refusedExports"]))
+          `shouldBe` [Just (Aeson.String "mixed.l4")]
+
+    it "gives no reason in a REST call's 404 to a caller that may not see functions" do
+      withServiceFromSources "refused-rest-vis" [("mixed.l4", mixed)] \baseUrl mgr -> do
+        req <- buildJsonPost (baseUrl <> "/deployments/refused-rest-vis/functions/who%20acted/evaluation")
+          (Aeson.object ["arguments" Aeson..= Aeson.object []])
+        resp <- httpLbs req { requestHeaders = hideAll <> requestHeaders req } mgr
+        statusCode' resp `shouldBe` 404
+        wireAt resp ["error"] `shouldBe` Right (Aeson.String "Function not found")
+
+    -- Two files may export the same name, and the export check may refuse
+    -- one and not the other. The name is served, by the export it does not
+    -- refuse, and the refused entry says so, with its file.
+    it "marks a refused export whose name another file's export serves, and serves the call" do
+      let numberWho = "@export Who acted\nGIVEN p IS A NUMBER\nGIVETH A NUMBER\n`who acted` MEANS p\n"
+      withServiceFromSources "refused-shared-name" [("a.l4", numberWho), ("b.l4", eventExport)] \baseUrl mgr -> do
+        status <- httpGet mgr (baseUrl <> "/deployments/refused-shared-name")
+        refusedFields (wireAt status ["metadata", "refusedExports"])
+          `shouldBe` [[("file", Aeson.String "b.l4"), ("name", Aeson.String "who acted"), ("nameServed", Aeson.Bool True)]]
+        listed <- httpGet mgr (baseUrl <> "/deployments/refused-shared-name/functions")
+        functionNames (responseBody listed) `shouldBe` ["who acted"]
+        resp <- evalFunction baseUrl mgr "refused-shared-name" "who%20acted"
+          (Aeson.object ["arguments" Aeson..= Aeson.object ["p" Aeson..= (3 :: Int)]])
+        assertSuccess resp \r ->
+          Map.lookup "value" r.fnResult `shouldBe` Just (FnLitInt 3)
+        tools <- mcpWith baseUrl mgr "refused-shared-name" [] "tools/list" (Aeson.object [])
+        map (lookup "nameServed") (refusedFields (wireAt tools ["result", "_meta", "l4/refusedExports"]))
+          `shouldBe` [Just (Aeson.Bool True)]
+        called <- callTool baseUrl mgr "refused-shared-name" [] "who-acted" ["p" Aeson..= (3 :: Int)]
+        wireAt called ["error"] `shouldSatisfy` absent
+
+    -- One file may export two names that a call addresses the same way; the
+    -- check refuses one, and the other serves the name.
+    it "marks a refused export whose name an export of the same file serves once sanitized" do
+      let hyphenWho = "@export Who acted, hyphenated\nGIVEN p IS A NUMBER\nGIVETH A NUMBER\n`who-acted` MEANS p\n"
+      withServiceFromSources "refused-same-file" [("both.l4", hyphenWho <> "\n" <> eventExport)] \baseUrl mgr -> do
+        status <- httpGet mgr (baseUrl <> "/deployments/refused-same-file")
+        refusedFields (wireAt status ["metadata", "refusedExports"])
+          `shouldBe` [[("file", Aeson.String "both.l4"), ("name", Aeson.String "who acted"), ("nameServed", Aeson.Bool True)]]
+        resp <- evalFunction baseUrl mgr "refused-same-file" "who%20acted"
+          (Aeson.object ["arguments" Aeson..= Aeson.object ["p" Aeson..= (3 :: Int)]])
+        assertSuccess resp \r ->
+          Map.lookup "value" r.fnResult `shouldBe` Just (FnLitInt 3)
+
+    -- Under --lazy-load the tool list is read from the metadata cache that
+    -- the service which last compiled the deployment wrote. One written
+    -- before the export check lists an export this build refuses; a call to
+    -- it compiles the deployment, and then says why it is not there.
+    it "says why, when a call to a function a stale cache lists finds it refused once compiled" do
+      let staleCache meta = meta
+            { metaFunctions = meta.metaFunctions <> [fs { fsName = "who acted" } | fs <- take 1 meta.metaFunctions]
+            , metaRefusedExports = []
+            }
+      withPendingCachedService "refused-stale-cache" [("mixed.l4", mixed)] staleCache \baseUrl mgr -> do
+        tools <- mcpWith baseUrl mgr "refused-stale-cache" [] "tools/list" (Aeson.object [])
+        case wireAt tools ["result", "tools"] of
+          Right (Aeson.Array ts) ->
+            [n | Aeson.Object t <- toList ts, Just (Aeson.String n) <- [Aeson.KeyMap.lookup "name" t]]
+              `shouldSatisfy` elem "who-acted"
+          other -> expectationFailure ("Expected a tool list, got " <> show other)
+        let untilCompiled (n :: Int) = do
+              called <- callTool baseUrl mgr "refused-stale-cache" [] "who-acted" []
+              if n > 0 && BS8.isInfixOf "compiling" (LBS.toStrict (responseBody called))
+                then threadDelay 500_000 >> untilCompiled (n - 1)
+                else pure called
+        called <- untilCompiled 120
+        case wireAt called ["error", "message"] of
+          Right (Aeson.String m) -> do
+            m `shouldSatisfy` Text.isInfixOf "`who acted` was not deployed, because its @export is refused"
+            m `shouldSatisfy` Text.isInfixOf eventReason
+          other -> expectationFailure ("Expected an error naming the refusal, got " <> show other)
+        callRefused baseUrl mgr "refused-stale-cache"
+
+    it "still refuses a deployment in which every @export is refused, with the reasons" do
+      withEmptyService \baseUrl mgr -> do
+        resp <- (`httpLbs` mgr) =<< buildMultipartRequest (baseUrl <> "/deployments") "refused-all"
+          (createZipBundle [("event.l4", eventExport), ("plain.l4", "DECIDE nothing IS 1\n")])
+        statusCode' resp `shouldBe` 202
+        (st, err) <- pollUpdate baseUrl mgr "refused-all" resp
+        st `shouldBe` "rejected"
+        err `shouldSatisfy` maybe False (Text.isInfixOf eventReason)
+        gone <- httpGet mgr (baseUrl <> "/deployments/refused-all")
+        statusCode' gone `shouldBe` 404
+
+    it "names a live rule that a redeploy now refuses as removed because it is refused" do
+      withEmptyService \baseUrl mgr -> do
+        first <- (`httpLbs` mgr) =<< buildMultipartRequest (baseUrl <> "/deployments") "refused-put"
+          (createZipBundle [("rules.l4", bigExport <> "\n@export Who acted\nGIVEN p IS A NUMBER\nGIVETH A NUMBER\n`who acted` MEANS p\n")])
+        pollUpdate baseUrl mgr "refused-put" first `shouldReturn` ("applied", Nothing)
+        put <- (`httpLbs` mgr) =<< buildMultipartMethod "PUT" (baseUrl <> "/deployments/refused-put") Nothing
+          (createZipBundle [("rules.l4", mixed)])
+        (st, err) <- pollUpdate baseUrl mgr "refused-put" put
+        st `shouldBe` "rejected"
+        err `shouldSatisfy` maybe False (Text.isInfixOf "rule who acted removed: its @export is refused, because")
+        err `shouldSatisfy` maybe False (Text.isInfixOf eventReason)
+
+    it "loads a stored deployment that has a refused export with its other exports after a restart" do
+      -- A store an older service wrote, before the export check refused
+      -- anything, holds such a file; the restart used to register it as failed.
+      withServicesRestarted [("refused-restart", [("qualifies.l4", qualifiesJL4), ("mixed.l4", mixed)])] (const (pure ())) \logLines baseUrl mgr -> do
+        assertRecompiled "refused-restart" logLines
+        status <- httpGet mgr (baseUrl <> "/deployments/refused-restart")
+        wireAt status ["status"] `shouldBe` Right (Aeson.String "ready")
+        refusedAt status ["metadata", "refusedExports"] `shouldSatisfy` refusedAsEvent
+        listed <- httpGet mgr (baseUrl <> "/deployments/refused-restart/functions")
+        functionNames (responseBody listed) `shouldBe` ["big", "compute_qualifies"]
+        resp <- evalFunction baseUrl mgr "refused-restart" "compute_qualifies" allTrueArgs
+        assertSuccess resp \r ->
+          Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool True)
+        callBig baseUrl mgr "refused-restart"
+        callRefused baseUrl mgr "refused-restart"
 
   describe "control plane (HTTP multipart)" do
     it "deploys a bundle and reaches ready state" do
@@ -2897,6 +3218,43 @@ spec = describe "integration" do
           _ -> expectationFailure "Expected empty deployments array"
 
   describe "lazy-load (compile on first request)" do
+    -- A pending deployment's cached metadata was written by the binary that
+    -- deployed it. A PUT or POST over it used to be compared with that cache,
+    -- so a schema this binary writes differently refused an unchanged PUT, and
+    -- bumped BREAKING on a POST, where an eager start compared the bundle with
+    -- itself. Now the stored sources are compiled first, as eager mode does
+    -- (STALEMENU, Meng, 2026-11-18).
+    describe "PUT and POST over a pending deployment whose cached schema differs" do
+      let major = Text.pack (show Version.serviceMajor)
+          staleCache meta = meta
+            { metaFunctions =
+                [ fs { fsParameters = MkParameters (Map.map (\p -> p { parameterType = "string" }) m) r }
+                | fs <- meta.metaFunctions
+                , let MkParameters m r = fs.fsParameters
+                ]
+            }
+          src = [("qualifies.l4", qualifiesJL4)]
+      it "applies a PUT of the unchanged bundle, at RUNNING + 1" do
+        withPendingCachedService "lazy-stale-put" src staleCache \baseUrl mgr -> do
+          resp <- (`httpLbs` mgr) =<< buildMultipartMethod "PUT" (baseUrl <> "/deployments/lazy-stale-put") Nothing (createZipBundle src)
+          statusCode' resp `shouldBe` 202
+          outcome <- pollUpdate baseUrl mgr "lazy-stale-put" resp
+          outcome `shouldBe` ("applied", Nothing)
+          deploymentVersionOf baseUrl mgr "lazy-stale-put" `shouldReturn` Just (major <> ".0.1")
+      it "answers a POST of the unchanged bundle with the deployment as it stands, as in eager mode" do
+        withPendingCachedService "lazy-stale-post-same" src staleCache \baseUrl mgr -> do
+          resp <- (`httpLbs` mgr) =<< buildMultipartRequest (baseUrl <> "/deployments") "lazy-stale-post-same" (createZipBundle src)
+          let decoded = Aeson.decode (responseBody resp) :: Maybe DeploymentStatusResponse
+          fmap (\d -> (d.dsStatus, d.dsUpdateId)) decoded `shouldBe` Just ("ready", Nothing)
+          deploymentVersionOf baseUrl mgr "lazy-stale-post-same" `shouldReturn` Just (major <> ".0.0")
+      it "does not bump BREAKING on a POST of a bundle with the same interface" do
+        withPendingCachedService "lazy-stale-post" src staleCache \baseUrl mgr -> do
+          resp <- (`httpLbs` mgr) =<< buildMultipartRequest (baseUrl <> "/deployments") "lazy-stale-post"
+            (createZipBundle [("qualifies.l4", qualifiesJL4 <> "\n-- v2\n")])
+          outcome <- pollUpdate baseUrl mgr "lazy-stale-post" resp
+          outcome `shouldBe` ("applied", Nothing)
+          deploymentVersionOf baseUrl mgr "lazy-stale-post" `shouldReturn` Just (major <> ".0.1")
+
     it "GET /deployments/{id} compiles pending deployment and returns ready" do
       withPendingService "lazy-get" [("qualifies.l4", qualifiesJL4)] \baseUrl mgr -> do
         req <- parseRequest (baseUrl <> "/deployments/lazy-get")
@@ -3306,6 +3664,432 @@ spec = describe "integration" do
         -- Small file compiles fast enough for the 2s optimistic timeout
         statusCode' resp `shouldSatisfy` (\s -> s == 200 || s == 202)
 
+  -- An EITHER input is read as the schema writes it (card J3, option B): on the
+  -- direct path, and through JSONDECODE on the wrapper path, which `pad: {}`
+  -- takes. Any other form, a bare value among them, is refused, naming the
+  -- input, on every path (review of #779, 2026-11-17).
+  describe "reads an EITHER input as {\"LEFT\": [v]} or {\"RIGHT\": [v]}" do
+    aroundAll (\k -> withServiceFromSources "either-in" [("either.l4", eitherInputJL4)] (curry k)) do
+      let call baseUrl mgr fn args = evalFunction baseUrl mgr "either-in" fn (Aeson.object ["arguments" Aeson..= args])
+          side :: Aeson.Value -> Aeson.Value
+          side v = Aeson.object ["e" Aeson..= v]
+      it "RIGHT and LEFT, on the direct path" \(baseUrl, mgr) -> do
+        call baseUrl mgr "side" (side (Aeson.object ["RIGHT" Aeson..= [5 :: Int]])) >>= (`shouldCarry` Answers (Aeson.Number 5))
+        call baseUrl mgr "side" (side (Aeson.object ["LEFT" Aeson..= ["x" :: Text]])) >>= (`shouldCarry` Answers (Aeson.Number (-1)))
+      it "a field of a record, on the wrapper path" \(baseUrl, mgr) -> do
+        let boxed v = Aeson.object ["b" Aeson..= Aeson.object ["v" Aeson..= v], "pad" Aeson..= Aeson.object []]
+        call baseUrl mgr "boxed" (boxed (Aeson.object ["RIGHT" Aeson..= [7 :: Int]])) >>= (`shouldCarry` Answers (Aeson.Number 7))
+        call baseUrl mgr "boxed" (boxed (Aeson.object ["LEFT" Aeson..= ["x" :: Text]])) >>= (`shouldCarry` Answers (Aeson.Number (-1)))
+      -- The wrapper's input record used to declare the input as `MAYBE EITHER
+      -- OF STRING, NUMBER`, which does not parse, so these failed.
+      it "an EITHER input itself, on the wrapper path: a batch case with a null" \(baseUrl, mgr) -> do
+        req <- buildJsonPost (baseUrl <> "/deployments/either-in/functions/side/evaluation/batch")
+          (Aeson.object
+            [ "outcomes" Aeson..= ([] :: [Text])
+            , "cases" Aeson..=
+                [ Aeson.object ["@id" Aeson..= (1 :: Int), "e" Aeson..= Aeson.object ["RIGHT" Aeson..= [5 :: Int]], "pad" Aeson..= Aeson.Null]
+                , Aeson.object ["@id" Aeson..= (2 :: Int), "e" Aeson..= Aeson.object ["LEFT" Aeson..= ["x" :: Text]], "pad" Aeson..= Aeson.Null]
+                ]
+            ])
+        resp <- httpLbs req mgr
+        wireAt resp ["cases"] `shouldBe` Right (Aeson.toJSON
+          [ Aeson.object ["@id" Aeson..= (1 :: Int), "value" Aeson..= (5 :: Int)]
+          , Aeson.object ["@id" Aeson..= (2 :: Int), "value" Aeson..= (-1 :: Int)]
+          ])
+      it "an EITHER input of a contract rule" \(baseUrl, mgr) -> do
+        let duty v = evalFunction baseUrl mgr "either-in" "duty%20by%20side"
+              (Aeson.object ["arguments" Aeson..= Aeson.object ["e" Aeson..= v], "startTime" Aeson..= (0 :: Int), "events" Aeson..= ([] :: [Aeson.Value])])
+            partyOf resp = wireAt resp ["contents", "result", "value", "OBLIGATION", "party"]
+        right <- duty (Aeson.object ["RIGHT" Aeson..= [5 :: Int]])
+        (statusCode' right, partyOf right) `shouldBe` (200, Right (Aeson.String "bob"))
+        left <- duty (Aeson.object ["LEFT" Aeson..= ["x" :: Text]])
+        (statusCode' left, partyOf left) `shouldBe` (200, Right (Aeson.String "alice"))
+      it "refuses an object that is neither form, on the direct path" \(baseUrl, mgr) ->
+        call baseUrl mgr "side" (side (Aeson.object ["RIGHT" Aeson..= [1 :: Int, 2]]))
+          >>= (`shouldCarry` Refuses "an EITHER is written {\"LEFT\": [value]} or {\"RIGHT\": [value]}")
+      -- The reviewer's rule: `WHEN RIGHT amount THEN amount * 0.05`, `OTHERWISE
+      -- 50`. A bare 2000 reached it without its side and answered 50, on both
+      -- paths, in a batch and through MCP.
+      describe "refuses a bare value, or an object with both keys, naming the input" do
+        let refusal = "Parameter 'the claim': an EITHER is written {\"LEFT\": [value]} or {\"RIGHT\": [value]}"
+            claim v extra = Aeson.object (("the claim" Aeson..= v) : extra)
+            bare = Aeson.Number 2000
+            both = Aeson.object ["LEFT" Aeson..= ["x" :: Text], "RIGHT" Aeson..= [1 :: Int]]
+            wrapped = ["pad" Aeson..= Aeson.object []]
+        it "answers the published form, on both paths" \(baseUrl, mgr) -> do
+          let right = Aeson.object ["RIGHT" Aeson..= [2000 :: Int]]
+          call baseUrl mgr "fee" (claim right []) >>= (`shouldCarry` Answers (Aeson.Number 100))
+          call baseUrl mgr "fee" (claim right wrapped) >>= (`shouldCarry` Answers (Aeson.Number 100))
+        it "on the direct path" \(baseUrl, mgr) -> do
+          call baseUrl mgr "fee" (claim bare []) >>= (`shouldCarry` Refuses refusal)
+          call baseUrl mgr "fee" (claim both []) >>= (`shouldCarry` Refuses refusal)
+          call baseUrl mgr "fee" (claim (Aeson.String "2000") []) >>= (`shouldCarry` Refuses refusal)
+        it "on the wrapper path" \(baseUrl, mgr) -> do
+          call baseUrl mgr "fee" (claim bare wrapped) >>= (`shouldCarry` Refuses refusal)
+          call baseUrl mgr "fee" (claim both wrapped) >>= (`shouldCarry` Refuses refusal)
+        it "in a record's field, on both paths" \(baseUrl, mgr) -> do
+          let boxed extra = Aeson.object (("b" Aeson..= Aeson.object ["v" Aeson..= bare]) : extra)
+              inField = "Parameter 'b': an EITHER is written"
+          call baseUrl mgr "boxed" (boxed []) >>= (`shouldCarry` Refuses inField)
+          call baseUrl mgr "boxed" (boxed wrapped) >>= (`shouldCarry` Refuses inField)
+        it "in an element of a list" \(baseUrl, mgr) ->
+          call baseUrl mgr "total" (Aeson.object ["es" Aeson..= [Aeson.object ["RIGHT" Aeson..= [1 :: Int]], bare]])
+            >>= (`shouldCarry` Refuses "Parameter 'es': an EITHER is written")
+        it "of a contract rule" \(baseUrl, mgr) -> do
+          resp <- evalFunction baseUrl mgr "either-in" "duty%20by%20side"
+            (Aeson.object ["arguments" Aeson..= Aeson.object ["e" Aeson..= bare], "startTime" Aeson..= (0 :: Int), "events" Aeson..= ([] :: [Aeson.Value])])
+          resp `shouldCarry` Refuses "Parameter 'e': an EITHER is written"
+        it "in a batch case" \(baseUrl, mgr) -> do
+          req <- buildJsonPost (baseUrl <> "/deployments/either-in/functions/fee/evaluation/batch")
+            (Aeson.object
+              [ "outcomes" Aeson..= ([] :: [Text])
+              , "cases" Aeson..=
+                  [ Aeson.object ["@id" Aeson..= (1 :: Int), "the claim" Aeson..= bare]
+                  , Aeson.object ["@id" Aeson..= (2 :: Int), "the claim" Aeson..= bare, "pad" Aeson..= Aeson.Null]
+                  , Aeson.object ["@id" Aeson..= (3 :: Int), "the claim" Aeson..= Aeson.object ["RIGHT" Aeson..= [2000 :: Int]]]
+                  ]
+              ])
+          resp <- httpLbs req mgr
+          wireAt resp ["cases"] `shouldBe` Right (Aeson.toJSON
+            [ Aeson.object ["@id" Aeson..= (1 :: Int), "@error" Aeson..= refusal]
+            , Aeson.object ["@id" Aeson..= (2 :: Int), "@error" Aeson..= refusal]
+            , Aeson.object ["@id" Aeson..= (3 :: Int), "value" Aeson..= (100 :: Int)]
+            ])
+        it "in an MCP tool call" \(baseUrl, mgr) -> do
+          called <- mcpRpc baseUrl mgr "either-in" "tools/call" $ Aeson.object
+            ["name" Aeson..= ("fee" :: Text), "arguments" Aeson..= claim bare []]
+          fmap fst (mcpPayloadText =<< called) `shouldBe` Just True
+          fmap (Text.isInfixOf "an EITHER is written" . snd) (mcpPayloadText =<< called) `shouldBe` Just True
+        it "still calls a missing, null or {} EITHER input missing" \(baseUrl, mgr) -> do
+          let missing = "Parameter 'the claim': missing required parameter"
+          call baseUrl mgr "fee" (Aeson.object []) >>= (`shouldCarry` Refuses missing)
+          call baseUrl mgr "fee" (claim Aeson.Null []) >>= (`shouldCarry` Refuses missing)
+          call baseUrl mgr "fee" (claim (Aeson.object []) []) >>= (`shouldCarry` Refuses missing)
+
+  -- A constructor that carries fields is read as {"Card": {its fields}}, and
+  -- one that carries none as its name (wire-form card J1, option A; HATBOX,
+  -- Meng, 2026-11-18). Any other form, the bare name of a constructor that
+  -- carries fields among them, is refused, naming the input, on every path.
+  describe "reads a constructor that carries data as {\"Card\": {its fields}}" do
+    aroundAll (\k -> withServiceFromSources "tagged-in" [("tagged.l4", taggedInputJL4)] (curry k)) do
+      let call baseUrl mgr fn args = evalFunction baseUrl mgr "tagged-in" fn (Aeson.object ["arguments" Aeson..= args])
+          pay v extra = Aeson.object (("p" Aeson..= v) : extra)
+          wrapped = ["pad" Aeson..= Aeson.object []]
+          card = Aeson.object ["Card" Aeson..= Aeson.object ["card fee" Aeson..= (2 :: Int)]]
+          bare = "Parameter 'p': the constructor `Card` carries fields, so it is written {\"Card\": {its fields}}"
+          malformed = "Parameter 'p': a `Payment` is the name of a constructor that carries no fields (Cash) or {\"<constructor>\": {its fields}} for one that does (Card, Voucher)"
+      it "answers the tagged form and a fieldless name, on both paths" \(baseUrl, mgr) -> do
+        forM_ [[], wrapped] \extra -> do
+          call baseUrl mgr "fee for" (pay card extra) >>= (`shouldCarry` Answers (Aeson.Number 2))
+          call baseUrl mgr "fee for" (pay (Aeson.String "Cash") extra) >>= (`shouldCarry` Answers (Aeson.Number 0))
+      it "gives a constructor whose fields are all MAYBE as {\"Voucher\": {}}" \(baseUrl, mgr) ->
+        call baseUrl mgr "fee for" (pay (Aeson.object ["Voucher" Aeson..= Aeson.object []]) [])
+          >>= (`shouldCarry` Answers (Aeson.Number 1))
+      it "refuses the bare name of a constructor that carries fields, on both paths" \(baseUrl, mgr) ->
+        forM_ [[], wrapped] \extra ->
+          call baseUrl mgr "fee for" (pay (Aeson.String "Card") extra) >>= (`shouldCarry` Refuses bare)
+      it "refuses a malformed object, on both paths" \(baseUrl, mgr) ->
+        forM_ [ Aeson.object ["card fee" Aeson..= (2 :: Int)]
+              , Aeson.object ["Cash" Aeson..= Aeson.object []]
+              , Aeson.object ["Card" Aeson..= Aeson.object ["card fee" Aeson..= (2 :: Int)], "Cash" Aeson..= Aeson.object []]
+              ] \v -> forM_ [[], wrapped] \extra ->
+          call baseUrl mgr "fee for" (pay v extra) >>= (`shouldCarry` Refuses malformed)
+      it "in a batch case and an MCP tool call" \(baseUrl, mgr) -> do
+        req <- buildJsonPost (baseUrl <> "/deployments/tagged-in/functions/fee%20for/evaluation/batch")
+          (Aeson.object
+            [ "outcomes" Aeson..= ([] :: [Text])
+            , "cases" Aeson..=
+                [ Aeson.object ["@id" Aeson..= (1 :: Int), "p" Aeson..= card]
+                , Aeson.object ["@id" Aeson..= (2 :: Int), "p" Aeson..= card, "pad" Aeson..= Aeson.Null]
+                , Aeson.object ["@id" Aeson..= (3 :: Int), "p" Aeson..= Aeson.String "Card"]
+                ]
+            ])
+        resp <- httpLbs req mgr
+        wireAt resp ["cases"] `shouldBe` Right (Aeson.toJSON
+          [ Aeson.object ["@id" Aeson..= (1 :: Int), "value" Aeson..= (2 :: Int)]
+          , Aeson.object ["@id" Aeson..= (2 :: Int), "value" Aeson..= (2 :: Int)]
+          , Aeson.object ["@id" Aeson..= (3 :: Int), "@error" Aeson..= bare]
+          ])
+        called <- mcpRpc baseUrl mgr "tagged-in" "tools/call" $ Aeson.object
+          ["name" Aeson..= ("fee-for" :: Text), "arguments" Aeson..= pay card []]
+        fmap (Text.isInfixOf "\"value\":2" . snd) (mcpPayloadText =<< called) `shouldBe` Just True
+      -- JSONDECODE, which the wrapper path reads with, used to take a type with
+      -- a constructor named like it for a record.
+      it "reads a type with a constructor named like it, on both paths" \(baseUrl, mgr) ->
+        forM_ [[], wrapped] \extra -> do
+          let v x = Aeson.object (("v" Aeson..= x) : extra)
+          call baseUrl mgr "verdict" (v (Aeson.object ["Verdict" Aeson..= Aeson.object ["reason" Aeson..= ("ok" :: Text)]])) >>= (`shouldCarry` Answers (Aeson.Number 1))
+          call baseUrl mgr "verdict" (v (Aeson.String "None")) >>= (`shouldCarry` Answers (Aeson.Number 0))
+      it "in a record's field and a list's element" \(baseUrl, mgr) -> do
+        call baseUrl mgr "boxed fee" (Aeson.object ["b" Aeson..= Aeson.object ["p" Aeson..= card]]) >>= (`shouldCarry` Answers (Aeson.Number 2))
+        call baseUrl mgr "boxed fee" (Aeson.object ["b" Aeson..= Aeson.object ["p" Aeson..= Aeson.String "Card"]])
+          >>= (`shouldCarry` Refuses "Parameter 'b': the constructor `Card` carries fields")
+        call baseUrl mgr "total fee" (Aeson.object ["ps" Aeson..= [card, Aeson.String "Cash", card]]) >>= (`shouldCarry` Answers (Aeson.Number 4))
+      -- The schema says so: a oneOf of the names and the tagged constructors
+      -- (MULLET), on the function's schema and in MCP's tools/list, where a
+      -- field's name is hyphenated and read back.
+      it "publishes the oneOf, and MCP reads a hyphenated field back" \(baseUrl, mgr) -> do
+        fnResp <- (`httpLbs` mgr) =<< parseRequest (baseUrl <> "/deployments/tagged-in/functions/fee%20for")
+        let pSchema = wireAt fnResp ["parameters", "properties", "p"]
+            oneOf = case pSchema of
+              Right (Aeson.Object o) -> Aeson.KeyMap.lookup "oneOf" o
+              _ -> Nothing
+        fmap (\case Aeson.Array a -> length a; _ -> 0) oneOf `shouldBe` Just 2
+        listed <- mcpRpc baseUrl mgr "tagged-in" "tools/list" (Aeson.object [])
+        let tool = case listed of
+              Just (Aeson.Object r) | Just (Aeson.Array ts) <- Aeson.KeyMap.lookup "tools" r ->
+                [ t | Aeson.Object t <- toList ts, Aeson.KeyMap.lookup "name" t == Just (Aeson.String "fee-for") ]
+              _ -> []
+        show tool `shouldSatisfy` List.isInfixOf "card-fee"
+        called <- mcpRpc baseUrl mgr "tagged-in" "tools/call" $ Aeson.object
+          ["name" Aeson..= ("fee-for" :: Text), "arguments" Aeson..= Aeson.object ["p" Aeson..= Aeson.object ["Card" Aeson..= Aeson.object ["card-fee" Aeson..= (3 :: Int)]]]]
+        fmap (Text.isInfixOf "\"value\":3" . snd) (mcpPayloadText =<< called) `shouldBe` Just True
+
+  -- A record is an object of its fields. A value that is not one used to reach
+  -- the rule on the direct path as a value its type does not allow, where
+  -- JSONDECODE, on the wrapper path, refused it; it is refused before routing
+  -- now, naming the input, on both paths (assumed, not ruled; review of #779,
+  -- 2026-11-19).
+  describe "refuses a record input that is not an object" do
+    aroundAll (\k -> withServiceFromSources "record-form" [("pair.l4", recordFormJL4)] (curry k)) do
+      let call baseUrl mgr args = evalFunction baseUrl mgr "record-form" "pair sum" (Aeson.object ["arguments" Aeson..= args])
+          wrapped = ["pad" Aeson..= Aeson.object []]
+          notObject = "Parameter 'p': a `Pair` is an object of its fields (left, right)"
+      it "on both paths, for a string, a number and an array" \(baseUrl, mgr) ->
+        forM_ [[], wrapped] \extra -> do
+          forM_ [Aeson.String "x", Aeson.Number 5, Aeson.toJSON [1 :: Int, 2]] \v ->
+            call baseUrl mgr (Aeson.object (("p" Aeson..= v) : extra)) >>= (`shouldCarry` Refuses notObject)
+          call baseUrl mgr (Aeson.object (("p" Aeson..= Aeson.object ["left" Aeson..= (2 :: Int), "right" Aeson..= (3 :: Int)]) : extra))
+            >>= (`shouldCarry` Answers (Aeson.Number 5))
+      it "in a record's field" \(baseUrl, mgr) -> do
+        let held v = evalFunction baseUrl mgr "record-form" "held sum" (Aeson.object ["arguments" Aeson..= Aeson.object ["h" Aeson..= Aeson.object ["q" Aeson..= v]]])
+        held (Aeson.String "x") >>= (`shouldCarry` Refuses "Parameter 'h': a `Pair` is an object of its fields (left, right)")
+        held (Aeson.object ["left" Aeson..= (2 :: Int), "right" Aeson..= (3 :: Int)]) >>= (`shouldCarry` Answers (Aeson.Number 5))
+
+  -- An enumeration, a type none of whose constructors carries fields, is the
+  -- name of one of them. A name it does not have was refused on the direct
+  -- path only, and a number or a boolean reached the rule as it stood on both,
+  -- which answered it from its OTHERWISE; it is refused before routing now,
+  -- naming the input, on both paths (review of #779, 2026-11-21).
+  describe "refuses a value of an enumeration that is not one of its names" do
+    aroundAll (\k -> withServiceFromSources "enum-form" [("party.l4", enumFormJL4)] (curry k)) do
+      let call baseUrl mgr fn args = evalFunction baseUrl mgr "enum-form" fn (Aeson.object ["arguments" Aeson..= args])
+          wrapped = ["pad" Aeson..= Aeson.object []]
+          notParty input = "Parameter '" <> input <> "': a `Party` is one of the strings \"Landlord\", \"Tenant\", the names of its constructors"
+          refused = [Aeson.String "Lodger", Aeson.Number 5, Aeson.Bool True, Aeson.object ["x" Aeson..= (1 :: Int)]]
+      it "answers each of its names, on both paths" \(baseUrl, mgr) ->
+        forM_ [[], wrapped] \extra -> do
+          let given input v = Aeson.object ((input Aeson..= v) : extra)
+          call baseUrl mgr "who pays" (given "p" (Aeson.String "Landlord")) >>= (`shouldCarry` Answers (Aeson.Number 1))
+          call baseUrl mgr "who pays" (given "p" (Aeson.String "Tenant")) >>= (`shouldCarry` Answers (Aeson.Number 2))
+          -- JSONDECODE, on the wrapper path, took Tone for a type with one
+          -- constructor named like it, and refused "Loud"
+          call baseUrl mgr "tone" (given "t" (Aeson.String "Tone")) >>= (`shouldCarry` Answers (Aeson.Number 1))
+          call baseUrl mgr "tone" (given "t" (Aeson.String "Loud")) >>= (`shouldCarry` Answers (Aeson.Number 2))
+          call baseUrl mgr "waiver" (given "w" (Aeson.String "Signed Waiver")) >>= (`shouldCarry` Answers (Aeson.Number 1))
+      it "refuses a name it does not have, a number, a boolean and an object, on both paths" \(baseUrl, mgr) ->
+        forM_ [[], wrapped] \extra -> do
+          let given input v = Aeson.object ((input Aeson..= v) : extra)
+          forM_ refused \v ->
+            call baseUrl mgr "who pays" (given "p" v) >>= (`shouldCarry` Refuses (notParty "p"))
+          forM_ [Aeson.String "Quiet", Aeson.Number 5] \v ->
+            call baseUrl mgr "tone" (given "t" v)
+              >>= (`shouldCarry` Refuses "Parameter 't': a `Tone` is one of the strings \"Tone\", \"Loud\", the names of its constructors")
+          forM_ [Aeson.String "Unsigned", Aeson.Number 5] \v ->
+            call baseUrl mgr "waiver" (given "w" v)
+              >>= (`shouldCarry` Refuses "Parameter 'w': a `Signed Waiver` is the string \"Signed Waiver\", the name of its constructor")
+      it "in a record's field, a list's element and a MAYBE, on both paths" \(baseUrl, mgr) -> do
+        forM_ [[], wrapped] \extra -> do
+          let given input v = Aeson.object ((input Aeson..= v) : extra)
+          call baseUrl mgr "lease payer" (given "l" (Aeson.object ["payer" Aeson..= ("Tenant" :: Text)])) >>= (`shouldCarry` Answers (Aeson.Number 2))
+          forM_ refused \v -> do
+            call baseUrl mgr "lease payer" (given "l" (Aeson.object ["payer" Aeson..= v])) >>= (`shouldCarry` Refuses (notParty "l"))
+            call baseUrl mgr "first party" (given "ps" (Aeson.toJSON [Aeson.String "Landlord", v])) >>= (`shouldCarry` Refuses (notParty "ps"))
+            call baseUrl mgr "maybe party" (given "mp" v) >>= (`shouldCarry` Refuses (notParty "mp"))
+          call baseUrl mgr "maybe party" (given "mp" (Aeson.String "Tenant")) >>= (`shouldCarry` Answers (Aeson.Number 2))
+          call baseUrl mgr "maybe party" (given "mp" Aeson.Null) >>= (`shouldCarry` Answers (Aeson.Number 0))
+        -- a LIST input fails on the wrapper path whatever its elements (a
+        -- limit of the wrapper, in the design note), so it is answered on the
+        -- direct path only
+        call baseUrl mgr "first party" (Aeson.object ["ps" Aeson..= [Aeson.String "Tenant", Aeson.String "Landlord"]]) >>= (`shouldCarry` Answers (Aeson.Number 2))
+      it "refuses a name a type with a constructor that carries fields does not have, on both paths" \(baseUrl, mgr) ->
+        forM_ [[], wrapped] \extra ->
+          call baseUrl mgr "payment" (Aeson.object (("pay" Aeson..= Aeson.String "Cheque") : extra))
+            >>= (`shouldCarry` Refuses "Parameter 'pay': a `Payment` is the name of a constructor that carries no fields (Cash) or {\"<constructor>\": {its fields}} for one that does (Card)")
+
+  -- A value of a basic type that JSONDECODE refuses, which the wrapper path
+  -- reads its inputs with, is refused before routing, naming the input: the
+  -- direct path passed it to the rule as it stood, so "TRUE" for a BOOLEAN
+  -- stopped on an internal type error and 5 for a STRING was answered 5. What
+  -- JSONDECODE reads the direct path reads the same way (assumed, not ruled;
+  -- review of #779, 2026-11-21).
+  describe "refuses a value of a basic type that JSONDECODE refuses" do
+    aroundAll (\k -> withServiceFromSources "scalar-form" [("scalars.l4", scalarFormJL4)] (curry k)) do
+      let call baseUrl mgr fn args = evalFunction baseUrl mgr "scalar-form" fn (Aeson.object ["arguments" Aeson..= args])
+          wrapped = ["pad" Aeson..= Aeson.object []]
+          paths = [[], wrapped]
+          given extra input v = Aeson.object ((input Aeson..= v) : extra)
+          str :: Text -> Aeson.Value
+          str = Aeson.String
+          notBoolean input = "Parameter '" <> input <> "': a BOOLEAN is true or false"
+          notNumber input = "Parameter '" <> input <> "': a NUMBER is a number, such as 5 or 2.5"
+          notString input = "Parameter '" <> input <> "': a STRING is a string, in quotes"
+      it "at the top level, on both paths" \(baseUrl, mgr) ->
+        forM_ paths \extra -> do
+          forM_ [str "TRUE", Aeson.Number 1, Aeson.object ["x" Aeson..= (1 :: Int)]] \v ->
+            call baseUrl mgr "flag" (given extra "b" v) >>= (`shouldCarry` Refuses (notBoolean "b"))
+          forM_ [str "5", Aeson.Bool True] \v ->
+            call baseUrl mgr "plus one" (given extra "n" v) >>= (`shouldCarry` Refuses (notNumber "n"))
+          forM_ [Aeson.Number 5, Aeson.Bool True] \v ->
+            call baseUrl mgr "echo" (given extra "s" v) >>= (`shouldCarry` Refuses (notString "s"))
+          call baseUrl mgr "day of" (given extra "d" (Aeson.Number 20260131))
+            >>= (`shouldCarry` Refuses "Parameter 'd': a DATE is a string such as \"2026-01-31\"")
+          call baseUrl mgr "day of" (given extra "d" (str "2026-13-45"))
+            >>= (`shouldCarry` Refuses "Parameter 'd': could not read \"2026-13-45\" as a DATE, a string such as \"2026-01-31\"")
+          call baseUrl mgr "clock" (given extra "t" (Aeson.Number 1030))
+            >>= (`shouldCarry` Refuses "Parameter 't': a TIME is a string such as \"14:30:00\" or \"14:30\"")
+          call baseUrl mgr "clock" (given extra "t" (str "25:99"))
+            >>= (`shouldCarry` Refuses "Parameter 't': could not read \"25:99\" as a TIME")
+          call baseUrl mgr "when" (given extra "w" (Aeson.Number 1))
+            >>= (`shouldCarry` Refuses "Parameter 'w': a DATETIME is a string such as \"2026-01-31T14:30:00Z\"")
+          call baseUrl mgr "when" (given extra "w" (str "2026-01-3110:30"))
+            >>= (`shouldCarry` Refuses "Parameter 'w': could not read \"2026-01-3110:30\" as a DATETIME")
+      it "in a record's field, a list's element and a MAYBE, and a LIST that is not an array, on both paths" \(baseUrl, mgr) ->
+        forM_ paths \extra -> do
+          call baseUrl mgr "held flag" (given extra "h" (Aeson.object ["f" Aeson..= str "TRUE", "t" Aeson..= str "10:30", "w" Aeson..= str "2026-01-31T10:30:00Z"]))
+            >>= (`shouldCarry` Refuses (notBoolean "h"))
+          call baseUrl mgr "total" (given extra "ns" (Aeson.toJSON [Aeson.Number 1, str "2"])) >>= (`shouldCarry` Refuses (notNumber "ns"))
+          call baseUrl mgr "maybe echo" (given extra "m" (Aeson.Number 5)) >>= (`shouldCarry` Refuses (notString "m"))
+          forM_ [Aeson.Number 5, Aeson.object ["x" Aeson..= (1 :: Int)]] \v ->
+            call baseUrl mgr "total" (given extra "ns" v) >>= (`shouldCarry` Refuses "Parameter 'ns': a LIST is an array")
+      it "answers what JSONDECODE reads, the same on both paths" \(baseUrl, mgr) -> do
+        forM_ paths \extra -> do
+          call baseUrl mgr "flag" (given extra "b" (Aeson.Bool True)) >>= (`shouldCarry` Answers (Aeson.Number 1))
+          call baseUrl mgr "plus one" (given extra "n" (Aeson.Number 2.5)) >>= (`shouldCarry` Answers (Aeson.Number 3.5))
+          call baseUrl mgr "echo" (given extra "s" (str "a")) >>= (`shouldCarry` Answers (str "a"))
+          -- the direct path read "31/01/2026" as the text, and the wrapper as a DATE
+          call baseUrl mgr "day of" (given extra "d" (str "31/01/2026")) >>= (`shouldCarry` Answers (str "2026-01-31"))
+          call baseUrl mgr "maybe echo" (given extra "m" Aeson.Null) >>= (`shouldCarry` Answers (str "none"))
+          -- a TIME and a DATETIME in a record's field, as the wrapper path
+          -- cannot take one at the top level (a limit in the design note): the
+          -- direct path dropped the half second, and stopped on the offset as
+          -- an unknown timezone
+          let held = Aeson.object ["f" Aeson..= True, "t" Aeson..= str "10:30:15.5", "w" Aeson..= str "2026-01-31T10:30:00+08:00"]
+          call baseUrl mgr "held time" (given extra "h" held) >>= (`shouldCarry` Answers (str "10:30:15.5"))
+          call baseUrl mgr "held when" (given extra "h" held) >>= (`shouldCarry` Answers (str "2026-01-31 02:30:00 UTC"))
+        call baseUrl mgr "total" (Aeson.object ["ns" Aeson..= [1, 2 :: Int]]) >>= (`shouldCarry` Answers (Aeson.Number 3))
+      -- JSONDECODE reads the forms the direct path read with parsers of its
+      -- own, so none of them is refused, among them the service's own answer
+      -- for a DATETIME; the wrapper reads a DATE at the top level with TODATE,
+      -- so it is given the date as JSONDECODE reads it (assumed, not ruled;
+      -- review of #779, 2026-11-21)
+      it "reads the forms the direct path read, the same on both paths" \(baseUrl, mgr) ->
+        forM_ paths \extra -> do
+          call baseUrl mgr "day of" (given extra "d" (str "2026-1-5")) >>= (`shouldCarry` Answers (str "2026-01-05"))
+          call baseUrl mgr "day of" (given extra "d" (str "2026-01-31T10:30:00Z")) >>= (`shouldCarry` Answers (str "2026-01-31"))
+          let held t w = Aeson.object ["f" Aeson..= True, "t" Aeson..= str t, "w" Aeson..= str w]
+          call baseUrl mgr "held time" (given extra "h" (held "10:30:00Z" "2026-01-31 10:30:00 UTC")) >>= (`shouldCarry` Answers (str "10:30:00"))
+          forM_ ["2026-01-31 10:30:00 UTC", "2026-01-31 10:30", "2026-01-31T10:30:00", "2026-01-31 18:30:00 Asia/Singapore"] \w ->
+            call baseUrl mgr "held when" (given extra "h" (held "10:30" w)) >>= (`shouldCarry` Answers (str "2026-01-31 10:30:00 UTC"))
+      -- A TIME followed by an offset is the clock as written, whichever side
+      -- of UTC the offset is, as http-json.md says; a DATETIME followed by
+      -- one is the instant it names (review of #779, 2026-11-25, which found
+      -- "-05:00" refused after a TIME where "+08:00" was read)
+      it "reads a TIME followed by an offset of either sign as the clock written, on both paths" \(baseUrl, mgr) -> do
+        let offsets = ["14:30:00+08:00", "14:30:00-05:00", "14:30:00+00:00", "14:30:00-00:00", "14:30:00Z", "14:30:00+0800", "14:30:00-0500", "14:30-05:00"]
+            held t w = Aeson.object ["f" Aeson..= True, "t" Aeson..= str t, "w" Aeson..= str w]
+        -- the wrapper path cannot take a TIME at the top level (a limit in the
+        -- design note), so the top level is asked of the direct path only
+        forM_ offsets \t ->
+          call baseUrl mgr "clock" (Aeson.object ["t" Aeson..= str t]) >>= (`shouldCarry` Answers (str "14:30:00"))
+        forM_ paths \extra -> do
+          forM_ offsets \t ->
+            call baseUrl mgr "held time" (given extra "h" (held t "2026-01-31T10:30:00Z")) >>= (`shouldCarry` Answers (str "14:30:00"))
+          forM_ ["14:30:00-05", "14:30:00+05"] \t ->
+            call baseUrl mgr "held time" (given extra "h" (held t "2026-01-31T10:30:00Z"))
+              >>= (`shouldCarry` Refuses ("could not read " <> Text.pack (show t) <> " as a TIME"))
+          forM_ [("2026-01-31T10:30:00-05:00", "2026-01-31 15:30:00 UTC"), ("2026-01-31T10:30:00-00:00", "2026-01-31 10:30:00 UTC"), ("2026-01-31T10:30:00+08:00", "2026-01-31 02:30:00 UTC")] \(w, answer) ->
+            call baseUrl mgr "held when" (given extra "h" (held "10:30" w)) >>= (`shouldCarry` Answers (str answer))
+
+  -- A type whose only constructor is named like it and carries fields is what
+  -- DECLARE T HAS declares, to the evaluator, so JSONDECODE reads it as a
+  -- record; the schemas and the direct path read it so too, and every path
+  -- reads the one form, its fields alone (assumed, not ruled; review of #779,
+  -- 2026-11-19, which found it published tagged and refused by JSONDECODE).
+  describe "reads a type whose only constructor is named like it as a record" do
+    aroundAll (\k -> withServiceFromSources "record-like" [("refund.l4", recordLikeJL4)] (curry k)) do
+      let call baseUrl mgr fn args = evalFunction baseUrl mgr "record-like" fn (Aeson.object ["arguments" Aeson..= args])
+          refund v extra = Aeson.object (("r" Aeson..= v) : extra)
+          wrapped = ["pad" Aeson..= Aeson.object []]
+          fields = Aeson.object ["amount" Aeson..= (40 :: Int)]
+          tagged = Aeson.object ["Deposit Refund" Aeson..= fields]
+          notObject = "Parameter 'r': a `Deposit Refund` is an object of its fields (amount)"
+      it "answers its fields alone, on both paths" \(baseUrl, mgr) ->
+        forM_ [[], wrapped] \extra ->
+          call baseUrl mgr "refund amount" (refund fields extra) >>= (`shouldCarry` Answers (Aeson.Number 40))
+      it "refuses the tagged form, as a record sent in its envelope is, on both paths" \(baseUrl, mgr) -> do
+        call baseUrl mgr "refund amount" (refund tagged []) >>= (`shouldCarry` Refuses "Parameter 'r': missing required parameter")
+        call baseUrl mgr "refund amount" (refund tagged wrapped) >>= (`shouldCarry` Refuses "Missing required field 'amount' in JSON object")
+      it "refuses its bare name, as a record that is not an object is, naming the input on both paths" \(baseUrl, mgr) ->
+        forM_ [[], wrapped] \extra ->
+          call baseUrl mgr "refund amount" (refund (Aeson.String "Deposit Refund") extra) >>= (`shouldCarry` Refuses notObject)
+      it "publishes it as a record, its fields alone, and answers it as a record is answered" \(baseUrl, mgr) -> do
+        fnResp <- (`httpLbs` mgr) =<< parseRequest (baseUrl <> "/deployments/record-like/functions/refund%20amount")
+        let keysAt path = case wireAt fnResp path of
+              Right (Aeson.Object o) -> Just (map Aeson.Key.toText (Aeson.KeyMap.keys o))
+              _ -> Nothing
+        keysAt ["parameters", "properties", "r", "properties"] `shouldBe` Just ["amount"]
+        wireAt fnResp ["parameters", "properties", "r", "required"] `shouldBe` Right (Aeson.toJSON ["amount" :: Text])
+        -- the answer keeps the envelope a record's has (card J2, not built)
+        call baseUrl mgr "refund of" (Aeson.object ["n" Aeson..= (40 :: Int)])
+          >>= (`shouldCarry` Answers (Aeson.object ["Deposit Refund" Aeson..= fields]))
+
+  -- A type whose only constructor is named like it and carries no fields is
+  -- published as its name, and JSONDECODE, which the fallback path reads with,
+  -- reads that name too, so both paths answer it (assumed, not ruled; review
+  -- of #779, 2026-11-19).
+  describe "reads a fieldless type named like its constructor as its name" do
+    aroundAll (\k -> withServiceFromSources "unit" [("unit.l4", unitJL4)] (curry k)) do
+      let call baseUrl mgr fn args = evalFunction baseUrl mgr "unit" fn (Aeson.object ["arguments" Aeson..= args])
+      it "on both paths, and answers it as its name" \(baseUrl, mgr) -> do
+        forM_ [[], ["pad" Aeson..= Aeson.object []]] \extra ->
+          call baseUrl mgr "takes unit" (Aeson.object (("u" Aeson..= Aeson.String "Unit") : extra))
+            >>= (`shouldCarry` Answers (Aeson.Number 1))
+        call baseUrl mgr "gives unit" (Aeson.object ["n" Aeson..= (1 :: Int)])
+          >>= (`shouldCarry` Answers (Aeson.String "Unit"))
+
+  -- A type that takes a type is read with what it is given in place of its
+  -- parameters. The direct path read each of these; JSONDECODE, which the
+  -- fallback path reads with, decoded every one to NOTHING (review of #779,
+  -- 2026-11-20).
+  describe "reads a type that takes a type, as the schemas publish it" do
+    aroundAll (\k -> withServiceFromSources "type-params" [("params.l4", typeParamsJL4)] (curry k)) do
+      let call baseUrl mgr fn args = evalFunction baseUrl mgr "type-params" fn (Aeson.object ["arguments" Aeson..= args])
+          bothPaths = [[], ["pad" Aeson..= Aeson.object []]]
+          number = Aeson.Number
+          cases =
+            [ ("holding amount", "h", Aeson.object ["amount" Aeson..= (5 :: Int)], number 5)
+            , ("box value", "b", Aeson.object ["value" Aeson..= (5 :: Int)], number 5)
+            , ("pick value", "p", Aeson.object ["Take" Aeson..= Aeson.object ["item" Aeson..= (5 :: Int)]], number 5)
+            , ("pick value", "p", Aeson.String "Skip", number 0)
+            , ("bag total", "g", Aeson.object ["items" Aeson..= [1, 2 :: Int]], number 3)
+            , ("opt value", "o", Aeson.object ["inner" Aeson..= (5 :: Int)], number 5)
+              -- a null takes the fallback path with or without the pad
+            , ("opt value", "o", Aeson.object ["inner" Aeson..= Aeson.Null], number (-1))
+            ]
+      it "answers each form on both paths" \(baseUrl, mgr) ->
+        forM_ cases \(fn, input, v, answer) -> forM_ bothPaths \extra ->
+          call baseUrl mgr fn (Aeson.object ((Aeson.Key.fromText input Aeson..= v) : extra)) >>= (`shouldCarry` Answers answer)
+      it "publishes a record of its fields, and a type with a constructor that carries data as a oneOf" \(baseUrl, mgr) -> do
+        let paramAt fn path = do
+              resp <- (`httpLbs` mgr) =<< parseRequest (baseUrl <> "/deployments/type-params/functions/" <> fn)
+              pure (wireAt resp (["parameters", "properties"] <> path))
+            keysOf = \case
+              Right (Aeson.Object o) -> Just (map Aeson.Key.toText (Aeson.KeyMap.keys o))
+              _ -> Nothing
+        (keysOf <$> paramAt "holding%20amount" ["h", "properties"]) `shouldReturn` Just ["amount"]
+        (either (const False) (const True) <$> paramAt "pick%20value" ["p", "oneOf"]) `shouldReturn` True
+
   describe "compiler" do
     it "compiles valid L4 sources" do
       logger <- newLogger False
@@ -3470,7 +4254,7 @@ spec = describe "integration" do
         ]
       case result of
         Left err -> do
-          err `shouldSatisfy` Text.isInfixOf "@export does not support an EVENT as an input yet"
+          err `shouldSatisfy` Text.isInfixOf "its input `e` is an EVENT, and @export does not support that yet"
           err `shouldSatisfy` Text.isInfixOf "who acted"
         Right (_fns, meta) ->
           expectationFailure $
@@ -3490,12 +4274,61 @@ spec = describe "integration" do
         ]
       case result of
         Left err -> do
-          err `shouldSatisfy` Text.isInfixOf "@export does not support an EVENT as a result yet"
+          err `shouldSatisfy` Text.isInfixOf "its result is an EVENT, and @export does not support that yet"
           err `shouldSatisfy` Text.isInfixOf "make event"
         Right (_fns, meta) ->
           expectationFailure $
             "Expected rejection, but published "
               <> show [fs.fsName | fs <- meta.metaFunctions]
+
+    -- A rule that returns a DEONTIC itself is a contract, and deploys (the
+    -- "deontic evaluation" tests). A DEONTIC inside a MAYBE or a LIST has no
+    -- contract path, so the export check refuses it (Meng, 2026-11-14,
+    -- ROCKINGCHAIR: "a MAYBE/LIST/EITHER/synonym of a DEONTIC stays refused").
+    it "rejects an @export that returns a MAYBE or a LIST of a DEONTIC" do
+      logger <- newLogger False
+      result <- compileBundle logger "test" $ Map.singleton "contract.l4" $ Text.unlines
+        [ "DECLARE Party IS ONE OF alice, bob"
+        , "DECLARE Act IS ONE OF ping, pong"
+        , ""
+        , "@export The duty"
+        , "GIVETH A MAYBE (DEONTIC Party Act)"
+        , "`the duty` MEANS JUST (PARTY alice MUST ping WITHIN 3)"
+        , ""
+        , "@export The duties"
+        , "GIVETH A LIST OF (DEONTIC Party Act)"
+        , "`the duties` MEANS LIST (PARTY alice MUST ping WITHIN 3)"
+        ]
+      case result of
+        Left err -> do
+          err `shouldSatisfy` Text.isInfixOf "its result is a MAYBE whose value is a DEONTIC, a contract rule, and @export does not support that yet"
+          err `shouldSatisfy` Text.isInfixOf "its result is a list whose elements are each a DEONTIC, a contract rule"
+        Right (_fns, meta) ->
+          expectationFailure $
+            "Expected rejection, but published "
+              <> show [fs.fsName | fs <- meta.metaFunctions]
+    -- A constructor's fields are looked at too: one that carries a DEONTIC is
+    -- refused, where it used to deploy as a function that is not a contract and
+    -- answer with the contract.
+    it "rejects an @export whose result has a constructor with a DEONTIC field" do
+      logger <- newLogger False
+      result <- compileBundle logger "test" $ Map.singleton "carrier.l4" $ Text.unlines
+        [ "DECLARE Party IS ONE OF alice, bob"
+        , "DECLARE Act IS ONE OF ping, pong"
+        , "DECLARE Carrier IS ONE OF Duty HAS d IS A DEONTIC Party Act"
+        , ""
+        , "@export The carrier"
+        , "GIVETH A Carrier"
+        , "`the carrier` MEANS Duty (PARTY alice MUST ping WITHIN 3)"
+        ]
+      case result of
+        Left err ->
+          err `shouldSatisfy` Text.isInfixOf "its result is of a type `Carrier` whose constructor `Duty` has a field `d` that is a DEONTIC, a contract rule, and @export does not support that yet"
+        Right (_fns, meta) ->
+          expectationFailure $
+            "Expected rejection, but published "
+              <> show [fs.fsName | fs <- meta.metaFunctions]
+
     -- Ruling M2, option A (2026-10-08). A clause group with no GIVEN has
     -- inputs that only the compiler named, and that nothing gives a type. It
     -- used to be published as the inputs `input 1` and `input 2`, typed
@@ -3712,19 +4545,18 @@ wireCases =
   , ("C8", "big", args [n 15, wrapper], Answers (Aeson.Bool True))
   , ("C9", "twice", args [n 5, direct], Answers (num 10))
   , ("C10", "twice", args [n 5, wrapper], Answers (num 10))
-    -- D1, D4 and D5 show that a pad of {} really takes the wrapper: their
-    -- "Expected JSON number" comes from its JSONDECODE, which the direct path
-    -- never runs. Should they stop saying so, the routing has changed, and the
-    -- other wrapper rows may be testing the direct path twice.
-  , ("D1", "twice", args ["n" Aeson..= ("abc" :: Text), wrapper], Refuses "Expected JSON number but got: String")
-    -- The direct path does not check that a scalar matches its parameter's
-    -- type, so this stops on an internal type error. That is the answer this
-    -- change found, pinned as such, not a good one.
-  , ("D2", "twice", args ["n" Aeson..= ("abc" :: Text), direct], Refuses "type error")
+    -- A value of a basic type that JSONDECODE refuses is refused before the
+    -- request is routed, so both paths give the same words and name the input
+    -- (assumed, not ruled; review of #779, 2026-11-21). D1, D4 and D5 used to
+    -- show that a pad of {} takes the wrapper, by JSONDECODE's own words; the
+    -- trace=full test below shows it now. D2, on the direct path, stopped on an
+    -- internal type error.
+  , ("D1", "twice", args ["n" Aeson..= ("abc" :: Text), wrapper], Refuses notNumber)
+  , ("D2", "twice", args ["n" Aeson..= ("abc" :: Text), direct], Refuses notNumber)
   , ("D3", "twice", args [wrapper], Refuses "Parameter 'n': missing required parameter")
   , ("D3d", "twice", args [direct], Refuses "Parameter 'n': missing required parameter")
-  , ("D4", "twice", args ["n" Aeson..= [1, 2 :: Int], wrapper], Refuses "Expected JSON number but got: Array")
-  , ("D5", "twice", args ["n" Aeson..= Aeson.object ["a" Aeson..= (1 :: Int)], wrapper], Refuses "Expected JSON number but got: Object")
+  , ("D4", "twice", args ["n" Aeson..= [1, 2 :: Int], wrapper], Refuses notNumber)
+  , ("D5", "twice", args ["n" Aeson..= Aeson.object ["a" Aeson..= (1 :: Int)], wrapper], Refuses notNumber)
     -- A rule's own Nothing and Just are answers, not L4's MAYBE.
   , ("E1", "penalty", args [n 5, direct], Answers (Aeson.String "Nothing"))
   , ("E2", "penalty", args [n 5, wrapper], Answers (Aeson.String "Nothing"))
@@ -3738,6 +4570,7 @@ wireCases =
   direct = "pad" Aeson..= (1 :: Int)
   wrapper = "pad" Aeson..= uncertain
   uncertain = Aeson.object []
+  notNumber = "Parameter 'n': a NUMBER is a number, such as 5 or 2.5"
   num :: Int -> Aeson.Value
   num = Aeson.toJSON
   nums :: [Int] -> Aeson.Value
@@ -3802,6 +4635,45 @@ withPendingServices' storeName deployments act = do
   testWithApplication (pure $ app env) \port -> do
     let baseUrl = "http://localhost:" <> show port
     result <- act baseUrl mgr
+    cleanDir tmpPath
+    pure result
+
+-- | A deployment registered as pending, as after a lazy restart, whose stored
+-- metadata says version MAJOR.0.0 and whose cached metadata (in the registry
+-- and in the store) is what this binary compiles the sources to, changed by
+-- the given function: the cache an older binary would have written.
+withPendingCachedService
+  :: Text -> [(FilePath, Text)] -> (DeploymentMetadata -> DeploymentMetadata)
+  -> (String -> Manager -> IO a) -> IO a
+withPendingCachedService deployId sources change act = do
+  let tmpPath = "/tmp/jl4-service-test-" <> Text.unpack deployId
+      sourceMap = Map.fromList sources
+      major = Text.pack (show Version.serviceMajor) <> ".0.0"
+  cleanDir tmpPath
+  store <- initStore tmpPath
+  logger <- newLogger False
+  compiled <- compileBundle logger deployId sourceMap
+  meta <- case compiled of
+    Right (_, m) -> pure (change m) {metaDeploymentVersion = major}
+    Left err -> expectationFailure (Text.unpack err) >> fail "did not compile"
+  BundleStore.saveBundle store deployId sourceMap BundleStore.StoredMetadata
+    { BundleStore.smVersion = computeVersion sourceMap
+    , BundleStore.smCreatedAt = "2026-01-01T00:00:00Z"
+    , BundleStore.smDescription = Nothing
+    , BundleStore.smServiceVersion = Nothing
+    , BundleStore.smDeploymentVersion = Just major
+    }
+  -- A lazy start registers the pending deployment with the cache it reads
+  -- from the store (Application.hs), and the tool list reads the same cache,
+  -- so both hold the changed metadata.
+  BundleStore.saveMetadataCache store deployId (encodeMetadataCache meta)
+  registry <- newTVarIO (Map.singleton (DeploymentId deployId) (DeploymentPending (Just meta)))
+  pendingUpd <- newTVarIO Map.empty
+  tasksReg <- newTVarIO Map.empty
+  let env = MkAppEnv registry pendingUpd store Nothing logger testOptions tasksReg
+  mgr <- newManager defaultManagerSettings
+  testWithApplication (pure $ app env) \port -> do
+    result <- act ("http://localhost:" <> show port) mgr
     cleanDir tmpPath
     pure result
 
@@ -4270,6 +5142,60 @@ buildMultipartRequest url deployId zipBytes = do
     , requestHeaders = [("Content-Type", "multipart/form-data; boundary=" <> boundary)]
     }
 
+-- | A multipart request by this method, with an "id" field when given, and a
+-- "sources" zip file.
+buildMultipartMethod :: BS.ByteString -> String -> Maybe Text -> LBS.ByteString -> IO Request
+buildMultipartMethod httpMethod url mDeployId zipBytes = do
+  req <- parseRequest url
+  let boundary = "----TestBoundary12345" :: BS.ByteString
+      crlf = "\r\n" :: BS.ByteString
+      dashdash = "--" :: BS.ByteString
+      idPart = case mDeployId of
+        Nothing -> []
+        Just deployId ->
+          [ dashdash <> boundary <> crlf
+          , "Content-Disposition: form-data; name=\"id\"" <> crlf <> crlf
+          , Text.Encoding.encodeUtf8 deployId <> crlf
+          ]
+      bodyParts = idPart <>
+        [ dashdash <> boundary <> crlf
+        , "Content-Disposition: form-data; name=\"sources\"; filename=\"bundle.zip\"" <> crlf
+        , "Content-Type: application/zip" <> crlf <> crlf
+        ]
+      body = LBS.fromChunks bodyParts <> zipBytes <> LBS.fromChunks [crlf, dashdash <> boundary <> dashdash <> crlf]
+  pure req
+    { method = httpMethod
+    , requestBody = RequestBodyLBS body
+    , requestHeaders = [("Content-Type", "multipart/form-data; boundary=" <> boundary)]
+    }
+
+-- | The update id of a deploy response, if it has one.
+jobOutcome :: Response LBS.ByteString -> Maybe Text
+jobOutcome resp = (Aeson.decode (responseBody resp) :: Maybe DeploymentStatusResponse) >>= (.dsUpdateId)
+
+-- | Poll the job a deploy response names until it is applied or rejected:
+-- its status and error.
+pollUpdate :: String -> Manager -> Text -> Response LBS.ByteString -> IO (Text, Maybe Text)
+pollUpdate baseUrl mgr deployId resp = case jobOutcome resp of
+  Nothing -> pure ("no job: " <> Text.Encoding.decodeUtf8 (LBS.toStrict (responseBody resp)), Nothing)
+  Just job -> go job (120 :: Int)
+ where
+  go _ 0 = pure ("timeout", Nothing)
+  go job n = do
+    r <- (`httpLbs` mgr) =<< parseRequest (baseUrl <> "/deployments/" <> Text.unpack deployId <> "/updates/" <> Text.unpack job)
+    let field k = case wireAt r [k] of Right (Aeson.String t) -> Just t; _ -> Nothing
+    case field "status" of
+      Just st | st `elem` ["applied", "rejected"] -> pure (st, field "error")
+      _ -> threadDelay 250_000 >> go job (n - 1)
+
+-- | The deploymentVersion GET /deployments/{id} reports.
+deploymentVersionOf :: String -> Manager -> Text -> IO (Maybe Text)
+deploymentVersionOf baseUrl mgr deployId = do
+  r <- (`httpLbs` mgr) =<< parseRequest (baseUrl <> "/deployments/" <> Text.unpack deployId)
+  pure $ case wireAt r ["metadata", "deploymentVersion"] of
+    Right (Aeson.String v) -> Just v
+    _ -> Nothing
+
 -- | Build a JSON POST request.
 buildJsonPost :: String -> Aeson.Value -> IO Request
 buildJsonPost url body = do
@@ -4434,3 +5360,367 @@ ladderLeafField field fd = maybe [] go (Aeson.KeyMap.lookup "body" fd)
      in here <> kids
   go (Aeson.Array xs) = concatMap go (toList xs)
   go _ = []
+
+-- | A rule with an EITHER input, one with an EITHER in a record field, and a
+-- contract rule with an EITHER input, which always takes the wrapper path.
+taggedInputJL4 :: Text
+taggedInputJL4 = Text.unlines
+  [ "IMPORT prelude"
+  , ""
+  , "DECLARE Payment IS ONE OF"
+  , "  Cash"
+  , "  Card HAS `card fee` IS A NUMBER"
+  , "  Voucher HAS code IS A MAYBE STRING"
+  , ""
+  , "DECLARE Box HAS p IS A Payment"
+  , ""
+  , "DECLARE Verdict IS ONE OF"
+  , "  Verdict HAS reason IS A STRING"
+  , "  None"
+  , ""
+  , "GIVEN p IS A Payment"
+  , "GIVETH A NUMBER"
+  , "`fee of` p MEANS"
+  , "  CONSIDER p"
+  , "  WHEN Card f THEN f"
+  , "  WHEN Voucher c THEN 1"
+  , "  WHEN Cash THEN 0"
+  , ""
+  , "@export Fee for a payment"
+  , "GIVEN p IS A Payment"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A NUMBER"
+  , "`fee for` MEANS `fee of` p"
+  , ""
+  , "@export Fee in a box"
+  , "GIVEN b IS A Box"
+  , "GIVETH A NUMBER"
+  , "`boxed fee` MEANS `fee of` (b's p)"
+  , ""
+  , "@export Total fee"
+  , "GIVEN ps IS A LIST OF Payment"
+  , "GIVETH A NUMBER"
+  , "`total fee` MEANS sum (map `fee of` ps)"
+  , ""
+  , "@export Verdict"
+  , "GIVEN v IS A Verdict"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A NUMBER"
+  , "`verdict` MEANS"
+  , "  CONSIDER v"
+  , "  WHEN Verdict r THEN 1"
+  , "  WHEN None THEN 0"
+  ]
+
+unitJL4 :: Text
+unitJL4 = Text.unlines
+  [ "IMPORT prelude"
+  , ""
+  , "DECLARE Unit IS ONE OF Unit"
+  , ""
+  , "@export Takes a unit"
+  , "GIVEN u IS A Unit"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A NUMBER"
+  , "`takes unit` MEANS"
+  , "  CONSIDER u"
+  , "  WHEN Unit THEN 1"
+  , ""
+  , "@export Gives a unit"
+  , "GIVEN n IS A NUMBER"
+  , "GIVETH A Unit"
+  , "`gives unit` MEANS Unit"
+  ]
+
+recordFormJL4 :: Text
+recordFormJL4 = Text.unlines
+  [ "DECLARE Pair HAS"
+  , "  left IS A NUMBER"
+  , "  right IS A NUMBER"
+  , ""
+  , "@export Pair sum"
+  , "GIVEN p IS A Pair"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A NUMBER"
+  , "`pair sum` MEANS p's left + p's right"
+  , ""
+  , "DECLARE Holder HAS q IS A Pair"
+  , ""
+  , "@export Held sum"
+  , "GIVEN h IS A Holder"
+  , "GIVETH A NUMBER"
+  , "`held sum` MEANS h's q's left + h's q's right"
+  ]
+
+scalarFormJL4 :: Text
+scalarFormJL4 = Text.unlines
+  [ "IMPORT prelude"
+  , ""
+  , "DECLARE Held HAS"
+  , "  f IS A BOOLEAN"
+  , "  t IS A TIME"
+  , "  w IS A DATETIME"
+  , ""
+  , "@export Flag"
+  , "GIVEN b IS A BOOLEAN"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A NUMBER"
+  , "`flag` MEANS IF b THEN 1 ELSE 0"
+  , ""
+  , "@export Plus one"
+  , "GIVEN n IS A NUMBER"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A NUMBER"
+  , "`plus one` MEANS n + 1"
+  , ""
+  , "@export Echo"
+  , "GIVEN s IS A STRING"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A STRING"
+  , "`echo` MEANS s"
+  , ""
+  , "@export Day of"
+  , "GIVEN d IS A DATE"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A DATE"
+  , "`day of` MEANS d"
+  , ""
+  , "@export Clock"
+  , "GIVEN t IS A TIME"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A TIME"
+  , "`clock` MEANS t"
+  , ""
+  , "@export When"
+  , "GIVEN w IS A DATETIME"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A DATETIME"
+  , "`when` MEANS w"
+  , ""
+  , "@export Held flag"
+  , "GIVEN h IS A Held"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A NUMBER"
+  , "`held flag` MEANS IF h's f THEN 1 ELSE 0"
+  , ""
+  , "@export Held time"
+  , "GIVEN h IS A Held"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A TIME"
+  , "`held time` MEANS h's t"
+  , ""
+  , "@export Held when"
+  , "GIVEN h IS A Held"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A DATETIME"
+  , "`held when` MEANS h's w"
+  , ""
+  , "@export Total"
+  , "GIVEN ns IS A LIST OF NUMBER"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A NUMBER"
+  , "`total` MEANS sum ns"
+  , ""
+  , "@export Maybe echo"
+  , "GIVEN m IS A MAYBE STRING"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A STRING"
+  , "`maybe echo` MEANS"
+  , "  CONSIDER m"
+  , "  WHEN JUST x THEN x"
+  , "  WHEN NOTHING THEN \"none\""
+  ]
+
+enumFormJL4 :: Text
+enumFormJL4 = Text.unlines
+  [ "DECLARE Party IS ONE OF Landlord, Tenant"
+  , "DECLARE Lease HAS payer IS A Party"
+  , "DECLARE Tone IS ONE OF Tone, Loud"
+  , "DECLARE `Signed Waiver` IS ONE OF `Signed Waiver`"
+  , "DECLARE Payment IS ONE OF"
+  , "  Cash"
+  , "  Card HAS fee IS A NUMBER"
+  , ""
+  , "GIVEN p IS A Party"
+  , "GIVETH A NUMBER"
+  , "`payer number` p MEANS"
+  , "  CONSIDER p"
+  , "  WHEN Landlord THEN 1"
+  , "  OTHERWISE 2"
+  , ""
+  , "@export Who pays"
+  , "GIVEN p IS A Party"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A NUMBER"
+  , "`who pays` MEANS `payer number` p"
+  , ""
+  , "@export Lease payer"
+  , "GIVEN l IS A Lease"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A NUMBER"
+  , "`lease payer` MEANS `payer number` (l's payer)"
+  , ""
+  , "@export First party"
+  , "GIVEN ps IS A LIST OF Party"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A NUMBER"
+  , "`first party` MEANS"
+  , "  CONSIDER ps"
+  , "  WHEN EMPTY THEN 0"
+  , "  WHEN x FOLLOWED BY rest THEN `payer number` x"
+  , ""
+  , "@export Maybe party"
+  , "GIVEN mp IS A MAYBE Party"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A NUMBER"
+  , "`maybe party` MEANS"
+  , "  CONSIDER mp"
+  , "  WHEN NOTHING THEN 0"
+  , "  WHEN JUST x THEN `payer number` x"
+  , ""
+  , "@export Tone"
+  , "GIVEN t IS A Tone"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A NUMBER"
+  , "`tone` MEANS"
+  , "  CONSIDER t"
+  , "  WHEN Tone THEN 1"
+  , "  WHEN Loud THEN 2"
+  , ""
+  , "@export Waiver"
+  , "GIVEN w IS A `Signed Waiver`"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A NUMBER"
+  , "`waiver` MEANS 1"
+  , ""
+  , "@export Payment"
+  , "GIVEN pay IS A Payment"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A NUMBER"
+  , "`payment` MEANS"
+  , "  CONSIDER pay"
+  , "  WHEN Cash THEN 1"
+  , "  OTHERWISE 2"
+  ]
+
+typeParamsJL4 :: Text
+typeParamsJL4 = Text.unlines
+  [ "IMPORT prelude"
+  , ""
+  , "DECLARE Holding a IS ONE OF"
+  , "  Holding HAS amount IS AN a"
+  , "DECLARE Box a HAS value IS AN a"
+  , "DECLARE Pick a IS ONE OF"
+  , "  Skip"
+  , "  Take HAS item IS AN a"
+  , "DECLARE Bag a HAS items IS A LIST OF a"
+  , "DECLARE Opt a HAS inner IS A MAYBE a"
+  , ""
+  , "@export Holding amount"
+  , "GIVEN h IS A Holding OF NUMBER"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A NUMBER"
+  , "`holding amount` MEANS"
+  , "  CONSIDER h"
+  , "  WHEN Holding n THEN n"
+  , ""
+  , "@export Box value"
+  , "GIVEN b IS A Box OF NUMBER"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A NUMBER"
+  , "`box value` MEANS b's value"
+  , ""
+  , "@export Pick value"
+  , "GIVEN p IS A Pick OF NUMBER"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A NUMBER"
+  , "`pick value` MEANS"
+  , "  CONSIDER p"
+  , "  WHEN Skip THEN 0"
+  , "  WHEN Take n THEN n"
+  , ""
+  , "@export Bag total"
+  , "GIVEN g IS A Bag OF NUMBER"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A NUMBER"
+  , "`bag total` MEANS sum (g's items)"
+  , ""
+  , "@export Opt value"
+  , "GIVEN o IS AN Opt OF NUMBER"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A NUMBER"
+  , "`opt value` MEANS"
+  , "  CONSIDER o's inner"
+  , "  WHEN JUST n THEN n"
+  , "  WHEN NOTHING THEN -1"
+  ]
+
+recordLikeJL4 :: Text
+recordLikeJL4 = Text.unlines
+  [ "IMPORT prelude"
+  , ""
+  , "DECLARE `Deposit Refund` IS ONE OF"
+  , "  `Deposit Refund` HAS amount IS A NUMBER"
+  , ""
+  , "@export Refund amount"
+  , "GIVEN r IS A `Deposit Refund`"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A NUMBER"
+  , "`refund amount` MEANS"
+  , "  CONSIDER r"
+  , "  WHEN `Deposit Refund` a THEN a"
+  , ""
+  , "@export A refund"
+  , "GIVEN n IS A NUMBER"
+  , "GIVETH A `Deposit Refund`"
+  , "`refund of` MEANS `Deposit Refund` n"
+  ]
+
+eitherInputJL4 :: Text
+eitherInputJL4 = Text.unlines
+  [ "DECLARE Box HAS v IS AN EITHER STRING NUMBER"
+  , ""
+  , "GIVEN e IS AN EITHER STRING NUMBER"
+  , "GIVETH A NUMBER"
+  , "`value of` e MEANS"
+  , "  CONSIDER e"
+  , "  WHEN LEFT s THEN -1"
+  , "  WHEN RIGHT n THEN n"
+  , ""
+  , "@export Side"
+  , "GIVEN e IS AN EITHER STRING NUMBER"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A NUMBER"
+  , "`side` MEANS `value of` e"
+  , ""
+  , "@export Boxed"
+  , "GIVEN b IS A Box"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A NUMBER"
+  , "`boxed` MEANS `value of` (b's v)"
+  , ""
+  , "DECLARE Party IS ONE OF alice, bob"
+  , "DECLARE Act IS ONE OF ping, pong"
+  , ""
+  , "@export Duty by side"
+  , "GIVEN e IS AN EITHER STRING NUMBER"
+  , "GIVETH A DEONTIC Party Act"
+  , "`duty by side` MEANS"
+  , "  CONSIDER e"
+  , "  WHEN LEFT s THEN PARTY alice MUST ping WITHIN 3"
+  , "  WHEN RIGHT n THEN PARTY bob MUST pong WITHIN n"
+  , ""
+  , "@export Fee"
+  , "GIVEN `the claim` IS AN EITHER STRING NUMBER"
+  , "      pad IS A MAYBE NUMBER"
+  , "GIVETH A NUMBER"
+  , "`fee` MEANS"
+  , "  CONSIDER `the claim`"
+  , "  WHEN RIGHT amount THEN amount * 0.05"
+  , "  OTHERWISE 50"
+  , ""
+  , "@export Total"
+  , "GIVEN es IS A LIST OF (EITHER STRING NUMBER)"
+  , "GIVETH A NUMBER"
+  , "`total` MEANS 0"
+  ]

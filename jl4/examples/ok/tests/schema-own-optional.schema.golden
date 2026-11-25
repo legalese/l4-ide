@@ -6,7 +6,7 @@
                     "type": "number"
                 },
                 "o": {
-                    "$ref": "#/$defs/Optional"
+                    "$ref": "#/$defs/Optional OF NUMBER"
                 }
             },
             "required": [
@@ -15,31 +15,30 @@
             ],
             "type": "object"
         },
-        "Optional": {
+        "Optional OF NUMBER": {
             "oneOf": [
                 {
-                    "properties": {
-                        "tag": {
-                            "const": "Absent"
-                        }
-                    },
-                    "required": [
-                        "tag"
+                    "enum": [
+                        "Absent"
                     ],
-                    "type": "object"
+                    "type": "string"
                 },
                 {
                     "properties": {
-                        "tag": {
-                            "const": "Present"
-                        },
-                        "value": {
-                            "$ref": "#/$defs/a"
+                        "Present": {
+                            "properties": {
+                                "value": {
+                                    "type": "number"
+                                }
+                            },
+                            "required": [
+                                "value"
+                            ],
+                            "type": "object"
                         }
                     },
                     "required": [
-                        "tag",
-                        "value"
+                        "Present"
                     ],
                     "type": "object"
                 }

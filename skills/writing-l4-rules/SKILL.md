@@ -320,12 +320,26 @@ parameters of that function and must be supplied by the caller — they behave
 just like `GIVEN` parameters at the API boundary. ASSUMEs not referenced by
 any exported function remain internal assumptions.
 
-**Function-typed inputs are not allowed for `@export`.** Neither a `GIVEN`
-parameter nor a referenced `ASSUME` may have a `FUNCTION FROM … TO …` type
-on an exported function: GIVENs can't be passed over JSON, and function-typed
-ASSUMEs stay uninterpreted at runtime (any call fails with a stuck
-"assumed term" error). The typechecker and `jl4-service` deploy both reject
-such bundles with `Function type inputs are not supported for @export`.
+**Only a type with a JSON form can cross the `@export` boundary.** Every
+input (a `GIVEN`, or a referenced `ASSUME`) and the result must be a `NUMBER`,
+`BOOLEAN`, `STRING`, `DATE`, `TIME`, `DATETIME`, a `LIST OF` or `MAYBE` of
+those, or a record or enumeration of those. The one exception is a result
+that is a `DEONTIC` itself (a contract rule): it is published, and
+`jl4-service` evaluates it against a `startTime` and the `events` so far, on
+`/evaluation` only (MCP `tools/call` and batch ignore them). A
+`FUNCTION FROM … TO …`, an `EVENT`, a type variable, and a `DEONTIC` anywhere
+else (an input, or inside a `MAYBE`, `LIST` or `EITHER` result) have no JSON
+form yet, so an `@export` of a rule with one is an error at the `@export`, and
+`jl4-service` deploys the file's other exports without it, naming it in
+`refusedExports` (a deployment whose every export is refused fails). The
+error says "its input `x` is a
+function, and @export does not support that yet" (or "its result", or "an
+EVENT", or "a DEONTIC, a contract rule"), and `l4 check` fails. The error
+does not stop the rest of the file: it is still type-checked, and the rule
+still evaluates in the editor with its `#EVAL` and `#EVALTRACE`. Remove the
+`@export`, or pass the parts of an event as separate inputs and build it
+inside the rule. Function-typed ASSUMEs also stay uninterpreted at runtime
+(any call fails with a stuck "assumed term" error).
 
 ### `@desc` — document parameters
 

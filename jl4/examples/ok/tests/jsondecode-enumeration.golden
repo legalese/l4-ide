@@ -1,0 +1,43 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+jsondecode-enumeration.l4:49:1-36:
+  RIGHT OF Landlord
+jsondecode-enumeration.l4:50:1-34:
+  RIGHT OF Tenant
+jsondecode-enumeration.l4:51:1-28:
+  2
+jsondecode-enumeration.l4:52:1-47:
+  RIGHT OF (Lease OF Tenant)
+jsondecode-enumeration.l4:53:1-52:
+  RIGHT OF (LIST Landlord, Tenant)
+jsondecode-enumeration.l4:54:1-34:
+  RIGHT OF NOTHING
+jsondecode-enumeration.l4:55:1-40:
+  RIGHT OF (JUST OF Tenant)
+jsondecode-enumeration.l4:56:1-31:
+  RIGHT OF Tone
+jsondecode-enumeration.l4:57:1-31:
+  RIGHT OF Loud
+jsondecode-enumeration.l4:59:1-34:
+  Expected a `Party` written as one of the strings "Landlord", "Tenant", the names of its constructors, but got: "Lodger"
+jsondecode-enumeration.l4:60:1-28:
+  Expected a `Party` written as one of the strings "Landlord", "Tenant", the names of its constructors, but got: "Lodger"
+jsondecode-enumeration.l4:61:1-25:
+  Expected a `Party` written as one of the strings "Landlord", "Tenant", the names of its constructors, but got: 5
+jsondecode-enumeration.l4:62:1-28:
+  Expected a `Party` written as one of the strings "Landlord", "Tenant", the names of its constructors, but got: true
+jsondecode-enumeration.l4:63:1-42:
+  Expected a `Party` written as one of the strings "Landlord", "Tenant", the names of its constructors, but got: {"Landlord":{}}
+jsondecode-enumeration.l4:64:1-28:
+  Expected a `Party` written as one of the strings "Landlord", "Tenant", the names of its constructors, but got: null
+jsondecode-enumeration.l4:65:1-47:
+  Expected a `Party` written as one of the strings "Landlord", "Tenant", the names of its constructors, but got: "Lodger"
+jsondecode-enumeration.l4:66:1-43:
+  Expected a `Party` written as one of the strings "Landlord", "Tenant", the names of its constructors, but got: 5
+jsondecode-enumeration.l4:67:1-40:
+  Expected a `Party` written as one of the strings "Landlord", "Tenant", the names of its constructors, but got: "Lodger"
+jsondecode-enumeration.l4:68:1-32:
+  Expected a `Tone` written as one of the strings "Tone", "Loud", the names of its constructors, but got: "Quiet"
+jsondecode-enumeration.l4:69:1-25:
+  Expected a `Tone` written as one of the strings "Tone", "Loud", the names of its constructors, but got: {}

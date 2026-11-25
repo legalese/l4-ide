@@ -22,6 +22,7 @@ module L4.EvaluateLazy
 , evalExceptionCode
 , prettyEvalDirectiveResult
 , prettyEvalDirectiveResultWithFields
+, evalDirectiveResultToJsonWithFields
 , prettyAssertionOutcome
 , prettyReductionOutcome
 , postprocessTrace
@@ -427,6 +428,20 @@ instance Aeson.ToJSON EvalDirectiveValue where
   toJSON (Reduction (ReducedErrored exc)) = Aeson.object
     [ "error" Aeson..= Text.unlines (prettyEvalException exc)
     ]
+
+-- | A result as its 'Aeson.ToJSON' instance writes it, except that a value's
+-- constructors are written with the names of their fields
+-- ('nfToJsonWithFieldNames'): @{"Injury": {"days off work": 3}}@, as
+-- jl4-service answers it and reads it as an input, where the instance writes
+-- @{"Injury": [3]}@. @l4 batch@ writes its results so (review of #779,
+-- 2026-11-20).
+evalDirectiveResultToJsonWithFields :: ConstructorFieldNames -> EvalDirectiveResult -> Aeson.Value
+evalDirectiveResultToJsonWithFields fields r@(MkEvalDirectiveResult _range res _trace) = case res of
+  Reduction (Reduced val) -> Aeson.object
+    [ "result" Aeson..= nfToJsonWithFieldNames fields val
+    , "trace"  Aeson..= Aeson.Null
+    ]
+  _ -> Aeson.toJSON r
 
 prettyEvalDirectiveValueWithFields :: ConstructorFieldNames -> EvalDirectiveValue -> Text
 prettyEvalDirectiveValueWithFields _fields (Assertion a)                    = prettyAssertionOutcome a

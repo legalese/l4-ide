@@ -24,12 +24,12 @@ import qualified Version
 import DeploymentLoader (triggerCompilationIfPending)
 import Logging (logInfo, logWarn)
 import Options (Options (..))
-import Shared (jsonError, encodeMetadataCache)
+import Shared (jsonError, encodeMetadataCache, visibleRefused)
 import Types
 
 import Control.Applicative ((<|>))
 import Control.Concurrent.Async (async)
-import Control.Concurrent.STM (atomically, modifyTVar', readTVarIO)
+import Control.Concurrent.STM (atomically, modifyTVar', readTVar, readTVarIO, retry)
 import Control.Monad (when)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Reader (asks)
@@ -96,6 +96,9 @@ data UpdateStatusResponse = UpdateStatusResponse
   , usDeploymentId :: !Text
   , usStatus       :: !Text   -- "compiling" | "applied" | "rejected"
   , usError        :: !(Maybe Text)
+  , usRefusedExports :: ![RefusedExport]
+  -- ^ On an applied job, the @\@export@s the deploy left out, and why. The
+  -- deployment's own metadata carries the same list.
   }
   deriving stock (Show, Generic)
 
@@ -105,6 +108,7 @@ instance ToJSON UpdateStatusResponse where
     , "deploymentId" .= u.usDeploymentId
     , "status"       .= u.usStatus
     ] <> maybe [] (\e -> ["error" .= e]) u.usError
+      <> (if null u.usRefusedExports then [] else ["refusedExports" .= u.usRefusedExports])
 
 instance FromJSON UpdateStatusResponse where
   parseJSON = Aeson.withObject "UpdateStatusResponse" $ \o ->
@@ -113,6 +117,7 @@ instance FromJSON UpdateStatusResponse where
       <*> o Aeson..: "deploymentId"
       <*> o Aeson..: "status"
       <*> o Aeson..:? "error"
+      <*> o Aeson..:? "refusedExports" Aeson..!= []
 
 -- | The control plane API for managing deployments.
 type ControlPlaneApi =
@@ -126,9 +131,9 @@ type ControlPlaneApi =
 -- | Combined handler for the control plane.
 controlPlaneHandler :: Visibility -> ServerT ControlPlaneApi AppM
 controlPlaneHandler vis =
-       postDeploymentHandler
+       postDeploymentHandler vis
   :<|> getDeploymentsHandler vis
-  :<|> getUpdateStatusHandler
+  :<|> getUpdateStatusHandler vis
   :<|> getDeploymentHandler vis
   :<|> putDeploymentHandler
   :<|> deleteDeploymentHandler
@@ -140,8 +145,8 @@ controlPlaneHandler vis =
 -- (if the id already exists) keeps serving until the job applies; a
 -- brand-new id simply does not exist until then. Returns 202 with an
 -- @updateId@ to poll, or "ready" immediately on a content-hash dedupe.
-postDeploymentHandler :: MultipartData Mem -> AppM DeploymentStatusResponse
-postDeploymentHandler multipart = do
+postDeploymentHandler :: Visibility -> MultipartData Mem -> AppM DeploymentStatusResponse
+postDeploymentHandler vis multipart = do
   env <- asks id
 
   -- Extract deployment ID (from multipart field or generate UUID)
@@ -158,6 +163,13 @@ postDeploymentHandler multipart = do
   let mDesc = extractDescription multipart
       version = computeVersion sourceMap
 
+  -- A pending deployment (lazy-load) is compiled first, from its stored
+  -- sources, by this binary, as an eager startup would have compiled it, so a
+  -- POST over it is answered as in eager mode: an identical bundle is the
+  -- deployment as it stands, and the version bump compares interfaces of this
+  -- binary, not the cached metadata of the one that wrote the store
+  -- (STALEMENU, Meng, 2026-11-18).
+  settlePending deployId
   registry <- liftIO $ readTVarIO env.deploymentRegistry
   -- The recompile shortcut is keyed on the CONTENT hash, so it must also be
   -- keyed on the requested id. Matching content alone meant that asking for a
@@ -175,7 +187,10 @@ postDeploymentHandler multipart = do
     Just (DeploymentReady _ existingMeta)
       | existingMeta.metaVersion == version ->
         -- Identical sources already deployed UNDER THIS ID — no recompile, no job.
-        pure (mkStatus deployId.unDeploymentId "ready" (Just existingMeta) Nothing)
+        -- The metadata is filtered by the visibility headers, as GET's is,
+        -- with the full function detail this answer always carried.
+        let fnMode = if vis.showFunctions then FnFull else FnNone
+        in pure (mkStatus deployId.unDeploymentId "ready" (Just (visibleMeta vis fnMode existingMeta)) Nothing)
     _ -> do
       let cfg = env.options
           isNew = not (Map.member deployId registry)
@@ -281,8 +296,8 @@ getDeploymentHandler vis deployIdText mFunctions = do
 -- | GET /deployments/{id}/updates/{updateId} — poll an async
 -- deploy/update job. Independent of the live deployment: a job's
 -- progress or failure never changes what GET /deployments/{id} reports.
-getUpdateStatusHandler :: Text -> Text -> AppM UpdateStatusResponse
-getUpdateStatusHandler deployIdText jobId = do
+getUpdateStatusHandler :: Visibility -> Text -> Text -> AppM UpdateStatusResponse
+getUpdateStatusHandler vis deployIdText jobId = do
   env <- asks id
   now <- liftIO getCurrentTime
   liftIO $ atomically $ modifyTVar' env.updateJobs (pruneJobs now)
@@ -294,11 +309,14 @@ getUpdateStatusHandler deployIdText jobId = do
         , usDeploymentId = j.ujDeploymentId
         , usStatus = case j.ujStatus of
             JobCompiling  -> "compiling"
-            JobApplied    -> "applied"
+            JobApplied _  -> "applied"
             JobRejected _ -> "rejected"
         , usError = case j.ujStatus of
             JobRejected m -> Just m
             _             -> Nothing
+        , usRefusedExports = case j.ujStatus of
+            JobApplied rs -> visibleRefused vis rs
+            _             -> []
         }
     _ -> throwError err404
 
@@ -319,6 +337,15 @@ putDeploymentHandler deployIdText multipart = do
 
   -- Must already exist. Capture its description (so a source-only PUT
   -- preserves it) and its current interface (for the compat gate).
+  --
+  -- A pending deployment (lazy-load) is compiled first, from its stored
+  -- sources, by this binary, so the gate compares the new bundle with what the
+  -- old one compiles to now, as in eager mode, and not with the cached metadata
+  -- of the binary that wrote the store (STALEMENU, Meng, 2026-11-18). If the old
+  -- sources no longer compile, the deployment is failed, as an eager startup
+  -- would have left it, and the gate skips it as it skips any failed deployment
+  -- (assumed, not ruled).
+  settlePending deployId
   registry <- liftIO $ readTVarIO env.deploymentRegistry
   (existingDesc, mOldIfaces) <- case Map.lookup deployId registry of
     Nothing -> throwError err404
@@ -448,7 +475,15 @@ runDeployJob env deployId jobId sourceMap storedMeta mDesc mGate = do
       reject ("Update rejected: compilation failed: " <> err)
     Just (Right (fns, meta0)) -> do
       let newIfaces = map (ifaceFromFunction . (.fnImpl)) (Map.elems fns)
-          breaking = maybe [] (`detectBreakingChanges` newIfaces) mGate
+          -- A live rule that this bundle leaves out because its @export is
+          -- now refused is a removed rule to its callers; say why it went.
+          refusedWhy n = case [r | r <- meta0.metaRefusedExports, r.reName == n] of
+            (r : _) -> ": its @export is refused, because " <> Text.intercalate "; " r.reReasons
+            [] -> ""
+          explain msg = case Text.stripSuffix " removed" =<< Text.stripPrefix "rule " msg of
+            Just n -> msg <> refusedWhy n
+            Nothing -> msg
+          breaking = map explain $ maybe [] (`detectBreakingChanges` newIfaces) mGate
       case breaking of
         (_:_) ->
           reject $ "Update rejected — it would break existing integrations: "
@@ -500,7 +535,7 @@ runDeployJob env deployId jobId sourceMap storedMeta mDesc mGate = do
                 ]
           atomically $ modifyTVar' env.deploymentRegistry $
             Map.insert deployId (DeploymentReady fns meta)
-          setJob env jobId JobApplied
+          setJob env jobId (JobApplied meta.metaRefusedExports)
           logInfo env.logger "Deploy job applied"
             [ ("deploymentId", toJSON deployId.unDeploymentId)
             , ("jobId", toJSON jobId)
@@ -545,22 +580,27 @@ nextDeploymentVersion major mPrev isBreaking =
 stateToResponse :: Bool -> Visibility -> FnMode -> DeploymentId -> DeploymentState -> DeploymentStatusResponse
 stateToResponse debugMode vis fnMode (DeploymentId did) = \case
   DeploymentPending mCachedMeta ->
-    let meta = case mCachedMeta of
-          Just m -> Just m { metaFunctions = case fnMode of FnNone -> []; FnSimple -> map simplify m.metaFunctions; FnFull -> m.metaFunctions, metaFiles = if vis.showFiles then m.metaFiles else [] }
-          Nothing -> Nothing
-    in mkStatus did "pending" meta Nothing
+    mkStatus did "pending" (visibleMeta vis fnMode <$> mCachedMeta) Nothing
   DeploymentCompiling -> mkStatus did "compiling" Nothing Nothing
   DeploymentReady _ meta ->
-    let filteredMeta = meta
-          { metaFunctions = case fnMode of
-              FnNone -> []
-              FnSimple -> map simplify meta.metaFunctions
-              FnFull -> meta.metaFunctions
-          , metaFiles = if vis.showFiles then meta.metaFiles else []}
-    in mkStatus did "ready" (Just filteredMeta) Nothing
+    mkStatus did "ready" (Just (visibleMeta vis fnMode meta)) Nothing
   DeploymentFailed err ->
     let errorMsg = if debugMode then Just err else Just "Compilation failed"
     in mkStatus did "failed" Nothing errorMsg
+
+-- | Deployment metadata as far as the request may see it: functions at the
+-- detail asked for (none without function visibility), files only with file
+-- visibility, and the refused exports by 'visibleRefused' (none without
+-- function visibility, and without their files without file visibility).
+visibleMeta :: Visibility -> FnMode -> DeploymentMetadata -> DeploymentMetadata
+visibleMeta vis fnMode meta = meta
+  { metaFunctions = case fnMode of
+      FnNone -> []
+      FnSimple -> map simplify meta.metaFunctions
+      FnFull -> meta.metaFunctions
+  , metaFiles = if vis.showFiles then meta.metaFiles else []
+  , metaRefusedExports = visibleRefused vis meta.metaRefusedExports
+  }
 
 -- | Validate a deployment ID.
 -- Must be <= 36 characters (UUID length), alphanumeric + hyphens + underscores,
@@ -615,6 +655,22 @@ stateDescription :: DeploymentState -> Maybe Text
 stateDescription (DeploymentReady _ meta)        = meta.metaDescription
 stateDescription (DeploymentPending (Just meta)) = meta.metaDescription
 stateDescription _                               = Nothing
+
+-- | Compile a pending (lazy-load) deployment from its stored sources, and wait
+-- for one that another request is compiling already, so that what is read from
+-- the registry next is ready or failed, as after an eager startup. Waiting is
+-- bounded by the compile timeout, and a little more.
+settlePending :: DeploymentId -> AppM ()
+settlePending deployId = do
+  env <- asks id
+  triggerCompilationIfPending deployId
+  let limit = (env.options.compileTimeout + 5) * 1_000_000
+  _ <- liftIO $ timeout limit $ atomically $ do
+    reg <- readTVar env.deploymentRegistry
+    case Map.lookup deployId reg of
+      Just DeploymentCompiling -> retry
+      _ -> pure ()
+  pure ()
 
 -- | The currently-deployed interface for the backwards-compatibility
 -- guard. Uses the live in-memory functions when ready (full schema,

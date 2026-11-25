@@ -1,0 +1,36 @@
+-- A type that takes a type, read by l4 batch (review of #779, 2026-11-20).
+-- JSONDECODE reads it with what it is given in place of its parameters, and
+-- the wrapper's input record brackets a type of more than one word, so a
+-- second input after it parses.
+
+DECLARE Holding a IS ONE OF
+  Holding HAS amount IS AN a
+
+DECLARE Pick a IS ONE OF
+  Skip
+  Take HAS item IS AN a
+
+DECLARE Opt a HAS inner IS A MAYBE a
+
+@export default Holding amount
+GIVEN h IS A Holding OF NUMBER
+      p IS A Pick OF NUMBER
+      o IS AN Opt OF NUMBER
+GIVETH A NUMBER
+`holding amount` MEANS
+  CONSIDER h
+  WHEN Holding n THEN n + `pick of` p + `opt of` o
+
+GIVEN p IS A Pick OF NUMBER
+GIVETH A NUMBER
+`pick of` p MEANS
+  CONSIDER p
+  WHEN Skip THEN 0
+  WHEN Take n THEN n
+
+GIVEN o IS AN Opt OF NUMBER
+GIVETH A NUMBER
+`opt of` o MEANS
+  CONSIDER o's inner
+  WHEN JUST n THEN n
+  WHEN NOTHING THEN 0

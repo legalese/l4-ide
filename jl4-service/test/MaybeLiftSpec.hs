@@ -57,3 +57,16 @@ spec = describe "MaybeLift" $ do
 
     it "keeps MAYBE (LIST OF NUMBER) without double-lifting inner elements" $ do
       liftTypeText "MAYBE (LIST OF NUMBER)" `shouldBe` "MAYBE (LIST OF NUMBER)"
+
+    -- A type of more than one word is bracketed, or the field does not parse
+    it "brackets a type with arguments" $ do
+      liftTypeText "EITHER OF STRING, NUMBER" `shouldBe` "MAYBE (EITHER OF STRING, NUMBER)"
+      liftTypeText "Box OF NUMBER" `shouldBe` "MAYBE (Box OF NUMBER)"
+      liftTypeText "`My Box` OF NUMBER" `shouldBe` "MAYBE (`My Box` OF NUMBER)"
+
+    it "brackets the element of a LIST that has arguments" $ do
+      liftTypeText "LIST OF EITHER OF STRING, NUMBER" `shouldBe` "MAYBE (LIST OF (MAYBE (EITHER OF STRING, NUMBER)))"
+
+    it "does not bracket a type that is bracketed already" $ do
+      liftTypeText "(EITHER OF STRING, NUMBER)" `shouldBe` "MAYBE (EITHER OF STRING, NUMBER)"
+      liftTypeText "(Box OF NUMBER) " `shouldBe` "MAYBE (Box OF NUMBER)"

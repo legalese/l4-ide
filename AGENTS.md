@@ -70,9 +70,9 @@ First run creates the golden file (test fails). Second run validates (should pas
 
 Tests live under `jl4/examples/`:
 
-- `jl4/examples/ok/` — files that should succeed
+- `jl4/examples/ok/` — files that `l4 check` passes
 - `jl4/examples/not-ok/` — files that should fail (subdirs: `tc/`, `nlg/`)
-  - Except the three top-level `not-ok/export-*.l4` fixtures, which must type-check: their schema goldens pin that an `@export` in an unsupported position yields no default export.
+  - The top-level `not-ok/export-*.l4` files type-check and evaluate, and `l4 check` fails them for an `@export` that the export check refuses, a pass of its own (`not-ok/export-unsendable-types.l4`).
 - `jl4/examples/experiments/` — real-world examples
 - `jl4/examples/legal/`, `jl4/examples/lsp/` — domain/LSP fixtures
 

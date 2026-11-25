@@ -90,9 +90,33 @@ liftTypeText tyText
       let elemType = Text.strip $ Text.drop 8 tyText
       in "MAYBE (LIST OF (" <> liftTypeText elemType <> "))"
   -- Other types (records, enums, custom types) - just wrap in MAYBE
-  -- The JSON decoder will handle field-level nulls
+  -- The JSON decoder will handle field-level nulls. A type of more than one
+  -- word is bracketed: @MAYBE EITHER OF STRING, NUMBER@ and @MAYBE Box OF
+  -- NUMBER@ do not parse.
   | otherwise =
-      "MAYBE " <> tyText
+      "MAYBE " <> bracketed tyText
+
+-- | A type as one argument of MAYBE: bracketed, unless it is one name, one
+-- quoted name, or bracketed already.
+bracketed :: Text -> Text
+bracketed tyText
+  | atomic = t
+  | otherwise = "(" <> t <> ")"
+  where
+    t = Text.strip tyText
+    atomic =
+      not (Text.any (== ' ') t)
+        || (Text.length t >= 2 && "`" `Text.isPrefixOf` t && "`" `Text.isSuffixOf` t && Text.count "`" t == 2)
+        || closesAtEnd
+    -- Does the bracket that opens the text close at its end?
+    closesAtEnd = case Text.uncons t of
+      Just ('(', _) -> go (0 :: Int) (Text.unpack t)
+      _ -> False
+    go depth = \case
+      [] -> False
+      c : rest ->
+        let depth' = case c of '(' -> depth + 1; ')' -> depth - 1; _ -> depth
+         in if depth' == 0 then null rest else go depth' rest
 
 -- | Lift a resolved type to MAYBE
 -- This version works with the AST representation

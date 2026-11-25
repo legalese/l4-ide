@@ -28,6 +28,13 @@ module L4.EvaluateLazy.Machine
 , parseDateText
 , parseTimeText
 , parseDatetimeText
+-- * The string readers JSONDECODE reads a DATE, a TIME and a DATETIME with,
+-- for callers that must read what it reads (jl4-service's direct path).
+, jsonDateText
+, jsonTimeText
+, jsonDatetimeText
+-- * A JSON value in an error message, as JSONDECODE's errors write it.
+, jsonForMessage
 , Config (..)
 , forwardExpr
 , matchBranches
@@ -55,6 +62,7 @@ import qualified Base.Set as Set
 import Control.Concurrent
 import System.Environment (lookupEnv)
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as BSL
 import qualified Data.Text.Encoding as TE
 #ifdef HTTP_ENABLED
 import           Network.HTTP.Req ((=:))
@@ -70,6 +78,7 @@ import qualified Data.Char as Char
 import Data.Fixed (Pico)
 import Data.Time (UTCTime)
 import qualified Data.Time as Time
+import Control.Applicative ((<|>))
 import Data.Time.LocalTime (TimeOfDay(..), LocalTime(..), timeToTimeOfDay, timeOfDayToTime)
 import qualified Data.Time.Format as TimeFormat
 import qualified Data.Time.Zones as TZ
@@ -1238,7 +1247,8 @@ isNullaryConstructorReturning conType targetTypeRef = case conType of
   -- If it's a function type, it's not nullary
   Fun {} -> False
   -- If it's directly a type application, check if it matches our target
-  TyApp _ tyRef [] -> getUnique tyRef == getUnique targetTypeRef
+  -- (a type that takes types too: Skip in Pick a IS ONE OF Skip, Take ...)
+  TyApp _ tyRef _ -> getUnique tyRef == getUnique targetTypeRef
   -- Other cases: not a match
   _ -> False
 
@@ -1313,7 +1323,7 @@ jsonValueToWHNFTyped jsonValue ty0 = do
             jsonListToWHNFTyped values elementType
           _ -> do
             userException $ UserError $
-              "Expected JSON array to decode to LIST type, but got: " <> Text.pack (show jsonValue)
+              "Expected JSON array to decode to LIST type, but got: " <> jsonForMessage jsonValue
 
     -- Handle MAYBE α
     TyApp _anno maybeRef [innerType]
@@ -1328,6 +1338,40 @@ jsonValueToWHNFTyped jsonValue ty0 = do
             innerRef <- allocateValue innerVal
             pure $ ValConstructor TypeCheck.justRef [innerRef]
 
+    -- An EITHER is read only in the form the service publishes, {"LEFT": [v]}
+    -- or {"RIGHT": [v]} (card J3, option B). Anything else, a bare value or an
+    -- object with both keys or neither, is refused, as a value of the wrong
+    -- JSON type is for a NUMBER: read without its side, it reached the rule
+    -- as a value its type does not allow, and a CONSIDER on it fell through to
+    -- its OTHERWISE (review of #779, 2026-11-17). JSONENCODE writes
+    -- {"RIGHT": v}, without the array, which is refused too.
+    TyApp _anno eitherRef [leftType, rightType]
+      | getUnique eitherRef == TypeCheck.eitherUnique ->
+        case eitherSide jsonValue of
+          Just (conRef, sideType, v) -> do
+            sideVal <- jsonValueToWHNFTyped v sideType
+            sideRef <- allocateValue sideVal
+            pure $ ValConstructor conRef [sideRef]
+          Nothing ->
+            userException $ UserError $
+              "Expected an EITHER written {\"LEFT\": [value]} or {\"RIGHT\": [value]} but got: " <> jsonForMessage jsonValue
+      where
+        eitherSide = \case
+          Aeson.Object obj
+            | [(key, Aeson.Array vec)] <- KeyMap.toList obj
+            , [v] <- Vector.toList vec ->
+                case Key.toText key of
+                  "LEFT" -> Just (TypeCheck.leftRef, leftType, v)
+                  "RIGHT" -> Just (TypeCheck.rightRef, rightType, v)
+                  _ -> Nothing
+          _ -> Nothing
+
+    -- A declared type given types (Box OF NUMBER): read as the type is, with
+    -- what it is given put in place of its parameters in each constructor's
+    -- fields (review of #779, 2026-11-20: without them, every form of such a
+    -- type that the schemas publish decoded to NOTHING).
+    TyApp _anno tyRef args@(_ : _) -> jsonValueToDeclared tyRef args jsonValue
+
     -- Handle custom record types and primitives: TyApp conRef []
     TyApp _anno tyRef [] -> do
       let typeName = nameToText (TypeCheck.getName tyRef)
@@ -1338,53 +1382,63 @@ jsonValueToWHNFTyped jsonValue ty0 = do
           case jsonValue of
             Aeson.String s -> pure $ ValString s
             _ -> userException $ UserError $
-                  "Expected JSON string but got: " <> Text.pack (show jsonValue)
+                  "Expected JSON string but got: " <> jsonForMessage jsonValue
         "NUMBER" -> do
           case jsonValue of
             Aeson.Number n -> pure $ ValNumber (toRational n)
             _ -> userException $ UserError $
-                  "Expected JSON number but got: " <> Text.pack (show jsonValue)
+                  "Expected JSON number but got: " <> jsonForMessage jsonValue
         "BOOLEAN" -> do
           case jsonValue of
             Aeson.Bool b -> pure $ if b then ValBool True else ValBool False
             _ -> userException $ UserError $
-                  "Expected JSON boolean but got: " <> Text.pack (show jsonValue)
+                  "Expected JSON boolean but got: " <> jsonForMessage jsonValue
         "DATE" -> do
           -- DATE fields in JSON should be ISO-8601 strings (YYYY-MM-DD)
           case jsonValue of
             Aeson.String s -> do
-              case parseDateText s of
+              case jsonDateText s of
                 Just day -> pure $ ValDate day
                 Nothing -> userException $ UserError $
                   "Could not parse date string '" <> s <> "'. Expected format: YYYY-MM-DD"
             _ -> userException $ UserError $
-                  "Expected JSON string for DATE field but got: " <> Text.pack (show jsonValue)
+                  "Expected JSON string for DATE field but got: " <> jsonForMessage jsonValue
         "TIME" -> do
           -- TIME fields in JSON should be strings (HH:MM:SS or HH:MM)
           case jsonValue of
             Aeson.String s -> do
-              case parseTimeText s of
+              case jsonTimeText s of
                 Just tod -> pure $ ValTime tod
                 Nothing -> userException $ UserError $
                   "Could not parse time string '" <> s <> "'. Expected format: HH:MM:SS or HH:MM"
             _ -> userException $ UserError $
-                  "Expected JSON string for TIME field but got: " <> Text.pack (show jsonValue)
+                  "Expected JSON string for TIME field but got: " <> jsonForMessage jsonValue
         "DATETIME" -> do
           -- DATETIME fields in JSON should be ISO-8601 strings with timezone
           case jsonValue of
             Aeson.String s -> do
-              case parseDatetimeText s of
-                Just utc -> do
+              case jsonDatetimeText s of
+                -- a zone named in the string is the value's; otherwise the
+                -- document's, as for one written with Z or an offset
+                Just (utc, Just (zone, _)) -> pure $ ValDateTime utc zone
+                Just (utc, Nothing) -> do
                   tc <- getTemporalContext
                   let tzName = fromMaybe "Etc/UTC" tc.tcDocumentTimezone
                   pure $ ValDateTime utc tzName
                 Nothing -> userException $ UserError $
                   "Could not parse datetime string '" <> s <> "'. Expected ISO-8601 format: YYYY-MM-DDTHH:MM:SSZ"
             _ -> userException $ UserError $
-                  "Expected JSON string for DATETIME field but got: " <> Text.pack (show jsonValue)
+                  "Expected JSON string for DATETIME field but got: " <> jsonForMessage jsonValue
 
         -- Not a primitive, check if it's a custom record type
-        _ -> do
+        _ -> jsonValueToDeclared tyRef [] jsonValue
+
+    -- For other types, fall back to generic decoding
+    _ -> jsonValueToWHNF jsonValue
+
+-- | A value of a declared type, given what the type is given ('instantiate').
+jsonValueToDeclared :: Resolved -> [Type' Resolved] -> Aeson.Value -> Machine WHNF
+jsonValueToDeclared tyRef args jsonValue = do
           -- For record types, we need to find the constructor with the same name
           entityInfo <- getEntityInfo
 
@@ -1392,6 +1446,31 @@ jsonValueToWHNFTyped jsonValue ty0 = do
           case Map.lookup (getUnique tyRef) entityInfo of
             Nothing ->
               jsonValueToWHNF jsonValue
+            Just (typeNameRef, _checkEntity)
+              -- A type with a constructor that carries fields, other than a
+              -- record's one constructor named like the type, is written tagged:
+              -- a constructor that carries fields is {"Card": {its fields}},
+              -- one that carries none its name, "Cash" (the wire-form bench, card
+              -- J1, option A; HATBOX, Meng, 2026-11-18). Anything else is refused,
+              -- as a value of the wrong JSON type is for a NUMBER.
+              | ctors <- [ (u, n, instantiate args t) | (u, n, t) <- constructorsOf entityInfo tyRef ]
+              , any (\(_, _, conType) -> not (isNullaryConstructorReturning conType tyRef)) ctors
+              , not (isRecordShaped typeNameRef ctors) ->
+                  jsonValueToTagged typeNameRef ctors jsonValue
+            -- A type none of whose constructors carries fields, other than a
+            -- type with one constructor named like it (DECLARE Unit IS ONE OF
+            -- Unit, read below), is an enumeration: it is written as the name
+            -- of one of its constructors, "Landlord", as both schemas publish
+            -- it and JSONENCODE writes it. Anything else, a name it does not
+            -- have or a value that is not a string, is refused, as it is for
+            -- every other kind of type. It reached the rule as it stood, so a
+            -- CONSIDER on it found no branch, and one that ends in OTHERWISE
+            -- answered it (review of #779, 2026-11-21).
+            Just (typeNameRef, _checkEntity)
+              | ctors@(_ : _) <- constructorsOf entityInfo tyRef
+              , all (\(_, _, conType) -> isNullaryConstructorReturning conType tyRef) ctors
+              , not (isRecordShaped typeNameRef ctors) ->
+                  jsonValueToEnumeration typeNameRef ctors jsonValue
             Just (typeNameRef, _checkEntity) -> do
               -- Now look for a constructor with the same name
               let constructors = Map.toList entityInfo
@@ -1400,65 +1479,187 @@ jsonValueToWHNFTyped jsonValue ty0 = do
                     | (unique, (name, TypeCheck.KnownTerm conType Constructor)) <- constructors
                     , nameToText (TypeCheck.getName name) == nameToText (TypeCheck.getName typeNameRef)
                     ]
+                    & fmap (\(u, n, t) -> (u, n, instantiate args t))
 
               case matchingConstructor of
-                Nothing -> do
-                  -- No record constructor found. Check if this is an enum type
-                  -- by looking for nullary constructors that return this type.
-                  case jsonValue of
-                    Aeson.String enumName -> do
-                      -- Look for a nullary constructor with this name that returns tyRef
-                      let enumConstructor = listToMaybe
-                            [ (unique, name)
-                            | (unique, (name, TypeCheck.KnownTerm conType Constructor)) <- constructors
-                            , nameToText (TypeCheck.getName name) == enumName
-                            , isNullaryConstructorReturning conType tyRef
-                            ]
-                      case enumConstructor of
-                        Just (enumUnique, enumConName) -> do
-                          -- Found a matching enum constructor
-                          let enumRef = Def enumUnique enumConName
-                          pure $ ValConstructor enumRef []
-                        Nothing ->
-                          -- No matching enum constructor, fall back to generic decoding
-                          jsonValueToWHNF jsonValue
-                    _ ->
-                      -- Not a string, fall back to generic decoding
-                      jsonValueToWHNF jsonValue
+                -- No constructor named like the type, and, after the cases
+                -- above, none of its own: a type declared with no body, or one
+                -- the table does not know. It is read as JSON is read without
+                -- a type, as it was (assumed, not ruled).
+                Nothing -> jsonValueToWHNF jsonValue
                 Just (conUnique, conName, conType) -> do
                   -- Construct a Resolved reference for the constructor
                   let conRef = Def conUnique conName
-                  -- Extract BOTH field names AND types from the constructor type
-                  fieldNamesAndTypes <- extractFieldNamesAndTypes conType
                   case jsonValue of
-                    Aeson.Object obj -> do
-                      -- Decode each field from the JSON object WITH TYPE INFORMATION
-                      -- Note: We ignore extra fields in the JSON (Postel's Law)
-                      fieldRefs <- forM fieldNamesAndTypes $ \(fieldName, fieldType0) -> do
-                        -- a synonym for MAYBE is a MAYBE: expand before deciding
-                        fieldType <- expandTypeSynonyms fieldType0
-                        case KeyMap.lookup (Key.fromText fieldName) obj of
-                          Nothing
-                            | isMaybeFieldTy fieldType ->
-                              -- MAYBE field missing in JSON: treat as NOTHING
-                              allocateValue $ ValConstructor TypeCheck.nothingRef []
-                            | otherwise -> do
-                              -- Required field missing in JSON: error
-                              userException $ UserError $
-                                "Missing required field '" <> fieldName <> "' in JSON object"
-                          Just fieldValue -> do
-                            -- RECURSIVELY decode the field value WITH TYPE INFORMATION
-                            fieldWHNF <- jsonValueToWHNFTyped fieldValue fieldType
-                            allocateValue fieldWHNF
-                      -- Construct the record with the decoded fields
-                      pure $ ValConstructor conRef fieldRefs
-                    _ -> do
-                      -- JSON value is not an object, can't decode to record
-                      userException $ UserError $
-                        "Expected JSON object to decode to record type, but got: " <> Text.pack (show jsonValue)
+                    Aeson.Object obj -> decodeConstructorFields conRef conType obj
+                    -- A constructor that carries no fields, named like its
+                    -- type, is also read as its name, which is how JSONENCODE
+                    -- writes it and the schemas publish one declared IS ONE OF
+                    -- (DECLARE Unit IS ONE OF Unit): so "Unit" is read on every
+                    -- path and JSONENCODE's output reads back. The entity table
+                    -- cannot tell it from DECLARE Unit HAS, which this reads so
+                    -- too (assumed, not ruled; review of #779, 2026-11-19).
+                    Aeson.String s
+                      | isNullaryConstructorReturning conType tyRef
+                      , s == nameToText (TypeCheck.getName conName) ->
+                          pure $ ValConstructor conRef []
+                    -- Anything else is refused, naming the type and the form
+                    -- it is read in, as the service's check names it
+                    -- ('recordFormMessage'): one whose constructor carries no
+                    -- fields is the string of its name, published so, and one
+                    -- that carries fields is an object of them. It said
+                    -- "record type" for both, though the first is published
+                    -- as a string (review of #779, 2026-11-20).
+                    _ | isNullaryConstructorReturning conType tyRef ->
+                          userException $ UserError $
+                            "Expected a `" <> typeText <> "` written as the string \"" <> typeText
+                              <> "\", the name of its constructor, but got: " <> jsonForMessage jsonValue
+                      | otherwise -> do
+                          fields <- extractFieldNamesAndTypes conType
+                          userException $ UserError $
+                            "Expected a `" <> typeText <> "` written as an object of its fields ("
+                              <> Text.intercalate ", " (map fst fields) <> "), but got: " <> jsonForMessage jsonValue
+                 where
+                  typeText = nameToText (TypeCheck.getName typeNameRef)
 
-    -- For other types, fall back to generic decoding
-    _ -> jsonValueToWHNF jsonValue
+-- | The constructors of a declared type, from the entity info: each one's
+-- unique, name and type.
+constructorsOf :: EntityInfo -> Resolved -> [(Unique, Name, Type' Resolved)]
+constructorsOf entityInfo tyRef =
+  [ (unique, name, conType)
+  | (unique, (name, TypeCheck.KnownTerm conType Constructor)) <- Map.toList entityInfo
+  , constructorResult conType == Just (getUnique tyRef)
+  ]
+ where
+  constructorResult = \case
+    Forall _ _ t -> constructorResult t
+    Fun _ _ t -> constructorResult t
+    TyApp _ r _ -> Just (getUnique r)
+    _ -> Nothing
+
+-- | A record: one constructor, named like the type.
+isRecordShaped :: Name -> [(Unique, Name, Type' Resolved)] -> Bool
+isRecordShaped typeName = \case
+  [(_, conName, _)] -> nameToText (TypeCheck.getName conName) == nameToText (TypeCheck.getName typeName)
+  _ -> False
+
+-- | A constructor's type with what its type is given put in place of the
+-- type's parameters: @Holding OF NUMBER@'s constructor @Holding@, of type
+-- @FOR ALL a. amount IS AN a -> Holding OF a@, has a field @amount@ of type
+-- @NUMBER@. The parameters are matched by place in the constructor's result,
+-- which names them in the order the type declares them.
+instantiate :: [Type' Resolved] -> Type' Resolved -> Type' Resolved
+instantiate [] conType = conType
+instantiate args conType = case conType of
+  Forall _ vs body
+    | TyApp _ _ resultArgs <- resultOf body ->
+        substituteTypeParams
+          (Map.fromList
+            [ (getUnique v, arg)
+            | (TyApp _ v [], arg) <- zip resultArgs args
+            , getUnique v `elem` map getUnique vs
+            ])
+          body
+  _ -> conType
+ where
+  resultOf = \case
+    Fun _ _ t -> resultOf t
+    t -> t
+
+-- | A value of an enumeration (see 'jsonValueToDeclared'): the name of one of
+-- its constructors.
+jsonValueToEnumeration :: Name -> [(Unique, Name, Type' Resolved)] -> Aeson.Value -> Machine WHNF
+jsonValueToEnumeration typeName ctors jsonValue = case jsonValue of
+  Aeson.String s
+    | (u, n, _) : _ <- [ c | c@(_, n, _) <- ctors, conText n == s ] ->
+        pure (ValConstructor (Def u n) [])
+  _ -> userException $ UserError $
+    "Expected a `" <> conText typeName <> "` written as " <> theNames <> ", but got: " <> jsonForMessage jsonValue
+ where
+  conText n = nameToText (TypeCheck.getName n)
+  quoted = [ "\"" <> conText n <> "\"" | (_, n, _) <- ctors ]
+  theNames = case quoted of
+    [one] -> "the string " <> one <> ", the name of its constructor"
+    _ -> "one of the strings " <> Text.intercalate ", " quoted <> ", the names of its constructors"
+
+-- | A value of a type written tagged (see 'jsonValueToWHNFTyped').
+jsonValueToTagged :: Name -> [(Unique, Name, Type' Resolved)] -> Aeson.Value -> Machine WHNF
+jsonValueToTagged typeName ctors jsonValue = case jsonValue of
+  Aeson.String s
+    | Just (u, n, conType) <- byName s ->
+        if carriesFields conType
+          then userException $ UserError $
+            "The constructor `" <> s <> "` carries fields, so it is written {\"" <> s <> "\": {its fields}}, but got: " <> jsonForMessage jsonValue
+          else pure (ValConstructor (Def u n) [])
+  Aeson.Object obj
+    | [(key, given)] <- KeyMap.toList obj
+    , Just inner <- case given of
+        Aeson.Object o -> Just o
+        -- no fields given, as the service's wrapper writes {"Voucher": {}}
+        Aeson.Null -> Just KeyMap.empty
+        _ -> Nothing
+    , Just (u, n, conType) <- byName (Key.toText key)
+    , carriesFields conType ->
+        decodeConstructorFields (Def u n) conType inner
+  _ -> userException $ UserError $
+    "Expected a `" <> nameToText (TypeCheck.getName typeName) <> "` written as the name of a constructor that carries no fields ("
+      <> Text.intercalate ", " [ conText n | (_, n, t) <- ctors, not (carriesFields t) ]
+      <> ") or as {\"<constructor>\": {its fields}} for one that does ("
+      <> Text.intercalate ", " [ conText n | (_, n, t) <- ctors, carriesFields t ]
+      <> "), but got: " <> jsonForMessage jsonValue
+ where
+  conText n = nameToText (TypeCheck.getName n)
+  byName s = listToMaybe [ c | c@(_, n, _) <- ctors, conText n == s ]
+  carriesFields = \case
+    Forall _ _ t -> carriesFields t
+    Fun {} -> True
+    _ -> False
+
+-- | A JSON value as it is written, compactly, for an error message: the value
+-- a reader refused, which the caller sent as JSON and should see as JSON, not
+-- in Haskell's notation (@Object (fromList [...])@; review of #779,
+-- 2026-11-20). A value longer than 'jsonInMessageLimit' characters is cut
+-- there, and the message says so, and how long it was.
+jsonForMessage :: Aeson.Value -> Text
+jsonForMessage v
+  | Text.length t <= jsonInMessageLimit = t
+  | otherwise =
+      Text.take jsonInMessageLimit t
+        <> "... (the first " <> Text.pack (show jsonInMessageLimit)
+        <> " of " <> Text.pack (show (Text.length t)) <> " characters)"
+ where
+  t = TE.decodeUtf8 (BSL.toStrict (Aeson.encode v))
+
+-- | How much of a refused JSON value an error message shows.
+jsonInMessageLimit :: Int
+jsonInMessageLimit = 200
+
+-- | A constructor's fields, read by name from a JSON object, each by its type.
+-- A MAYBE field that is missing is NOTHING; extra keys are ignored.
+decodeConstructorFields :: Resolved -> Type' Resolved -> Aeson.Object -> Machine WHNF
+decodeConstructorFields conRef conType obj = do
+  -- Extract BOTH field names AND types from the constructor type
+  fieldNamesAndTypes <- extractFieldNamesAndTypes conType
+  -- Decode each field from the JSON object WITH TYPE INFORMATION
+  -- Note: We ignore extra fields in the JSON (Postel's Law)
+  fieldRefs <- forM fieldNamesAndTypes $ \(fieldName, fieldType0) -> do
+    -- a synonym for MAYBE is a MAYBE: expand before deciding
+    fieldType <- expandTypeSynonyms fieldType0
+    case KeyMap.lookup (Key.fromText fieldName) obj of
+      Nothing
+        | isMaybeFieldTy fieldType ->
+          -- MAYBE field missing in JSON: treat as NOTHING
+          allocateValue $ ValConstructor TypeCheck.nothingRef []
+        | otherwise -> do
+          -- Required field missing in JSON: error
+          userException $ UserError $
+            "Missing required field '" <> fieldName <> "' in JSON object"
+      Just fieldValue -> do
+        -- RECURSIVELY decode the field value WITH TYPE INFORMATION
+        fieldWHNF <- jsonValueToWHNFTyped fieldValue fieldType
+        allocateValue fieldWHNF
+  -- Construct the record with the decoded fields
+  pure $ ValConstructor conRef fieldRefs
 
 -- | A type with its synonyms expanded at the head, as far as they go. The
 -- checker records a synonym's body on its 'TypeCheck.KnownType'; a
@@ -3114,6 +3315,110 @@ parseDatetimeText raw =
        | fmt <- formats
        , Just utc <- [TimeFormat.parseTimeM True TimeFormat.defaultTimeLocale fmt (Text.unpack trimmed)]
        ]
+
+-- | A DATE as JSONDECODE reads it: what TODATE reads ('parseDateText'), a
+-- year, month and day whose month and day may have one digit
+-- (@"2026-1-5"@), or the date as written of a string 'jsonDatetimeText'
+-- reads (@"2026-01-31T10:30:00Z"@).
+--
+-- The forms beyond TODATE's are those jl4-service's direct path read before
+-- it read inputs as JSONDECODE does, so that no input it read is refused now,
+-- and so that both paths read the same values (assumed, not ruled; review of
+-- #779, 2026-11-21). A string with anything else after its date, which that
+-- path also read, is not one of them.
+jsonDateText :: Text -> Maybe Time.Day
+jsonDateText s =
+  parseDateText s
+    <|> looseYmd s
+    <|> (jsonDatetimeText s *> looseYmd (Text.take 10 s))
+
+-- | A TIME as JSONDECODE reads it: what TOTIME reads ('parseTimeText'), or
+-- hours, minutes and optionally seconds, each of one or two digits, with a
+-- fraction of a second, followed by nothing, @Z@, @" UTC"@, an offset on
+-- either side of UTC (@"+08:00"@, @"-05:00"@, @"-0500"@) or the name of a zone
+-- (@" Asia/Singapore"@). A TIME has no zone, so the clock is read as written
+-- and the zone left out, as the direct path read it (see 'jsonDateText').
+jsonTimeText :: Text -> Maybe TimeOfDay
+jsonTimeText s = parseTimeText s <|> do
+  (tod, _, rest) <- looseClock s
+  if rest `elem` ["", "Z", " UTC"] || isOffset rest || isZoneName rest
+    then Just tod
+    else Nothing
+ where
+  -- a negative offset was refused until review of #779, 2026-11-25
+  isOffset r = case Text.uncons r of
+    Just (sign, o) | sign == '+' || sign == '-' -> isHhMm o
+    _ -> False
+  isHhMm o = case Text.splitOn ":" o of
+    [h, m] -> twoDigits h && twoDigits m
+    [hm] -> Text.length hm == 4 && Text.all Char.isDigit hm
+    _ -> False
+  twoDigits t = Text.length t == 2 && Text.all Char.isDigit t
+  isZoneName r = case Text.uncons r of
+    Just (' ', name) -> isJust (tryLoadTZPure name)
+    _ -> False
+
+-- | A DATETIME as JSONDECODE reads it: the instant, and the zone the string
+-- names by name, with the time as written there. What TODATETIME reads
+-- ('parseDatetimeText') has no zone name. So does a date and a time
+-- (@"2026-01-31 10:30"@, @"2026-01-31T10:30:00.5"@) followed by nothing, @Z@
+-- or @UTC@, which is read in UTC; one whose time has seconds and is followed
+-- by the name of a zone (@"2026-01-31 10:30:00 Asia/Singapore"@) is read in
+-- that zone (see 'jsonDateText').
+jsonDatetimeText :: Text -> Maybe (UTCTime, Maybe (Text, LocalTime))
+jsonDatetimeText s = ((, Nothing) <$> parseDatetimeText s) <|> do
+  day <- strictYmd (Text.take 10 s)
+  (sep, afterDate) <- Text.uncons (Text.drop 10 s)
+  if sep == 'T' || sep == ' ' then Just () else Nothing
+  (tod, hasSeconds, zone) <- looseClock afterDate
+  let written = LocalTime day tod
+  if zone `elem` ["", "Z", " UTC", "UTC"]
+    then Just (Time.UTCTime day (timeOfDayToTime tod), Nothing)
+    else case Text.uncons zone of
+      Just (' ', name)
+        | hasSeconds, Just tz <- tryLoadTZPure name ->
+            Just (TZ.localTimeToUTCTZ tz written, Just (name, written))
+      _ -> Nothing
+ where
+  strictYmd t = case Text.splitOn "-" t of
+    [_, m, d] | Text.length m == 2, Text.length d == 2 -> looseYmd t
+    _ -> Nothing
+
+-- | A year of four digits, and a month and a day of one or two, separated by
+-- hyphens, that make a date.
+looseYmd :: Text -> Maybe Time.Day
+looseYmd t = case Text.splitOn "-" t of
+  [y, m, d]
+    | Text.length y == 4
+    , all (\x -> not (Text.null x) && Text.all Char.isDigit x) [y, m, d]
+    , Text.length m <= 2
+    , Text.length d <= 2 ->
+        Time.fromGregorianValid (read (Text.unpack y)) (read (Text.unpack m)) (read (Text.unpack d))
+  _ -> Nothing
+
+-- | A clock at the start of a string: hours and minutes, and optionally
+-- seconds with a fraction, each of one or two digits, separated by colons,
+-- that make a time of day; whether it had seconds; and what follows it.
+looseClock :: Text -> Maybe (TimeOfDay, Bool, Text)
+looseClock t = do
+  (h, r1) <- field t
+  r1' <- Text.stripPrefix ":" r1
+  (m, r2) <- field r1'
+  (sec, hasSeconds, rest) <- case Text.stripPrefix ":" r2 of
+    Just r2' -> do
+      (whole, r3) <- field r2'
+      case Text.stripPrefix "." r3 of
+        Just r3' | (frac, r4) <- Text.span Char.isDigit r3', not (Text.null frac) ->
+          Just (fromIntegral whole + read ("0." <> Text.unpack frac), True, r4)
+        _ -> Just (fromIntegral whole, True, r3)
+    Nothing -> Just (0, False, r2)
+  tod <- Time.makeTimeOfDayValid h m sec
+  pure (tod, hasSeconds, rest)
+ where
+  field :: Text -> Maybe (Int, Text)
+  field x = case Text.span Char.isDigit x of
+    (ds, rest) | not (Text.null ds), Text.length ds <= 2 -> Just (read (Text.unpack ds), rest)
+    _ -> Nothing
 
 -- | Format a TimeOfDay as HH:MM:SS
 formatTimeOfDay :: TimeOfDay -> Text

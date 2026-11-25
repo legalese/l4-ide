@@ -1,0 +1,20 @@
+-- l4 batch reads an enumeration as the name of one of its constructors and
+-- refuses anything else, in an input and in a record's field. The rule ends in
+-- OTHERWISE, so a value passed through as it stood was answered 2.
+
+DECLARE Party IS ONE OF Landlord, Tenant
+
+DECLARE Lease HAS payer IS A Party
+
+@export Who pays
+GIVEN p IS A Party
+GIVETH A NUMBER
+`who pays` MEANS
+  CONSIDER p
+  WHEN Landlord THEN 1
+  OTHERWISE 2
+
+@export Lease payer
+GIVEN l IS A Lease
+GIVETH A NUMBER
+`lease payer` MEANS `who pays` (l's payer)

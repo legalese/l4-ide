@@ -23,7 +23,7 @@ import qualified L4.StateGraph as StateGraph
 import Compiler (toDecl)
 import Logging (logInfo)
 import Options (Options (..))
-import Shared (jsonError)
+import Shared (jsonError, findRefused, refusedExportReason)
 import Types
 
 import qualified Data.Aeson as Aeson
@@ -98,7 +98,7 @@ type FunctionRoutes =
 dataPlaneHandler :: Visibility -> ServerT DataPlaneApi AppM
 dataPlaneHandler vis deployIdText =
        listFunctionsHandler deployId
-  :<|> functionRoutesHandler deployId
+  :<|> functionRoutesHandler vis deployId
   :<|> openApiHandler vis deployId
  where
   deployId = DeploymentId deployIdText
@@ -112,18 +112,18 @@ shortRoutesHandler vis deployIdText =
   :<|> listFunctionsHandler deployId
   :<|> openApiHandler vis deployId
   :<|> shortFileBrowseHandler deployId
-  :<|> functionRoutesHandler deployId
+  :<|> functionRoutesHandler vis deployId
  where
   deployId = DeploymentId deployIdText
 
-functionRoutesHandler :: DeploymentId -> Text -> ServerT FunctionRoutes AppM
-functionRoutesHandler deployId fnName =
-       getFunctionHandler deployId fnName
-  :<|> evalFunctionHandler deployId fnName
-  :<|> batchFunctionHandler deployId fnName
-  :<|> queryPlanHandler' deployId fnName
-  :<|> listStateGraphsHandler deployId fnName
-  :<|> getStateGraphDotHandler deployId fnName
+functionRoutesHandler :: Visibility -> DeploymentId -> Text -> ServerT FunctionRoutes AppM
+functionRoutesHandler vis deployId fnName =
+       getFunctionHandler vis deployId fnName
+  :<|> evalFunctionHandler vis deployId fnName
+  :<|> batchFunctionHandler vis deployId fnName
+  :<|> queryPlanHandler' vis deployId fnName
+  :<|> listStateGraphsHandler vis deployId fnName
+  :<|> getStateGraphDotHandler vis deployId fnName
 
 -- ----------------------------------------------------------------------------
 -- Deployment lookup helpers
@@ -163,17 +163,26 @@ requireDeploymentReady deployId = do
 -- | Look up a function by name within a deployment.
 -- Tries the exact name first, then falls back to matching by sanitized name
 -- (so that "check-person" in a URL matches the function "check person").
-requireFunction :: Map Text ValidatedFunction -> Text -> AppM ValidatedFunction
-requireFunction fns fnName =
+--
+-- A name that the deployment left out because its @export is refused
+-- ('metaRefusedExports') is not found either, and the 404 says why, matched
+-- the same way ('findRefused'), when the caller may see functions.
+requireFunction :: Visibility -> DeploymentMetadata -> Map Text ValidatedFunction -> Text -> AppM ValidatedFunction
+requireFunction vis meta fns fnName =
   case Map.lookup fnName fns of
     Just vf -> pure vf
     Nothing ->
       -- Fall back: find a function whose name sanitizes to the same form
       let sanitized = sanitizePropertyName fnName
           match = find (\(k, _) -> sanitizePropertyName k == sanitized) (Map.toList fns)
-      in case match of
-        Just (_, vf) -> pure vf
-        Nothing -> throwError err404 { errBody = jsonError "Function not found" }
+      in case (match, findRefused vis meta fnName) of
+        (Just (_, vf), _) -> pure vf
+        (Nothing, Just r) -> throwError err404 { errBody = jsonError (refusedExportMessage r) }
+        (Nothing, Nothing) -> throwError err404 { errBody = jsonError "Function not found" }
+
+-- | What a call to an @export that the deploy left out is told.
+refusedExportMessage :: RefusedExport -> Text
+refusedExportMessage r = "Function not found: " <> refusedExportReason r
 
 -- ----------------------------------------------------------------------------
 -- Handlers
@@ -189,15 +198,15 @@ listFunctionsHandler deployId = do
   pure [SimpleFunction fn.fnImpl.name fn.fnImpl.description | fn <- Map.elems fns]
 
 -- | GET /deployments/{id}/functions/{fn}
-getFunctionHandler :: DeploymentId -> Text -> AppM AnnotatedFunctionSummary
-getFunctionHandler deployId fnName = do
+getFunctionHandler :: Visibility -> DeploymentId -> Text -> AppM AnnotatedFunctionSummary
+getFunctionHandler vis deployId fnName = do
   logger <- asks (.logger)
   liftIO $ logInfo logger "Function retrieved"
     [ ("deploymentId", Aeson.toJSON deployId.unDeploymentId)
     , ("functionName", Aeson.toJSON fnName)
     ]
   (fns, meta) <- requireDeploymentReady deployId
-  vf <- requireFunction fns fnName
+  vf <- requireFunction vis meta fns fnName
   let fn = vf.fnImpl
   -- Find the source file from metadata
   let sourceFile = case [fs.fsSourceFile | fs <- meta.metaFunctions, fs.fsName == fn.name] of
@@ -216,21 +225,22 @@ getFunctionHandler deployId fnName = do
 
 -- | POST /deployments/{id}/functions/{fn}/evaluation
 evalFunctionHandler
-  :: DeploymentId
+  :: Visibility
+  -> DeploymentId
   -> Text
   -> Maybe Text       -- X-L4-Trace header
   -> Maybe TraceLevel -- ?trace= query param
   -> Maybe Bool       -- ?graphviz= query param
   -> FnArguments
   -> AppM (EvalResponse SimpleResponse)
-evalFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz fnArgs = do
+evalFunctionHandler vis deployId fnName mTraceHeader mTraceParam mGraphViz fnArgs = do
   logger <- asks (.logger)
   liftIO $ logInfo logger "Function evaluated"
     [ ("deploymentId", Aeson.toJSON deployId.unDeploymentId)
     , ("functionName", Aeson.toJSON fnName)
     ]
-  (fns, _meta) <- requireDeploymentReady deployId
-  vf <- requireFunction fns fnName
+  (fns, meta) <- requireDeploymentReady deployId
+  vf <- requireFunction vis meta fns fnName
 
   -- Check if this function has deontic parameters (indicating DEONTIC return type)
   let paramMap = vf.fnImpl.parameters.parameterMap :: Map Text Parameter
@@ -270,14 +280,15 @@ evalFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz fnArgs = 
 
 -- | POST /deployments/{id}/functions/{fn}/evaluation/batch
 batchFunctionHandler
-  :: DeploymentId
+  :: Visibility
+  -> DeploymentId
   -> Text
   -> Maybe Text       -- X-L4-Trace header
   -> Maybe TraceLevel -- ?trace= query param
   -> Maybe Bool       -- ?graphviz= query param
   -> BatchRequest
   -> AppM (EvalResponse BatchResponse)
-batchFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz batchArgs = do
+batchFunctionHandler vis deployId fnName mTraceHeader mTraceParam mGraphViz batchArgs = do
   logger <- asks (.logger)
   liftIO $ logInfo logger "Batch evaluated"
     [ ("deploymentId", Aeson.toJSON deployId.unDeploymentId)
@@ -285,8 +296,8 @@ batchFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz batchArg
     ]
   let traceLevel = determineTraceLevel mTraceHeader mTraceParam
       includeGraphViz = traceLevel == TraceFull && Maybe.fromMaybe False mGraphViz
-  (fns, _meta) <- requireDeploymentReady deployId
-  vf <- requireFunction fns fnName
+  (fns, meta) <- requireDeploymentReady deployId
+  vf <- requireFunction vis meta fns fnName
 
   -- Capture the environment before going concurrent
   env <- ask
@@ -366,15 +377,15 @@ batchFunctionHandler deployId fnName mTraceHeader mTraceParam mGraphViz batchArg
 -- would be computed while Warp sends the response, and by then Warp's own
 -- connection timeout (30 s) is running again: a plan that took longer was cut
 -- off at 30 to 60 s, the connection closed with no status and no error.
-queryPlanHandler' :: DeploymentId -> Text -> FnArguments -> AppM QueryPlanResponse
-queryPlanHandler' deployId fnName fnArgs = do
+queryPlanHandler' :: Visibility -> DeploymentId -> Text -> FnArguments -> AppM QueryPlanResponse
+queryPlanHandler' vis deployId fnName fnArgs = do
   logger <- asks (.logger)
   liftIO $ logInfo logger "Query plan generated"
     [ ("deploymentId", Aeson.toJSON deployId.unDeploymentId)
     , ("functionName", Aeson.toJSON fnName)
     ]
-  (fns, _meta) <- requireDeploymentReady deployId
-  vf <- requireFunction fns fnName
+  (fns, meta) <- requireDeploymentReady deployId
+  vf <- requireFunction vis meta fns fnName
 
   cached <- case vf.fnDecisionQueryCache of
     Just c -> pure c
@@ -414,15 +425,15 @@ storeDecisionQueryCache deployId fnName cache = do
 -- ----------------------------------------------------------------------------
 
 -- | GET /deployments/{id}/functions/{fn}/state-graphs
-listStateGraphsHandler :: DeploymentId -> Text -> AppM StateGraphListResponse
-listStateGraphsHandler deployId fnName = do
+listStateGraphsHandler :: Visibility -> DeploymentId -> Text -> AppM StateGraphListResponse
+listStateGraphsHandler vis deployId fnName = do
   logger <- asks (.logger)
   liftIO $ logInfo logger "State graphs listed"
     [ ("deploymentId", Aeson.toJSON deployId.unDeploymentId)
     , ("functionName", Aeson.toJSON fnName)
     ]
-  (fns, _meta) <- requireDeploymentReady deployId
-  vf <- requireFunction fns fnName
+  (fns, meta) <- requireDeploymentReady deployId
+  vf <- requireFunction vis meta fns fnName
   case vf.fnCompiled of
     Nothing -> throwError err404 { errBody = jsonError "No compiled module found for function" }
     Just compiled -> do
@@ -432,16 +443,16 @@ listStateGraphsHandler deployId fnName = do
         }
 
 -- | GET /deployments/{id}/functions/{fn}/state-graphs/{graphName}
-getStateGraphDotHandler :: DeploymentId -> Text -> Text -> AppM Text
-getStateGraphDotHandler deployId fnName graphName = do
+getStateGraphDotHandler :: Visibility -> DeploymentId -> Text -> Text -> AppM Text
+getStateGraphDotHandler vis deployId fnName graphName = do
   logger <- asks (.logger)
   liftIO $ logInfo logger "State graph retrieved"
     [ ("deploymentId", Aeson.toJSON deployId.unDeploymentId)
     , ("functionName", Aeson.toJSON fnName)
     , ("graphName", Aeson.toJSON graphName)
     ]
-  (fns, _meta) <- requireDeploymentReady deployId
-  vf <- requireFunction fns fnName
+  (fns, meta) <- requireDeploymentReady deployId
+  vf <- requireFunction vis meta fns fnName
   case vf.fnCompiled of
     Nothing -> throwError err404 { errBody = jsonError "No compiled module found for function" }
     Just compiled -> do

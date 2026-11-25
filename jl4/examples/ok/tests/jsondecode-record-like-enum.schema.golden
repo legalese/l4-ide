@@ -1,0 +1,27 @@
+{
+    "$defs": {
+        "Deposit Refund": {
+            "properties": {
+                "amount": {
+                    "type": "number"
+                }
+            },
+            "required": [
+                "amount"
+            ],
+            "type": "object"
+        }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "Refund amount",
+    "properties": {
+        "r": {
+            "$ref": "#/$defs/Deposit Refund"
+        }
+    },
+    "required": [
+        "r"
+    ],
+    "title": "refund amount",
+    "type": "object"
+}

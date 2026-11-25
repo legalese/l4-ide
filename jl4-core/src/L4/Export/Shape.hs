@@ -1,0 +1,509 @@
+{-# LANGUAGE OverloadedStrings #-}
+
+-- | What can cross the boundary of an @\@export@: the one place that decides
+-- whether a type of an exported rule's input or result has a JSON form.
+--
+-- 'jsonShape' answers it for one type. Every other question about the
+-- boundary (is this @\@export@ allowed, what does its schema say, what does
+-- the editor list) is meant to be asked of it, instead of being answered a
+-- second time by a check of its own.
+--
+-- The table, one row for each kind of type. The shape a type has is what a
+-- request carries for it and what an answer carries back.
+--
+-- > NUMBER                         JNumber
+-- > BOOLEAN                        JBool
+-- > STRING                         JString
+-- > DATE, TIME, DATETIME           JDate, JTime, JDateTime   (ISO 8601 strings)
+-- > LIST OF a                      JArray (shape a)
+-- > MAYBE a                        JOptional (shape a)       (may be left out or null)
+-- > DECLARE T HAS ...              JRecord                   (fields in declaration order)
+-- > DECLARE T IS ONE OF T HAS …    JRecord                   (one constructor, named like the type: a
+-- >                                                          record, as the decoder reads it:
+-- >                                                          'recordLikeConstructor')
+-- > DECLARE T IS ONE OF a, b       JEnum                     (the constructors' names)
+-- > DECLARE T IS ONE OF a, b HAS … JTagged                   (a constructor that carries fields is
+-- >                                                          {"b": {its fields}}, one that carries none
+-- >                                                          its name: wire-form card J1, option A; no
+-- >                                                          shape if a field's type has none:
+-- >                                                          UInConstructor)
+-- > DECLARE T IS A type            the shape of that type
+-- > a type with parameters         the shape of its body, parameters replaced; no shape if
+-- >                                an argument has none, whether or not the parameter is used:
+-- >                                UInArgument
+-- > a record that contains itself  JRecursive               (expansion stops there)
+-- > DEONTIC party action           no shape yet: UDeontic (a result that is a DEONTIC itself is
+-- >                                published all the same, as a contract: 'L4.Export.isContractResult')
+-- > EVENT party action             no shape yet: UEvent
+-- > FUNCTION FROM a TO b           no shape yet: UFunction
+-- > a type variable                no shape: UPolymorphic
+-- > TYPE, in GIVEN a IS A TYPE      no shape: UTypeAsInput
+-- > EITHER a b                     JEither (shape a) (shape b) ({"LEFT":[a]} or {"RIGHT":[b]}, as the
+-- >                                                          encoder writes it: wire-form card J3, option B)
+-- > any built-in type not listed above, or a type not found
+-- >                                no shape yet: UUnknownType
+--
+-- A new built-in type has no shape until someone adds a row here.
+module L4.Export.Shape (
+  JsonShape (..),
+  JsonField (..),
+  JsonConstructor (..),
+  ShapeName (..),
+  Unsendable (..),
+  ResultOrigin (..),
+  Holder (..),
+  isUnresolved,
+  ShapeEnv (..),
+  moduleDeclares,
+  shapeEnvFromDeclares,
+  jsonShape,
+  recordLikeConstructor,
+  contractUnderName,
+  unsendableWhat,
+  unsendableHint,
+) where
+
+import Base
+import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
+import qualified Data.Text as Text
+import Optics ((^.))
+
+import L4.Print (prettyLayout)
+import L4.Syntax
+import L4.TypeCheck.Environment (
+  booleanUnique,
+  contractUnique,
+  dateUnique,
+  datetimeUnique,
+  eitherUnique,
+  eventUnique,
+  listUnique,
+  maybeUnique,
+  numberUnique,
+  stringUnique,
+  timeUnique,
+ )
+import L4.TypeCheck.Types (EntityInfo)
+
+-- | The form a value of a type has in JSON.
+data JsonShape
+  = JNumber
+  | JString
+  | JBool
+  | JDate
+  | JTime
+  | JDateTime
+  | -- | The type and its constructors' names, when none carries fields.
+    JEnum ShapeName [Text]
+  | -- | The type and its constructors, when one at least carries fields. One
+    -- that carries fields is written @{"Card": {"card fee": 2}}@, keyed by its
+    -- name, and one that carries none is its name, @"Cash"@ (the wire-form
+    -- bench, card J1, option A, ruled by Meng on 2026-10-15), as the encoder
+    -- writes them.
+    JTagged ShapeName [JsonConstructor]
+  | -- | The type and its fields.
+    JRecord ShapeName [JsonField]
+  | -- | A record that is being expanded already: the type only.
+    JRecursive ShapeName
+  | JArray JsonShape
+  | JOptional JsonShape
+  | -- | The shapes of the two sides. An EITHER is written @{"LEFT": [v]}@ or
+    -- @{"RIGHT": [v]}@ (the wire-form bench, card J3, option B, ruled by Meng
+    -- on 2026-10-15).
+    JEither JsonShape JsonShape
+  deriving stock (Eq, Show)
+
+-- | A constructor of a 'JTagged' type: its name and its fields, none for one
+-- that is written as its name.
+data JsonConstructor = JsonConstructor
+  { constructorName :: !Text
+  , constructorFields :: ![JsonField]
+  }
+  deriving stock (Eq, Show)
+
+data JsonField = JsonField
+  { fieldName :: !Text
+  , fieldShape :: !JsonShape
+  , fieldRequired :: !Bool
+  , fieldDescription :: !(Maybe Text)
+  -- ^ The field's @\@desc@.
+  }
+  deriving stock (Eq, Show)
+
+-- | A declared type, as a shape names it: what a schema calls it and says of it.
+data ShapeName = MkShapeName
+  { shapeTypeName :: !Text
+  -- ^ The name it is declared with.
+  , shapeTypeArgs :: ![Text]
+  -- ^ The types it is given, printed, for a type with parameters: @Box OF
+  -- NUMBER@ and @Box OF STRING@ have different fields, so a schema that names
+  -- its types once must tell them apart.
+  , shapeTypeDescription :: !(Maybe Text)
+  -- ^ Its declaration's @\@desc@.
+  }
+  deriving stock (Eq, Show)
+
+-- | A type with no parameters and no @\@desc@, by its name.
+instance IsString ShapeName where
+  fromString n = MkShapeName (Text.pack n) [] Nothing
+
+-- | Why a type has no shape.
+data Unsendable
+  = UFunction
+  | UDeontic
+  | UEvent
+  | -- | A type variable, by name: the rule is generic.
+    UPolymorphic Text
+  | -- | An input that is itself a type (@GIVEN a IS A TYPE@): the rule is generic.
+    UTypeAsInput
+  | -- | A type that is not known, or a built-in type that has no shape yet, by name.
+    UUnknownType Text
+  | -- | The record, the field, and why the field's type has no shape.
+    UInField Text Text Unsendable
+  | -- | The type, its constructor, the constructor's field, and why the field's
+    -- type has no shape.
+    UInConstructor Text Text Text Unsendable
+  | -- | The type that takes a type, and why what it was given has no shape.
+    UInArgument Text Unsendable
+  | -- | The built-in type that holds it, and why what it holds has no shape.
+    UInBuiltin Holder Unsendable
+  | -- | A result L4 could not work out a type for, from a rule with no GIVETH.
+    UNotWorkedOut
+  | -- | A result whose type is a declared name for a DEONTIC: whether the
+    -- GIVETH wrote the name or L4 inferred it, the name, and the DEONTIC it
+    -- stands for, printed. See 'contractUnderName'.
+    UContractUnderName ResultOrigin Text Text
+  | -- | A type whose name did not resolve, or that was given the wrong number of
+    -- arguments, by name. The cause has its own error (of the type check, here or
+    -- in an import), so this one is not reported: see 'isUnresolved'.
+    UUnresolved Text
+  deriving stock (Eq, Show, Generic)
+  deriving anyclass (NFData)
+
+-- | Where a result's type came from: its GIVETH, or, for a rule with none, the
+-- type L4 inferred from its body.
+data ResultOrigin = ResultWritten | ResultInferred
+  deriving stock (Eq, Show, Generic)
+  deriving anyclass (NFData)
+
+-- | A built-in type that holds others.
+data Holder = InList | InMaybe | InEither
+  deriving stock (Eq, Show, Generic)
+  deriving anyclass (NFData)
+
+-- | What 'jsonShape' looks types up in: the declarations of the module and of
+-- everything it imports, by the unique of the type they declare. The type
+-- checker's own information goes with them, for the result of a definition with
+-- no GIVETH.
+data ShapeEnv = MkShapeEnv
+  { declared :: !(Map.Map Unique (Declare Resolved))
+  , entities :: !EntityInfo
+  , typeVariables :: !(Set.Set Unique)
+  -- ^ The type variables in scope: the inputs of a generic rule that are types
+  -- (@GIVEN a IS A TYPE@). The type checker keeps these in its local scope and
+  -- not in 'entities'.
+  }
+
+-- | Every DECLARE of a module, in sections too. Not the ones it imports.
+moduleDeclares :: Module Resolved -> [Declare Resolved]
+moduleDeclares (MkModule _ _ section) = inSection section
+ where
+  inSection (MkSection _ _ _ decls) = decls >>= inDecl
+  inDecl = \case
+    Declare _ d -> [d]
+    Section _ sub -> inSection sub
+    _ -> []
+
+shapeEnvFromDeclares :: [Declare Resolved] -> EntityInfo -> ShapeEnv
+shapeEnvFromDeclares decls ei =
+  MkShapeEnv
+    { declared = Map.fromList [(getUnique name, d) | d@(MkDeclare _ _ (MkAppForm _ name _ _) _) <- decls]
+    , entities = ei
+    , typeVariables = Set.empty
+    }
+
+-- | The shape of a type, or why it has none.
+--
+-- Whether it has one is worked out by reading each declaration once
+-- ('firstUnsendable'), so the answer costs what the source costs to read. The
+-- shape itself is a tree with a declared type written out, with its arguments
+-- filled in, on every path to it, which can be far larger than that (a record
+-- whose two fields share a record type, nested, doubles at each level), so it is
+-- built only as far as it is looked at. Walking all of it costs its size. The
+-- service's schema ('L4.FunctionSchema.typeToParameter') walks all of it;
+-- jl4-schema's ('L4.JsonSchema.generateJsonSchema') writes each declared type,
+-- with its arguments, once.
+jsonShape :: ShapeEnv -> Type' Resolved -> Either Unsendable JsonShape
+jsonShape env ty = case firstUnsendable env ty of
+  Just why -> Left why
+  Nothing -> Right (expand env ty)
+
+-- | Is this a declared name for a DEONTIC (@DECLARE Duty IS A DEONTIC Party Act@),
+-- directly or through other names? Then it is 'UContractUnderName', with the
+-- DEONTIC it stands for. A result typed so is not a contract: the service
+-- takes a result to its contract path only when its type is a DEONTIC
+-- ('L4.Export.isContractResult'), so the check refuses it, and says why. The
+-- 'ResultOrigin' says whether the GIVETH wrote the name or L4 inferred it, so
+-- that the error does not say the rule wrote what it did not.
+contractUnderName :: ShapeEnv -> ResultOrigin -> Type' Resolved -> Maybe Unsendable
+contractUnderName env origin = \case
+  ty@(TyApp _ name _) -> UContractUnderName origin (nameText name) . prettyLayout <$> go (Set.singleton (getUnique name)) ty
+  _ -> Nothing
+ where
+  go seen = \case
+    TyApp _ name args
+      | Declared _ sub (SynonymDecl _ inner) _ <- typeHead env name args ->
+          case substitute (Map.fromList sub) inner of
+            t@(TyApp _ n [_, _]) | getUnique n == contractUnique -> Just t
+            t@(TyApp _ n _) | getUnique n `Set.notMember` seen -> go (Set.insert (getUnique n) seen) t
+            _ -> Nothing
+    _ -> Nothing
+
+-- | What a type with this name and these arguments is: the table at the top of
+-- this module, as code. The arguments are a type's own or stand for them.
+data TypeHead t
+  = HasShape JsonShape
+  | HasNoShape Unsendable
+  | ArrayOf t
+  | OptionalOf t
+  | EitherOf t t
+  | -- | Its name, each of its parameters with the argument it is used with, what
+    -- it is declared to be, and its @\@desc@.
+    Declared Text [(Unique, t)] (TypeDecl Resolved) (Maybe Text)
+
+typeHead :: ShapeEnv -> Resolved -> [t] -> TypeHead t
+typeHead env name args
+  | u == numberUnique, null args = HasShape JNumber
+  | u == booleanUnique, null args = HasShape JBool
+  | u == stringUnique, null args = HasShape JString
+  | u == dateUnique, null args = HasShape JDate
+  | u == timeUnique, null args = HasShape JTime
+  | u == datetimeUnique, null args = HasShape JDateTime
+  | u == listUnique, [a] <- args = ArrayOf a
+  | u == maybeUnique, [a] <- args = OptionalOf a
+  | u == eitherUnique, [a, b] <- args = EitherOf a b
+  | u == contractUnique = HasNoShape UDeontic
+  | u == eventUnique = HasNoShape UEvent
+  | Just (MkDeclare ann _ (MkAppForm _ declared params _) body) <- Map.lookup u env.declared =
+      if length params == length args
+        then Declared (nameText declared) (zip (map getUnique params) args) body (getDesc <$> ann ^. annDesc)
+        else HasNoShape (UUnresolved (nameText declared))
+  | OutOfScope{} <- name = HasNoShape (UUnresolved text)
+  | u `Set.member` env.typeVariables = HasNoShape (UPolymorphic text)
+  | otherwise = HasNoShape (UUnknownType text)
+ where
+  u = getUnique name
+  text = nameText name
+
+-- | Where 'firstUnsendable' is reading: the parameters of the declaration it is
+-- in, and the type variables that a FOR ALL has put in scope.
+data Reading = MkReading
+  { parameters :: !(Set.Set Unique)
+  , quantified :: !(Set.Set Unique)
+  , typeItself :: !Unsendable
+  -- ^ What to say of @TYPE@ here: of an input it means the rule is generic, and of
+  -- a field it does not.
+  }
+
+-- | The first thing in a type that has no shape, or 'Nothing'.
+--
+-- This reads declarations and does not instantiate them. Each declared type is
+-- read once, with its parameters taken as fine, in the order its fields are
+-- written. Each type argument is looked at where it is written, whether or not
+-- the parameter is used. So a type with parameters has a shape when its
+-- declaration has one and all of its arguments do, which costs what the source
+-- costs to read however many ways the types can be filled in, and on a cycle the
+-- declarations already read are all there is to say.
+--
+-- What is refused is what names something with no shape: 'UInField' and
+-- 'UInConstructor' say which field of which declaration, and 'UInArgument' which
+-- type was given it.
+firstUnsendable :: ShapeEnv -> Type' Resolved -> Maybe Unsendable
+firstUnsendable env ty =
+  either Just (const Nothing) $
+    evalState (runExceptT (walk (MkReading Set.empty Set.empty UTypeAsInput) ty)) Set.empty
+ where
+  walk :: Reading -> Type' Resolved -> ExceptT Unsendable (State (Set.Set Unique)) ()
+  walk reading = \case
+    Fun{} -> throwError UFunction
+    Type{} -> throwError reading.typeItself
+    InfVar{} -> throwError UNotWorkedOut
+    Forall _ bound inner ->
+      walk reading{quantified = Set.union reading.quantified (Set.fromList (map getUnique bound))} inner
+    TyApp _ name args
+      | getUnique name `Set.member` reading.parameters -> traverse_ (walk reading) args
+      | getUnique name `Set.member` reading.quantified -> throwError (UPolymorphic (nameText name))
+      | otherwise -> case typeHead env name args of
+          HasShape _ -> pure ()
+          HasNoShape why -> throwError why
+          ArrayOf a -> walk reading a `catchError` (throwError . UInBuiltin InList)
+          OptionalOf a -> walk reading a `catchError` (throwError . UInBuiltin InMaybe)
+          EitherOf a b -> (walk reading a *> walk reading b) `catchError` (throwError . UInBuiltin InEither)
+          Declared typeName sub body _ -> do
+            declaration (getUnique name) typeName (map fst sub) body
+            for_ sub \(_, arg) ->
+              walk reading arg `catchError` (throwError . UInArgument typeName)
+
+  declaration :: Unique -> Text -> [Unique] -> TypeDecl Resolved -> ExceptT Unsendable (State (Set.Set Unique)) ()
+  declaration u typeName params body = do
+    seen <- gets (Set.member u)
+    unless seen do
+      modify' (Set.insert u)
+      let reading = MkReading (Set.fromList params) Set.empty (UUnknownType "TYPE")
+      case body of
+        SynonymDecl _ inner -> walk reading inner
+        -- A constructor's fields are not part of the shape ('expand'), but a
+        -- field of a type with no shape still has no JSON form.
+        EnumDecl _ cons ->
+          for_ cons \(MkConDecl _ conName fields) ->
+            for_ fields \(MkTypedName _ fieldName fieldTy _) ->
+              walk reading fieldTy
+                `catchError` (throwError . UInConstructor typeName (nameText conName) (nameText fieldName))
+        RecordDecl _ _ fields ->
+          for_ fields \(MkTypedName _ fieldName fieldTy _) ->
+            walk reading fieldTy
+              `catchError` (throwError . UInField typeName (nameText fieldName))
+
+-- | The shape of a type that 'firstUnsendable' found nothing wrong with. It stops
+-- at a declared type that is being expanded already, so what it gives for a type
+-- in a cycle depends on where the type is reached from.
+expand :: ShapeEnv -> Type' Resolved -> JsonShape
+expand env = go Set.empty
+ where
+  go :: Set.Set Unique -> Type' Resolved -> JsonShape
+  go seen = \case
+    Forall _ _ inner -> go seen inner
+    TyApp _ name args -> case typeHead env name args of
+      HasShape shape -> shape
+      ArrayOf a -> JArray (go seen a)
+      OptionalOf a -> JOptional (go seen a)
+      EitherOf a b -> JEither (go seen a) (go seen b)
+      Declared typeName sub body desc
+        | getUnique name `Set.member` seen -> JRecursive named
+        | otherwise ->
+            let
+              seen' = Set.insert (getUnique name) seen
+              inner = go seen' . substitute (Map.fromList sub)
+             in
+              case body of
+                SynonymDecl _ t -> inner t
+                -- A type none of whose constructors carries fields is the
+                -- constructors' names. One that carries fields is tagged with its
+                -- name (card J1 of the wire-form bench, option A); 'firstUnsendable'
+                -- has looked at its fields.
+                -- One constructor, named like the type, that carries fields is
+                -- a record, as 'recordLikeConstructor' says.
+                EnumDecl {}
+                  | Just (_, fs) <- recordLikeConstructor typeName body -> JRecord named (map (field inner) fs)
+                EnumDecl _ cons
+                  | all (\(MkConDecl _ _ fs) -> null fs) cons -> JEnum named [nameText c | MkConDecl _ c _ <- cons]
+                  | otherwise ->
+                      JTagged named
+                        [ JsonConstructor (nameText c) (map (field inner) fs)
+                        | MkConDecl _ c fs <- cons
+                        ]
+                RecordDecl _ _ fields -> JRecord named (map (field inner) fields)
+       where
+        named = MkShapeName typeName (map (prettyLayout . snd) sub) desc
+      HasNoShape _ -> checked
+    _ -> checked
+
+  field inner (MkTypedName ann fieldName ty _) =
+    let shape = inner ty
+     in JsonField
+          { fieldName = nameText fieldName
+          , fieldShape = shape
+          , fieldRequired = case shape of JOptional _ -> False; _ -> True
+          , fieldDescription = getDesc <$> ann ^. annDesc
+          }
+
+  checked = error "jsonShape: firstUnsendable has looked at everything this reaches"
+
+-- | A type with the parameters of its declaration replaced by the arguments it
+-- is used with.
+substitute :: Map.Map Unique (Type' Resolved) -> Type' Resolved -> Type' Resolved
+substitute sub
+  | Map.null sub = id
+  | otherwise = go
+ where
+  go = \case
+    TyApp ann r []
+      | Just t <- Map.lookup (getUnique r) sub -> t
+      | otherwise -> TyApp ann r []
+    TyApp ann r ts -> TyApp ann r (map go ts)
+    Fun ann args res -> Fun ann [MkOptionallyNamedType a n (go t) | MkOptionallyNamedType a n t <- args] (go res)
+    Forall ann vs t -> Forall ann vs (go t)
+    other -> other
+
+nameText :: Resolved -> Text
+nameText = rawNameToText . rawName . getActual
+
+-- | The constructor and its fields, when a type declared @IS ONE OF@ has one
+-- constructor only, named like the type, and it carries fields:
+-- @DECLARE Refund IS ONE OF Refund HAS amount IS A NUMBER@. The evaluator
+-- cannot tell it from @DECLARE Refund HAS amount IS A NUMBER@, so @JSONDECODE@
+-- reads it as a record ('L4.EvaluateLazy.Machine.isRecordShaped') and
+-- @JSONENCODE@ writes it as one, its fields alone. The schemas ('jsonShape')
+-- and the service's decoder take it for a record too, so that every reader
+-- reads the one form, @{"amount": 40}@ (assumed, not ruled: the review of #779
+-- of 2026-11-19 found the schemas publishing it tagged, which @JSONDECODE@
+-- refuses). Given the type's name as 'nameText' writes it.
+recordLikeConstructor :: Text -> TypeDecl Resolved -> Maybe (Resolved, [TypedName Resolved])
+recordLikeConstructor typeName = \case
+  EnumDecl _ [MkConDecl _ c fs@(_ : _)] | nameText c == typeName -> Just (c, fs)
+  _ -> Nothing
+
+-- | Is this only that a type did not resolve? Then the error about that says what
+-- is wrong, and saying the type cannot be sent would only mislead.
+isUnresolved :: Unsendable -> Bool
+isUnresolved = \case
+  UUnresolved _ -> True
+  UInField _ _ why -> isUnresolved why
+  UInConstructor _ _ _ why -> isUnresolved why
+  UInArgument _ why -> isUnresolved why
+  UInBuiltin _ why -> isUnresolved why
+  _ -> False
+
+-- | What is not supported, in a few words, for the error to say "its input
+-- `e` is <what>".
+unsendableWhat :: Unsendable -> Text
+unsendableWhat = \case
+  UFunction -> "a function"
+  UDeontic -> "a DEONTIC, a contract rule"
+  UEvent -> "an EVENT"
+  UPolymorphic v -> "of the type variable `" <> v <> "`, so the rule is generic"
+  UTypeAsInput -> "a type, so the rule is generic"
+  UUnknownType t -> "of the type `" <> t <> "`"
+  UInField r f why -> "of a record type `" <> r <> "` whose field `" <> f <> "` is " <> unsendableWhat why
+  UInConstructor t c f why -> "of a type `" <> t <> "` whose constructor `" <> c <> "` has a field `" <> f <> "` that is " <> unsendableWhat why
+  UInArgument t why -> "of the type `" <> t <> "`, given " <> dropOf (unsendableWhat why)
+  UInBuiltin InList why -> "a list whose elements are each " <> unsendableWhat why
+  UInBuiltin InMaybe why -> "a MAYBE whose value is " <> unsendableWhat why
+  UInBuiltin InEither why -> "an EITHER one of whose sides is " <> unsendableWhat why
+  UNotWorkedOut -> "of a type that L4 could not work out from the rule"
+  UContractUnderName ResultWritten n _ -> "written with `" <> n <> "`, a type name for a DEONTIC"
+  UContractUnderName ResultInferred n _ -> "inferred to be `" <> n <> "`, a type name for a DEONTIC"
+  UUnresolved t -> "of the type `" <> t <> "`, which has an error of its own"
+ where
+  dropOf what = fromMaybe what (Text.stripPrefix "of " what)
+
+-- | One line on what to do about it.
+unsendableHint :: Unsendable -> Text
+unsendableHint = \case
+  UFunction -> "Pass the values the function would work on, and apply the function inside the rule."
+  UDeontic -> "An @export can return a DEONTIC itself, but it can't take one as an input or return one inside another type yet. Return the DEONTIC itself, or remove the @export; the rule still evaluates in the editor, with its #EVAL and #EVALTRACE."
+  UEvent -> "Take the party, the action and the time as separate inputs, and build the event inside the rule."
+  UPolymorphic _ -> genericHint
+  UTypeAsInput -> genericHint
+  UUnknownType _ -> "Use a NUMBER, BOOLEAN, STRING, DATE, TIME, DATETIME, a LIST or MAYBE of those, or a record or enumeration of them."
+  UInField _ _ why -> unsendableHint why
+  UInConstructor _ _ _ why -> unsendableHint why
+  UInArgument _ why -> unsendableHint why
+  UInBuiltin _ why -> unsendableHint why
+  UNotWorkedOut -> "Write its type in the GIVEN and GIVETH."
+  UContractUnderName ResultWritten _ t -> "An @export returns a contract only when its GIVETH writes the DEONTIC type out: write GIVETH A " <> t <> " instead."
+  UContractUnderName ResultInferred _ t -> "An @export returns a contract only when its GIVETH writes the DEONTIC type out, and this rule has no GIVETH: add GIVETH A " <> t <> "."
+  UUnresolved _ -> "Fix the error about that type."
+ where
+  genericHint = "Write the type it is used at in its GIVEN and GIVETH, or publish a rule that calls it at that type."

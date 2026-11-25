@@ -31,6 +31,7 @@ import Optics.Cons
 import Servant.API
 import Data.OpenApi (ToSchema)
 import L4.EvaluateLazy.Exceptions (Refusal (..), parseRefusalMarker, prettyRefusal, refusalMarker)
+import L4.EvaluateLazy.Machine (jsonForMessage)
 
 type FunctionName = Text
 
@@ -284,7 +285,7 @@ prettyEvaluatorError = \case
   UnknownArguments args ->
     "Unknown argument(s): " <> Text.intercalate ", " args
   CannotHandleParameterType lit ->
-    "Cannot handle parameter type: " <> Text.pack (show lit)
+    "Cannot handle parameter type: " <> jsonForMessage (toJSON lit)
   CannotHandleUnknownVars ->
     "Cannot handle unknown variables in input"
 

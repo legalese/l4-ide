@@ -13,6 +13,7 @@ import System.IO.Temp (withSystemTempDirectory)
 import System.Process (proc, readCreateProcessWithExitCode)
 
 import qualified Data.Text as T
+import qualified Data.Text.IO as TIO
 
 import L4.MLIR.IR
 import L4.MLIR.Emit (renderMLIR)
@@ -21,6 +22,7 @@ import L4.MLIR.Dialect.Arith
 import L4.MLIR.Dialect.SCF
 import L4.MLIR.Runtime.Builtins (builtinDeclarations)
 import L4.MLIR.Lower (lowerProgramWithInfo, lowerProgramWithDiagnostics)
+import L4.MLIR.Pipeline (compileToMLIR)
 import L4.MLIR.Schema (bundleExports, applyDiagnostics, encodeBundle, FunctionExport)
 
 import qualified Data.Aeson as Aeson
@@ -227,6 +229,44 @@ main = do
     , test "plain fn stays supported"          testPlainFunctionSupported
     , test "REFUSE marks the export unsupported" testRefuseUnsupported
     , test "jl4-mlir run declines an unsupported export" testRunDeclinesUnsupported
+    , test "an EVENT input is refused, as the service refuses it" $
+        testExportRefused
+          ["GIVEN e IS AN EVENT Party Act", "GIVETH A NUMBER", "`refused` MEANS 1"]
+          "its input `e` is an EVENT"
+    , test "a function-typed input is refused, as the service refuses it" $
+        testExportRefused
+          ["GIVEN f IS A FUNCTION FROM NUMBER TO BOOLEAN", "GIVETH A NUMBER", "`refused` MEANS 1"]
+          "its input `f` is a function"
+    , test "a DEONTIC input is refused, as the service refuses it" $
+        testExportRefused
+          ["GIVEN d IS A DEONTIC Party Act", "GIVETH A NUMBER", "`refused` MEANS 1"]
+          "its input `d` is a DEONTIC"
+    , test "an export of a record with a function field is refused" $
+        testExportRefused
+          ["GIVEN r IS A Rule", "GIVETH A NUMBER", "`refused` MEANS 1"]
+          "whose field"
+    , test "a generic export is refused" $
+        testExportRefused
+          ["GIVEN a IS A TYPE", "      x IS AN a", "GIVETH AN a", "`refused` MEANS x"]
+          "its input `a`"
+    , test "a MAYBE of a DEONTIC result is refused, having no contract path" $
+        testExportRefused
+          ["GIVETH A MAYBE (DEONTIC Party Act)", "`refused` MEANS NOTHING"]
+          "its result is a MAYBE whose value is a DEONTIC"
+    , test "a LIST of a DEONTIC result is refused, having no contract path" $
+        testExportRefused
+          ["GIVETH A LIST OF (DEONTIC Party Act)", "`refused` MEANS LIST (PARTY alice MUST ping WITHIN 3)"]
+          "its result is a list whose elements are each a DEONTIC"
+    , test "an EITHER with a DEONTIC result is refused, having no contract path" $
+        testExportRefused
+          ["GIVETH AN EITHER NUMBER (DEONTIC Party Act)", "`refused` MEANS LEFT 1"]
+          "its result is an EITHER one of whose sides is a DEONTIC"
+    , test "a synonym for a DEONTIC result is refused, having no contract path" $
+        testExportRefused
+          ["GIVETH A `Duty`", "`refused` MEANS PARTY alice MUST ping WITHIN 3"]
+          "its result is written with `Duty`, a type name for a DEONTIC"
+    , test "a DEONTIC result is compiled, as the service deploys it" testDeonticResultCompiled
+    , test "a rule the check has nothing to say about is compiled" testPlainExportCompiled
     , test "deontic REFUSE after HENCE is unsupported" $
         testDeonticRefuse False ["MUST `pay`", "WITHIN 10", "HENCE REFUSE \"after payment\""]
     , test "deontic REFUSE after LEST is unsupported" $
@@ -241,6 +281,39 @@ main = do
         testDeonticRefuse False ["MUST `pay`", "WITHIN REFUSE \"no deadline modelled\""]
     , test "REFUSE in a called definition is unsupported" $
         testExportMark refuseMark [] (feeInYear oldFeeRefuses "`the old fee`")
+    -- The lowering has no image of an EITHER (review of #779, 2026-11-17):
+    -- a rule that answered n for RIGHT n answered 0 for {"RIGHT": [5]} and for
+    -- 5, so an EITHER in the signature marks the export unsupported.
+    , test "an EITHER input is unsupported" $
+        testExportMark eitherMark [] (eitherExport ["GIVEN e IS AN EITHER STRING NUMBER"] "GIVETH A NUMBER" "`fee` e MEANS\n  CONSIDER e\n  WHEN RIGHT n THEN n\n  OTHERWISE 50")
+    , test "an EITHER in a MAYBE input is unsupported" $
+        testExportMark eitherMark [] (eitherExport ["GIVEN e IS A MAYBE (EITHER STRING NUMBER)"] "GIVETH A NUMBER" "`fee` e MEANS 1")
+    , test "an EITHER in a record field of an input is unsupported" $
+        testExportMark eitherMark [] (eitherExport ["GIVEN b IS A Claim"] "GIVETH A NUMBER" "`fee` b MEANS 1")
+    , test "an EITHER behind a synonym in a list input is unsupported" $
+        testExportMark eitherMark [] (eitherExport ["GIVEN es IS A LIST OF Amount"] "GIVETH A NUMBER" "`fee` es MEANS 1")
+    , test "an EITHER result is unsupported" $
+        testExportMark eitherMark [] (eitherExport ["GIVEN n IS A NUMBER"] "GIVETH AN EITHER STRING NUMBER" "`fee` n MEANS RIGHT n")
+    , test "an export with no EITHER beside a record that holds one stays supported" $
+        testExportMark Nothing [] (eitherExport ["GIVEN n IS A NUMBER"] "GIVETH A NUMBER" "`fee` n MEANS n")
+    -- The runtime reads no tagged constructor, {"Card": {its fields}}, nor the
+    -- oneOf of a type with both kinds (HATBOX, MULLET, 2026-11-18).
+    , test "a constructor that carries data in an input is unsupported" $
+        testExportMark taggedMark [] (taggedExport ["GIVEN p IS A Payment"] "GIVETH A NUMBER" "`fee` p MEANS 1")
+    , test "a constructor that carries data in a result is unsupported" $
+        testExportMark taggedMark [] (taggedExport ["GIVEN n IS A NUMBER"] "GIVETH A Payment" "`fee` n MEANS Cash")
+    -- A type whose only constructor is named like it and carries fields is a
+    -- record everywhere else; the lowering does not take it for one, so it
+    -- stays unsupported, with a reason that names it (review of #779,
+    -- 2026-11-20), and one that carries nothing stays supported.
+    , test "a type whose only constructor is named like it, in an input, is unsupported for itself" $
+        testExportMark recordLikeMark [] (taggedExport ["GIVEN r IS A `Deposit Refund`"] "GIVETH A NUMBER" "`fee` r MEANS r's amount")
+    , test "a type whose only constructor is named like it, as the result, is unsupported for itself" $
+        testExportMark recordLikeMark [] (taggedExport ["GIVEN n IS A NUMBER"] "GIVETH A `Deposit Refund`" "`fee` n MEANS `Deposit Refund` n")
+    , test "a fieldless type whose only constructor is named like it stays supported" $
+        testExportMark Nothing [] (taggedExport ["GIVEN u IS A Unit"] "GIVETH A NUMBER" "`fee` u MEANS 1")
+    , test "an enumeration whose constructors carry nothing stays supported" $
+        testExportMark Nothing [] (taggedExport ["GIVEN c IS A Colour"] "GIVETH A Colour" "`fee` c MEANS c")
     , test "a called definition with no REFUSE stays supported" $
         testExportMark Nothing [] (feeInYear oldFeeIsFifty "`the old fee`")
     , test "REFUSE two calls away is unsupported" $
@@ -335,6 +408,60 @@ test name action = do
   result <- action
   putStrLn $ if result then "ok" else "FAIL"
   pure result
+
+-- | A file that declares what the tests of 'L4.MLIR.Pipeline' refuse, and one
+-- @\@export@ with these lines.
+exportFixture :: [T.Text] -> T.Text
+exportFixture rule =
+  T.unlines $
+    [ "DECLARE Party IS ONE OF alice, bob"
+    , "DECLARE Act IS ONE OF ping, pong"
+    , "DECLARE Rule HAS test IS A FUNCTION FROM NUMBER TO BOOLEAN"
+    , "DECLARE `Duty` IS A DEONTIC Party Act"
+    , ""
+    , "@export The rule"
+    ]
+      <> rule
+
+-- | 'compileToMLIR' on a file holding this source: 'Nothing' when it compiles,
+-- or what it was refused with.
+compileFixture :: T.Text -> IO (Maybe [T.Text])
+compileFixture src =
+  withSystemTempDirectory "jl4-mlir-export" \dir -> do
+    let file = dir </> "fixture.l4"
+    TIO.writeFile file src
+    either Just (const Nothing) <$> compileToMLIR file
+
+testExportRefused :: [T.Text] -> T.Text -> IO Bool
+testExportRefused rule want =
+  compileFixture (exportFixture rule) >>= \case
+    Nothing -> do
+      putStrLn "\n    it compiled"
+      pure False
+    Just errs
+      | any (T.isInfixOf want) errs -> pure True
+      | otherwise -> do
+          putStrLn $ "\n    expected " <> T.unpack want <> ", got " <> show errs
+          pure False
+
+-- | The JS runtime evaluates a contract from the schema (README, known gaps),
+-- and the service deploys a rule whose result is a DEONTIC itself, so neither
+-- refuses it.
+testDeonticResultCompiled :: IO Bool
+testDeonticResultCompiled =
+  compileFixture (exportFixture ["GIVETH A DEONTIC Party Act", "`the duty` MEANS PARTY alice MUST ping WITHIN 3"]) >>= \case
+    Nothing -> pure True
+    Just errs -> do
+      putStrLn $ "\n    refused: " <> show errs
+      pure False
+
+testPlainExportCompiled :: IO Bool
+testPlainExportCompiled =
+  compileFixture (exportFixture ["GIVEN p IS A Party", "GIVETH A Party", "`same` MEANS p"]) >>= \case
+    Nothing -> pure True
+    Just errs -> do
+      putStrLn $ "\n    refused: " <> show errs
+      pure False
 
 -- | Test that MLIR types render correctly.
 testTypeEmission :: IO Bool
@@ -689,6 +816,49 @@ theExportMark json = case Aeson.decodeStrict (TE.encodeUtf8 json) of
                      Just (Aeson.String reason) -> Just reason
                      _ -> Nothing)
   _ -> Left ("expected a schema with one export, got: " <> T.unpack (T.take 400 json))
+
+-- | The mark an export with a constructor that carries data in its signature gets.
+taggedMark :: Maybe T.Text
+taggedMark = Just "a constructor that carries data, in an input or the result, is not supported by the WASM backend"
+
+-- | A module that declares a type with a constructor that carries data, an
+-- enumeration, a type whose only constructor is named like it, with fields and
+-- without, then an export with these inputs, this GIVETH and this definition.
+taggedExport :: [T.Text] -> T.Text -> T.Text -> [T.Text]
+taggedExport givens giveth def =
+  [ "DECLARE Payment IS ONE OF"
+  , "  Cash"
+  , "  Card HAS `card fee` IS A NUMBER"
+  , "DECLARE Colour IS ONE OF Red, Green"
+  , "DECLARE `Deposit Refund` IS ONE OF"
+  , "  `Deposit Refund` HAS amount IS A NUMBER"
+  , "DECLARE Unit IS ONE OF Unit"
+  , ""
+  , "@export The fee"
+  ]
+    <> givens
+    <> [giveth, def]
+
+-- | The mark an export with a type whose only constructor is named like it and
+-- carries fields gets.
+recordLikeMark :: Maybe T.Text
+recordLikeMark = Just "a type whose only constructor is named like it and carries fields, read as a record, in an input or the result, is not supported by the WASM backend"
+
+-- | The mark an export with an EITHER in its signature gets.
+eitherMark :: Maybe T.Text
+eitherMark = Just "EITHER in an input or the result is not supported by the WASM backend"
+
+-- | A module that declares a record and a synonym that hold an EITHER, then
+-- an export with these inputs, this GIVETH and this definition.
+eitherExport :: [T.Text] -> T.Text -> T.Text -> [T.Text]
+eitherExport givens giveth def =
+  [ "DECLARE Amount IS AN EITHER STRING NUMBER"
+  , "DECLARE Claim HAS amount IS AN Amount"
+  , ""
+  , "@export The fee"
+  ]
+    <> givens
+    <> [giveth, def]
 
 -- | A module with the given definitions, then an export that answers 100
 -- from the year 2000 and otherwise the given expression.

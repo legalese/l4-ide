@@ -1,0 +1,9 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+jsondecode-record-like-enum.l4:20:1-41:
+  RIGHT OF (`Deposit Refund` OF 40)
+jsondecode-record-like-enum.l4:21:1-39:
+  "{\"amount\":40}"
+jsondecode-record-like-enum.l4:22:1-57:
+  RIGHT OF (`Deposit Refund` OF 40)

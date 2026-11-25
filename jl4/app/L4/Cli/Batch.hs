@@ -68,7 +68,8 @@ import qualified LSP.Core.Shake as Shake
 import qualified LSP.L4.Rules as Rules
 import Language.LSP.Protocol.Types (normalizedFilePathToUri, toNormalizedFilePath)
 
-import L4.Export (ExportedFunction(..), ExportedParam(..), getDefaultFunction, getExportedFunctions)
+import L4.Export (ExportError (..), ExportSite (..), ExportedFunction(..), ExportedParam(..), getDefaultFunction, getExportedFunctions, prettyExportError, refusalsOf)
+import L4.Export.Shape (Unsendable (..))
 import L4.DirectiveFilter (filterIdeDirectives)
 import L4.EvaluateLazy
   ( EvalConfig(..)
@@ -76,16 +77,17 @@ import L4.EvaluateLazy
   , EvalDirectiveValue(..)
   , AssertionOutcome(..)
   , ReductionOutcome(..)
+  , evalDirectiveResultToJsonWithFields
   , prettyEvalException
   , prettyRefusal
   )
 import L4.Lexer (showStringLit)
-import L4.Print (prettyLayout)
+import L4.Print (extractConstructorFieldNames, prettyLayout)
 import L4.Syntax
   ( AppForm(..), Declare(..), Module(..), Resolved, Section(..), TopDecl(Declare, Section)
   , Type'(..), TypeDecl(..), Unique, getUnique
   )
-import L4.TypeCheck.Environment (maybeUnique)
+import L4.TypeCheck.Environment (eitherUnique, maybeUnique)
 
 import L4.Cli.Common
 
@@ -206,9 +208,11 @@ batchCmd opts = do
   (initErrs, mTc) <- runOneshot evalConfig opts.batchFile \nfp -> do
     let uri = normalizedFilePathToUri nfp
     _ <- Shake.addVirtualFileFromFS nfp
-    Shake.use Rules.SuccessfulTypeCheck uri
-  tcRes <- case mTc of
-    Just tc | tc.success -> pure tc
+    tc <- Shake.use Rules.SuccessfulTypeCheck uri
+    exportErrs <- Shake.use Rules.ExportCheck uri
+    pure ((,) <$> tc <*> exportErrs)
+  (tcRes, exportErrs) <- case mTc of
+    Just (tc, errs) | tc.success -> pure (tc, errs)
     _ -> do
       putDiagnostics initErrs
       TIO.putStrLn "Error: type checking failed"
@@ -217,6 +221,14 @@ batchCmd opts = do
     Right ef -> pure ef
     Left err -> do
       TIO.putStrLn $ "Error: " <> err
+      exitFailure
+  -- A row can hold no function, so a rule with an input that is one has nothing to
+  -- run on. This is all that batch asks of the export check: it runs the rest of
+  -- what the check refuses, a MAYBE or a LIST of a DEONTIC among them.
+  case concatMap prettyExportError (functionInputs (refusalsOf exportErrs exportFn)) of
+    [] -> pure ()
+    says -> do
+      mapM_ (TIO.putStrLn . ("Error: " <>)) says
       exitFailure
   let filteredModule = filterIdeDirectives tcRes.module'
       filteredSource = prettyLayout filteredModule
@@ -344,6 +356,17 @@ processRow opts evalConfig filteredSource exportFn params schema synonyms declar
             , Key.fromString "errors" Aeson..= errs
             ]
       in pure (env, not ok)
+  -- An input typed EITHER, sent in another form than {"LEFT": [v]} or
+  -- {"RIGHT": [v]}, is refused here, naming the input; the wrapper's
+  -- JSONDECODE would refuse it too, but without the input's name.
+  | errs@(_ : _) <- eitherFieldErrors synonyms schema input = pure
+      ( Aeson.object
+          [ Key.fromString "input"       Aeson..= input
+          , Key.fromString "output"      Aeson..= Aeson.Null
+          , Key.fromString "status"      Aeson..= ("error" :: Text)
+          , Key.fromString "diagnostics" Aeson..= errs
+          ]
+      , True )
   | otherwise = do
       let wrapperCode     = generateBatchWrapper exportFn.exportName params input
           combinedProgram = filteredSource <> wrapperCode
@@ -357,12 +380,21 @@ processRow opts evalConfig filteredSource exportFn params schema synonyms declar
       (evalErrs, mEval) <- runOneshot rowConfig virtualPath \nfp -> do
         let uri = normalizedFilePathToUri nfp
         _ <- Shake.addVirtualFile (toNormalizedFilePath virtualPath) combinedProgram
-        Shake.use Rules.EvaluateLazy uri
-      let (status, outputJson, diags) = case mEval of
+        results <- Shake.use Rules.EvaluateLazy uri
+        tc <- Shake.use Rules.SuccessfulTypeCheck uri
+        pure ((,) <$> results <*> tc)
+      let -- A constructor that carries data is written with its fields' names,
+          -- {"Injury": {"days off work": 3}}, as the service answers it and as
+          -- an input of its type is read, so a result can be sent back
+          -- (review of #779, 2026-11-20); it was written positionally,
+          -- {"Injury": [3]}.
+          encode (evalResults, tc) =
+            Aeson.toJSON (map (evalDirectiveResultToJsonWithFields (extractConstructorFieldNames tc.entityInfo)) evalResults)
+          (status, outputJson, diags) = case mEval of
             Nothing ->
               -- The wrapper failed to typecheck/parse (e.g. a schema mismatch).
               ("error" :: Text, Aeson.Null, Aeson.toJSON evalErrs)
-            Just evalResults ->
+            Just evaluated@(evalResults, _) ->
               -- The wrapper evaluated; a row still "fails" if evaluation raised
               -- an exception (e.g. JSONDECODE could not coerce a cell to the
               -- declared type). Those surface as `Reduction (ReducedErrored …)`.
@@ -373,10 +405,10 @@ processRow opts evalConfig filteredSource exportFn params schema synonyms declar
               let excMsgs = concatMap resultExceptionMsgs evalResults
                   refMsgs = concatMap resultRefusalMsgs evalResults
               in if not (null excMsgs)
-                   then ("error",   Aeson.toJSON evalResults, Aeson.toJSON excMsgs)
+                   then ("error",   encode evaluated, Aeson.toJSON excMsgs)
                    else if not (null refMsgs)
-                     then ("refused", Aeson.toJSON evalResults, Aeson.toJSON refMsgs)
-                     else ("success", Aeson.toJSON evalResults, Aeson.Array mempty)
+                     then ("refused", encode evaluated, Aeson.toJSON refMsgs)
+                     else ("success", encode evaluated, Aeson.Array mempty)
           env = Aeson.object
             [ Key.fromString "input"       Aeson..= input
             , Key.fromString "output"      Aeson..= outputJson
@@ -419,7 +451,7 @@ resultExceptionMsgs (MkEvalDirectiveResult _ res _) = case res of
 -- that primitive-typed values have the right JSON kind. Lenient on
 -- compound/unknown types (never rejects what it cannot judge).
 validateRow :: Map.Map Unique (Type' Resolved) -> [ExportedParam] -> Aeson.Value -> [Text]
-validateRow synonyms schema (Aeson.Object o) = concatMap checkParam schema
+validateRow synonyms schema input@(Aeson.Object o) = concatMap checkParam schema <> eitherFieldErrors synonyms schema input
   where
     -- a synonym for @MAYBE@ is a @MAYBE@ (@DECLARE MaybeYear IS A MAYBE NUMBER@),
     -- as evaluation reads it, though the export's own flag does not see that
@@ -443,6 +475,30 @@ validateRow synonyms schema (Aeson.Object o) = concatMap checkParam schema
       _ -> ""
 validateRow _ _ other =
   [ "Input record is not a JSON object: " <> jsonKindName other ]
+
+-- | An input whose type is an EITHER (behind MAYBEs and synonyms) sent in
+-- another form than @{"LEFT": [v]}@ or @{"RIGHT": [v]}@ (the wire-form bench,
+-- card J3, option B), by name. A missing or null input is left to the checks
+-- for those; an EITHER further down, in a record or a list, is refused by
+-- JSONDECODE when the row is evaluated.
+eitherFieldErrors :: Map.Map Unique (Type' Resolved) -> [ExportedParam] -> Aeson.Value -> [Text]
+eitherFieldErrors synonyms schema (Aeson.Object o) =
+  [ "Field '" <> p.paramName <> "': an EITHER is written {\"LEFT\": [value]} or {\"RIGHT\": [value]}"
+  | p <- schema
+  , Just ty <- [p.paramType]
+  , TyApp _ name [_, _] <- [throughMaybe synonyms ty]
+  , getUnique name == eitherUnique
+  , Just v <- [KeyMap.lookup (Key.fromText p.paramName) o]
+  , v /= Aeson.Null
+  , not (eitherForm v)
+  ]
+  where
+    eitherForm = \case
+      Aeson.Object kv
+        | [(k, Aeson.Array vec)] <- KeyMap.toList kv
+        , Vector.length vec == 1 -> Key.toText k `elem` ["LEFT", "RIGHT"]
+      _ -> False
+eitherFieldErrors _ _ _ = []
 
 data PrimKind = KNum | KBool | KStr
 
@@ -929,8 +985,15 @@ generateInputRecord params = Text.unlines $
   where
     formatField (idx, (name, mty)) =
       let fieldIndent = if idx == 0 then "  " else ", "
-          tyText      = maybe "A NUMBER" prettyLayout mty
+          tyText      = maybe "A NUMBER" (bracketed . prettyLayout) mty
       in fieldIndent <> quoteIdent name <> " IS " <> tyText
+    -- A type of more than one word is bracketed: unbracketed, the comma that
+    -- starts the next field is read as one more of its arguments
+    -- (@h IS Holding OF NUMBER@ then @, pad IS ...@ is a parse error), as the
+    -- service's wrapper brackets one ('Backend.MaybeLift.liftTypeText').
+    bracketed t
+      | Text.any (== ' ') t = "(" <> t <> ")"
+      | otherwise = t
 
 generateDecoder :: Text
 generateDecoder = Text.unlines
@@ -986,6 +1049,18 @@ quoteIdent name
     isPlain = case Text.uncons name of
       Just (c, _) -> isAlpha c && Text.all (\x -> isAlphaNum x || x == '_') name
       Nothing     -> False
+
+-- | The refusals that are about an input with a function in it.
+functionInputs :: [ExportError] -> [ExportError]
+functionInputs errs = [e | e@(ExportUnsendable _ _ (ExportInput _) why) <- errs, holdsFunction why]
+ where
+  holdsFunction = \case
+    UFunction -> True
+    UInField _ _ why -> holdsFunction why
+    UInConstructor _ _ _ why -> holdsFunction why
+    UInArgument _ why -> holdsFunction why
+    UInBuiltin _ why -> holdsFunction why
+    _ -> False
 
 extractParamsFromExport :: ExportedFunction -> [(Text, Maybe (Type' Resolved))]
 extractParamsFromExport ef =

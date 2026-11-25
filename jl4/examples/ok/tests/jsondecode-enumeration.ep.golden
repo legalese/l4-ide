@@ -1,0 +1,69 @@
+-- JSONDECODE reads an enumeration, a type none of whose constructors carries
+-- fields, from the name of one of its constructors, and refuses anything
+-- else: a name it does not have, or a value that is not a string. It passed
+-- them to the rule as they stood, so a CONSIDER on one found no branch, and
+-- a rule that ends in OTHERWISE answered it (review of #779, 2026-11-21).
+
+DECLARE Party IS ONE OF Landlord, Tenant
+
+DECLARE Lease HAS payer IS A Party
+
+-- one of its constructors is named like it, and it has another
+DECLARE Tone IS ONE OF Tone, Loud
+
+GIVEN p IS A Party
+GIVETH A NUMBER
+`who pays` p MEANS
+  CONSIDER p
+  WHEN Landlord THEN 1
+  OTHERWISE 2
+
+GIVEN s IS A STRING
+GIVETH AN EITHER STRING Party
+`decode party` s MEANS JSONDECODE s
+
+-- what a rule that ends in OTHERWISE answers for a decoded value
+GIVEN s IS A STRING
+GIVETH A NUMBER
+`answer` s MEANS
+  CONSIDER `decode party` s
+  WHEN RIGHT x THEN `who pays` x
+  WHEN LEFT e THEN 0
+
+GIVEN s IS A STRING
+GIVETH AN EITHER STRING Lease
+`decode lease` s MEANS JSONDECODE s
+
+GIVEN s IS A STRING
+GIVETH AN EITHER STRING (LIST OF Party)
+`decode parties` s MEANS JSONDECODE s
+
+GIVEN s IS A STRING
+GIVETH AN EITHER STRING (MAYBE Party)
+`decode maybe party` s MEANS JSONDECODE s
+
+GIVEN s IS A STRING
+GIVETH AN EITHER STRING Tone
+`decode tone` s MEANS JSONDECODE s
+
+#EVAL `decode party` "\"Landlord\""
+#EVAL `decode party` "\"Tenant\""
+#EVAL `answer` "\"Tenant\""
+#EVAL `decode lease` "{\"payer\": \"Tenant\"}"
+#EVAL `decode parties` "[\"Landlord\", \"Tenant\"]"
+#EVAL `decode maybe party` "null"
+#EVAL `decode maybe party` "\"Tenant\""
+#EVAL `decode tone` "\"Tone\""
+#EVAL `decode tone` "\"Loud\""
+
+#EVAL `decode party` "\"Lodger\""
+#EVAL `answer` "\"Lodger\""
+#EVAL `decode party` "5"
+#EVAL `decode party` "true"
+#EVAL `decode party` "{\"Landlord\": {}}"
+#EVAL `decode party` "null"
+#EVAL `decode lease` "{\"payer\": \"Lodger\"}"
+#EVAL `decode parties` "[\"Landlord\", 5]"
+#EVAL `decode maybe party` "\"Lodger\""
+#EVAL `decode tone` "\"Quiet\""
+#EVAL `decode tone` "{}"

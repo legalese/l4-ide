@@ -18,6 +18,7 @@
 module L4.MLIR.Schema
   ( -- * Schema bundle
     WasmBundle (..)
+  , isDeonticType
   , FunctionExport (..)
   , StateGraphExport (..)
   , TraceMeta (..)
@@ -48,7 +49,7 @@ import Data.Char (isAlphaNum)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.List (sortOn)
-import Data.Maybe (fromMaybe, maybeToList)
+import Data.Maybe (fromMaybe, isJust, mapMaybe, maybeToList)
 import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -70,8 +71,9 @@ import L4.Syntax
 import L4.Annotation (HasSrcRange, rangeOf)
 import L4.Parser.SrcSpan (SrcRange(..))
 import L4.TypeCheck.Types (InfoMap, EntityInfo)
+import L4.TypeCheck.Environment (eitherUnique)
 import qualified L4.Utils.IntervalMap as IV
-import L4.Export (ExportedFunction(..), ExportedParam(..), getExportedFunctions, enrichReturnTypes)
+import L4.Export (ExportedFunction(..), ExportedParam(..), getExportedFunctions, enrichReturnTypes, isContractResult)
 import L4.Refusal (refusalReasons)
 import qualified L4.Print as Print
 import L4.StateGraph
@@ -79,9 +81,9 @@ import L4.StateGraph
   , StateGraph(..)
   )
 import L4.FunctionSchema
-  ( Parameters(..), Parameter(..), declaresFromModule, typeToParameter
+  ( Parameters(..), Parameter(..), declaresFromModule, typeToParameter, uncheckedParameter
   )
-import L4.TypeCheck.Environment (contractUnique)
+import L4.Export.Shape (recordLikeConstructor, shapeEnvFromDeclares)
 
 -- ---------------------------------------------------------------------------
 -- Bundle types
@@ -788,6 +790,32 @@ buildExport mayRefuse infoMap declares fnReturnTypes unannotatedFns ef =
       -- WITHIN is carried as printed text, which the runtime reads as a
       -- number.
       refuseInBody = mayRefuse ef.exportDecide
+      -- The lowering has no image of an EITHER: it lowers neither LEFT nor
+      -- RIGHT, and a pattern on one matches every value, and the runtime
+      -- reads no {"LEFT": [v]} or {"RIGHT": [v]} input. So an export with an
+      -- EITHER in an input or its result, at any depth, is marked
+      -- unsupported, as a REFUSE is, and is evaluated by jl4-service, which
+      -- reads and writes that form.
+      eitherInSignature = signatureHasEither declares ef
+      -- Nor does its runtime read or write a constructor that carries data in
+      -- the tagged form, {"Card": {its fields}} (wire-form card J1, option A;
+      -- HATBOX), nor the oneOf of a type that has both kinds of constructor
+      -- (MULLET): such an export is marked unsupported too (assumed, not
+      -- ruled).
+      taggedInSignature = signatureHas (\n d -> isTaggedDecl d && not (isRecordLikeDecl n d)) declares ef
+      -- A type whose only constructor is named like it and carries fields is a
+      -- record on every other surface, its fields alone, and its own reason
+      -- says so. The lowering does not take it for one: measured on
+      -- 2026-11-20, with the mark removed, the runtime stopped on such an
+      -- input ("Cannot read properties of undefined") and answered 0 for such
+      -- a result, where a record declared HAS answers both. So it stays
+      -- unsupported (assumed, not ruled; review of #779, 2026-11-20).
+      recordLikeInSignature = signatureHas isRecordLikeDecl declares ef
+      unsupportedReasons =
+        [ refuseUnsupportedReason | refuseInBody ]
+          <> [ eitherUnsupportedReason | eitherInSignature ]
+          <> [ taggedUnsupportedReason | taggedInSignature ]
+          <> [ recordLikeUnsupportedReason | recordLikeInSignature ]
   in FunctionExport
        { apiName     = sanitizeFunctionName name
        , wasmSymbol  = sanitizeWasmSymbol name
@@ -797,11 +825,12 @@ buildExport mayRefuse infoMap declares fnReturnTypes unannotatedFns ef =
        , returnSchema = returnSchema_
        , isDeontic   = isDeonticFn
        , paramOrder  = paramOrder_
-       -- Assume compilable unless evaluation may reach a REFUSE;
-       -- 'applyDiagnostics' downgrades functions the lowering flagged as
-       -- unsupported.
-       , supported   = not refuseInBody
-       , unsupportedReason = if refuseInBody then Just refuseUnsupportedReason else Nothing
+       -- Assume compilable unless evaluation may reach a REFUSE, or the
+       -- signature holds an EITHER; 'applyDiagnostics' downgrades functions
+       -- the lowering flagged as unsupported.
+       , supported   = null unsupportedReasons
+       , unsupportedReason =
+           if null unsupportedReasons then Nothing else Just (Text.intercalate "; " unsupportedReasons)
        , traceMeta   = Just traceMeta_
        , deonticContract = deonticContract_
        }
@@ -809,6 +838,67 @@ buildExport mayRefuse infoMap declares fnReturnTypes unannotatedFns ef =
 -- | Why an export from which evaluation may reach a REFUSE is unsupported.
 refuseUnsupportedReason :: Text
 refuseUnsupportedReason = "REFUSE is not supported by the WASM backend"
+
+-- | Why an export with an EITHER in an input or its result is unsupported.
+eitherUnsupportedReason :: Text
+eitherUnsupportedReason = "EITHER in an input or the result is not supported by the WASM backend"
+
+-- | Why an export with a constructor that carries data in an input or the
+-- result is unsupported.
+taggedUnsupportedReason :: Text
+taggedUnsupportedReason = "a constructor that carries data, in an input or the result, is not supported by the WASM backend"
+
+-- | Why an export with a type whose only constructor is named like it and
+-- carries fields, in an input or the result, is unsupported.
+recordLikeUnsupportedReason :: Text
+recordLikeUnsupportedReason = "a type whose only constructor is named like it and carries fields, read as a record, in an input or the result, is not supported by the WASM backend"
+
+-- | A type whose only constructor is named like it and carries fields
+-- ('recordLikeConstructor'), given the type's name as the declarations are
+-- keyed by it.
+isRecordLikeDecl :: Text -> TypeDecl Resolved -> Bool
+isRecordLikeDecl typeName decl = isJust (recordLikeConstructor typeName decl)
+
+-- | A type declared with a constructor that carries fields.
+isTaggedDecl :: TypeDecl Resolved -> Bool
+isTaggedDecl = \case
+  EnumDecl _ cons -> any (\(MkConDecl _ _ fs) -> not (null fs)) cons
+  _ -> False
+
+-- | Does an input or the result of this export hold an EITHER, at any depth:
+-- in a LIST, a MAYBE, a type's argument, a record's field, a constructor's
+-- field, or behind a synonym? A declared type is looked at once, so a record
+-- that contains itself ends the walk.
+signatureHasEither :: Map Text (Declare Resolved) -> ExportedFunction -> Bool
+signatureHasEither = signatureHasType (\name -> getUnique name == eitherUnique) (\_ _ -> False)
+
+-- | Does an input or the result of this export reach a declared type of which
+-- this is true, at any depth, as 'signatureHasEither' walks?
+signatureHas :: (Text -> TypeDecl Resolved -> Bool) -> Map Text (Declare Resolved) -> ExportedFunction -> Bool
+signatureHas = signatureHasType (const False)
+
+-- | The walk of 'signatureHasEither' and 'signatureHas': a built-in type by
+-- its name, a declared type by its name and its declaration.
+signatureHasType :: (Resolved -> Bool) -> (Text -> TypeDecl Resolved -> Bool) -> Map Text (Declare Resolved) -> ExportedFunction -> Bool
+signatureHasType builtin declared declares ef =
+  any (go Set.empty) (mapMaybe (.paramType) ef.exportParams <> maybeToList ef.exportReturnType)
+  where
+    go :: Set.Set Text -> Type' Resolved -> Bool
+    go seen = \case
+      TyApp _ name args
+        | builtin name -> True
+        | any (go seen) args -> True
+        | otherwise ->
+            let nameText = rawNameToText (rawName (getActual name))
+            in not (Set.member nameText seen) && case Map.lookup nameText declares of
+                 Just (MkDeclare _ _ _ decl) -> declared nameText decl || inDecl (Set.insert nameText seen) decl
+                 Nothing -> False
+      Forall _ _ inner -> go seen inner
+      _ -> False
+    inDecl seen = \case
+      RecordDecl _ _ fields -> or [ go seen t | MkTypedName _ _ t _ <- fields ]
+      EnumDecl _ cons -> or [ go seen t | MkConDecl _ _ fs <- cons, MkTypedName _ _ t _ <- fs ]
+      SynonymDecl _ body -> go seen body
 
 -- | M6: walk a 'Decide' body to extract a 'DeonticContract' tree.
 -- The body is a 'Regulative' wrapping a 'Deonton' record; the
@@ -1748,7 +1838,10 @@ paramToParameter :: Map Text (Declare Resolved) -> ExportedParam -> Parameter
 paramToParameter declares p =
   let base = case p.paramType of
         Nothing -> emptyParam "object"
-        Just ty -> typeToParameter declares Set.empty ty
+        -- The pipeline refuses an input the export check refuses
+        -- ('L4.MLIR.Pipeline.typecheckL4File'), so every input here has a shape.
+        Just ty -> either (const uncheckedParameter) id
+          (typeToParameter (shapeEnvFromDeclares (Map.elems declares) Map.empty) ty)
   in base
        { parameterAlias       = Nothing
        , parameterDescription = maybe "" Text.strip p.paramDescription
@@ -1766,6 +1859,7 @@ emptyParam t = Parameter
   , parameterItems         = Nothing
   , parameterRequired      = Nothing
   , parameterL4Type        = Nothing
+  , parameterOneOf         = Nothing
   }
 
 
@@ -1773,10 +1867,10 @@ emptyParam t = Parameter
 -- DEONTIC parameter injection — mirrors jl4-service/src/Compiler.hs
 -- ---------------------------------------------------------------------------
 
--- | Is this a DEONTIC (contract) return type?
+-- | Is this a DEONTIC (contract) return type? The same test as the export
+-- check's and the service's ('isContractResult').
 isDeonticType :: Type' Resolved -> Bool
-isDeonticType (TyApp _ name [_, _]) = getUnique name == contractUnique
-isDeonticType _ = False
+isDeonticType = isContractResult
 
 -- | For DEONTIC-returning functions, the HTTP API injects two extra
 -- parameters: @startTime@ (number) and @events@ (array of
