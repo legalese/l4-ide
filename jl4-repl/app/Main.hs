@@ -307,14 +307,16 @@ fileImportsHaveErrors st uri = brokenImports st uri >>= \case
       <> " If you have fixed that since, start the REPL again: it does not see a change to a file it has already checked, even on `:reload`."
 
 -- | The same, for a line of the REPL: when the loaded file's own imports are
--- fine, the broken module came in through @:import@.
+-- fine, the broken module came in through @:import@. What @:import@ added is
+-- matched by name, as written after @IMPORT@ without the backticks a name such
+-- as @`my-broken`@ needs.
 lineImportsHaveErrors :: ReplState -> FilePath -> NormalizedUri -> IO Text
 lineImportsHaveErrors st contextFile lineUri = do
   let contextUri = normalizedFilePathToUri (toNormalizedFilePath contextFile)
   [mTc] <- shakeRunDatabase st.ideState.shakeDb [Shake.use Rules.SuccessfulTypeCheck contextUri]
   case mTc of
     Just tc | Rules.evaluable tc -> do
-      added <- map (Text.strip . Text.drop (Text.length "IMPORT ")) <$> readIORef st.imports
+      added <- map (Text.dropAround (== '`') . Text.strip . Text.drop (Text.length "IMPORT ")) <$> readIORef st.imports
       broken <- brokenImports st lineUri
       pure $ case filter ((`elem` added) . fst) broken of
         [] -> importsHaveErrors

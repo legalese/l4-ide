@@ -4901,17 +4901,21 @@ spec bin = do
 
     -- A module that :import added stops every line too, though the loaded
     -- file's own imports are clean, and `l4 check` on the file passes; so the
-    -- REPL says that :import added it, and :reset gets past it.
+    -- REPL says that :import added it, and :reset gets past it. A name that
+    -- needs backticks is named too.
     it "the REPL names a module that :import added and that has errors, and evaluates again after :reset" $ withRepl \repl -> do
-      (_, rs) <- session repl (libAndMain okDir <> [(errDir </> "lib.l4", "broken.l4")])
-        [":import broken", "1 PLUS 1", ":reset", "1 PLUS 1"]
+      (_, rs) <- session repl (libAndMain okDir <> [(errDir </> "lib.l4", "broken.l4"), (errDir </> "lib.l4", "my-broken.l4")])
+        [":import broken", "1 PLUS 1", ":reset", "1 PLUS 1", ":import `my-broken`", "1 PLUS 1"]
+      let refusal name = "`:import` added `" <> name <> "`, which has errors, so nothing is evaluated; `:imports` lists what `:import` added, and `:reset` removes it."
       case rs of
-        [added, refused, reset, again] -> do
+        [added, refused, reset, again, addedQuoted, refusedQuoted] -> do
           added `shouldBe` "Added: IMPORT broken"
-          refused `shouldBe` "`:import` added `broken`, which has errors, so nothing is evaluated; `:imports` lists what `:import` added, and `:reset` removes it."
+          refused `shouldBe` refusal "broken"
           reset `shouldSatisfy` T.isPrefixOf "REPL reset."
           again `shouldBe` "2"
-        _ -> expectationFailure ("four replies were expected, not " <> show rs)
+          addedQuoted `shouldBe` "Added: IMPORT `my-broken`"
+          refusedQuoted `shouldBe` refusal "my-broken"
+        _ -> expectationFailure ("six replies were expected, not " <> show rs)
 
     -- A file that imports a ring of imports without being in it is checked
     -- without the ring, and was evaluated; it is not now. A file on the ring
