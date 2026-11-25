@@ -149,11 +149,13 @@ propositionalBound =
     , "  BOOLEAN is not analysed, and is reported as skipped rather than as"
     , "  clean."
     , ""
-    , "  A DECIDE whose body is the literal TRUE or FALSE, as written, is a"
-    , "  CONSTANT: it is listed as one and counted (summary.constants), and"
-    , "  nothing in it is checked, so a FALSE one is not reported as unsat."
-    , "  A body that is FALSE without being the literal -- `FALSE OR FALSE',"
-    , "  or a call read through to a constant -- is analysed as usual."
+    , "  A DECIDE whose body is the literal TRUE or FALSE, as written, with no"
+    , "  WHERE or LET, is a CONSTANT: it is listed as one and counted"
+    , "  (summary.constants), and nothing in it is checked, so a FALSE one is"
+    , "  not reported as unsat. A body that is FALSE without being the"
+    , "  literal -- `FALSE OR FALSE', a call read through to a constant, or"
+    , "  a FALSE with a WHERE or LET, even one it does not use -- is analysed"
+    , "  as usual."
     , ""
     , "  A local WHERE / LET binding is substituted into the rule before"
     , "  analysis, with arguments put in place of parameters, so"
@@ -533,6 +535,10 @@ decideName (MkDecide _ _ (MkAppForm _ n _ _) _) = prettyLayout (getOriginal n)
 -- literal itself. Not "no atoms": inert prose lowers to a constant too
 -- ('interesting'), and a body that is FALSE without being the literal
 -- (@FALSE OR FALSE@, or a call read through to a constant) keeps its finding.
+-- So does a literal with a WHERE or a LET, even one it does not use: the body
+-- is then a 'Where' or a 'LetIn' around the literal, which 'GR.literalBool'
+-- does not look inside. Brackets around the literal leave no node, so
+-- @DECIDE x IF (FALSE)@ is a constant.
 --
 -- Listed as analysed, with no findings, counted in @summary.constants@ and
 -- marked @"constant": "TRUE"@ or @"FALSE"@ in the JSON, and "a constant: its

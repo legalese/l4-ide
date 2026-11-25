@@ -116,6 +116,7 @@ A rule whose whole body is `FALSE` or `TRUE` is often deliberate: an encoding re
 `l4 verify` lists such a rule as a **constant** and checks nothing in it, so `DECIDE x IF FALSE` is not reported as a requirement nobody can meet.
 In the JSON report such a rule's entry has a `constant` key, `"TRUE"` or `"FALSE"`, and `summary.constants` counts them.
 Only the bare word counts: a rule that is false for some other reason, such as one that asks for a constant `FALSE` rule and something else, is still reported.
+So is a bare word with a `WHERE` or a `LET`, even one it does not use: `DECIDE x IF FALSE WHERE z MEANS TRUE` is reported as a requirement nobody can meet.
 A finding on a rule that reads through a constant names the constant when it is inside the reported condition and has the finding’s sign: a `FALSE` one for a finding that something can never hold, a `TRUE` one for a finding that something always holds, each the other way round under a `NOT` or in the scope of an `IMPLIES`.
 It says “which is the constant `FALSE`” when the rule called is itself listed as a constant, and “whose meaning is `FALSE`” when that rule comes out `FALSE` only once it is read through.
 
