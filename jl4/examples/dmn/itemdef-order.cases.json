@@ -1,0 +1,40 @@
+{
+  "note": [
+    "Engine cases for itemdef-order.l4 (smucclaw/l4-ide#1101). The values are",
+    "what `l4 run` prints for the #EVAL lines of that file. What this file",
+    "really asks is whether each engine LOADS the model: before #1101 KIE",
+    "reported TYPE_DEF_NOT_FOUND for `kind_of_group` and `grade_optional` and",
+    "built nothing, so no case ran. Case B supplies a present `grade` and case",
+    "A an absent one, so both the enum hop and the `_optional` alias are read."
+  ],
+  "cases": [
+    {
+      "name": "A. whole class, no grade",
+      "context": {
+        "g": {
+          "kind": "whole class",
+          "leader": { "age": 9, "grade": null, "buddy": null },
+          "pupils": 30
+        },
+        "c": { "founder": null, "fee": 20 }
+      },
+      "expect": { "allowance_for": 10, "leader_age": 9, "fee_with_levy": 22 }
+    },
+    {
+      "name": "B. crafts group, senior leader with a buddy, club with a founder",
+      "context": {
+        "g": {
+          "kind": "crafts group",
+          "leader": {
+            "age": 11,
+            "grade": "senior",
+            "buddy": { "age": 10, "grade": "junior", "buddy": null }
+          },
+          "pupils": 8
+        },
+        "c": { "founder": { "club": null, "years": 3 }, "fee": 20 }
+      },
+      "expect": { "allowance_for": 5, "leader_age": 11, "fee_with_levy": 22 }
+    }
+  ]
+}

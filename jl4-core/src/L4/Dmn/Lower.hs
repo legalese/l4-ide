@@ -4117,6 +4117,8 @@ lowerModule opts modul@(MkModule _ uri _) =
   ------------------------------------------------------------------------
 
   -- Every module-local DECLARE that has an itemDefinition, in source order.
+  -- (Source order is the order they are minted in and names are uniquified in;
+  -- the emitted order is the dependency order of 'itemDefs', #1101.)
   --
   -- __Referenced or not.__ Reachability-gating would make the artifact depend
   -- on which decisions happened to survive lowering -- a moving target that
@@ -4259,8 +4261,16 @@ lowerModule opts modul@(MkModule _ uri _) =
   -- so one with no referrer is noise in an artifact whose whole claim is that
   -- every line in it means something. The gate is the emitted 'DmnType's, not
   -- the L4, so what is minted and what is pointed at cannot disagree.
+  --
+  -- __That is the order they are minted in, not the order they are emitted
+  -- in__ (smucclaw/l4-ide#1101). KIE resolves a component's typeRef to an
+  -- enum or an alias only when the definition comes earlier in the document,
+  -- and both an enum declared after the record that uses it and every alias
+  -- (appended here after all the bases) would come later, so the list is put
+  -- in dependency order, keeping this order wherever nothing forces otherwise
+  -- ('itemDefsInDependencyOrder', which records what was measured).
   itemDefs :: [ItemDefinition]
-  itemDefs = baseItemDefs <> aliasItemDefs <> hydratedItemDefs
+  itemDefs = itemDefsInDependencyOrder (baseItemDefs <> aliasItemDefs <> hydratedItemDefs)
 
   -- §4.4. The stored components verbatim -- same names, same typeRefs, so a
   -- reader can diff the two definitions and see exactly what hydration added --

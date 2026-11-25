@@ -1070,18 +1070,18 @@ spec bin = do
           out `shouldSatisfy` ("decision_stated_term_literal" `isInfixOf`)
           out `shouldSatisfy` ("Unknown variable 'disposal.term_in_years'" `isInfixOf`)
           out `shouldSatisfy` ("<<< FAILED" `isInfixOf`)
-          -- A SECOND, independent error, measured 2026-07-31 and recorded here
-          -- rather than tidied away: KIE resolves itemDefinition typeRefs in
-          -- DOCUMENT ORDER, and `itemdef_claim`'s `assessed grade` component
-          -- points at `Grade_optional`, which this emitter appends AFTER the
-          -- definitions that reference it. Pre-existing (HEAD's sumtype.dmn has
-          -- the same ordering) and previously unmeasured, because no engine had
-          -- ever looked at this file. It is confined to the `_optional` alias
-          -- machinery and `sumtype.dmn` is the only DMN golden that uses it, so
-          -- it changes no MustPass leg -- but it is a real portability defect
-          -- and pinning it here is what stops it being lost. See §11-R8-a.
-          out `shouldSatisfy` ("TYPE_DEF_NOT_FOUND" `isInfixOf`)
-          out `shouldSatisfy` ("Grade_optional" `isInfixOf`)
+          -- A SECOND, independent error was measured here on 2026-07-31 and
+          -- pinned until it was fixed: KIE resolves an itemDefinition typeRef
+          -- to an alias only when the alias comes EARLIER in the document, and
+          -- `itemdef_claim`'s `assessed grade` component points at
+          -- `Grade_optional`, which the emitter used to append after every base
+          -- definition. FIXED 2026-11-25 (smucclaw/l4-ide#1101): definitions
+          -- are now emitted in dependency order, and this leg asserts the
+          -- error is GONE, so the refusal above is the only thing KIE rejects.
+          -- The exhibit that pins the order on both engines as a MustPass is
+          -- `itemdef-order`, through its engine baseline.
+          out `shouldSatisfy` (not . ("TYPE_DEF_NOT_FOUND" `isInfixOf`))
+          out `shouldSatisfy` (not . ("Grade_optional" `isInfixOf`))
 
   -- Tier 1 of the Phase 5 evidence: the 23 hand-written BKM/service probes,
   -- exactly per DMN-PHASE5-BUILD-PLAN.md §1's matrix. See 'bkmProbeMatrix'

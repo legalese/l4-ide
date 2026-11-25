@@ -1,0 +1,11 @@
+# Expected external-engine verdicts for the itemDefinition-order exhibit
+# (itemdef-order.l4, smucclaw/l4-ide#1101). Same format and contract as
+# regcf-corpus.engine-baseline.txt: one line per engine, matched as a FIXED
+# SUBSTRING by the dmn-engines job of .github/workflows/pr-checks.yml.
+#
+# Measured 2026-11-25. The KIE line is the point of the file: before #1101
+# the exporter wrote itemDefinitions in DECLARE order, and KIE answered
+# "0 case(s), 4 error(s)" (TYPE_DEF_NOT_FOUND for kind_of_group and
+# grade_optional) on this module while Camunda answered 6/6.
+KIE 8.44.0.Final VERDICT: 1 file(s), 2 case(s), 0 error(s), 0 warning(s), 6/6 decision(s) SUCCEEDED, 6/6 value(s) as expected
+Camunda 8.7.6 (zeebe-dmn) VERDICT: 1 file(s), 2 case(s), 1 parsed, 0 error(s), 6/6 decision(s) evaluated, 6/6 value(s) as expected

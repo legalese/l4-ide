@@ -3840,6 +3840,84 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
         LogicTable _   -> expectationFailure "expected a boxed literal for `excluded`"
         LogicContext _ -> expectationFailure "expected a boxed literal for `excluded`"
 
+  -- smucclaw/l4-ide#1101. KIE resolves a typeRef to an enum or an alias only
+  -- when that definition comes earlier in the document (TYPE_DEF_NOT_FOUND
+  -- otherwise), so the engine-relevant property is: no definition names a
+  -- definition that comes after it, except inside a cycle of records, which
+  -- KIE accepts in either order (measured 2026-11-25; see
+  -- 'itemDefsInDependencyOrder').
+  describe "itemDefinition order (#1101)" $ do
+    let defNamed n comps base vals =
+          MkItemDefinition ("itemdef_" <> n) n n base vals
+            [MkItemComponent (n <> "_c" <> Text.pack (show i)) c c t | (i, (c, t)) <- zip [1 :: Int ..] comps]
+        record n comps = defNamed n comps Nothing Nothing
+        enum n = defNamed n [] (Just DmnString) (Just ["a", "b"])
+        alias n = defNamed n [] (Just DmnString) Nothing
+        named n = DmnNamed n DmnString
+        -- the names a definition refers to that come LATER in the list
+        forwardRefs defs =
+          [ (d.idfName, r)
+          | (i, d) <- zip [0 :: Int ..] defs
+          , DmnNamed r _ <- maybeToList d.idfBase <> map (.icmType) d.idfComponents
+          , Just j <- [lookup r (zip (map (.idfName) defs) [0 ..])]
+          , j > i
+          ]
+        order = map (.idfName) . itemDefsInDependencyOrder
+
+    it "moves an enum and an alias up to the first record that names them, and nothing else" $ do
+      let defs =
+            [ record "group" [("kind", named "kind"), ("leader", named "pupil")]
+            , record "pupil" [("grade", named "grade_optional"), ("buddy", named "pupil")]
+            , record "club" [("founder", named "member")]
+            , record "member" [("club", named "club")]
+            , enum "kind"
+            , enum "grade"
+            , alias "grade_optional"
+            ]
+      order defs
+        `shouldBe` ["grade_optional", "pupil", "kind", "group", "club", "member", "grade"]
+
+    it "leaves a list already in dependency order unchanged" $ do
+      let defs =
+            [ enum "kind"
+            , record "pupil" [("age", DmnNumber)]
+            , record "group" [("kind", named "kind"), ("leader", named "pupil")]
+            , enum "unused"
+            ]
+      order defs `shouldBe` map (.idfName) defs
+
+    it "keeps a cycle in the order given, without pulling its later member up" $ do
+      -- `club` and `member` refer to each other, and `fee` sits between
+      -- them: nothing forces `member` up past it.
+      let defs =
+            [ record "club" [("founder", named "member")]
+            , record "fee" [("amount", DmnNumber)]
+            , record "member" [("club", named "club")]
+            ]
+      order defs `shouldBe` ["club", "fee", "member"]
+
+    it "emits no forward reference outside a cycle in any golden subject" $
+      forM_ goldenSubjects \(srcPath, _, _) -> do
+        src <- Text.readFile (examplesRoot </> srcPath)
+        let defs = (drgAsCli srcPath src).drgItemDefs
+            isRecordCycle (a, b) = (b, a) `elem` reachable || a == b
+            reachable =
+              [ (d.idfName, r)
+              | d <- defs, DmnNamed r _ <- map (.icmType) d.idfComponents ]
+            bad = filter (not . isRecordCycle) (forwardRefs defs)
+        -- 'reachable' is one hop, which is all the corpus's cycles need; a
+        -- longer cycle would show up here as a false alarm, never a miss.
+        bad `shouldBe` []
+
+    it "the exhibit's enum and alias come before the records that name them" $ do
+      src <- Text.readFile (examplesRoot </> "dmn" </> "itemdef-order.l4")
+      let names = map (.idfName) (drgAsCli "itemdef-order.l4" src).drgItemDefs
+          pos n = lookup n (zip names [0 :: Int ..])
+      pos "kind_of_group" `shouldSatisfy` (< pos "group")
+      pos "grade_optional" `shouldSatisfy` (< pos "pupil")
+      -- and the mutually recursive pair keeps its source order
+      pos "crafts_club" `shouldSatisfy` (< pos "club_member")
+
   describe "golden" $ forM_ goldenSubjects \(srcPath, stem, label) -> do
     it (label <> ", as DMN 1.3 XML") $
       goldenOf examplesRoot srcPath (stem <> ".dmn") emitDrg
@@ -4234,6 +4312,14 @@ goldenSubjects =
   , ( "dmn" </> "refuse.l4"
     , "refuse"
     , "the refusal exhibit"
+    )
+    -- The ITEMDEFINITION-ORDER exhibit (smucclaw/l4-ide#1101): every type is
+    -- declared after a type that uses it, and the self- and mutually
+    -- recursive records are there to show a cycle keeps its source order.
+    -- Engine-checked in CI through its `.engine-baseline.txt`.
+  , ( "dmn" </> "itemdef-order.l4"
+    , "itemdef-order"
+    , "the itemDefinition-order exhibit"
     )
   ]
 

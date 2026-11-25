@@ -1,0 +1,13 @@
+fidelity report — dmnmd
+  [D-MD-NODRG] blocking — definitions_itemdef_order
+      dmnmd is a table format, not a graph: the 3 information requirement(s) between these decisions have no markdown form
+      lost: the decision requirements graph; which decision feeds which is invisible
+  [D-MD-NONIDENTCOLUMN] blocking — decision_allowance_for
+      `g.kind` is an input EXPRESSION; a dmnmd column header is a variable name (letter, then alphanumerics/spaces/underscores), so this table is omitted
+      lost: the whole table
+  [D-MD-NOLITERAL] blocking — decision_leader_age
+      `leader age` is a formula (g.leader.age), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown
+  [D-MD-NOLITERAL] blocking — decision_fee_with_levy
+      `fee with levy` is a formula (c.fee + 2), and dmnmd has no boxed-expression form: a named quantity defined by one expression, rather than a decision over cases, cannot be written as a table
+      lost: the decision itself; it is omitted from the markdown

@@ -96,6 +96,11 @@ No decisions to export: every decision in this module was left out of the DMN mo
 `--include-tests` is offered only for the scaffolding; it does not bring back the other two kinds.
 A file with no `DECIDE` or `MEANS` at all gets a one-line refusal saying so.
 
+**Types.** Each record (`DECLARE … HAS`) and each `IS ONE OF` becomes a DMN `<itemDefinition>`.
+L4 lets you use a type before you declare it, but KIE does not load a model in which a record's field points at an `IS ONE OF` written further down the file (it reports `TYPE_DEF_NOT_FOUND`), so the export writes every type before the types that use it, and keeps your order everywhere else.
+A record that refers to itself, or two records that refer to each other, is written in your order: KIE 8.44 and Camunda 8.7.6 both load and run such a model, measured on `jl4/examples/dmn/itemdef-order.l4`.
+No other engine has been checked.
+
 ## What doesn't survive
 
 Both emit a **fidelity report**, and reading it is not optional. `Blocking` notes here usually

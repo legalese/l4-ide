@@ -1,0 +1,75 @@
+-- The ITEMDEFINITION-ORDER exhibit for the DMN exporter (smucclaw/l4-ide#1101).
+--
+-- L4 does not require a type to be declared before it is used, and DMN's XSD
+-- puts no order on `itemDefinition*`, but KIE 8.44.0.Final resolves a record
+-- component's typeRef to a SIMPLE definition (an enum's string domain, or a
+-- `_optional` alias) only when that definition comes EARLIER in the document.
+-- Before #1101 the exporter wrote the definitions in DECLARE order, so a
+-- record whose field is typed by an enum declared further down made KIE report
+-- TYPE_DEF_NOT_FOUND and build nothing, while the fidelity report said nothing
+-- was lost. Every type below is declared AFTER a type that uses it, and the
+-- emitted file must still load on both engines.
+--
+-- What each part is for:
+--
+--   * `group` -> `kind of group`   the issue's case: a record field typed by an
+--                                  enum declared later. The enum must move up.
+--   * `group` -> `pupil`           a record field typed by a record declared
+--                                  later. KIE accepts this order (measured
+--                                  2026-11-25), so it is here to show the move
+--                                  is harmless, not that it is needed.
+--   * `pupil` -> `grade`           a MAYBE of an enum declared later: the field
+--                                  points at the domain-free alias
+--                                  `grade_optional`, which the exporter appends
+--                                  after every base definition, so it must move
+--                                  up too (the alias half of the same defect,
+--                                  first measured on sumtype.dmn on 2026-07-31).
+--   * `pupil` <-> `pupil`          a record that refers to itself through a
+--                                  MAYBE, and
+--   * `crafts club` <-> `club member`  two records that refer to each other.
+--                                  A cycle has no dependency order; KIE and
+--                                  Camunda both load either order (measured
+--                                  2026-11-25), and the exporter keeps the
+--                                  source order inside a cycle.
+--
+-- Cases: itemdef-order.cases.json, expected values from `l4 run` on this file.
+
+DECLARE `group` HAS
+    `kind` IS A `kind of group`
+    `leader` IS A `pupil`
+    `pupils` IS A NUMBER
+
+DECLARE `pupil` HAS
+    `age` IS A NUMBER
+    `grade` IS A MAYBE `grade`
+    `buddy` IS A MAYBE `pupil`
+
+DECLARE `crafts club` HAS
+    `founder` IS A MAYBE `club member`
+    `fee` IS A NUMBER
+
+DECLARE `club member` HAS
+    `club` IS A MAYBE `crafts club`
+    `years` IS A NUMBER
+
+DECLARE `kind of group` IS ONE OF `whole class`, `crafts group`
+
+DECLARE `grade` IS ONE OF `junior`, `senior`
+
+GIVEN g IS A `group`
+GIVETH A NUMBER
+DECIDE `allowance for` g IS
+    IF g's `kind` EQUALS `whole class` THEN 10 ELSE 5
+
+GIVEN g IS A `group`
+GIVETH A NUMBER
+DECIDE `leader age` g IS g's `leader`'s `age`
+
+GIVEN c IS A `crafts club`
+GIVETH A NUMBER
+DECIDE `fee with levy` c IS c's `fee` PLUS 2
+
+#EVAL `allowance for` (`group` `whole class` (`pupil` 9 NOTHING NOTHING) 30)
+#EVAL `allowance for` (`group` `crafts group` (`pupil` 11 (JUST `senior`) NOTHING) 8)
+#EVAL `leader age` (`group` `crafts group` (`pupil` 11 (JUST `senior`) NOTHING) 8)
+#EVAL `fee with levy` (`crafts club` NOTHING 20)

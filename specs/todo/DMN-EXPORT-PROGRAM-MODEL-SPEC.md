@@ -3856,8 +3856,9 @@ cast to BusinessKnowledgeModel` inside `parse()` and rejects the entire DRG**, i
 
     > **Carve-out, AMENDED 2026-07-30 under review — when τ carries `allowedValues`, the element
     > points at a minted domain-free alias `<τ>_optional` instead.** Same base `typeRef`
-    > (`<typeRef>string</typeRef>`), **no** `allowedValues`, minted at most once per module, emitted
-    > after the base definitions, and **only where an element actually points at it**. τ with no
+    > (`<typeRef>string</typeRef>`), **no** `allowedValues`, minted at most once per module, minted
+    > after the base definitions (emitted before the first one that names it since 2026-11-25,
+    > smucclaw/l4-ide#1101; see the [D] note below), and **only where an element actually points at it**. τ with no
     > domain-carrying `itemDefinition` — a record, a builtin, a `LIST OF` — keeps the lowering above
     > unchanged, because it asserts no range for the hop to re-assert.
     >
@@ -3900,6 +3901,22 @@ cast to BusinessKnowledgeModel` inside `parse()` and rejects the entire DRG**, i
     > `sumtype` MustFail leg asserts `TYPE_DEF_NOT_FOUND` and `Grade_optional` by name, so the day
     > it is fixed the leg goes red and this paragraph gets read. The carve-out's own text above
     > ("emitted after the base definitions") is the sentence to change.
+    >
+    > **FIXED 2026-11-25 (smucclaw/l4-ide#1101), and wider than this note knew.** The same KIE
+    > behaviour refuses a record whose field is typed by an `IS ONE OF` declared later in the
+    > module, with no alias involved, so the repair is not "aliases first" but dependency order:
+    > `itemDefsInDependencyOrder` (`jl4-core/src/L4/Dmn/IR.hs`) puts every definition before any
+    > that names it and keeps the minted order (bases in source order, then aliases, then hydrated
+    > records) wherever nothing forces otherwise. References inside a cycle of records impose no
+    > order: measured the same day, KIE 8.44.0.Final and Camunda 8.7.6 both load and run a record
+    > that refers to itself through a `MAYBE`, two records that refer to each other (in either
+    > order), and a record whose field is a record declared later. Of the goldens only `sumtype.dmn`
+    > moved (`Grade_optional` now sits before `Claim`); KIE's errors on it went from 4 to 2, the
+    > remaining one being the `ERR_COMPILING_FEEL` this exhibit exists for, and the MustFail leg now
+    > asserts `TYPE_DEF_NOT_FOUND` is absent. The new `itemdef-order` golden, with an engine
+    > baseline, is the MustPass that keeps it fixed (KIE before the fix: `0 case(s), 4 error(s)`;
+    > after: `6/6 value(s) as expected` on both engines). Choosing dependency order over the
+    > narrower "aliases first" is decided by Claude 2026-11-25, pending Meng's review.
 
     > The residue is recorded on the note: at an aliased site an engine no longer validates the
     > values that _are_ present, so a string outside τ's constructors passes where at a non-`MAYBE`

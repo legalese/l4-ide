@@ -47,6 +47,7 @@ module L4.Dmn.IR
   , dmnTypeBase
     -- * The data model
   , ItemDefinition (..)
+  , itemDefsInDependencyOrder
   , ItemComponent (..)
     -- * FEEL surface syntax
   , renderUnaryTest
@@ -101,6 +102,7 @@ module L4.Dmn.IR
 import Base
 import qualified Base.Text as Text
 import qualified Data.Graph as Graph
+import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import Data.Char (isAlphaNum, isAscii, isDigit)
 import Data.Ratio (denominator, numerator)
@@ -205,6 +207,68 @@ data ItemDefinition = MkItemDefinition
   , idfComponents :: ![ItemComponent]
   }
   deriving stock (Eq, Show, Generic)
+
+-- | The order to emit @\<itemDefinition\>@s in: every definition before any
+-- definition whose @\<typeRef\>@s refer to it, and otherwise the order given
+-- (smucclaw/l4-ide#1101).
+--
+-- __Why an order at all.__ The DMN XSD puts no order on @itemDefinition*@, but
+-- KIE 8.44.0.Final resolves a component's @typeRef@ to a SIMPLE definition (an
+-- enum's string domain, or a @_optional@ alias) only when that definition comes
+-- earlier in the document: a record whose field is typed by an enum declared
+-- further down fails with @TYPE_DEF_NOT_FOUND@ and KIE builds nothing, while
+-- Camunda 8.7.6 loads the same file. L4 does not require a type to be declared
+-- before it is used, so source order is not a safe emission order.
+--
+-- __What KIE does accept, measured 2026-11-25 on both engines__: a record whose
+-- field refers forward to another RECORD (@fwdrecord@), a record that refers to
+-- itself through a @MAYBE@ (@selfref@), and two records that refer to each
+-- other, written in either order (@mutual@, @mutual-rev@); each answered 2/2 or
+-- 1/1 on KIE and Camunda. A cycle can only pass through records, since an enum
+-- or an alias has no components, so a reference INSIDE a cycle (a record's to
+-- itself, or between the records of one cycle) imposes no order and is
+-- ignored: no order of a cycle puts every member first, and none is needed.
+--
+-- __The order given is kept wherever nothing forces otherwise__, so a file that
+-- was already in dependency order comes out byte-identical. That is why this
+-- is a depth-first walk in the order given, which before emitting a definition
+-- emits any definition it refers to that is not out yet, rather than any
+-- topological sort: 'Data.Graph.stronglyConnComp' is used only to tell which
+-- references lie inside a cycle, never for the order, because it promises
+-- none for definitions with no edge between them (the same lesson as the
+-- computed-field walk of spec §4.4.2).
+itemDefsInDependencyOrder :: [ItemDefinition] -> [ItemDefinition]
+itemDefsInDependencyOrder defs =
+  [d | i <- reverse (snd (foldl' visit (Set.empty, []) (Map.keys byIndex))), Just d <- [Map.lookup i byIndex]]
+ where
+  byIndex = Map.fromList (zip [0 :: Int ..] defs)
+  indexOfName = Map.fromList [(d.idfName, i) | (i, d) <- Map.toList byIndex]
+  -- The definitions this one names in a typeRef: its base, then its
+  -- components'. A builtin, or a name no definition here carries, is no edge.
+  refsOf d =
+    nubOrd
+      [ j
+      | DmnNamed nm _ <- maybeToList d.idfBase <> map (.icmType) d.idfComponents
+      , Just j <- [Map.lookup nm indexOfName]
+      ]
+  refs = Map.map refsOf byIndex
+  cycleOf =
+    Map.fromList
+      [ (i, k)
+      | (k, c) <- zip [0 :: Int ..] (Graph.stronglyConnComp [(i, i, js) | (i, js) <- Map.toList refs])
+      , i <- Graph.flattenSCC c
+      ]
+  -- What must be out before i: what it names outside its own cycle, in the
+  -- order given.
+  before i =
+    sort [j | j <- Map.findWithDefault [] i refs, Map.lookup j cycleOf /= Map.lookup i cycleOf]
+  -- The accumulator is the emission in reverse. Marking a definition before
+  -- walking what it needs would also stop a cycle, but 'before' has none.
+  visit (seen, acc) i
+    | Set.member i seen = (seen, acc)
+    | otherwise =
+        let (seen', acc') = foldl' visit (Set.insert i seen, acc) (before i)
+        in (seen', i : acc')
 
 -- | A /constant/ FEEL value: the only thing this exporter will ever put on the
 -- endpoint of a 'UnaryTest'.
@@ -999,15 +1063,20 @@ data Drg = MkDrg
     -- 'L4.Dmn.Markdown.markdownReport' all stay one-argument functions over one
     -- IR, and so that the fidelity report can name the artifact it describes.
   , drgItemDefs  :: ![ItemDefinition]
-    -- ^ one per module-local record and @IS ONE OF@, in source order, referenced
-    -- or not. Reachability-gating would make the artifact depend on which
-    -- decisions happened to survive lowering — a moving target — and an
-    -- unreferenced itemDefinition is inert. They are the __first children__ of
+    -- ^ one per module-local record and @IS ONE OF@, referenced or not.
+    -- Reachability-gating would make the artifact depend on which decisions
+    -- happened to survive lowering — a moving target — and an unreferenced
+    -- itemDefinition is inert. They are the __first children__ of
     -- @\<definitions\>@ (§4.3).
     --
-    -- The __domain-free aliases__ follow them, and those /are/ gated on being
+    -- The __domain-free aliases__ join them, and those /are/ gated on being
     -- pointed at: an alias exists only to be some @MAYBE@ site's @typeRef@, so
     -- unlike a base definition one with no referrer says nothing.
+    --
+    -- __In dependency order__, not source order, since smucclaw/l4-ide#1101:
+    -- each definition before any that refers to it, and source order (bases,
+    -- then aliases, then hydrated records) wherever nothing forces otherwise.
+    -- 'itemDefsInDependencyOrder' says why KIE needs it.
   , drgNodes     :: ![DrgNode]
   , drgNotes     :: ![FidelityNote]  -- ^ module-level notes; per-table ones live on the table
   , drgOmitted   :: ![(Text, DropReason)]
