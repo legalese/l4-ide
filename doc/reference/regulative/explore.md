@@ -143,6 +143,8 @@ Two positions are **the same state** when four things agree:
    A cell nothing reads is dropped from the state and named on the coverage line.
 3. **The answer of any rule with no inputs that reads a ledger**, if it has been asked.
    L4 keeps such a rule's first answer, so it is part of where the run stands.
+   A rule counts however it reaches the `RECALL`: itself, or by calling a rule that does, with its inputs in order, with `WITH`, as a genitive (``Bob's `taken by` ``), or through another rule that does any of these.
+   Before review of smucclaw/l4-ide#1107 only the first two spellings counted, and on `unstable` they still do: a constant that called its reader with `WITH`, as a genitive or through such a wrapper was left out, so two positions that differed only in its kept answer were merged, and the graph gave one of them the other's acts with nothing on the coverage line to say so (`jl4/tests-cli/fixtures/explore-kept-answers/`: 4 states where there are 5, and after `go skip` a `buy` the run passes over, measured 2026-11-25).
 4. **Which of the live deadlines the clock has already passed, and which of the live deadlines and window openings comes first.** The clock itself is not kept (unless you ask for `--grid`, below), and a clock at a deadline is the same state as one before it.
    The order of the deadlines and openings is kept because the printed contract does not always say it: a deadline anchored to another (`WITHIN 3 OF THE DEADLINE`) prints the same wherever it falls.
 

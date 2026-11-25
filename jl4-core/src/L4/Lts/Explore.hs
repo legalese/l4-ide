@@ -288,7 +288,7 @@ readSitesOf :: Module Resolved -> [Module Resolved] -> ReadSites
 readSitesOf main imported = MkReadSites
   { rsCells = Map.fromListWith (||)
       [ (s, mode == RecallAll) | ReadCell _ _ _ mode (Lit _ (StringLit _ s)) <- everyExpr ]
-  , rsTimeScoped = any timeScoped everyExpr
+  , rsTimeScoped = any scoped (concatMap (Optics.toListOf (Optics.gplate @Resolved)) (main : imported))
   , rsLedgerCafs = Map.fromList
       [ (u, nameToText n)
       | (Def u n, [], _) <- topDecides
@@ -296,23 +296,21 @@ readSitesOf main imported = MkReadSites
   }
   where
     everyExpr = concatMap exprsOf (main : imported)
-    timeScoped = \ case
-      Var _ r   -> scoped r
-      App _ r _ -> scoped r
-      _         -> False
+    -- every name in the modules, however it is spelt, as 'readers' below
     scoped r = getUnique r `elem` [TypeCheck.evalAsOfSystemTimeUnique, TypeCheck.evalUnderValidTimeUnique]
     MkModule _ _ mainSection = main
     topDecides =
       [ (name, args, body) | MkDecide _ _ (MkAppForm _ name args _) body <- decidesOf mainSection ]
     -- the least set of the module's rules that read a ledger, directly or
-    -- by naming one that does
+    -- by naming one that does, however it is spelt ('namesIn', every name
+    -- at every node). Until review of smucclaw/l4-ide#1107 only variables
+    -- and positional calls counted, on unstable too, so a constant that
+    -- reached a ledger reader through WITH, as a genitive, or through a
+    -- wrapper of either was not keyed, and two positions that differed only
+    -- in its kept answer were one state.
     readers = fixpoint (Set.fromList [ getUnique name | (name, _, body) <- topDecides, readsDirectly body ])
     readsDirectly body = not (null [ () | ReadCell {} <- subExprsOf body ])
-    refsOf body = Set.fromList (concat [ heads e | e <- subExprsOf body ])
-    heads = \ case
-      Var _ r   -> [getUnique r]
-      App _ r _ -> [getUnique r]
-      _         -> []
+    refsOf body = Set.fromList (map getUnique (namesIn body))
     fixpoint s =
       let s' = s <> Set.fromList [ getUnique name | (name, _, body) <- topDecides, not (Set.disjoint (refsOf body) s) ]
       in if s' == s then s else fixpoint s'

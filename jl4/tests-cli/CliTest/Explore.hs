@@ -46,6 +46,11 @@ sections = "tests-cli" </> "fixtures" </> "lts-sections"
 deadlines :: FilePath
 deadlines = "tests-cli" </> "fixtures" </> "explore-deadlines"
 
+-- | Review of smucclaw/l4-ide#1107: the kept answer of a constant that reads
+-- a ledger, called four ways.
+keptAnswers :: FilePath
+keptAnswers = "tests-cli" </> "fixtures" </> "explore-kept-answers"
+
 fixtures :: [FilePath]
 fixtures =
   [ brief </> f | f <- ["d1-naive.l4", "d2-reread.l4", "d3-atomic.l4", "refused-number.l4", "properties.l4"] ]
@@ -53,6 +58,7 @@ fixtures =
   <> [ breached </> f | f <- ["sale.l4", "resell.l4", "continuation.l4"] ]
   <> [ sections </> f | f <- ["sectioned.l4", "two-sections.l4"] ]
   <> [ deadlines </> f | f <- ["shapes.l4", "given.l4", "carried.l4", "armed.l4", "ledger.l4", "called.l4", "section-given.l4", "section-reader.l4", "clock.l4", "locals.l4", "slow.l4", "dated.l4"] ]
+  <> [ keptAnswers </> f | f <- ["positional.l4", "named.l4", "genitive.l4", "wrapper.l4"] ]
 
 -- | The acceptance run of the fixtures' README: the clock bounded at
 -- closing, the cells the properties read kept.
@@ -1015,6 +1021,15 @@ spec bin = describe "l4 explore" $ do
       lout `shouldSatisfy` ("Alice MUST pay \8212 due by 740176 (WITHIN 14 OF `the kickoff`)" `isInfixOf`)
       lout `shouldSatisfy` ("Alice MUST pay \8212 due by 740176 (WITHIN 14 OF (YMD OF 2026, 7, 1))" `isInfixOf`)
       length (filter ("Next deadline: 740176 (Alice: pay)" `isInfixOf`) (lines lout)) `shouldBe` 2
+
+  describe "a silent wrong graph that unstable has too (review of #1107)" $ do
+    forM_ ["positional.l4", "named.l4", "genitive.l4", "wrapper.l4"] \ f ->
+      it (f <> ": a constant that reads a ledger is keyed by its kept answer however it calls the reader") $ do
+        Output code out _ <- runL4 bin ["explore", keptAnswers </> f, "--contract", "start"]
+        code `shouldBe` ExitSuccess
+        out `shouldSatisfy` ("start, explored from its outset at 0: 5 states, 8 transitions" `isInfixOf`)
+        out `shouldSatisfy` ("  s0 -> s2  PARTY Bob DOES go OF skip" `isInfixOf`)
+        out `shouldSatisfy` ("1 act passed over" `isInfixOf`)
   where
     liveness =
       [ "--eventually", "Alice has bought or stopped"
