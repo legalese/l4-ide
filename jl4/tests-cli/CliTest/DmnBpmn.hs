@@ -7,14 +7,16 @@ module CliTest.DmnBpmn (spec, fixtures) where
 import Control.Monad (forM_, unless, when)
 import Data.List (isInfixOf, sort)
 import System.Directory
-  ( createDirectoryIfMissing
+  ( copyFile
+  , createDirectoryIfMissing
   , doesFileExist
   , getTemporaryDirectory
+  , listDirectory
   , removePathForcibly
   )
-import System.Environment (lookupEnv)
+import System.Environment (getEnvironment, lookupEnv)
 import System.Exit (ExitCode(..))
-import System.FilePath ((</>))
+import System.FilePath (takeExtension, (</>))
 import Test.Hspec
 
 import CliTest.Common
@@ -165,6 +167,23 @@ exportImportedPartialFixture = fixtureDir </> "export-imported-partial.l4"
 exportImportedUncheckedFixture :: FilePath
 exportImportedUncheckedFixture = fixtureDir </> "export-imported-unchecked.l4"
 -- Inputs spelled like a FEEL function the export calls.
+-- A prelude.l4 and a daydate.l4 of the author's own, beside the importer,
+-- and the same calls against the real libraries.
+exportShadowPreludeFixture, exportPreludeCallsFixture :: FilePath
+exportShadowPreludeFixture = fixtureDir </> "export-shadow-prelude" </> "uses-shadow.l4"
+exportPreludeCallsFixture  = fixtureDir </> "export-prelude-calls.l4"
+-- What the seven calls in those fixtures become when lowered as the
+-- library's.
+preludeCallForms :: [String]
+preludeCallForms =
+  [ "<text>count(xs)</text>"
+  , "<text>sum(concatenate([0], xs))</text>"
+  , "<text>max(a, b)</text>"
+  , "<text>list contains(xs, x)</text>"
+  , "<text>(every n_elem in xs satisfies n_elem &gt; 0)</text>"
+  , "<text>m != null</text>"
+  , "<text>date(\"2024-01-02\")</text>"
+  ]
 exportShadowedBuiltinsFixture, exportShadowedBuiltinsCases :: FilePath
 exportShadowedBuiltinsFixture = fixtureDir </> "export-shadowed-builtins.l4"
 exportShadowedBuiltinsCases   = fixtureDir </> "export-shadowed-builtins.cases.json"
@@ -668,6 +687,44 @@ spec bin = do
       -- An input spelled like a FEEL function the export calls hides that
       -- function, so it is renamed as a keyword would be; its label keeps
       -- the L4 name.
+      -- Which module is the library is asked of the module, not of its file
+      -- name. JL4_LIBRARY_PATH outranks a file beside the importer, so each
+      -- test sets the variable as it needs, whatever the suite was given.
+      describe "the prelude and daydate, recognised as the library only when they are" $ do
+        let envWithout = filter ((/= "JL4_LIBRARY_PATH") . fst) <$> getEnvironment
+        it "lowers no call into a prelude.l4 or daydate.l4 of the author's own as the library's" $ do
+          env <- envWithout
+          Output code sout serr <- runL4WithEnv (Just env) bin
+            ["export", "dmn", exportShadowPreludeFixture, "--fidelity-report"]
+          code `shouldBe` ExitSuccess
+          -- the author's copies won resolution (`shadow marker` is theirs alone)
+          serr `shouldSatisfy` ("[chosen]   project root:" `isInfixOf`)
+          sout `shouldSatisfy` ("h + shadow_marker" `isInfixOf`)
+          forM_ preludeCallForms \form -> sout `shouldNotSatisfy` (form `isInfixOf`)
+          serr `shouldSatisfy` ("7 blocking" `isInfixOf`)
+          forM_ ["how_many", "how_much", "the_bigger", "is_listed", "all_positive", "is_given", "the_start"] \d ->
+            serr `shouldSatisfy` (("[D-LITERALEXPR] blocking — decision_" <> d) `isInfixOf`)
+
+        it "lowers the same calls as the library's from the copy compiled into l4" $ do
+          env <- envWithout
+          Output code sout _ <- runL4WithEnv (Just env) bin ["export", "dmn", exportPreludeCallsFixture]
+          code `shouldBe` ExitSuccess
+          forM_ preludeCallForms \form -> sout `shouldSatisfy` (form `isInfixOf`)
+
+        it "lowers them as the library's from a copy of the libraries that JL4_LIBRARY_PATH names" $ do
+          env <- envWithout
+          tmp <- getTemporaryDirectory
+          let libCopy = tmp </> "l4-dmn-library-copy"
+              libSrc  = ".." </> "jl4-core" </> "libraries"
+          removePathForcibly libCopy
+          createDirectoryIfMissing True libCopy
+          files <- filter ((== ".l4") . takeExtension) <$> listDirectory libSrc
+          forM_ files \f -> copyFile (libSrc </> f) (libCopy </> f)
+          Output code sout _ <- runL4WithEnv (Just (("JL4_LIBRARY_PATH", libCopy) : env)) bin
+            ["export", "dmn", exportPreludeCallsFixture]
+          code `shouldBe` ExitSuccess
+          forM_ preludeCallForms \form -> sout `shouldSatisfy` (form `isInfixOf`)
+
       it "renames an input spelled like a FEEL function the export calls" $ do
         Output code sout _ <- runL4 bin ["export", "dmn", exportShadowedBuiltinsFixture]
         code `shouldBe` ExitSuccess

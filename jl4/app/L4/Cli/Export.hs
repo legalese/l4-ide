@@ -67,13 +67,14 @@ import qualified Base.Text as Text
 import Control.Exception (SomeException, try)
 import qualified Base.Set as Set
 import Options.Applicative
-import System.Directory (doesDirectoryExist, listDirectory)
+import System.Directory (canonicalizePath, doesDirectoryExist, listDirectory)
+import System.Environment (lookupEnv)
 import System.Exit (exitFailure, exitSuccess)
-import System.FilePath (replaceExtension, takeBaseName, takeDirectory, takeExtension, (</>))
+import System.FilePath (replaceExtension, takeBaseName, takeDirectory, takeExtension, takeFileName, (</>))
 
 import qualified LSP.Core.Shake as Shake
 import qualified LSP.L4.Rules as Rules
-import Language.LSP.Protocol.Types (normalizedFilePathToUri)
+import Language.LSP.Protocol.Types (normalizedFilePathToUri, uriToFilePath)
 
 import L4.Bpmn.Emit (renderBpmn)
 import L4.Bpmn.IR (BpmnExport (..), BpmnOptions (..), DeadlineUnitPolicy (..))
@@ -83,7 +84,7 @@ import L4.Dmn.Emit (emitDrg)
 import L4.Dmn.IR (Drg (..), DmnFlavor (..), DropReason (..), defaultDmnFlavor, dmnReport, drgDecisions)
 import L4.Dmn.Lower
   ( DmnLowerOptions (..), ImportedModule (..), checkerClauseMatrixRanges
-  , checkerMissingMatchRanges, lowerModule, moduleTitle, resolveMaybePredicates )
+  , checkerMissingMatchRanges, embeddedLibraryModule, lowerModule, moduleTitle, resolveMaybePredicates )
 import L4.Dmn.Markdown (emitMarkdown, markdownReport)
 import L4.Interchange.Fidelity
   (FidelityNote (..), FidelityReport (..), FidelitySeverity (..), renderReport)
@@ -424,6 +425,9 @@ moduleDecideNames (MkModule _ _ sec) = goSec sec
 -- judgement stays with the callers.
 dmnDrgFor :: ExportOptions -> Rules.TypeCheckResult -> IO Drg
 dmnDrgFor opts tcRes = do
+  -- Which loaded modules are the standard library, for the lowering's
+  -- provenance tests (`sum`, `all`, `YMD`, `isJust` and the rest).
+  library <- dmnLibraryModule (Rules.transitiveDependencies tcRes)
   -- FIXTURE(d)'s importer view (§2.5.7, OPEN-5): a sibling-directory scan.
   -- Textual and conservative-keep: an occurrence of a decide's name anywhere
   -- in an importing sibling counts as an external reference, so over-matching
@@ -452,7 +456,7 @@ dmnDrgFor opts tcRes = do
             -- L4.Dmn.Lower beside its only consumer, so this call site and the
             -- golden harness's cannot drift apart on how recognition is done.
             , dloMaybePredicates =
-                resolveMaybePredicates tcRes.module' tcRes.environment tcRes.entityInfo
+                resolveMaybePredicates library tcRes.module' tcRes.environment tcRes.entityInfo
             , dloIncludeTests = opts.exportIncludeTests
             -- DMN-SAFE's L1: the checker's own exhaustiveness warnings, from
             -- the same check result the module came from (the golden harness
@@ -476,9 +480,38 @@ dmnDrgFor opts tcRes = do
                     }
                 | dep <- Rules.transitiveDependencies tcRes
                 ]
+            , dloLibraryModule = library
             }
           tcRes.module'
   pure drg
+
+-- | The standard-library file a loaded module is, for 'dloLibraryModule': the
+-- copy compiled into this binary, or a file in the @$JL4_LIBRARY_PATH@
+-- directory, which outranks every other place the resolver looks (CLAUDE.md
+-- §5). Nothing else is the library, whatever it is called: a @prelude.l4@
+-- beside the exported file outranks the compiled-in copy when that variable
+-- is unset, and is the author's own module. Nor is a library found in the
+-- per-user store or the editor bundle, which the resolver reaches only when
+-- @$JL4_LIBRARY_PATH@ names a directory without it; those fail closed, so each
+-- call into them is refused (Blocking) rather than lowered as the library's.
+--
+-- Paths are compared canonically (symbolic links and @..@ resolved) because
+-- the variable may be spelled relative or through a link.
+dmnLibraryModule :: [Rules.TypeCheckResult] -> IO (NormalizedUri -> Maybe Text)
+dmnLibraryModule deps = do
+  mLibDir <- traverse canonical =<< lookupEnv "JL4_LIBRARY_PATH"
+  fromLibDir <- case mLibDir of
+    Nothing -> pure []
+    Just libDir -> fmap catMaybes $ for deps \dep -> do
+      let MkModule _ u _ = dep.module'
+      case uriToFilePath (fromNormalizedUri u) of
+        Nothing -> pure Nothing
+        Just p -> do
+          dir <- canonical (takeDirectory p)
+          pure (if dir == libDir then Just (u, Text.pack (takeFileName p)) else Nothing)
+  pure \u -> embeddedLibraryModule u <|> lookup u fromLibDir
+ where
+  canonical p = either (\(_ :: SomeException) -> p) id <$> try (canonicalizePath p)
 
 exportDmn :: ExportOptions -> Rules.TypeCheckResult -> IO FidelityReport
 exportDmn opts tcRes = do

@@ -31,6 +31,7 @@ import Base
 import qualified Base.Text as Text
 
 import L4.API.VirtualFS (TypeCheckWithDepsResult (..), VFS, checkWithImports, emptyVFS, vfsFromList)
+import L4.Cycles (apiLibraryFile)
 import qualified Base.Set as Set
 import L4.Dmn.Emit (emitDrg, escapeXmlAttr, escapeXmlText)
 import L4.Dmn.IR
@@ -1360,6 +1361,20 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
         feelIdentText w `shouldBe` (w <> "_")
       -- the whole folded name only, as for a keyword
       feelIdentText "max count" `shouldBe` "max_count"
+
+    -- Which module is the library is the caller's to say: a recogniser that
+    -- names none leaves every prelude call to the loud refusal.
+    it "lowers a prelude call as the library's only when the caller's recogniser says it is the library" $ do
+      let src =
+            "IMPORT prelude\n\
+            \GIVEN xs IS A LIST OF NUMBER\n\
+            \GIVETH A NUMBER\n\
+            \DECIDE `how many` xs IS count xs\n"
+          textOf drg = case (decisionNamed "how many" drg).dcnLogic of
+            LogicLiteral x -> x.feText
+            _              -> "(not a boxed literal)"
+      textOf (drgOf src) `shouldBe` "count(xs)"
+      textOf (drgAdjusted (\o -> o { dloLibraryModule = const Nothing }) src) `shouldBe` "count OF xs"
 
     it "renames an input spelled like a FEEL function, so the call still reaches the function" $ do
       let src =
@@ -4792,7 +4807,7 @@ drgGeneral vfs adjust flavor mkName src = case checkWithImports vfs src of
                 -- CLI uses (jl4/app/L4/Cli/Export.hs). If these two ever stopped
                 -- agreeing, a golden would move without any source moving.
                 , dloMaybePredicates =
-                    resolveMaybePredicates tc.tcdModule tc.tcdEnvironment tc.tcdEntityInfo
+                    resolveMaybePredicates apiLibraryFile tc.tcdModule tc.tcdEnvironment tc.tcdEntityInfo
                 , dloIncludeTests = False
                 , dloMissingMatchRanges = checkerMissingMatchRanges tc.tcdErrors
                 -- L1's Decide-level channel (clause matrices), extracted by
@@ -4812,6 +4827,10 @@ drgGeneral vfs adjust flavor mkName src = case checkWithImports vfs src of
                         }
                     | ri <- tc.tcdResolvedImports
                     ]
+                -- The API pipeline names every module @project:/<name>.l4@
+                -- and looks a name up among the libraries before the VFS, so
+                -- there @project:/prelude.l4@ is the library.
+                , dloLibraryModule = apiLibraryFile
                 }
           )
           tc.tcdModule

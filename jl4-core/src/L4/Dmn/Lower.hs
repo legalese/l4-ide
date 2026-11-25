@@ -84,6 +84,7 @@ module L4.Dmn.Lower
   , moduleTitle
   , DmnLowerOptions (..)
   , defaultDmnLowerOptions
+  , embeddedLibraryModule
   , ImportedModule (..)
   , checkerMissingMatchRanges
   , checkerClauseMatrixRanges
@@ -383,6 +384,8 @@ data TableCtx = MkTableCtx
     -- reference. See 'constantOf' and 'renderFeelIn' respectively.
   , tcSubst        :: !TC.Substitution
   , tcUri          :: !NormalizedUri
+  , tcLibrary      :: !(NormalizedUri -> Maybe Text)
+    -- ^ 'dloLibraryModule', for the provenance tests ('fromPrelude')
   }
 
 -- | Enough to satisfy 'rowsToDmn' standing alone. Knows no constructors, so a
@@ -402,6 +405,7 @@ defaultTableCtx = MkTableCtx
   , tcDateConstants = Map.empty
   , tcSubst        = Map.empty
   , tcUri          = toNormalizedUri (Uri "")
+  , tcLibrary      = embeddedLibraryModule
   }
 
 -- | The typechecker's answer to "what type is this expression?", bundled — the
@@ -421,6 +425,9 @@ data TypeOracle = MkTypeOracle
   { toTypes :: !TypeEnv
   , toSubst :: !TC.Substitution
   , toUri   :: !NormalizedUri
+  , toLibrary :: !(NormalizedUri -> Maybe Text)
+    -- ^ 'dloLibraryModule': which modules are the standard library, for the
+    -- provenance tests 'fromPrelude' and 'fromDaydate'
   }
 
 -- | An oracle that knows only what each node's own annotation already says.
@@ -443,6 +450,7 @@ noTypeOracle = MkTypeOracle
   { toTypes = emptyTypeEnv
   , toSubst = Map.empty
   , toUri   = toNormalizedUri (Uri "")
+  , toLibrary = embeddedLibraryModule
   }
 
 oracleOf :: TableCtx -> TypeOracle
@@ -450,6 +458,7 @@ oracleOf ctx = MkTypeOracle
   { toTypes = ctx.tcTypes
   , toSubst = ctx.tcSubst
   , toUri   = ctx.tcUri
+  , toLibrary = ctx.tcLibrary
   }
 
 data DmnLowerOptions = MkDmnLowerOptions
@@ -523,6 +532,22 @@ data DmnLowerOptions = MkDmnLowerOptions
     -- a decision of this model, with a @D-IMPORTED@ note, because this
     -- exporter emits no DMN @import@ (spec §18). Empty: no constant is copied,
     -- and every reference to an imported value refuses (see 'neHomeUri').
+  , dloLibraryModule :: !(NormalizedUri -> Maybe Text)
+    -- ^ the standard-library file a module IS (@prelude.l4@, @daydate.l4@)
+    -- when this run resolved it as the library, and 'Nothing' for every other
+    -- module. The provenance tests ('fromPrelude', 'fromDaydate',
+    -- 'resolveMaybePredicates') ask this, not the module's file name: a
+    -- @prelude.l4@ beside the exported file outranks the copy compiled into
+    -- the binary, and is the author's own module, not the library.
+    --
+    -- Each pipeline knows its own answer, so each caller supplies it: the CLI
+    -- accepts the compiled-in copy and a file in @$JL4_LIBRARY_PATH@
+    -- (jl4\/app\/L4\/Cli\/Export.hs); the API pipeline, whose @project:\/@
+    -- names are looked up among the libraries first, accepts those
+    -- ('L4.Cycles.apiLibraryFile', in the golden harness). The default,
+    -- 'embeddedLibraryModule', accepts the compiled-in copy alone, so a caller
+    -- that supplies nothing loses recognition (a loud, Blocking refusal of
+    -- each call) rather than trusting a file it cannot vouch for.
   }
 
 -- | One module the exported module imports, with what its own check produced
@@ -578,7 +603,15 @@ defaultDmnLowerOptions = MkDmnLowerOptions
   , dloClauseMatrixRanges = []
   , dloExternalRefNames   = Nothing
   , dloImportedModules    = []
+  , dloLibraryModule      = embeddedLibraryModule
   }
+
+-- | The library file a module is when it is the copy compiled into this
+-- binary (@jl4-embedded:\/prelude.l4@), and 'Nothing' otherwise. The default
+-- 'dloLibraryModule'; "L4.Cycles" recognises the compiled-in copy by the same
+-- prefix ('L4.Cycles.libraryFile').
+embeddedLibraryModule :: NormalizedUri -> Maybe Text
+embeddedLibraryModule u = Text.stripPrefix "jl4-embedded:/" (fromNormalizedUri u).getUri
 
 -- | Find the prelude's @isJust@ and @isNothing@ by SHAPE, not by module path.
 --
@@ -599,7 +632,7 @@ defaultDmnLowerOptions = MkDmnLowerOptions
 -- @isJust@ ALONGSIDE the prelude fall back to no recognition rather than to the
 -- wrong one: two candidates, so 'Nothing'.
 --
--- __Two PROVENANCE conditions on top of the shape, and neither is a path
+-- __Three PROVENANCE conditions on top of the shape, and none is a path
 -- test.__ 'Unique' carries the URI of the module that minted it, so:
 --
 --   * both survivors must come from the SAME module — one prelude defines the
@@ -614,29 +647,31 @@ defaultDmnLowerOptions = MkDmnLowerOptions
 -- The "exactly one survivor" sentence above USED to claim it covered that case;
 -- it did not, and the case it named was the one it missed.
 --
--- __Still not filtered by the module's PATH.__ The prelude's URI differs between
--- the CLI (a real file path, or @jl4-embedded:@, or an XDG store) and the VFS
--- harness (@project:\/prelude.l4@), so a path test would recognise the
--- combinators in one and not the other — the same drift this function exists to
--- prevent, only harder to see. Comparing URIs for EQUALITY is immune to that,
--- because both sides are minted by the same resolver in the same run.
---
--- __What is still not established, stated rather than glossed:__ that the
--- defining module is the L4 prelude and not some other imported library that
--- happens to define both names at both types. Closing that would need the
--- BODIES, and 'TC.EntityInfo' carries only types. A library that reimplements
--- @isJust@ and @isNothing@ at @MAYBE a -> BOOLEAN@ and is imported INSTEAD of
--- the prelude will be recognised; a library imported ALONGSIDE it will not.
+-- __And a third: the module is the prelude, as the caller's recogniser
+-- judges it__ ('dloLibraryModule', passed here as the first argument; both
+-- call sites pass the same one they put in the options). Without it, a module
+-- that reimplements @isJust@ and @isNothing@ at @MAYBE a -> BOOLEAN@ and is
+-- imported INSTEAD of the prelude was recognised, and that includes a
+-- @prelude.l4@ of the author's own beside the exported file, which outranks
+-- the compiled-in copy when @JL4_LIBRARY_PATH@ is unset: its
+-- @\`isJust\` x MEANS FALSE@ was rendered @x != null@ (found by the review of
+-- smucclaw/l4-ide#1103, 2026-11-26). The recogniser is not a path test: the
+-- prelude's URI differs between the CLI (@jl4-embedded:@, or a file in
+-- @JL4_LIBRARY_PATH@) and the VFS harness (@project:\/prelude.l4@), and each
+-- caller supplies the rule for its own pipeline, so neither recognises what
+-- the other would not.
 resolveMaybePredicates
-  :: Module Resolved   -- ^ the module being exported; a definition from HERE is not the prelude's
+  :: (NormalizedUri -> Maybe Text)   -- ^ 'dloLibraryModule'
+  -> Module Resolved   -- ^ the module being exported; a definition from HERE is not the prelude's
   -> TC.Environment
   -> TC.EntityInfo
   -> Maybe MaybePredicates
-resolveMaybePredicates (MkModule _ selfUri _) env info = do
+resolveMaybePredicates library (MkModule _ selfUri _) env info = do
   j <- soleMatch "isJust"
   n <- soleMatch "isNothing"
   guard (j.moduleUri == n.moduleUri)
   guard (j.moduleUri /= selfUri)
+  guard (library j.moduleUri == Just "prelude.l4")
   pure (MkMaybePredicates { mpIsJust = j, mpIsNothing = n })
  where
   soleMatch nm = case filter shaped (Map.findWithDefault [] (NormalName nm) env) of
@@ -1100,8 +1135,8 @@ foldDateLiteral oracle e = case e of
  where
   dateHead r =
     getUnique r == TC.dateFromDMYUnique
-      || (fromDaydate r && named r ["Date", "Days to date"])
-  ymdHead r = fromDaydate r && named r ["YMD", "Year month day"]
+      || (fromDaydate oracle.toLibrary r && named r ["Date", "Days to date"])
+  ymdHead r = fromDaydate oracle.toLibrary r && named r ["YMD", "Year month day"]
   named r ns = nameOf r `elem` ns || unqualifiedNameToText (getActual r) `elem` ns
 
 -- | Provenance: does this reference resolve to a definition in the standard
@@ -1110,8 +1145,8 @@ foldDateLiteral oracle e = case e of
 -- Asked of @all@ \/ @any@ before either is lowered to a FEEL quantifier
 -- (#936): they are ordinary prelude @DECIDE@s, so the same reasoning as
 -- 'fromDaydate' applies unchanged.
-fromPrelude :: Resolved -> Bool
-fromPrelude = definedIn "prelude.l4"
+fromPrelude :: (NormalizedUri -> Maybe Text) -> Resolved -> Bool
+fromPrelude library = definedIn library "prelude.l4"
 
 -- | Provenance: does this reference resolve to a definition in the @daydate@
 -- library?
@@ -1125,26 +1160,31 @@ fromPrelude = definedIn "prelude.l4"
 -- answer is exact for the thing that matters: a same-named function defined
 -- anywhere else resolves to a different module and declines.
 --
--- Matched on the URI's BASENAME rather than its full path, because the same
--- library is reached under several spellings — a @file://@ path under
--- @JL4_LIBRARY_PATH@, the repo's own @jl4-core\/libraries@, or the embedded
--- copy seeded into the VFS under the @jl4-embedded@ scheme (see the resolution
--- order in CLAUDE.md §5). Every one of them ends in @daydate.l4@, and nothing
--- else does: a user module that shadows @YMD@ lives in its own file, and one
--- that shadows it while ALSO being called @daydate.l4@ is the library, by
--- resolution.
-fromDaydate :: Resolved -> Bool
-fromDaydate = definedIn "daydate.l4"
+-- __Which module is the library is the caller's to say__ ('dloLibraryModule'),
+-- because the same library is reached under several spellings — the embedded
+-- copy under the @jl4-embedded@ scheme, a @file://@ path under
+-- @JL4_LIBRARY_PATH@, or @project:\/daydate.l4@ in the API pipeline — and
+-- because a file merely CALLED @daydate.l4@ is not one of them. This used to
+-- match the URI's basename, on the reasoning that a module called
+-- @daydate.l4@ "is the library, by resolution". It is not: with
+-- @JL4_LIBRARY_PATH@ unset, a @daydate.l4@ (or @prelude.l4@) beside the
+-- exported file outranks the compiled-in copy (resolution order, CLAUDE.md
+-- §5), so it is the author's own module, and its @YMD@, @sum@ or @all@ was
+-- lowered as the library's while @l4 run@ evaluated the author's body
+-- (found by the review of smucclaw/l4-ide#1103, 2026-11-26).
+fromDaydate :: (NormalizedUri -> Maybe Text) -> Resolved -> Bool
+fromDaydate library = definedIn library "daydate.l4"
 
 -- | The URI every builtin 'Unique' carries (@jl4:builtin@), read off one of
 -- them rather than spelled again here.
 builtinModuleUri :: NormalizedUri
 builtinModuleUri = TC.trueUnique.moduleUri
 
--- | The basename of the module that minted this reference's defining
--- occurrence. See 'fromDaydate' for why the BASENAME is the right granularity.
-definedIn :: Text -> Resolved -> Bool
-definedIn base r = moduleBaseName (getUnique r).moduleUri == base
+-- | Does this reference's defining occurrence live in the library file
+-- @base@, as the caller's recogniser ('dloLibraryModule') judges the module
+-- that minted it? See 'fromDaydate'.
+definedIn :: (NormalizedUri -> Maybe Text) -> Text -> Resolved -> Bool
+definedIn library base r = library (getUnique r).moduleUri == Just base
 
 -- | The last path segment of a module URI (@weeklimit.l4@), which is what a
 -- fidelity note may name: never the directory it was found in.
@@ -2708,7 +2748,7 @@ renderFeelIn names ctors oracle top = let (_, txt, frag) = go top in MkFeelExpr 
   -- @every@ \/ @some@, or not a list quantifier at all.
   listQuantKeyword :: Resolved -> Maybe Text
   listQuantKeyword r
-    | not (fromPrelude r) = Nothing
+    | not (fromPrelude oracle.toLibrary r) = Nothing
     | named ["all"]       = Just "every"
     | named ["any"]       = Just "some"
     | otherwise           = Nothing
@@ -2722,7 +2762,7 @@ renderFeelIn names ctors oracle top = let (_, txt, frag) = go top in MkFeelExpr 
   -- A prelude @DECIDE@ of this name, and nothing else of that name.
   preludeNamed :: Resolved -> Text -> Bool
   preludeNamed r n =
-    fromPrelude r
+    fromPrelude oracle.toLibrary r
       && (nameOf r == n || unqualifiedNameToText (getActual r) == n)
 
   -- The predicate's binder and the body to render under it. Three shapes, and
@@ -3267,7 +3307,8 @@ annTypeSource o e = case (getAnno e).extra.resolvedInfo of
 -- through the context it is in the middle of building.
 annTypeOf :: TypeEnv -> TC.Substitution -> NormalizedUri -> Expr Resolved -> DmnType
 annTypeOf env subst uri =
-  oracleType MkTypeOracle { toTypes = env, toSubst = subst, toUri = uri }
+  -- 'oracleType' reads no provenance, so the library recogniser is inert here.
+  oracleType MkTypeOracle { toTypes = env, toSubst = subst, toUri = uri, toLibrary = embeddedLibraryModule }
 
 -- | FEEL's type system is numbers, strings, booleans, dates, lists and contexts
 -- — no algebraic data types. What it /does/ have is the __context__, which is a
@@ -3990,7 +4031,7 @@ lowerModule opts modul@(MkModule _ uri _) =
     libraryRef r =
       let u = getUnique r
       in (u.moduleUri == builtinModuleUri && u /= TC.rulesEffectiveDateUnique)
-           || fromPrelude r || fromDaydate r
+           || fromPrelude opts.dloLibraryModule r || fromDaydate opts.dloLibraryModule r
 
   -- The closed constants reached from these bodies, directly or through
   -- another closed constant.
@@ -5091,7 +5132,7 @@ lowerModule opts modul@(MkModule _ uri _) =
     ]
 
   moduleOracle = MkTypeOracle
-    { toTypes = typeEnv, toSubst = opts.dloSubstitution, toUri = uri }
+    { toTypes = typeEnv, toSubst = opts.dloSubstitution, toUri = uri, toLibrary = opts.dloLibraryModule }
 
   -- The law-time PREDICATE idiom (regcf.l4:119-121):
   --
@@ -6623,7 +6664,7 @@ lowerModule opts modul@(MkModule _ uri _) =
     -- fields, so asking `oracleOf tctx` while computing `tcOutputType` would
     -- force the record that is being built.
     oracle0 = MkTypeOracle
-      { toTypes = typeEnv, toSubst = opts.dloSubstitution, toUri = uri }
+      { toTypes = typeEnv, toSubst = opts.dloSubstitution, toUri = uri, toLibrary = opts.dloLibraryModule }
 
     givethSrc = case mGiveth of
       Just (MkGivethSig _ ty) -> Just ty
@@ -6650,6 +6691,7 @@ lowerModule opts modul@(MkModule _ uri _) =
       , tcDateConstants = dateConstants
       , tcSubst        = opts.dloSubstitution
       , tcUri          = uri
+      , tcLibrary      = opts.dloLibraryModule
       }
 
     subExprs = toListOf (cosmosOf (gplate @(Expr Resolved))) body
@@ -7150,7 +7192,7 @@ lowerModule opts modul@(MkModule _ uri _) =
     ]
    where
     isListQuant r =
-      fromPrelude r
+      fromPrelude opts.dloLibraryModule r
         && ( nameOf r `elem` ["all", "any"]
                || unqualifiedNameToText (getActual r) `elem` ["all", "any"] )
 

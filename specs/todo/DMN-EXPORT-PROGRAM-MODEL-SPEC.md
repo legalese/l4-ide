@@ -4127,13 +4127,19 @@ cast to BusinessKnowledgeModel` inside `parse()` and rejects the entire DRG**, i
     test would trip on):
 
     - both survivors must come from the **same** module — one prelude defines the pair;
-    - that module must **not** be the module being exported.
+    - that module must **not** be the module being exported;
+    - since the review of smucclaw/l4-ide#1103, that module must be the prelude as the caller's
+      recogniser judges it (`dloLibraryModule`, §17.8).
 
-    **What is still not established, stated rather than glossed:** that the defining module is the
-    L4 prelude and not some other imported library that defines both names at both types. Closing
-    that would need the **bodies**, and `EntityInfo` carries only types. A library imported
-    _instead_ of the prelude is recognised; one imported _alongside_ it is not. Pinned by "does not
-    recognise a LOCALLY defined isJust as the prelude's" in `jl4/tests/DmnExport.hs`.
+    **What the first two did not establish, and the third now does:** that the defining module is
+    the L4 prelude and not some other imported library that defines both names at both types. A
+    library imported _instead_ of the prelude was recognised, and that included a `prelude.l4` of
+    the author's own beside the exported file, which outranks the compiled-in copy when
+    `JL4_LIBRARY_PATH` is unset: its `` `isJust` x MEANS FALSE `` was rendered `m != null`
+    (measured 2026-11-26 on `jl4/tests-cli/fixtures/export-shadow-prelude/uses-shadow.l4`). The
+    bodies are still not read; the module's identity is. Pinned by "does not recognise a LOCALLY
+    defined isJust as the prelude's" in `jl4/tests/DmnExport.hs`, and by the shadow test in
+    `jl4/tests-cli/CliTest/DmnBpmn.hs`.
 
     **Discharging R8-d's two reasons, separately, because only one of them is answered:**
 
@@ -6314,6 +6320,14 @@ Until this date only `MODULO` among the numeric builtins was lowered (`modulo`).
 | prelude `min`, `max` | `min(a, b)`, `max(a, b)`    | NUMBER overloads only, gated on the type oracle (call and operands plain `number`); the MAYBE NUMBER ones decline |
 
 The prelude ones are recognised by provenance then name (`preludeNamed`, as `elem` and `all`/`any` are), so a module's own `sum` or `min` is not lowered.
+
+**Which module is the prelude.** Found by the review of #1103's lowering, and older than it: provenance meant the defining module's file name (`definedIn` compared the URI's basename with `prelude.l4` or `daydate.l4`), on the reasoning that a module called `daydate.l4` "is the library, by resolution".
+It is not: with `JL4_LIBRARY_PATH` unset, a `prelude.l4` or `daydate.l4` beside the exported file outranks the compiled-in copy (CLAUDE.md §5), so it is the author's own module.
+On `jl4/tests-cli/fixtures/export-shadow-prelude/uses-shadow.l4`, which imports such a pair whose functions have the library's names and types and other bodies, the build before this change lowered all seven calls as the library's (`count(xs)`, `sum(concatenate([0], xs))`, `max(a, b)`, `list contains(xs, x)`, `every`, `m != null`, `date("2024-01-02")`) with no Blocking note, while `l4 run` evaluated the author's bodies (measured 2026-11-26).
+The same hole reached `fromDaydate` (`Date`, `YMD`), the #1102 closure's `libraryRef`, the requirement edges `binderInlinedBodies` adds, and `resolveMaybePredicates` (R8-d′'s `isJust`, §11), because all of them asked `definedIn`.
+Now the caller says which modules are the library (`dloLibraryModule`), and `definedIn` asks it: the CLI accepts the copy compiled into `l4` (`jl4-embedded:/…`) and a file in the `$JL4_LIBRARY_PATH` directory, compared canonically; the golden harness, on the API pipeline, accepts `project:/<name>.l4` (`L4.Cycles.apiLibraryFile`), because that pipeline looks a name up among the libraries before the files it is given; the default accepts the compiled-in copy alone.
+A library found anywhere else (the per-user store or the editor bundle, which the resolver reaches only when `$JL4_LIBRARY_PATH` names a directory without it) is not recognised, so its calls are refused (Blocking) rather than trusted; that is loud, and it is decided by Claude 2026-11-26, pending Meng's review.
+On the shadow fixture every one of the seven calls is now a Blocking `D-LITERALEXPR`; the same calls against the real libraries (`jl4/tests-cli/fixtures/export-prelude-calls.l4`) are lowered as before from the compiled-in copy, from a copy of the libraries named by `$JL4_LIBRARY_PATH` (absolute, and relative through a symbolic link), and from a checkout's `jl4-core/libraries`.
 Left as they were, each a raw-L4 refusal: `SQRT` (partial, L5), `TRUNC` (no single FEEL function), `minimum` and `maximum` (`@nonexhaustive` on `EMPTY` in L4, measured `eval/non-exhaustive-patterns`, while FEEL's `min([])` is null on Camunda and a FAILED decision on KIE), and the MAYBE NUMBER `min`/`max` (which skip a `NOTHING`: measured `min (JUST 3) NOTHING` is `JUST 3`).
 The exhibit is `jl4/examples/dmn/rounding.l4`, with cases and an engine baseline (72/72 on both engines; before this change the same file made KIE report `0 case(s), 16 error(s)` and Camunda parse nothing).
 
