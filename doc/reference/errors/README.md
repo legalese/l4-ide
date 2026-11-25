@@ -762,7 +762,7 @@ What this does not cover:
 - `l4 export`, in every format, `l4 verify` and `l4 state-graph` still write their output over a module whose import has errors.
   The error does not make them fail: each exits with status 0 on a file it can convert, as it does when the import is clean.
   `l4 export` and `l4 verify` print the error, and `l4 state-graph` does not.
-- In the output of `l4 export catala`, the test that comes from each `#EVAL` or `#ASSERT` then has no expected value, and `l4 export catala` says that L4 produced no value for it.
+  The test that comes from each `#EVAL` or `#ASSERT` in the Catala output then has no expected value, and `l4 export catala` says that L4 produced no value for it.
 - A bundle posted straight to a jl4-service you run yourself, as a zip of files sent to its `/deployments` endpoint, is still evaluated in one case.
   When the only errors in a module its file imports are names that module reads and never declares, which the service takes as inputs, the service accepts the bundle and evaluates its functions: one that reads nothing from that module answers as usual, and one that reads a name from it answers `Internal error: ... is not in scope.`
   `l4 deploy` and `l4 redeploy`, with or without `--server`, refuse such a file before they upload anything, as [Using the l4 CLI](../../tutorials/getting-started/l4-cli.md#deploy-update-list-remove) says of `l4 deploy`, and the editor's **Deploy** stays off for it, as [Deploy your rules](../../tutorials/deploying-rules/exporting-rules-for-deployment.md#step-3-deploy) says.
