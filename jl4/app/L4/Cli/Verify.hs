@@ -1263,6 +1263,18 @@ analyseBody labels order defs listed body written
         -- @x OR NOT x@.
         contingent e = sat' [] (BDQ.BNot e)
 
+        -- Whether a site stands under an odd number of NOTs: its path is how it
+        -- was reached, and @.not@ is the one step of it that negates. Under
+        -- one, a condition its siblings entail is, read the other way round,
+        -- an alternative that cannot hold where it sits, and the normal form
+        -- already reports that as a dead branch: @a AND NOT (a AND b)@ is
+        -- @a AND ((NOT a) OR (NOT b))@, whose @NOT a@ is dead. So a conjunct is
+        -- not also reported there as entailed. An alternative the others cover
+        -- is still looked for under a NOT: read the other way round it is a
+        -- condition its siblings entail, which only this walk reports
+        -- (decided by Claude 2026-11-25, pending Meng's review).
+        underOddNot site = odd (Text.count ".not" site)
+
         go :: [BDQ.BoolExpr Int] -> Text -> BDQ.BoolExpr Int -> [Finding]
         go ctx site = \case
           e@(BDQ.BAnd es)
@@ -1294,6 +1306,7 @@ analyseBody labels order defs listed body written
                             -- guard (decided by Claude 2026-11-25, pending
                             -- Meng's review).
                           , Map.member arm starts
+                          , not (underOddNot site)
                           , interesting ei
                           , contingent ei
                           , not (sat' ctx' (BDQ.BNot ei))

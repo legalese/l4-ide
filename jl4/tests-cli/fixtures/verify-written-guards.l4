@@ -95,3 +95,19 @@ GIVETH A BOOLEAN
 DECIDE `a hurdle in a test` g x y z IF
   BRANCH IF x AND (x OR y) THEN g
          OTHERWISE z
+
+-- Reported once, as a dead branch, not also as a redundant condition.
+
+-- (11) Under a NOT, a condition the context entails is, read the other way
+--      round, an alternative that cannot hold: `a AND NOT (a AND b)` is
+--      `a AND ((NOT a) OR (NOT b))`, whose `NOT a` is dead.
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `a hurdle under a NOT` a b IF
+    a AND NOT (a AND b)
+
+-- (12) The same, deeper: inside an alternative under the NOT.
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN, c IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `a hurdle in an alternative under a NOT` a b c IF
+    a AND NOT (b OR (a AND c))

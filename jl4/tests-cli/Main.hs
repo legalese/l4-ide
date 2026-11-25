@@ -6828,6 +6828,11 @@ spec bin = do
       lookup "`a hurdle through a call`" found `shouldBe` Just [("vacuous-guard", "body.and[1]")]
       lookup "either" found `shouldBe` Just []
       lookup "`a hurdle in a test`" found `shouldBe` Just []
+      -- Under a NOT, a conjunct the context entails is the normal form's dead
+      -- branch, and is reported as that alone. Before this was fixed each was
+      -- reported twice, also as a redundant condition under the NOT.
+      lookup "`a hurdle under a NOT`" found `shouldBe` Just [("dead-branch", "body.and[1].or[0]")]
+      lookup "`a hurdle in an alternative under a NOT`" found `shouldBe` Just [("dead-branch", "body.and[2].or[0]")]
       source <- lines <$> readFile verifyWrittenGuardsFixture
       let startsWith nm want =
             case [ (line, col)
