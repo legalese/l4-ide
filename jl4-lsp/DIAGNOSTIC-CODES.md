@@ -169,6 +169,8 @@ Warnings, except `lint/redundant-lang-en`, which is a hint.
 | `lint/starts-copies-at-once`           | `check`  | A rule that starts two or more copies of itself at once.                                   |
 | `lint/lest-without-deadline`           | `check`  | A LEST on a MUST, DO or MAY with no deadline, which nothing can reach.                     |
 
+- `lint/lest-without-deadline`: Scope ruled HOURGLASS, Meng 2026-11-25: MUST, DO and MAY with neither WITHIN nor BEFORE; not MUST NOT; not an EVERY with no join line.
+
 ## eval/
 
 Severity Information for `eval/result` and `eval/assertion-passed`, Warning for `eval/refused`, Error for the rest. An `#ASSERT` that raises has the code of what it raised, not `eval/assertion-failed`.
