@@ -88,20 +88,25 @@ The pipeline’s output lands in [**legalese/canon**](https://github.com/legales
 
 ### Three commands you will use directly
 
-`l4 verify FILE` compiles each boolean rule through the ladder into a decision diagram and reports four families of defect: an **unsatisfiable** conjunction, a **dead branch** that can never be taken where it sits, a **vacuous guard** (a condition its siblings already entail, or an alternative the others already cover), and an **unreachable outcome** — a verdict the rule can never deliver. If OPA’s rule-completeness warnings are your reference point, this is the same instinct with a stricter engine behind it.
+`l4 verify FILE` compiles each boolean rule through the ladder into a decision diagram and reports four families of defect: an **unsatisfiable** conjunction, a **dead branch** that can never be taken where it sits, a **vacuous guard** (a condition its siblings already entail, or an alternative the others already cover), and an **unreachable outcome** — a verdict the rule can never deliver.
+If OPA’s rule-completeness warnings are your reference point, this is the same instinct with a stricter engine behind it.
 
 To check a rule, the tool first rewrites it as one long list of “all of these must hold” clauses, and that rewriting creates clauses the drafter never wrote.
 So a vacuous guard is looked for only among the conditions the rule actually writes: `(a AND b) OR ((NOT a) AND e)` gets no finding, however the rewriting splits it up, while `x AND (x OR y)` is reported once, with the line and column of the first word of `(x OR y)`, its `x`.
 The same holds for an alternative the others already cover: `(a AND b) OR b` is reported at `a AND b`, which lets nothing through that `b` does not.
-Both are looked for under a `NOT` as well.
+Both are looked for under a `NOT` as well; there, a condition the others already entail is a dead branch of the rewritten rule, and is reported as that alone.
+Two conditions that entail each other, such as the two `x` of `x AND x`, are both reported, and so are two alternatives that cover each other, although deleting either one alone leaves the rule as it was.
 A condition written in a local definition (`WHERE` or `LET`) is placed where the definition writes it, at its opening bracket if its first word is one of the definition's parameters, which stands for whatever each use passes in.
-When the rule uses the definition more than once, the copies of a condition written once are judged as one: `qualifies a AND qualifies b`, where `qualifies x` means `x AND c`, gets no finding, just as it gets none when `qualifies` is a rule of its own; the price is that a definition used twice the same way can go unreported.
+A bracketed group whose first word is a use of a local definition is placed at its bracket, not at that word.
+When a local definition is used more than once, a condition inside it can be reported because another use repeats it, and `l4 verify` cannot yet tell such a finding from a real one: `qualifies a AND qualifies b`, where `qualifies x` means `x AND c`, reports `c` twice, although nothing in the rule is redundant.
+A separate issue tracks the fix.
 Each row of a `BRANCH`, and the `ELSE` of an `IF`, also carries “none of the rows above applied”, which nobody wrote, so the tests themselves are not checked for this, only what each `THEN`, `ELSE` and `OTHERWISE` says: a redundant condition inside a test goes unreported.
+An alternative is judged without the negations of the alternatives beside the `OR` it sits inside, so in `d OR (a AND (b OR (c AND d)))` the `c AND d`, which can hold only where `d` has already let the case through, goes unreported too.
 The other findings name a place in the rewritten rule, such as `body.and[1].or[0]`, which need not appear in the source as written, and so does a vacuous guard that is a scope nobody can be in; these carry no line and column.
 
 A rule that calls another rule is read through to what that rule means, in the same file or an imported one. So if an encoding writes an exception as its own rule and the offence calls it as a defeater, asking for both at once is reported as a contradiction, not passed over. Findings are still reported at the sites of the rule you are looking at; the called rule has its own entry. A call whose meaning is too large to draw stays opaque, and the report names it.
 
-A rule whose whole body is `FALSE` or `TRUE` is usually deliberate: an encoding records “the text says no” this way, or switches a provision off.
+A rule whose whole body is `FALSE` or `TRUE` is often deliberate: an encoding records “the text says no” this way, or switches a provision off.
 `l4 verify` lists such a rule as a **constant** and checks nothing in it, so `DECIDE x IF FALSE` is not reported as a requirement nobody can meet.
 Only the bare word counts: a rule that is false for some other reason, such as one that asks for a constant `FALSE` rule and something else, is still reported.
 A finding on a rule that reads through a constant names the constant when it is inside the reported condition and has the finding’s sign: a `FALSE` one for a finding that something can never hold, a `TRUE` one for a finding that something always holds, each the other way round under a `NOT`.

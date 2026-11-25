@@ -904,7 +904,8 @@ scanOr e = [e]
 -- Where that element is a part of the expression (a call written with its
 -- first argument first), it starts where that part does.
 -- An operator whose first operand is written outside its own text (a
--- parameter, read through) starts where its own text does.
+-- parameter or a local definition's use, read through) starts where its own
+-- text does.
 --
 -- Not counting the bracket was decided by Claude 2026-11-25, pending Meng's
 -- review: a group can share its bracket with the groups around it, and its first
@@ -926,8 +927,11 @@ writtenStart e = case operands e of
     -- A first operand written somewhere else: the argument a definition read
     -- through ('Transform.inlineLocalBindingsForDrawing') put in place of its
     -- parameter, so that the operator is in the definition and its first
-    -- operand at the call. The operator is placed where its own text is, in
-    -- the definition, at the bracket that opens it if it has one.
+    -- operand at the call; or a use of a local definition, which the reading
+    -- through replaces with the definition's text, keeping nothing of where
+    -- the use was written ('Transform.withTypeOfSite'). The operator is placed
+    -- where its own text is, at the bracket that opens it if it has one, not
+    -- at its first word.
     within inner = case (inner, rangeOf e) of
       (Just p, Just r) | p < r.start || p > r.end -> Just r.start
       _ -> inner
