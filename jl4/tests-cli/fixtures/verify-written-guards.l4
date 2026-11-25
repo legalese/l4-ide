@@ -58,3 +58,40 @@ DECIDE `a hurdle in a definition` a b d IF
     GIVEN x IS A BOOLEAN
     GIVETH A BOOLEAN
     `qualifies` x MEANS x AND (x OR d)
+
+-- (7) The redundant condition is in what the ELSE of an IF says, which is
+--     checked like what a THEN says.
+GIVEN g IS A BOOLEAN, x IS A BOOLEAN, y IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `a hurdle in an ELSE` g x y IF
+    IF g THEN FALSE ELSE x AND (x OR y)
+
+-- (8) The redundant condition is in what the OTHERWISE of a BRANCH says.
+GIVEN g IS A BOOLEAN, x IS A BOOLEAN, y IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `a hurdle in an OTHERWISE` g x y IF
+  BRANCH IF g THEN TRUE
+         OTHERWISE x AND (x OR y)
+
+-- (9) The redundant condition is a call, which reads through to a condition
+--     the rule already asks for: `either a b` means `a OR b`. It is placed
+--     at the call.
+GIVEN x IS A BOOLEAN, y IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `either` x y IF x OR y
+
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `a hurdle through a call` a b IF
+    a AND `either` a b
+
+-- Not reported.
+
+-- (10) The redundant condition is in the test of a row. Every row after the
+--      first carries the tests before it, negated, which nobody wrote, so the
+--      tests are not checked; this is what that costs.
+GIVEN g IS A BOOLEAN, x IS A BOOLEAN, y IS A BOOLEAN, z IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `a hurdle in a test` g x y z IF
+  BRANCH IF x AND (x OR y) THEN g
+         OTHERWISE z

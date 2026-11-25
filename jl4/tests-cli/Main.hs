@@ -26,7 +26,7 @@ import qualified Data.Aeson as Aeson
 import Data.Aeson (Value(..), eitherDecode, toJSON)
 import Data.Foldable (toList, traverse_)
 import Data.IORef (atomicModifyIORef', newIORef)
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, isJust)
 import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.Aeson.Key as Key
 import System.Directory
@@ -6718,8 +6718,14 @@ spec bin = do
     it "goes RED on a decision no assignment can satisfy" $
       expectVerifyFinding bin verifyUnsatFixture "unsat"
 
-    it "goes RED on an OR limb that cannot hold where it sits" $
+    it "goes RED on an OR limb that cannot hold where it sits" $ do
       expectVerifyFinding bin verifyDeadBranchFixture "dead-branch"
+      -- Exactly one finding, at its place in the normal form. The rule as
+      -- written is walked too, for a redundant condition, and a dead branch is
+      -- not looked for there; reported from both walks, it would be here twice.
+      env <- jsonEnvelope bin ["verify", verifyDeadBranchFixture, "--format", "json"]
+      lookup "`one limb is inoperative`" (findingSitesByDecision env)
+        `shouldBe` Just [("dead-branch", "body.and[1].or[0]")]
 
     it "goes RED on a conjunct its own siblings already entail" $
       expectVerifyFinding bin verifyVacuousGuardFixture "vacuous-guard"
@@ -6745,12 +6751,27 @@ spec bin = do
       code `shouldBe` ExitFailure 1
       sout `shouldSatisfy` ("\"unreachable-outcome\"" `isInfixOf`)
 
+    -- The seam's findings are the normal form's, and each is reported once:
+    -- the walk over the rule as written looks only for a redundant condition,
+    -- so a finding that walk repeated would show here as a second copy.
+    it "reports each finding at a rule's seam once, at its place in the normal form" $ do
+      env <- jsonEnvelope bin ["verify", verifySeamFixture, "--format", "json"]
+      let found = findingSitesByDecision env
+      lookup "`a rule that reaches nobody`" found `shouldBe` Just [("vacuous-guard", "body.scope")]
+      lookup "`everyone in scope is in breach`" found `shouldBe` Just [("unreachable-outcome", "body")]
+      lookup "`a requirement that adds nothing`" found `shouldBe` Just [("unreachable-outcome", "body")]
+      -- None of them is placed in the source: the normal form is not in it.
+      [ nm | (nm, f) <- findingObjectsByDecision env, isJust (objField f "writtenAt") ] `shouldBe` []
+
     -- `x XOR y` normalises into a CNF containing `x OR NOT x`; reporting that
     -- clause as a vacuous guard would fire on ordinary drafting and teach the
     -- reader to ignore the tool. verify-clean.l4's first decision IS an xor, so
-    -- this is measured, not asserted. Two things keep it out now: the clause is
-    -- valid on its own, and redundancy is looked for in the rule as written,
-    -- where the clause does not exist (smucclaw/l4-ide#1093).
+    -- this is measured, not asserted. What keeps the clause out now is that
+    -- redundancy is looked for in the rule as written, where the clause does
+    -- not exist (smucclaw/l4-ide#1093). The gate that used to keep it out, that
+    -- a condition true on its own is not reported, is not reached by this
+    -- file; `a condition true on its own` in verify-covered-alternatives.l4
+    -- is what pins it.
     it "does not report the tautological clauses CNF distribution manufactures" $ do
       Output code sout _ <- runL4 bin ["verify", verifyCleanFixture, "--format", "json"]
       code `shouldBe` ExitSuccess
@@ -6775,6 +6796,12 @@ spec bin = do
       lookup "`eligible, as a choice`" found `shouldBe` Just []
       lookup "`three ways in`" found `shouldBe` Just []
       lookup "`exclusive rows`" found `shouldBe` Just []
+      -- Clean because all four were analysed, not because some were skipped.
+      case objField env "summary" of
+        Just summ -> do
+          objField summ "analysed" `shouldBe` Just (Number 4)
+          objField summ "skipped" `shouldBe` Just (Number 0)
+        Nothing -> expectationFailure "expected a summary"
 
     -- The other half of #1093: a condition the drafter DID write that excludes
     -- nothing is still reported, once, at the place it sits in the rule as
@@ -6783,7 +6810,9 @@ spec bin = do
     -- condition's normal form, and `a hurdle inside a limb` was reported at
     -- `body.and[1]`, a conjunction the rule as written does not have. The
     -- requirement case, the row of a BRANCH and verify-vacuous-guard.l4 read
-    -- the same either way, and are the controls.
+    -- the same either way, and are the controls. So are what an ELSE and an
+    -- OTHERWISE say, a call that reads through to a condition already asked
+    -- for, and a redundant condition in a test, which is not checked.
     it "reports a redundant condition the drafter wrote, once, where it is written" $ do
       env <- jsonEnvelope bin ["verify", verifyWrittenGuardsFixture, "--format", "json"]
       let found = findingSitesByDecision env
@@ -6799,6 +6828,11 @@ spec bin = do
       -- operand, so before this was fixed the `a` that opens `(a AND b)` was
       -- placed at the bracket that opens the group around it.
       lookup "`a hurdle in two brackets`" found `shouldBe` Just [("vacuous-guard", "body.and[1].or[0].and[0]")]
+      lookup "`a hurdle in an ELSE`" found `shouldBe` Just [("vacuous-guard", "body.and[1].and[1]")]
+      lookup "`a hurdle in an OTHERWISE`" found `shouldBe` Just [("vacuous-guard", "body.or[1].and[1].and[1]")]
+      lookup "`a hurdle through a call`" found `shouldBe` Just [("vacuous-guard", "body.and[1]")]
+      lookup "either" found `shouldBe` Just []
+      lookup "`a hurdle in a test`" found `shouldBe` Just []
       source <- lines <$> readFile verifyWrittenGuardsFixture
       let startsWith nm want =
             case [ (line, col)
@@ -6816,6 +6850,9 @@ spec bin = do
       startsWith "`a hurdle in the requirement`" "x OR y))"
       startsWith "`a hurdle in a row`" "x OR y)"
       startsWith "`a hurdle in two brackets`" "a AND b) OR c)"
+      startsWith "`a hurdle in an ELSE`" "x OR y)"
+      startsWith "`a hurdle in an OTHERWISE`" "x OR y)"
+      startsWith "`a hurdle through a call`" "`either` a b"
       -- A condition whose first word is a parameter is placed in the local
       -- definition, where it is written, not at the argument of the call.
       [ round line :: Int
@@ -6824,6 +6861,13 @@ spec bin = do
         `shouldBe` [60, 60]
       Output _ text _ <- runL4 bin ["verify", verifyWrittenGuardsFixture]
       text `shouldSatisfy` ("[vacuous-guard] at body.or[0].and[1], written at 23:16" `isInfixOf`)
+      -- With --no-coalesce-atoms nothing is read through, so the call is an
+      -- atom of its own and adds a condition; the rest read the same.
+      separate <- jsonEnvelope bin ["verify", verifyWrittenGuardsFixture, "--format", "json", "--no-coalesce-atoms"]
+      let found' = findingSitesByDecision separate
+      lookup "`a hurdle through a call`" found' `shouldBe` Just []
+      filter ((/= "`a hurdle through a call`") . fst) found'
+        `shouldBe` filter ((/= "`a hurdle through a call`") . fst) found
 
     -- An alternative the others already cover adds nothing, and is reported
     -- where it is written, under a NOT too. Before the fix none of the three
@@ -6950,6 +6994,15 @@ spec bin = do
       lookup "`x cannot matter`" found `shouldBe` Just ["unreachable-outcome"]
       lookup "`the waiver was signed`" found `shouldBe` Just []
       lookup "`the rule is in force`" found `shouldBe` Just []
+      -- Only a constant carries the key: a decision that reads through one is
+      -- not one.
+      [ nm
+        | Just (Array ds) <- [objField env "decisions"]
+        , d <- toList ds
+        , Just (String nm) <- [objField d "name"]
+        , isJust (objField d "constant")
+        ]
+        `shouldBe` ["`the waiver was signed`", "`the rule is in force`"]
 
     -- #1095's third ask: a finding on a rule that reads through a constant names
     -- the constant, because the cause is usually intended, and "x cannot
