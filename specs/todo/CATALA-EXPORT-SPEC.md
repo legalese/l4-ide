@@ -1096,7 +1096,9 @@ TALLYSTICK, ruled 2026-11-12 by Meng (typed "BANNETON TALLYSTICK" in session GM)
 4. The text layout: the cover points with their spans, a `T`/`F` table of the buckets, the first witness of each and L4's answer there, and the impossible buckets capped at sixteen unless `--all`.
 5. The closing coverage line, in the style of `l4 explore`.
 6. The limits in the `--help` footer, as that footer was printed in the example run.
-   Its sentences on the candidates, on the solver's witnesses and on the inputs no condition reads were reworded on 2026-11-25 to say what the search does; that corrects the description, not this ruling (see "Corrected 2026-11-25" above).
+   Its sentences on the candidates, on the solver's witnesses and on the inputs no condition reads were reworded on 2026-11-25 to say what the search does, and a sentence was added saying that an input whose type has no value within two levels leaves no candidates at all; that corrects the description, not this ruling (see "Corrected 2026-11-25" above).
+   So does the change to its sentence on a call to another rule, from "A call to another rule is one cover point and its body is not read." to "A call to another rule is one cover point: its conditions are not cover points, though its numbers are among the candidates.", since the numbers in the body of a rule a cover point calls are among the candidates.
+   The footer is also extended, decided by Claude 2026-11-25, pending Meng's review: the cover points' sentence names "the WHENs of a CONSIDER" among the conditions a rule branches on (smucclaw/l4-ide#1094), and sentences are added on the shapes of a `CONSIDER` that are covered, on the decisions the solver cannot read, and on a condition that raises where an earlier arm answers, with the limit of that check to the candidates (see "Refined for smucclaw/l4-ide#1094" and "Refined for a raise behind an earlier arm" above).
 
 CROSSWORD, ruled 2026-11-12 (21:59Z) by Meng, who typed the word in session GM in one message with other sessions' words: the four items that stood as assumed after TALLYSTICK, as built.
 
