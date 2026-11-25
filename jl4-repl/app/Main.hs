@@ -295,22 +295,14 @@ loadFile st fp = do
 -- | What the REPL says, on loading a file and instead of evaluating a line, when
 -- a module the file imports, directly or not, has errors: nothing is evaluated
 -- then, as nothing is in a file with errors of its own (smucclaw/l4-ide#1025,
--- 'Rules.evaluable'). It names the module, and says how to get past it: for a
--- module the file imports, fixing it and starting the REPL again, since the
--- REPL does not see a change to a file it has already checked, even on
--- @:reload@ or @:reset@; for one that @:import@ added, @:reset@, or starting
--- the REPL again once it is fixed (decided by Claude 2026-11-25, pending
--- Meng's review).
+-- 'Rules.evaluable'). It names the module, or modules, and what is wrong with
+-- each, and for one that @:import@ added, says that @:reset@ removes it
+-- (decided by Claude 2026-11-25, pending Meng's review).
 fileImportsHaveErrors :: ReplState -> NormalizedUri -> IO Text
 fileImportsHaveErrors st uri = brokenImports st uri >>= \case
   [] -> pure importsHaveErrors
   broken -> pure $
     "This file imports " <> describeBroken (map snd broken) <> ", so nothing is evaluated; `l4 check` on the file shows the errors."
-      <> restartToSeeAFix
-
-restartToSeeAFix :: Text
-restartToSeeAFix =
-  " If you have fixed that since, start the REPL again: it does not see a change to a file it has already checked, even on `:reload` or `:reset`."
 
 -- | The same, for a line of the REPL whose own imports have errors. When the
 -- loaded file is evaluable, a broken module came in through @:import@: the
@@ -330,7 +322,6 @@ lineImportsHaveErrors st contextFile lineUri = do
         fromImports ->
           "`:import` added " <> describeBroken fromImports <> ", so nothing is evaluated;"
             <> " `:imports` lists what `:import` added, and `:reset` removes it."
-            <> restartToSeeAFix
     _ -> fileImportsHaveErrors st contextUri
 
 -- | The modules a file imports directly that stop it being evaluated, each with

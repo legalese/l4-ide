@@ -751,9 +751,8 @@ The same holds for every file that imports this one, directly or not, since its 
   A results panel that was open keeps the last results it had, as it does while a file has an error of its own.
   A decision graph of a rule in the file can still be drawn.
   Where the rule calls another rule, answering the graph's questions makes it say that evaluation failed: `A module this file imports has errors, so nothing is evaluated; the error on its IMPORT names it.`
-- The REPL names the module when it loads the file, and again for each line you ask it to evaluate, in a message that begins ``This file imports `lib`, which has errors, so nothing is evaluated; `l4 check` on the file shows the errors.``
-  The REPL does not see a change to a file it has already checked, even on `:reload` or `:reset`, so once the module is fixed, start the REPL again; the message says so too.
-- A module that `:import` added in the REPL stops every line in the same way, and the REPL says so, in a message that begins `` `:import` added `lib`, which has errors, so nothing is evaluated; `:imports` lists what `:import` added, and `:reset` removes it. ``
+- The REPL names the module when it loads the file, and again for each line you ask it to evaluate: ``This file imports `lib`, which has errors, so nothing is evaluated; `l4 check` on the file shows the errors.``
+- A module that `:import` added in the REPL stops every line in the same way, and the REPL says so: `` `:import` added `lib`, which has errors, so nothing is evaluated; `:imports` lists what `:import` added, and `:reset` removes it. ``
 
 What this does not cover:
 

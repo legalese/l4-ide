@@ -4805,11 +4805,15 @@ spec bin = do
         replQueries = ["`the answer`", "1 PLUS 1", ":trace `the answer`", ":traceascii `the answer`"]
         -- What the REPL says, on loading main.l4 and for each line, while a
         -- module it imports has errors: which modules, and what is wrong with
-        -- each, then the same advice.
+        -- each.
         fileMessageFor :: T.Text -> T.Text
-        fileMessageFor modules = "This file imports " <> modules <> ", so nothing is evaluated; `l4 check` on the file shows the errors." <> restartAdvice
-        restartAdvice = " If you have fixed that since, start the REPL again: it does not see a change to a file it has already checked, even on `:reload` or `:reset`."
+        fileMessageFor modules = "This file imports " <> modules <> ", so nothing is evaluated; `l4 check` on the file shows the errors."
         fileMessage = fileMessageFor "`lib`, which has errors"
+        -- The REPL used to end each refusal by saying it would not see a fix
+        -- until it was started again; it sees one on :reload now
+        -- (legalese/l4-ide#878), so a refusal must not say that.
+        noRestartAdvice :: T.Text -> Expectation
+        noRestartAdvice said = said `shouldNotSatisfy` T.isInfixOf "start the REPL again"
         withLsp act = maybe (pendingWith "no jl4-lsp binary (set JL4_LSP_BIN, or run under cabal test)") act mLsp
         -- Draw the decision graph of `we agree` in ladder.l4 from its lens,
         -- then ask the language server to evaluate the call in it to a rule
@@ -4906,6 +4910,7 @@ spec bin = do
 
     it "the REPL evaluates no line of it, and names the module that stops it, on loading the file and for each line" $ withRepl \repl -> do
       (loaded, rs) <- session repl (libAndMain errDir) replQueries
+      mapM_ noRestartAdvice (loaded : rs)
       loaded `shouldSatisfy` T.isSuffixOf ("Error loading file: " <> fileMessage)
       rs `shouldBe` replicate (length replQueries) fileMessage
 
@@ -4927,7 +4932,8 @@ spec bin = do
         , ":import `my-broken`", "1 PLUS 1", ":reset"
         , ":import broken -- my lib", "1 PLUS 1"
         ]
-      let refusal name = "`:import` added `" <> name <> "`, which has errors, so nothing is evaluated; `:imports` lists what `:import` added, and `:reset` removes it." <> restartAdvice
+      let refusal name = "`:import` added `" <> name <> "`, which has errors, so nothing is evaluated; `:imports` lists what `:import` added, and `:reset` removes it."
+      mapM_ noRestartAdvice rs
       case rs of
         [added, refused, reset, again, addedQuoted, refusedQuoted, _, addedNoted, refusedNoted] -> do
           added `shouldBe` "Added: IMPORT broken"
