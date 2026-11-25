@@ -3951,7 +3951,8 @@ cast to BusinessKnowledgeModel` inside `parse()` and rejects the entire DRG**, i
     > after: `6/6 value(s) as expected` on both engines). Choosing dependency order over the
     > narrower "aliases first" is decided by Claude 2026-11-25, pending Meng's review. Dependency
     > order is also wider than KIE needs: it puts a record before a record whose field it types,
-    > which KIE accepts in either order (`fwdrecord` above), so `legal/promissory-note.l4`'s
+    > which KIE accepts in either order (measured above: "a record whose field is a record
+    > declared later"), so `legal/promissory-note.l4`'s
     > `Bank_Account` now comes before `Company`, whose `Account` it types. Reordering those too,
     > rather than moving only what KIE refuses, is decided by Claude 2026-11-25, pending Meng's
     > review.
