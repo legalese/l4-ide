@@ -688,6 +688,11 @@ verifyCoveredAlternativesFixture = fixtureDir </> "verify-covered-alternatives.l
 verifyDefinitionUsedTwiceFixture :: FilePath
 verifyDefinitionUsedTwiceFixture = fixtureDir </> "verify-definition-used-twice.l4"
 
+-- A rule whose requirement is unsatisfiable, kept apart from verify-seam.l4,
+-- which the pipeline uses as its control for unreachable-outcome.
+verifyUnsatRequirementFixture :: FilePath
+verifyUnsatRequirementFixture = fixtureDir </> "verify-unsat-requirement.l4"
+
 -- Referential transparency (specs/todo/WHERE-INLINING-SPEC.md): a zero-arity
 -- WHERE/LET binding is inlined before analysis, so a rule means the same thing
 -- however its limbs are named. The recursive file is the termination control.
@@ -1050,7 +1055,7 @@ coreFixtures =
   , verifyClauseGroupCallFixture, verifyClauseGroupWhereFixture, verifyClauseTableFixture, verifyClauseGroupMaybeFixture
   , verifyClauseTableLargeFixture
   , verifyManufacturedClausesFixture, verifyWrittenGuardsFixture
-  , verifyCoveredAlternativesFixture, verifyDefinitionUsedTwiceFixture
+  , verifyCoveredAlternativesFixture, verifyDefinitionUsedTwiceFixture, verifyUnsatRequirementFixture
   , verifyVacuousGuardFixture, verifySeamFixture, verifyNestedFixture
   , verifyWhereTransparencyFixture, verifyWhereRecursiveFixture
   , verifyConstantsFixture, verifyConstantsReadThroughFixture
@@ -6760,12 +6765,15 @@ spec bin = do
       lookup "`a rule that reaches nobody`" found `shouldBe` Just [("vacuous-guard", "body.scope")]
       lookup "`everyone in scope is in breach`" found `shouldBe` Just [("unreachable-outcome", "body")]
       lookup "`a requirement that adds nothing`" found `shouldBe` Just [("unreachable-outcome", "body")]
-      -- An unsatisfiable requirement: the walk over the rule as written reaches
-      -- it too, and would say `unsat` a second time if it reported one.
-      lookup "`a requirement nobody can meet`" found
-        `shouldBe` Just [("unreachable-outcome", "body"), ("unsat", "body.requirement")]
       -- None of them is placed in the source: the normal form is not in it.
       [ nm | (nm, f) <- findingObjectsByDecision env, isJust (objField f "writtenAt") ] `shouldBe` []
+      -- An unsatisfiable requirement, in a fixture of its own: the walk over
+      -- the rule as written reaches it too, and would say `unsat` a second
+      -- time if it reported one.
+      nested <- jsonEnvelope bin ["verify", verifyUnsatRequirementFixture, "--format", "json"]
+      lookup "`a requirement nobody can meet`" (findingSitesByDecision nested)
+        `shouldBe` Just [("unreachable-outcome", "body"), ("unsat", "body.requirement")]
+      [ nm | (nm, f) <- findingObjectsByDecision nested, isJust (objField f "writtenAt") ] `shouldBe` []
 
     -- `x XOR y` normalises into a CNF containing `x OR NOT x`; reporting that
     -- clause as a vacuous guard would fire on ordinary drafting and teach the
