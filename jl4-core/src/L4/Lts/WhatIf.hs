@@ -782,13 +782,16 @@ openingOf clock raw = case raw.roOpens of
 -- whose @GIVEN@ nothing supplies, which its @TYPICALLY@ default gives a run
 -- too, and of a rule that supplies the @GIVEN@ itself with @WITH@.
 --
--- Not covered: a rule of an IMPORTED module that reads a ledger. The rig
--- holds the imports' heaps, not their source, so such a rule is not in
--- 'clReads', and an expression naming it is worked out against an empty
--- ledger (measured 2026-11-25: @fromMaybe 10 (RECALL `period`)@ in an
--- imported file, named by a @WITHIN@, explores and lists as @WITHIN 10@).
--- That is the run's deadline only while nothing has recorded the cell; the
--- explore page states it as a limit.
+-- Not covered, a known limit: a rule of an IMPORTED module that reads a
+-- ledger, the clock, the world outside the file or its own section @GIVEN@.
+-- The rig holds the imports' heaps, not their source, so such a rule is not
+-- in 'clReads', and an expression naming it is worked out outside a run
+-- (measured 2026-11-25: @fromMaybe 10 (RECALL `period`)@ in an imported
+-- file, named by a @WITHIN@, explores and lists as @WITHIN 10@; measured
+-- 2026-11-26: an imported @TODAY@ reader explores to 8 or 5 by
+-- @--fixed-now@). That is the run's deadline only while nothing has recorded
+-- the cell, or on the day the command ran; the explore page states it as a
+-- silent failure.
 data Closed = MkClosed
   { clEval  :: Maybe (Expr Resolved -> IO (Either Text (Value NF)))
     -- ^ the evaluator's answer for a closed expression, or what stopped it;
