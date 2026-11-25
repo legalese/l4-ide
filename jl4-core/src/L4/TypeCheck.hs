@@ -3237,6 +3237,11 @@ checkDeonton ann subject action opens due mjoin hence lest partyT actionT = do
 --     @ONCE@ line's @WITHIN@, which already counts.
 --   * A @MUST NOT@ reaches its @LEST@ when the forbidden act is performed
 --     ('Contract10'), deadline or not, so it never draws this.
+--   * An @EVERY@ with a @LEST@ and no join line does not draw it either: it is
+--     already an error ('ContinuationWithoutJoin', R-Q1), which asks for the
+--     line a deadline could go on, and the rule cannot run until it is
+--     written. Once it is, a rule still without a deadline draws this
+--     (decided by Claude 2026-11-25, pending Meng's review).
 --
 -- This is the same rule as 'hasDeadline' in 'checkDeontonBody', and as the
 -- state graph's "unreachable: no WITHIN" caption
@@ -3254,16 +3259,18 @@ warnLestWithoutDeadline ann subject modal opens due mjoin = \ case
     | reachedOnlyByDeadline modal
     , isNothing due
     , not (hasJoinDeadline mjoin)
+    , not (quantified && isNothing mjoin)
     -> addWarning $ LestWithoutDeadline MkLestWithoutDeadlineInfo
          { range = lestKeywordRange ann <|> rangeOf lestExpr
          , modal
-         , quantified = case subject of
-             Every {} -> True
-             Party {} -> False
+         , quantified
          , opens = isJust opens
          }
   _ -> pure ()
   where
+    quantified = case subject of
+      Every {} -> True
+      Party {} -> False
     -- no wildcard, so a new modal has to say how its LEST is reached
     reachedOnlyByDeadline = \ case
       DMust    -> True

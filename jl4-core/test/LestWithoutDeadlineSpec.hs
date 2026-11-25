@@ -176,6 +176,14 @@ spec = describe "a LEST on a rule with no deadline (smucclaw/l4-ide#1097)" do
         out `shouldSatisfy` Text.isPrefixOf "PARTY "
         (not (null (lestWarnings r)), lestTaken out) `shouldSatisfy` \ (warned, taken) -> warned /= taken
 
+  it "stays silent on an EVERY with no join line, which is already an error asking for the line" do
+    -- the join line is where a deadline could go, so the warning would name
+    -- a line the author has not written, on a rule that cannot run yet
+    r <- checked (module_ [ "EVERY Tenant t IN tenants", "  MUST payRent", "  " <> lestBody ] [])
+    [ e | e <- r.tcdErrors, checkErrorCode e.kind == "check/continuation-without-join" ]
+      `shouldSatisfy` (not . null)
+    length (lestWarnings r) `shouldBe` 0
+
   it "sits on the LEST keyword of the rule that has no deadline, not on an enclosing one" do
     -- the outer rule has a deadline; the rule under its LEST does not
     let src = module_
