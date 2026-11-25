@@ -514,10 +514,13 @@ asConstant a = case a.anConstant of
 
 -- | Analyse one decision.
 --
--- The unit of analysis is the decision's OWN ladder, as written: every finding
--- names a site in this rule's text. Local @WHERE@ / @LET@ bindings are substituted
--- first ('Transform.inlineLocalBindingsInDecide'), because a rule means the same
--- thing however its limbs are named.
+-- The unit of analysis is the decision's OWN ladder: every finding names a site
+-- in it, and a site is a place in this rule, not in a rule it calls. Most
+-- findings are read off the ladder's normal form, whose sites need not exist in
+-- the source; a redundant condition is read off the ladder as written
+-- ('Written'), and carries where it starts in the source. Local @WHERE@ /
+-- @LET@ bindings are substituted first ('Transform.inlineLocalBindingsInDecide'),
+-- because a rule means the same thing however its limbs are named.
 --
 -- A call to another boolean rule is still one leaf of that ladder, but it is no
 -- longer an OPAQUE leaf: 'callMeanings' works out what it means, and every
@@ -898,10 +901,10 @@ ladderNodeCount budget root = go 0 [root]
 
 -- | The rule as written: its body drawn WITHOUT the normal form, so its
 -- conjunctions are the drafter's own, with its atoms in the analysis's atom
--- space. A redundant condition is looked for here and nowhere else
--- (smucclaw/l4-ide#1093): the normal form distributes a disjunction of
--- conjunctions into clauses nobody wrote, and some of those are entailed by
--- their siblings (@(a AND b) OR ((NOT a) AND e)@ yields @b OR e@, entailed by
+-- space. A redundant condition (a conjunct entailed, an alternative covered) is
+-- looked for here and nowhere else (smucclaw/l4-ide#1093): the normal form
+-- distributes a disjunction of conjunctions into clauses nobody wrote, and some
+-- of those are entailed by their siblings (@(a AND b) OR ((NOT a) AND e)@ yields @b OR e@, entailed by
 -- @a OR e@ and @NOT a OR b@), although no condition in the source is.
 --
 -- One expansion is still in this drawing, because the ladder draws it whether
@@ -1278,7 +1281,8 @@ data Pass
   -- @unreachable-outcome@.
   | AsWritten
   -- ^ Over the rule as written ('Written'): the @vacuous-guard@ (b), a
-  -- condition its own siblings already entail, and only that.
+  -- condition its own siblings already entail or an alternative the others
+  -- already cover, and only that.
   deriving stock Eq
 
 analyseBody
