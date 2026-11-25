@@ -17,9 +17,14 @@ cabal run jl4-repl
 ## Common Commands
 
 - `:help` — show built-in help
-- `:load <file>` / `:reload` — load or reload the current file
+- `:load <file>` / `:reload` — load a file, or load the current file again
+- `:reset` — remove what `:import` added, and load the current file again
 - `:type <expr>` — show the inferred type for an expression
 - `:info <name>` / `:env` — inspect names in scope
+
+`:load`, `:reload` and `:reset` each read the file again from disk, with every module it imports, directly or not, and every module that `:import` added.
+So an edit you save while the REPL runs is seen at the next of these commands.
+Evaluating a line does not read any file again: after an edit, `:reload` before you ask.
 
 ## Query Planning (Elicitation)
 

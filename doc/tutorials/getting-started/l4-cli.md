@@ -797,6 +797,8 @@ Then evaluate expressions live:
 ```
 
 Useful REPL commands: `:help`, `:load <file>` / `:reload`, `:type <expr>`, `:info <name>` / `:env`, `:decides` and `:queryplan` (query planning), and `:trace` / `:traceascii` / `:tracefile` (evaluation traces). See [jl4-repl's README](https://github.com/legalese/l4-ide/tree/main/jl4-repl) for the full list.
+`:load` and `:reload` read the file again from disk, with every file it imports, so a change you save while the REPL runs is seen; `:reset` does the same, and also removes what `:import` added.
+Evaluating a line does not read the files again, so after a change, `:reload` before you ask.
 
 ---
 

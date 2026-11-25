@@ -1221,6 +1221,11 @@ jl4-core/src/L4/
 5. **Should the REPL auto-reload files when they change on disk?**
    - Nice for development, but could be surprising
    - Could be an option: `:set autoreload on`
+   - Not answered; what the REPL does as of 2026-11-25 (smucclaw/l4-ide#1099), decided by Claude 2026-11-25, pending Meng's review:
+     `:load`, `:reload` and `:reset` read again from disk every file the REPL has read: the loaded file, every module it imports, directly or not, and every module `:import` added.
+     Evaluating a line reads no file again, so there is no auto-reload.
+     `:reset` re-reads in the same store as `:reload`; it does not start a new store.
+     Before #1099 none of the three read a file again: the store kept the first text it read of each file (`syncStoreWithDisk` in `jl4-repl/app/Main.hs` says why).
 
 ## References
 
