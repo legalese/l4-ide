@@ -88,12 +88,16 @@ The pipeline’s output lands in [**legalese/canon**](https://github.com/legales
 
 ### Three commands you will use directly
 
-`l4 verify FILE` compiles each boolean rule through the ladder into a decision diagram and reports four families of defect: an **unsatisfiable** conjunction, a **dead branch** that can never be taken where it sits, a **vacuous guard** that its siblings already entail, and an **unreachable outcome** — a verdict the rule can never deliver. If OPA’s rule-completeness warnings are your reference point, this is the same instinct with a stricter engine behind it.
+`l4 verify FILE` compiles each boolean rule through the ladder into a decision diagram and reports four families of defect: an **unsatisfiable** conjunction, a **dead branch** that can never be taken where it sits, a **vacuous guard** (a condition its siblings already entail, or an alternative the others already cover), and an **unreachable outcome** — a verdict the rule can never deliver. If OPA’s rule-completeness warnings are your reference point, this is the same instinct with a stricter engine behind it.
 
 To check a rule, the tool first rewrites it as one long list of “all of these must hold” clauses, and that rewriting creates clauses the drafter never wrote.
-So a vacuous guard is looked for only among the conditions the rule actually writes: `(a AND b) OR ((NOT a) AND e)` gets no finding, however the rewriting splits it up, while `x AND (x OR y)` is reported once, with the line and column where `(x OR y)` starts.
+So a vacuous guard is looked for only among the conditions the rule actually writes: `(a AND b) OR ((NOT a) AND e)` gets no finding, however the rewriting splits it up, while `x AND (x OR y)` is reported once, with the line and column of the first word of `(x OR y)`, its `x`.
+The same holds for an alternative the others already cover: `(a AND b) OR b` is reported at `a AND b`, which lets nothing through that `b` does not.
+Both are looked for under a `NOT` as well.
+A condition written in a local definition (`WHERE` or `LET`) is placed where the definition writes it, at its opening bracket if its first word is one of the definition's parameters, which stands for whatever each use passes in.
+When the rule uses the definition more than once, the copies of a condition written once are judged as one: `qualifies a AND qualifies b`, where `qualifies x` means `x AND c`, gets no finding, just as it gets none when `qualifies` is a rule of its own; the price is that a definition used twice the same way can go unreported.
 Each row of a `BRANCH`, and the `ELSE` of an `IF`, also carries “none of the rows above applied”, which nobody wrote, so the tests themselves are not checked for this, only what each `THEN`, `ELSE` and `OTHERWISE` says: a redundant condition inside a test goes unreported.
-The other findings name a place in the rewritten rule, such as `body.and[1].or[0]`, which need not appear in the source as written.
+The other findings name a place in the rewritten rule, such as `body.and[1].or[0]`, which need not appear in the source as written, and so does a vacuous guard that is a scope nobody can be in; these carry no line and column.
 
 A rule that calls another rule is read through to what that rule means, in the same file or an imported one. So if an encoding writes an exception as its own rule and the offence calls it as a defeater, asking for both at once is reported as a contradiction, not passed over. Findings are still reported at the sites of the rule you are looking at; the called rule has its own entry. A call whose meaning is too large to draw stays opaque, and the report names it.
 
