@@ -6363,7 +6363,7 @@ A test against `EMPTY` in a table therefore falls to `fallbackCell`, a boolean c
 
 ## 18. Values read from an imported module — smucclaw/l4-ide#1102, 2026-11-25
 
-The exporter writes one `<definitions>` per module and emits no DMN `<import>` (§2.5.7's "module-local, for v1").
+The exporter writes one `<definitions>` per module and emits no DMN `<import>` (§5.1, the status note of 2026-07-29: "this exporter emits no imports").
 Until this date a nullary reference to a value defined in another module rendered as its FEEL name, with no element behind it and no note: `decideFreeTerms` and `classifyRef` drop cross-module names (§2.4.5), so neither an `inputData` nor a requirement edge was minted.
 Measured on the issue's repro (`monthly.l4` importing `` `the longest week` MEANS 42 ``): KIE 8.44.0.Final refused the file (`ERR_COMPILING_FEEL … Unknown variable 'the_longest_week'`), and Camunda 8.7.6 parsed it and answered null.
 No ruling in this spec covers imported values; the issue offered two options, and both are taken, each for its own population, decided by Claude 2026-11-25, pending Meng's review.
