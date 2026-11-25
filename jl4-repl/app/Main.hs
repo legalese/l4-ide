@@ -295,13 +295,19 @@ loadNamed st name = do
   absPath <- makeAbsolute (Text.unpack (Text.strip name))
   exists <- doesFileExist absPath
   if not exists
-    then pure ("Error: there is no file " <> Text.pack absPath, st, False)
+    then pure ("Error: " <> noFile absPath, st, False)
     else do
       let newState = st { loadedFile = Just absPath }
       result <- loadFile newState absPath
       case result of
         Left err -> pure ("Error: " <> err, newState, False)
         Right _ -> pure ("Loaded: " <> Text.pack absPath, newState, False)
+
+-- | What the REPL says of a file it was asked to load that is not there, at
+-- start-up, @:load@, @:reload@ and @:reset@ alike (decided by Claude
+-- 2026-11-25, pending Meng's review).
+noFile :: FilePath -> Text
+noFile fp = "there is no file " <> Text.pack fp
 
 -- | The loaded file's text from disk, for a line to be read against when the
 -- store holds no copy of it, or nothing when it cannot be read: the file was
@@ -362,6 +368,13 @@ loadFile st fp = do
   -- Read the file into the store, and every file the store has read before
   -- again, from disk (smucclaw/l4-ide#1099)
   syncStoreWithDisk st nfp
+  -- A file that is not there is said to be gone, not to have failed its check
+  exists <- doesFileExist fp
+  if exists then checkLoadedFile st uri else pure (Left (noFile fp))
+
+-- | Check the file just read into the store, for 'loadFile'
+checkLoadedFile :: ReplState -> NormalizedUri -> IO (Either Text ())
+checkLoadedFile st uri = do
   -- Trigger type check
   [mtc] <- shakeRunDatabase st.ideState.shakeDb [Shake.use Rules.SuccessfulTypeCheck uri]
   case mtc of

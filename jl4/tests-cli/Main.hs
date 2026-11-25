@@ -2667,20 +2667,31 @@ spec bin = do
       withSystemTempDirectory "l4-repl-edit" \work -> do
         writeFile (work </> "main.l4") "x MEANS 1\n"
         rs <- replSession repl work ["main.l4"] [Send ":load nosuch.l4", Send "x", Send ":l nosuch.l4", Send "x"]
-        map (T.takeWhile (/= ':')) (answers [0, 2] rs) `shouldBe` ["Error", "Error"]
+        map (saysNoFile "Error: " "nosuch.l4") (answers [0, 2] rs) `shouldBe` [True, True]
         answers [1, 3] rs `shouldBe` ["1", "1"]
 
+    -- The same words for a loaded file that has gone, at :reload and :reset,
+    -- and at start-up for one that was never there.
     it "goes on answering after the loaded file is deleted" $ withRepl \repl ->
       withSystemTempDirectory "l4-repl-edit" \work -> do
         writeFile (work </> "main.l4") "x MEANS 1\n"
         rs <- replSession repl work ["main.l4"]
-          [ Send "x", OnDisk (removeFile (work </> "main.l4")), Send ":reload", Send "x", Send "1 PLUS 1" ]
+          [ Send "x", OnDisk (removeFile (work </> "main.l4")), Send ":reload", Send "x", Send ":reset", Send "1 PLUS 1" ]
         case rs of
-          [before', reloaded, _x, sum'] -> do
+          [before', reloaded, _x, reset, sum'] -> do
             before' `shouldBe` "1"
-            T.takeWhile (/= ':') reloaded `shouldBe` "Error reloading"
+            reloaded `shouldSatisfy` saysNoFile "Error reloading: " "main.l4"
+            reset `shouldSatisfy` saysNoFile "Error reloading: " "main.l4"
             sum' `shouldBe` "2"
-          other -> expectationFailure ("Expected 4 replies, got " ++ show other)
+          other -> expectationFailure ("Expected 5 replies, got " ++ show other)
+
+    it "says so when it is started on a file that is not there, and goes on answering" $ withRepl \repl ->
+      withSystemTempDirectory "l4-repl-edit" \work -> do
+        (banner, rs) <- replSessionWithBanner repl work ["nosuch.l4"] [Send "1 PLUS 1"]
+        filter ("Error" `T.isPrefixOf`) (T.lines banner) `shouldSatisfy` \case
+          [line] -> saysNoFile "Error loading file: " "nosuch.l4" line
+          _ -> False
+        rs `shouldBe` ["2"]
 
   -- A rule that may refuse to answer gets no query plan, from the REPL or from
   -- the language server: each says why in the one sentence core gives, which
@@ -7882,14 +7893,18 @@ data ReplStep = Send String | OnDisk (IO ())
 -- that nothing blocks on it. A prompt that does not come within two minutes,
 -- or a REPL that ends before it, fails the test with what the REPL printed.
 replSession :: FilePath -> FilePath -> [String] -> [ReplStep] -> IO [T.Text]
-replSession repl work args steps =
+replSession repl work args steps = snd <$> replSessionWithBanner repl work args steps
+
+-- | 'replSession', with what the REPL printed before its first prompt.
+replSessionWithBanner :: FilePath -> FilePath -> [String] -> [ReplStep] -> IO (T.Text, [T.Text])
+replSessionWithBanner repl work args steps =
   withFile (work </> "repl-stderr.log") WriteMode \herr ->
     withCreateProcess (proc repl args)
       { std_in = CreatePipe, std_out = CreatePipe, std_err = UseHandle herr, cwd = Just work } \mIn mOut _ ph ->
         case (mIn, mOut) of
           (Just hin, Just hout) -> do
             hSetBinaryMode hout True
-            _ <- toPrompt hout "the first prompt"
+            banner <- toPrompt hout "the first prompt"
             replies <- forM steps \case
               OnDisk change -> Nothing <$ change
               Send line -> do
@@ -7898,7 +7913,7 @@ replSession repl work args steps =
                 Just <$> toPrompt hout line
             BS.hPut hin ":quit\n" >> hClose hin
             _ <- waitForProcess ph
-            pure [ r | Just r <- replies ]
+            pure (banner, [ r | Just r <- replies ])
           _ -> fail "replSession: no pipes to the REPL"
   where
     prompt = "jl4> "
@@ -7914,3 +7929,12 @@ replSession repl work args steps =
       | otherwise = do
           chunk <- BS.hGetSome h 4096
           if BS.null chunk then pure (Left acc) else readTo h (acc <> chunk)
+
+-- | Whether @reply@ is the REPL's word that the file @name@ is not there,
+-- after @prefix@. The REPL names the file by an absolute path made from the
+-- folder it runs in, which can be spelled otherwise than the test's own name
+-- for it (on macOS a temporary folder under @/var@ is @/private/var@ to the
+-- REPL), so only the end of the path is compared.
+saysNoFile :: T.Text -> String -> T.Text -> Bool
+saysNoFile prefix name reply =
+  (prefix <> "there is no file ") `T.isPrefixOf` reply && T.pack name `T.isSuffixOf` reply
