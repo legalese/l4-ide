@@ -150,7 +150,7 @@ Measured on `jl4/examples/dmn/rounding.l4` before its functions were lowered: ei
 
 They are recognised as the prelude's, so a `sum` or `min` you define yourself is not touched.
 That includes a file of your own called `prelude.l4` or `daydate.l4`: the export treats a module as the library only when it is the copy built into `l4` or a file in the folder `JL4_LIBRARY_PATH` names, so a `prelude.l4` beside your file, which `l4` loads in place of the built-in one, has its calls written as L4 with a Blocking note, as a call into any other file you import is.
-Still written as L4, with a Blocking note, and so still fatal to the whole file on both engines: `SQRT` (undefined below zero), `TRUNC` (no single FEEL function), `minimum` and `maximum` (L4 gives no answer on an empty list, while FEEL gives null), and `min` and `max` over `MAYBE NUMBER`, which skip a `NOTHING`.
+Still written as L4, with a Blocking note, and so still fatal to the whole file on both engines: `SQRT` (undefined below zero), `TRUNC` (no single FEEL function), `minimum` and `maximum` (L4 gives no answer on an empty list, while FEEL's `min` and `max` of an empty list answer null on Camunda 8.7.6 and fail the decision on KIE 8.44), and `min` and `max` over `MAYBE NUMBER`, which skip a `NOTHING`.
 
 **The empty list.** `EMPTY` is written as FEEL's empty list, `[]`, so `count EMPTY` is `count([])` and `xs EQUALS EMPTY` is `xs = []`.
 A rule that tests a list against `EMPTY`, such as a `DECIDE` clause on `EMPTY`, gets a column of its own that holds the whole test, `list = []`, because the simple tests a table cell holds have no form for a list: their values are numbers, strings, booleans and dates.

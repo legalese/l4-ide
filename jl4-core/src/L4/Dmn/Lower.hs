@@ -2376,8 +2376,10 @@ renderFeelIn names ctors oracle top = let (_, txt, frag) = go top in MkFeelExpr 
     --     NOTHING) have a different meaning from FEEL's, so the gate is the
     --     oracle saying the call and both operands are a plain number, and an
     --     unknown type declines. @minimum@ and @maximum@ are not lowered: L4
-    --     leaves them undefined on an empty list (@nonexhaustive@) where FEEL
-    --     answers null, which on KIE is a FAILED decision.
+    --     leaves them undefined on an empty list (@nonexhaustive@), and FEEL's
+    --     @min([])@ is null on Camunda and fails the decision on KIE ("The
+    --     parameter 'list', in function min(), cannot be null or empty";
+    --     measured 2026-11-26, KIE 8.44.0.Final and Camunda 8.7.6).
     --
     -- __What none of them fixes__: FEEL's number is a 34-digit decimal and
     -- L4's an exact rational (spec §2.4.4), and a rounding function turns a
