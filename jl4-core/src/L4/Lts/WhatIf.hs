@@ -89,7 +89,10 @@ module L4.Lts.WhatIf
   , literalOnly
   , evalInModule
   , outcomeValue
-  , runStateRules
+  , RunRead (..)
+  , ModuleReads (..)
+  , moduleReads
+  , runReadRules
   , namesIn
     -- * The replay
   , whatIf
@@ -132,6 +135,7 @@ import qualified Base.Text as Text
 import qualified Optics
 
 import L4.Annotation (emptyAnno)
+import L4.Discharge (sectionBinders)
 import L4.Evaluate.ValueLazy hiding (Blame)
 import L4.EvaluateLazy
   ( EvalConfig
@@ -623,7 +627,7 @@ deadlineOf closed pos raw = case raw.roDue of
       Nothing -> reifyExpr raw.roEnv e >>= pure . \ case
         Lit _ (NumericLit _ r) -> Right r
         _ -> Left "the WITHIN was never evaluated and is not a literal, so its deadline is not known here"
-      Just ev -> closedDeadline ev closed.clRunState pos raw "the WITHIN" e >>= pure . \ case
+      Just ev -> closedDeadline ev closed.clReads pos raw "the WITHIN" e >>= pure . \ case
         Right (ValNumber r) -> Right r
         Right other -> Left ("the WITHIN is " <> notANumber other <> ", so its deadline is not known here")
         Left why -> Left why
@@ -643,7 +647,7 @@ deadlineOf closed pos raw = case raw.roDue of
     anchorOf = anchorInstantOf clock raw Nothing
     -- an OF e the residual did not force, worked out as the duration is; an
     -- instant is a NUMBER or a DATE, as the machine lowers an anchor
-    closedAnchor ev e = closedDeadline ev closed.clRunState pos raw "the anchor of the WITHIN" e >>= pure . \ case
+    closedAnchor ev e = closedDeadline ev closed.clReads pos raw "the anchor of the WITHIN" e >>= pure . \ case
       Right (ValNumber r) -> Right r
       Right (ValDate d)   -> anchorInstant (ValDate d)
       Right other -> Left ("the anchor of the WITHIN is " <> notANumber other <> ", so its deadline is not known here")
@@ -739,45 +743,120 @@ openingOf clock raw = case raw.roOpens of
 --
 -- The rule, decided by Claude 2026-11-25, pending Meng's review: the
 -- expression, with what the residual has forced read back into it
--- ('reifyExpr'), is worked out ONLY when it is CLOSED, meaning it names no
--- local the replay cannot resolve ('openLocals': a @GIVEN@, a @WHERE@ local,
--- a pattern-bound value the residual holds unforced), no lifecycle value
--- (@THE JOIN@, @THE DEADLINE@, @THE ARMING@), no @RECALL@ of its own, and no
--- rule of the module that reads a ledger ('runStateRules'). (Until review on
--- 2026-11-25 a @RECALL@ written in the @WITHIN@ itself was missed and worked
--- out against an empty ledger.) A closed expression means the same in
--- every run, so one @#EVAL@ of it in the module ('evalInModule') is the
--- evaluator's own answer for it, which §2.4 asks for: nothing here re-derives
--- arithmetic. Anything not closed is not known here, and the reason says
--- what it reads. The tick the answer leads to is still held to 'confirmTick'.
+-- ('reifyExpr'), is worked out ONLY when it is CLOSED, meaning that nowhere
+-- in it ('namesIn': every name, at every node) does it name
+--
+-- * a local the replay cannot resolve ('openRefs': a @GIVEN@, a @WHERE@
+--   local, a pattern-bound value the residual holds unforced);
+-- * a lifecycle value (@THE JOIN@, @THE DEADLINE@, @THE ARMING@);
+-- * something a run supplies and one @#EVAL@ in the module does not see as
+--   the run does ('RunRead'): a ledger (a @RECALL@ of its own) or a section
+--   @GIVEN@;
+-- * a rule of the module that reads one of those, directly or through
+--   another ('runReadRules').
+--
+-- A closed expression means the same in every run, so one @#EVAL@ of it in
+-- the module ('evalInModule') is the evaluator's own answer for it, which
+-- §2.4 asks for: nothing here re-derives arithmetic. Anything not closed is
+-- not known here, and the reason says what it reads. The tick the answer
+-- leads to is still held to 'confirmTick'.
+--
+-- What review on 2026-11-25 changed: a @RECALL@ written in the @WITHIN@
+-- itself was missed, and so was a rule reached by a named call or a
+-- genitive ('namesIn'); and a section @GIVEN@ was taken for a module
+-- constant. "L4.Discharge" makes a section @GIVEN@ a parameter of every rule
+-- that reads it UNDER THE GIVEN'S OWN UNIQUE, which is also a top-level name
+-- ('posReplayScope'), so the check let it through, and the @#EVAL@ read it
+-- at its @TYPICALLY@ default: @`the duty` WITH `the period` IS 10 PLUS 10@
+-- explored with the deadline 30, where the run's is 20. An @OF@ anchor that
+-- reads one was read the same way, and @l4 explore@ had read it so before
+-- smucclaw/l4-ide#1107 too. A rule that reads one, worked out in the module,
+-- stopped with the evaluator's internal error ("given signatures' values'
+-- lengths do not match"), the discharged call meeting a second discharge.
+-- Now every read of a section @GIVEN@ is open (decided by Claude 2026-11-25,
+-- pending Meng's review): that also leaves unknown the deadline of a rule
+-- whose @GIVEN@ nothing supplies, which its @TYPICALLY@ default gives a run
+-- too, and of a rule that supplies the @GIVEN@ itself with @WITH@.
 --
 -- Not covered: a rule of an IMPORTED module that reads a ledger. The rig
 -- holds the imports' heaps, not their source, so such a rule is not in
--- 'clRunState', and an expression naming it is worked out against an empty
+-- 'clReads', and an expression naming it is worked out against an empty
 -- ledger (measured 2026-11-25: @fromMaybe 10 (RECALL `period`)@ in an
 -- imported file, named by a @WITHIN@, explores and lists as @WITHIN 10@).
 -- That is the run's deadline only while nothing has recorded the cell; the
--- explore page lists it among the silent failures.
+-- explore page states it as a limit.
 data Closed = MkClosed
-  { clEval     :: Maybe (Expr Resolved -> IO (Either Text (Value NF)))
+  { clEval  :: Maybe (Expr Resolved -> IO (Either Text (Value NF)))
     -- ^ the evaluator's answer for a closed expression, or what stopped it;
     -- 'Nothing' to work nothing out ('literalOnly')
-  , clRunState :: Set Unique
-    -- ^ the module's rules whose answer depends on the run: 'runStateRules'
+  , clReads :: ModuleReads
+    -- ^ what in the module a run supplies: 'moduleReads'
   }
 
 -- | The reader for one rig, with no cache: one @#EVAL@ for each deadline read.
 closedIn :: Rig -> Closed
 closedIn rig = MkClosed
   { clEval = Just (fmap outcomeValue . evalInModule rig)
-  , clRunState = runStateRules rig.rigModule
+  , clReads = moduleReads rig.rigModule
   }
 
 -- | The reader that works nothing out: a deadline the residual holds as an
 -- expression is known only when it is a literal, word for word as before
 -- smucclaw/l4-ide#1107 ('candidatesOf', 'enabledSet').
 literalOnly :: Closed
-literalOnly = MkClosed {clEval = Nothing, clRunState = Set.empty}
+literalOnly = MkClosed {clEval = Nothing, clReads = noModuleReads}
+
+-- | What an expression reads that a run supplies, so that one @#EVAL@ of it
+-- in the module, outside any run, would not see it as the run does.
+data RunRead
+  = ReadsLedger
+    -- ^ a @RECALL@: outside a run the ledger is empty
+  | ReadsSectionGiven Name
+    -- ^ a section @GIVEN@, which a @WITH@ supplies in a run; outside one it
+    -- is its @TYPICALLY@ default, or nothing
+  deriving stock (Eq, Show)
+
+-- | What in one module a run supplies ('RunRead'), read off its source.
+data ModuleReads = MkModuleReads
+  { mrSectionGivens :: Set Unique
+    -- ^ every section @GIVEN@ of the module ("L4.Discharge".'sectionBinders')
+  , mrRules         :: Map Unique RunRead
+    -- ^ 'runReadRules'
+  }
+
+noModuleReads :: ModuleReads
+noModuleReads = MkModuleReads {mrSectionGivens = Set.empty, mrRules = Map.empty}
+
+moduleReads :: Module Resolved -> ModuleReads
+moduleReads m = MkModuleReads {mrSectionGivens = givens, mrRules = runReadRules givens m}
+  where
+    givens = Map.keysSet (sectionBinders m)
+
+-- | What an expression itself reads that a run supplies, in the order met: a
+-- @RECALL@ anywhere in it, then a name that is a section @GIVEN@.
+directReads :: Set Unique -> Expr Resolved -> [RunRead]
+directReads givens e =
+  [ ReadsLedger | ReadCell {} <- subExprs e ]
+  <> [ ReadsSectionGiven (getOriginal r) | r <- namesIn e, Set.member (getUnique r) givens ]
+
+-- | The module's rules whose answer depends on the run they are forced in,
+-- not on the module alone, each with what it reads ('RunRead'): those that
+-- read a ledger or a section @GIVEN@, directly or by naming one that does
+-- ('namesIn'). An @#EVAL@ outside a run does not see what a run supplies, so
+-- a deadline that names one of them is not worked out ('Closed').
+runReadRules :: Set Unique -> Module Resolved -> Map Unique RunRead
+runReadRules givens (MkModule _ _ section) = grow direct
+  where
+    rules = [ (getUnique name, body) | MkDecide _ _ (MkAppForm _ name _ _) body <- decidesOf section ]
+    direct = Map.fromList [ (u, r) | (u, body) <- rules, r : _ <- [directReads givens body] ]
+    grow known =
+      let reached = Map.fromList
+            [ (u, r)
+            | (u, body) <- rules
+            , not (Map.member u known)
+            , r : _ <- [ [ r' | n <- namesIn body, Just r' <- [Map.lookup (getUnique n) known] ] ]
+            ]
+      in if Map.null reached then known else grow (known <> reached)
 
 -- | One @#EVAL@ of an expression in the module, after every directive the
 -- module carries is taken out ('withoutDirectives'), so that the one result
@@ -805,19 +884,6 @@ outcomeValue = \ case
   where
     oneLine = Text.unwords . concatMap Text.words
 
--- | The module's rules whose answer depends on the run they are forced in,
--- not on the module alone: those that read a ledger (@RECALL@), directly or
--- by naming one that does. An @#EVAL@ outside a run sees an empty ledger, so
--- a deadline that names one of them is not worked out ('Closed').
-runStateRules :: Module Resolved -> Set Unique
-runStateRules (MkModule _ _ section) = grow direct
-  where
-    rules = [ (getUnique name, body) | MkDecide _ _ (MkAppForm _ name _ _) body <- decidesOf section ]
-    direct = Set.fromList [ u | (u, body) <- rules, not (null [ () | ReadCell {} <- subExprs body ]) ]
-    grow s =
-      let s' = s <> Set.fromList [ u | (u, body) <- rules, any ((`Set.member` s) . getUnique) (namesIn body) ]
-      in if s' == s then s else grow s'
-
 -- | Every name an expression mentions, at every node: a variable, the head of
 -- an application whether its arguments are positional or named (@`f` WITH x
 -- IS 1@), the rule a genitive applies (@Bob's `period for`@), and any other
@@ -836,23 +902,37 @@ namesIn = Optics.toListOf (Optics.gplate @Resolved)
 -- WITHIN"). A literal, after what the residual forced is read back, is its own
 -- value and is not evaluated.
 closedDeadline
-  :: (Expr Resolved -> IO (Either Text (Value NF))) -> Set Unique
+  :: (Expr Resolved -> IO (Either Text (Value NF))) -> ModuleReads
   -> Position -> RawObligation NF -> Text -> Expr Resolved -> IO (Either Text (Value NF))
-closedDeadline eval readsRun pos raw what e = do
+closedDeadline eval known pos raw what e = do
   e' <- reifyExpr raw.roEnv e
   case e' of
     Lit _ (NumericLit _ r) -> pure (Right (ValNumber r))
     _ | (v : _) <- openRefs pos.posReplayScope raw.roEnv e' ->
-          pure (Left (what <> " reads `" <> unqualifiedNameToText (getOriginal v) <> "`, which the contract has not worked out yet (an input of the rule, or a name local to it), so its deadline is not known here"))
+          pure (Left (what <> " reads " <> quoted v <> ", which the contract has not worked out yet (an input of the rule, or a name local to it), so its deadline is not known here"))
       | not (null [ () | Lifecycle {} <- subExprs e' ]) ->
           pure (Left (what <> " is not a literal, so its deadline is not known here"))
-      | not (null [ () | ReadCell {} <- subExprs e' ]) ->
-          pure (Left (what <> " reads a ledger with RECALL, so it is worked out only in a run and its deadline is not known here"))
-      | (v : _) <- [ getOriginal r | r <- namesIn e', Set.member (getUnique r) readsRun ] ->
-          pure (Left (what <> " reads `" <> unqualifiedNameToText v <> "`, which reads a ledger, so it is worked out only in a run and its deadline is not known here"))
+      -- a rule first, so that the reason names what the rule wrote: after
+      -- "L4.Discharge" a call of a rule that reads a section GIVEN passes
+      -- the GIVEN too, which the rule's author did not write
+      | ((v, rr) : _) <- [ (r, rr) | r <- namesIn e', Just rr <- [Map.lookup (getUnique r) known.mrRules] ] ->
+          pure (Left (what <> " reads " <> quoted v <> ", which reads " <> runReadText False rr <> inARun))
+      | (rr : _) <- directReads known.mrSectionGivens e' ->
+          pure (Left (what <> " reads " <> runReadText True rr <> inARun))
       | otherwise -> eval e' >>= pure . \ case
           Right v  -> Right v
           Left why -> Left ("working out " <> what <> " failed (" <> why <> "), so its deadline is not known here")
+  where
+    quoted r = "`" <> unqualifiedNameToText (getOriginal r) <> "`"
+    inARun = ", so it is worked out only in a run and its deadline is not known here"
+
+-- | What a 'RunRead' is, for a reason line: @written@ when the deadline
+-- itself has it, rather than a rule it names.
+runReadText :: Bool -> RunRead -> Text
+runReadText written = \ case
+  ReadsLedger | written   -> "a ledger with RECALL"
+              | otherwise -> "a ledger"
+  ReadsSectionGiven n -> "`" <> unqualifiedNameToText n <> "`, a section GIVEN, which a WITH can supply"
 
 -- | 'openLocals' over every name in the expression ('namesIn'), not only its
 -- variables: a local applied as a function (@`f` 3@, @`f` WITH x IS 3@) is

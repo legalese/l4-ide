@@ -52,7 +52,7 @@ fixtures =
   <> [ instants </> f | f <- ["clocks.l4", "window.l4", "half.l4", "adjacent.l4", "open.l4", "flip3.l4", "room.l4", "lapse.l4", "merged.l4", "lapse-fixed.l4", "cap-re.l4", "own-lapse.l4", "frac-re.l4", "fx-fork.l4", "fx-barrier.l4", "succ2.l4", "hidden.l4", "succ4.l4", "cap-shift.l4", "frac-start.l4", "frac-wait.l4", "frac-stamp.l4"] ]
   <> [ breached </> f | f <- ["sale.l4", "resell.l4", "continuation.l4"] ]
   <> [ sections </> f | f <- ["sectioned.l4", "two-sections.l4"] ]
-  <> [ deadlines </> f | f <- ["shapes.l4", "given.l4", "carried.l4", "armed.l4", "ledger.l4", "called.l4"] ]
+  <> [ deadlines </> f | f <- ["shapes.l4", "given.l4", "carried.l4", "armed.l4", "ledger.l4", "called.l4", "section-given.l4"] ]
 
 -- | The acceptance run of the fixtures' README: the clock bounded at
 -- closing, the cells the properties read kept.
@@ -919,6 +919,23 @@ spec bin = describe "l4 explore" $ do
         out `shouldSatisfy` (("time runs out on pay, in 1 state: " <> why) `isInfixOf`)
         out `shouldNotSatisfy` ("time passes the deadline 50" `isInfixOf`)
         Output lcode lout _ <- listed c "called.l4"
+        lcode `shouldBe` ExitSuccess
+        lout `shouldSatisfy` (why `isInfixOf`)
+        lout `shouldSatisfy` ("Next deadline: not known here" `isInfixOf`)
+
+    -- review of #1107: a section GIVEN supplied by a WITH was read at its
+    -- TYPICALLY default (30, and 35 through the OF anchor, where the run's
+    -- deadline is 20 for both)
+    it "section-given.l4: a WITHIN or an OF anchor that reads a section GIVEN is not worked out, supplied or not" $
+      forM_ [ ("the deal", "the WITHIN", "the period", "30")
+            , ("the plain deal", "the WITHIN", "the period", "30")
+            , ("anchored deal", "the anchor of the WITHIN", "the start", "35") ] \ (c, what, given, wrong) -> do
+        let why = what <> " reads `" <> given <> "`, a section GIVEN, which a WITH can supply, so it is worked out only in a run and its deadline is not known here"
+        Output code out _ <- explored c "section-given.l4"
+        code `shouldBe` ExitFailure 2
+        out `shouldSatisfy` (("time runs out on pay, in 1 state: " <> why) `isInfixOf`)
+        out `shouldNotSatisfy` (("time passes the deadline " <> wrong) `isInfixOf`)
+        Output lcode lout _ <- listed c "section-given.l4"
         lcode `shouldBe` ExitSuccess
         lout `shouldSatisfy` (why `isInfixOf`)
         lout `shouldSatisfy` ("Next deadline: not known here" `isInfixOf`)
