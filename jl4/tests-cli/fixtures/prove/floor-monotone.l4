@@ -1,0 +1,16 @@
+-- The repro of smucclaw/l4-ide#1098: z3 4.16.0 gives no answer on this claim in
+-- 90 s, and cvc5 1.4.2 proves the same emitted script in about 0.1 s.
+IMPORT prelude
+
+GIVEN `months` IS A NUMBER, `c` IS A NUMBER
+GIVETH A NUMBER
+DECIDE `the grant` `months` `c` IS FLOOR ((`c` TIMES (`months` DIVIDED BY 30)) TIMES 6000 PLUS 0.5)
+
+§§ `the obligation`
+    GIVEN `pa` IS A NUMBER, `pb` IS A NUMBER, `c` IS A NUMBER
+
+`grant is monotone in months` MEANS
+    IF `pa` AT MOST `pb` AND `pa` AT LEAST 0 AND `c` AT LEAST 0
+    THEN `the grant` `pa` `c` AT MOST `the grant` `pb` `c`
+    ELSE TRUE
+#ASSERT `grant is monotone in months`

@@ -1,0 +1,6 @@
+-- For the stub-solver tests of `l4 prove`'s second solver (smucclaw/l4-ide#1098):
+-- one assertion that is FALSE at every negative x, and holds at x = 1.
+§ `A second solver`
+    GIVEN x IS A NUMBER
+
+#ASSERT x TIMES 3 AT LEAST 0
