@@ -3983,7 +3983,8 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
   -- constructor does, a wrong answer in every position: `count EMPTY` as
   -- count("EMPTY"), `xs EQUALS EMPTY` as xs = "EMPTY", and a WHEN EMPTY clause
   -- as an input entry "EMPTY" that no list equals. It is FEEL's `[]` in an
-  -- expression, and never a cell, whose simple values have no list form.
+  -- expression, an output entry among them, and never an input entry, whose
+  -- simple values have no list form: a test against it is a boolean column.
   describe "EMPTY, the empty list" $ do
     let literalNamed nm src = case (decisionNamed nm (drgOf src)).dcnLogic of
           LogicLiteral x -> x

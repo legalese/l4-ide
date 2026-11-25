@@ -207,6 +207,10 @@ exportShadowedBuiltinsCases   = fixtureDir </> "export-shadowed-builtins.cases.j
 exportEmptyListFixture, exportEmptyListCases :: FilePath
 exportEmptyListFixture = fixtureDir </> "export-empty-list.l4"
 exportEmptyListCases   = fixtureDir </> "export-empty-list.cases.json"
+-- EMPTY as a table's output entry, and a list tested against it in a table
+exportEmptyListTableFixture, exportEmptyListTableCases :: FilePath
+exportEmptyListTableFixture = fixtureDir </> "export-empty-list-table.l4"
+exportEmptyListTableCases   = fixtureDir </> "export-empty-list-table.cases.json"
 exportAdvisoryOnlyFixture = fixtureDir </> "export-advisory-only.l4"
 
 -- The FIXTURE(d) backticked-import pair: a HYPHENATED module beside a sibling
@@ -755,6 +759,13 @@ spec bin = do
         sout `shouldSatisfy` (not . ("\"EMPTY\"" `isInfixOf`))
         sout `shouldSatisfy` ("h + count([])" `isInfixOf`)
         sout `shouldSatisfy` ("xs = []" `isInfixOf`)
+
+      it "writes EMPTY in a table as an output entry [] and a boolean column xs = []" $ do
+        Output code sout _ <- runL4 bin ["export", "dmn", exportEmptyListTableFixture]
+        code `shouldBe` ExitSuccess
+        sout `shouldSatisfy` (not . ("\"EMPTY\"" `isInfixOf`))
+        sout `shouldSatisfy` ("<text>[]</text>" `isInfixOf`)
+        sout `shouldSatisfy` ("<text>xs = []</text>" `isInfixOf`)
 
       -- An input spelled like a FEEL function the export calls hides that
       -- function, so it is renamed as a keyword would be; its label keeps
@@ -1558,6 +1569,33 @@ spec bin = do
         dmn [dmn, "--cases", exportEmptyListCases] \out -> do
           out `shouldSatisfy` ("1 parsed, 0 error(s)" `isInfixOf`)
           out `shouldSatisfy` ("10/10 value(s) as expected" `isInfixOf`)
+
+  -- The same, in a decision table: `[]` as an output entry, and a list tested
+  -- against EMPTY as a boolean column.
+  describe "EMPTY in a decision table (opt-in: L4_DMN_ENGINE_CHECK=1)" $ do
+    let exported = do
+          tmp <- getTemporaryDirectory
+          let outDir  = tmp </> "l4-export-empty-list-table"
+              outFile = outDir </> "export-empty-list-table.dmn"
+          removePathForcibly outDir
+          createDirectoryIfMissing True outDir
+          Output code _ serr <- runL4 bin ["export", "dmn", exportEmptyListTableFixture, "-o", outFile]
+          unless (code == ExitSuccess) $
+            expectationFailure ("l4 export dmn failed:\n" ++ serr)
+          pure outFile
+    it "KIE answers an output entry [] and a test against EMPTY as L4 does" $ do
+      dmn <- exported
+      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustPass
+        dmn [dmn, "--cases", exportEmptyListTableCases] \out -> do
+          out `shouldSatisfy` ("2 case(s), 0 error(s), 0 warning(s)" `isInfixOf`)
+          out `shouldSatisfy` ("4/4 value(s) as expected" `isInfixOf`)
+
+    it "Camunda answers an output entry [] and a test against EMPTY as L4 does" $ do
+      dmn <- exported
+      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustPass
+        dmn [dmn, "--cases", exportEmptyListTableCases] \out -> do
+          out `shouldSatisfy` ("1 parsed, 0 error(s)" `isInfixOf`)
+          out `shouldSatisfy` ("4/4 value(s) as expected" `isInfixOf`)
 
   -- The placement rule's NEGATIVE control (spec §4.3, §9). Everything else in
   -- this file asserts that a gate stays green, which on its own says nothing
