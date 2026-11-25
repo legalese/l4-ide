@@ -27,12 +27,13 @@ import Text.Printf (printf)
 import Development.IDE.Graph.Database (shakeRunDatabase)
 import Language.LSP.Protocol.Types (toNormalizedFilePath, normalizedFilePathToUri, fromNormalizedUri, NormalizedUri)
 import qualified Language.LSP.Protocol.Types as LSP
--- for 'syncStoreWithDisk'
+-- for 'syncStoreWithDisk', 'loadNamed' and 'loadedFileFromDisk'
 import Control.Concurrent.STM (atomically, modifyTVar', readTVarIO)
 import Control.Exception (IOException, try)
 import Data.Int (Int32)
 import qualified Data.Text.Utf16.Rope.Mixed as Rope
 import Language.LSP.VFS (VFS (..), VirtualFile (..))
+import System.Directory (doesFileExist)
 
 import LSP.Logger (makeDefaultStderrRecorder, cmapWithPrio, cfilter, pretty, Recorder, WithPriority(..), Priority(..))
 import L4.TypeCheck.Types (CheckError(..), CheckErrorWithContext(..))
@@ -285,6 +286,30 @@ runRepl replState = do
             then say "Goodbye!"
             else loop readInput say newState
 
+-- | @:load@ and @:l@: load the file named. When there is no file of that name
+-- the REPL says so, and the file loaded before stays loaded (smucclaw/l4-ide#1099;
+-- decided by Claude 2026-11-25, pending Meng's review). It used to end the
+-- session.
+loadNamed :: ReplState -> Text -> IO (Text, ReplState, Bool)
+loadNamed st name = do
+  absPath <- makeAbsolute (Text.unpack (Text.strip name))
+  exists <- doesFileExist absPath
+  if not exists
+    then pure ("Error: there is no file " <> Text.pack absPath, st, False)
+    else do
+      let newState = st { loadedFile = Just absPath }
+      result <- loadFile newState absPath
+      case result of
+        Left err -> pure ("Error: " <> err, newState, False)
+        Right _ -> pure ("Loaded: " <> Text.pack absPath, newState, False)
+
+-- | The loaded file's text from disk, for a line to be read against when the
+-- store holds no copy of it, or nothing when it cannot be read: the file was
+-- deleted since it was loaded, or was never there. Reading it used to end the
+-- session (smucclaw/l4-ide#1099).
+loadedFileFromDisk :: FilePath -> IO Text
+loadedFileFromDisk fp = either (\ (_ :: IOException) -> "") id <$> try (Text.IO.readFile fp)
+
 -- | Read the file @loaded@ into the store, and read again every file the store
 -- has read from disk before, so that what is checked next is what is on disk
 -- now (smucclaw/l4-ide#1099). @:load@, @:reload@ and @:reset@ do this, through
@@ -393,22 +418,8 @@ processInput st input
       let arg = Text.strip $ Text.drop (Text.length (":tracefile " :: Text)) stripped
       msg <- configureTraceSink st arg
       pure (msg, st, False)
-  | ":load " `Text.isPrefixOf` stripped = do
-      let fp = Text.unpack $ Text.strip $ Text.drop 6 stripped
-      absPath <- makeAbsolute fp
-      let newState = st { loadedFile = Just absPath }
-      result <- loadFile newState absPath
-      case result of
-        Left err -> pure ("Error: " <> err, newState, False)
-        Right _ -> pure ("Loaded: " <> Text.pack absPath, newState, False)
-  | ":l " `Text.isPrefixOf` stripped = do
-      let fp = Text.unpack $ Text.strip $ Text.drop 3 stripped
-      absPath <- makeAbsolute fp
-      let newState = st { loadedFile = Just absPath }
-      result <- loadFile newState absPath
-      case result of
-        Left err -> pure ("Error: " <> err, newState, False)
-        Right _ -> pure ("Loaded: " <> Text.pack absPath, newState, False)
+  | ":load " `Text.isPrefixOf` stripped = loadNamed st (Text.drop 6 stripped)
+  | ":l " `Text.isPrefixOf` stripped = loadNamed st (Text.drop 3 stripped)
   | ":reload" `Text.isPrefixOf` stripped || ":r" == stripped = do
       case st.loadedFile of
         Nothing -> pure ("No file loaded", st, False)
@@ -741,7 +752,7 @@ evalExpression st contextFile exprText = do
       mContent <- Shake.getVirtualFileText st.ideState contextUri
       case mContent of
         Just content -> pure content
-        Nothing -> Text.IO.readFile contextFile
+        Nothing -> loadedFileFromDisk contextFile
   let replContent = importPreamble <> originalContent <> "\n\n-- REPL expression " <> Text.pack (show evalNum) <> "\n" <> actualExpr <> "\n"
   
   -- Create a unique virtual file for REPL evaluation
@@ -843,7 +854,7 @@ evalWithTrace st contextFile exprText = do
       mContent <- Shake.getVirtualFileText st.ideState contextUri
       case mContent of
         Just content -> pure content
-        Nothing -> Text.IO.readFile contextFile
+        Nothing -> loadedFileFromDisk contextFile
   
   let replContent = importPreamble <> originalContent <> "\n\n-- REPL trace " <> Text.pack (show evalNum) <> "\n" <> actualExpr <> "\n"
   
@@ -893,7 +904,7 @@ evalWithTraceAscii st contextFile exprText = do
       mContent <- Shake.getVirtualFileText st.ideState contextUri
       case mContent of
         Just content -> pure content
-        Nothing -> Text.IO.readFile contextFile
+        Nothing -> loadedFileFromDisk contextFile
 
   let replContent = importPreamble <> originalContent <> "\n\n-- REPL trace " <> Text.pack (show evalNum) <> "\n" <> actualExpr <> "\n"
 
@@ -1146,7 +1157,7 @@ getExpressionType st contextFile exprText = do
       mContent <- Shake.getVirtualFileText st.ideState contextUri
       case mContent of
         Just content -> pure content
-        Nothing -> Text.IO.readFile contextFile
+        Nothing -> loadedFileFromDisk contextFile
   -- Build the virtual file content with #CHECK directive
   let replContent = importPreamble <> originalContent <> "\n\n-- REPL type query " <> Text.pack (show evalNum) <> "\n#CHECK " <> exprText <> "\n"
   

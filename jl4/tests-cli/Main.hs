@@ -2659,6 +2659,29 @@ spec bin = do
         answers [2] rs `shouldBe` freshReply
         freshReply `shouldNotBe` ["42"]
 
+    -- A file that is not there does not end the session: :load says so and
+    -- keeps the file loaded before, and a line after the loaded file was
+    -- deleted is still answered (decided by Claude 2026-11-25, pending Meng's
+    -- review). 'replSession' fails the test if the REPL ends.
+    it "keeps the file it had loaded when :load names a file that is not there" $ withRepl \repl ->
+      withSystemTempDirectory "l4-repl-edit" \work -> do
+        writeFile (work </> "main.l4") "x MEANS 1\n"
+        rs <- replSession repl work ["main.l4"] [Send ":load nosuch.l4", Send "x", Send ":l nosuch.l4", Send "x"]
+        map (T.takeWhile (/= ':')) (answers [0, 2] rs) `shouldBe` ["Error", "Error"]
+        answers [1, 3] rs `shouldBe` ["1", "1"]
+
+    it "goes on answering after the loaded file is deleted" $ withRepl \repl ->
+      withSystemTempDirectory "l4-repl-edit" \work -> do
+        writeFile (work </> "main.l4") "x MEANS 1\n"
+        rs <- replSession repl work ["main.l4"]
+          [ Send "x", OnDisk (removeFile (work </> "main.l4")), Send ":reload", Send "x", Send "1 PLUS 1" ]
+        case rs of
+          [before', reloaded, _x, sum'] -> do
+            before' `shouldBe` "1"
+            T.takeWhile (/= ':') reloaded `shouldBe` "Error reloading"
+            sum' `shouldBe` "2"
+          other -> expectationFailure ("Expected 4 replies, got " ++ show other)
+
   -- A rule that may refuse to answer gets no query plan, from the REPL or from
   -- the language server: each says why in the one sentence core gives, which
   -- names the rule and every reason it may refuse with, read from the rule and
