@@ -53,6 +53,7 @@ module L4.Lts.List
     TraceReport (..)
   , Standing (..)
   , reportOf
+  , reportOfWith
   , reportFrom
     -- * A trace that is not in the file
   , freshTrace
@@ -140,7 +141,12 @@ data Standing
 -- deadline written as a name or an expression is worked out when it is
 -- closed ('closedIn', smucclaw/l4-ide#1107), as @l4 explore@ works it out.
 reportOf :: Rig -> Trace -> IO (Maybe TraceReport)
-reportOf rig tr = fmap (reportFrom tr) <$> enabledSetWith (closedIn rig) rig tr
+reportOf rig = reportOfWith (closedIn rig) rig
+
+-- | 'reportOf' with the deadline reader given: @l4 lts@ gives
+-- 'closedInWith' the modules the file imports, once for all its traces.
+reportOfWith :: Closed -> Rig -> Trace -> IO (Maybe TraceReport)
+reportOfWith closed rig tr = fmap (reportFrom tr) <$> enabledSetWith closed rig tr
 
 -- | The answers, read off an enabled set already tried. Pure, so that a
 -- test can hand it an outcome the replay would not produce on its own.

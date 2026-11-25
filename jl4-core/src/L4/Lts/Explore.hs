@@ -278,12 +278,20 @@ data ReadSites = MkReadSites
     -- TIME@, through which a read can see past a cell's latest entry
   , rsLedgerCafs :: !(Map Unique Text)
     -- ^ the main module's top-level rules with no inputs whose answer
-    -- depends on a ledger read, directly or through another rule
+    -- depends on a ledger read, directly or through another rule, of the
+    -- module or of one it imports
+  , rsReads      :: !ModuleReads
+    -- ^ what a deadline is not worked out through ('Closed'), read off the
+    -- module and the modules it imports ('moduleReads')
   }
 
 -- | The read sites of the module explored and of the modules it imports.
 -- Only the explored module's own rules can be ledger-reading constants of
--- a run: an imported module's heap is built once, before any replay.
+-- a run: an imported module's heap is built once, before any replay. But a
+-- constant of the module that calls an imported rule reading a ledger is
+-- one: since review of smucclaw/l4-ide#1107 the imported rules count when
+-- 'readers' follows a call, where on unstable such a constant was not keyed
+-- and two positions that differed only in its kept answer were one state.
 readSitesOf :: Module Resolved -> [Module Resolved] -> ReadSites
 readSitesOf main imported = MkReadSites
   { rsCells = Map.fromListWith (||)
@@ -293,6 +301,7 @@ readSitesOf main imported = MkReadSites
       [ (u, nameToText n)
       | (Def u n, [], _) <- topDecides
       , Set.member u readers ]
+  , rsReads = moduleReads main imported
   }
   where
     everyExpr = concatMap exprsOf (main : imported)
@@ -301,6 +310,9 @@ readSitesOf main imported = MkReadSites
     MkModule _ _ mainSection = main
     topDecides =
       [ (name, args, body) | MkDecide _ _ (MkAppForm _ name args _) body <- decidesOf mainSection ]
+    -- the rules 'readers' follows a call into: the module's, and those of
+    -- its imports that it reaches by name, each with the names it mentions
+    allDecides = [ (name, body, refsOf body) | (name, _, body) <- reachableRules main imported ]
     -- the least set of the module's rules that read a ledger, directly or
     -- by naming one that does, however it is spelt ('namesIn', every name
     -- at every node). Until review of smucclaw/l4-ide#1107 only variables
@@ -308,11 +320,11 @@ readSitesOf main imported = MkReadSites
     -- reached a ledger reader through WITH, as a genitive, or through a
     -- wrapper of either was not keyed, and two positions that differed only
     -- in its kept answer were one state.
-    readers = fixpoint (Set.fromList [ getUnique name | (name, _, body) <- topDecides, readsDirectly body ])
+    readers = fixpoint (Set.fromList [ getUnique name | (name, body, _) <- allDecides, readsDirectly body ])
     readsDirectly body = not (null [ () | ReadCell {} <- subExprsOf body ])
     refsOf body = Set.fromList (map getUnique (namesIn body))
     fixpoint s =
-      let s' = s <> Set.fromList [ getUnique name | (name, _, body) <- topDecides, not (Set.disjoint (refsOf body) s) ]
+      let s' = s <> Set.fromList [ getUnique name | (name, _, refs) <- allDecides, not (Set.disjoint refs s) ]
       in if s' == s then s else fixpoint s'
 
 -- | Keep these cells although no @RECALL@ in the modules reads them: the
@@ -945,8 +957,8 @@ liveDeadlines ex pos = for (obligationsOf pos) \ raw -> case raw.roDue of
 -- (@l4 lts@ lists the same stop as the reason, and exits 0). Any other
 -- failure (a division by zero) is the reason the deadline is not known, and
 -- the tick is listed as untried with it.
-exploreClosed :: Rig -> IORef (Map (Text, [Unique]) (Either Text (Value NF))) -> Closed
-exploreClosed rig cache = (closedIn rig) {clEval = Just evalCached}
+exploreClosed :: Rig -> ReadSites -> IORef (Map (Text, [Unique]) (Either Text (Value NF))) -> Closed
+exploreClosed rig sites cache = (closedIn rig) {clEval = Just evalCached, clReads = sites.rsReads}
   where
     evalCached e = do
       let key = (prettyLayout e, map getUnique (namesIn e))
@@ -1383,7 +1395,7 @@ newExplorerWith hint opts sites rig0 start = do
     , exRig = rig
     , exStart = start
     , exActionType = contractActionType rig0.rigEntityInfo start.stContract
-    , exClosed = exploreClosed rig cache
+    , exClosed = exploreClosed rig sites cache
     , exHint = hint
     , exRecords = records
     }

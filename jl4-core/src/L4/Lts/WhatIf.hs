@@ -86,6 +86,7 @@ module L4.Lts.WhatIf
     -- * A deadline written as a name or an expression
   , Closed (..)
   , closedIn
+  , closedInWith
   , literalOnly
   , evalInModule
   , outcomeValue
@@ -93,6 +94,7 @@ module L4.Lts.WhatIf
   , ModuleReads (..)
   , moduleReads
   , runReadRules
+  , reachableRules
   , namesIn
     -- * The replay
   , whatIf
@@ -756,11 +758,10 @@ openingOf clock raw = case raw.roOpens of
 -- * something a run supplies and one @#EVAL@ in the module does not see as
 --   the run does ('RunRead'): a ledger (a @RECALL@ of its own) or a section
 --   @GIVEN@;
--- * a rule of the module that reads one of those, directly or through
---   another ('runReadRules').
+-- * a rule of the module, or of a module it imports, that reads one of
+--   those, directly or through another ('runReadRules').
 --
--- A closed expression means the same in every run (except through a rule of
--- an imported module, which is not checked: below), so one @#EVAL@ of it in
+-- A closed expression means the same in every run, so one @#EVAL@ of it in
 -- the module ('evalInModule') is the evaluator's own answer for it, which
 -- §2.4 asks for: nothing here re-derives arithmetic. Anything not closed is
 -- not known here, and the reason says what it reads. The tick the answer
@@ -783,16 +784,16 @@ openingOf clock raw = case raw.roOpens of
 -- whose @GIVEN@ nothing supplies, which its @TYPICALLY@ default gives a run
 -- too, and of a rule that supplies the @GIVEN@ itself with @WITH@.
 --
--- Not covered, a known limit: a rule of an IMPORTED module that reads a
--- ledger, the clock, the world outside the file or its own section @GIVEN@.
--- The rig holds the imports' heaps, not their source, so such a rule is not
--- in 'clReads', and an expression naming it is worked out outside a run
--- (measured 2026-11-25: @fromMaybe 10 (RECALL `period`)@ in an imported
--- file, named by a @WITHIN@, explores and lists as @WITHIN 10@; measured
--- 2026-11-26: an imported @TODAY@ reader explores to 8 or 5 by
--- @--fixed-now@). That is the run's deadline only while nothing has recorded
--- the cell, or on the day the command ran; the explore page states it as a
--- silent failure.
+-- The rules of the modules the file imports are read too, when the caller
+-- passes them ('closedInWith'; @l4 lts@ and @l4 explore@ do, from the type
+-- checker's resolved modules, as @l4 explore@ already did for its @RECALL@
+-- sites). The rig holds the imports as heaps, not as source, so without
+-- them a deadline naming an imported rule that reads a ledger, the clock,
+-- the world outside the file or a section @GIVEN@ was worked out outside a
+-- run (measured 2026-11-25: an imported @fromMaybe 10 (RECALL `period`)@
+-- explored and listed as @WITHIN 10@, and an imported @TODAY@ reader, the
+-- standard library's @`Today serial`@ among them, as 8 or 5 by
+-- @--fixed-now@).
 data Closed = MkClosed
   { clEval  :: Maybe (Expr Resolved -> IO (Either Text (Value NF)))
     -- ^ the evaluator's answer for a closed expression, or what stopped it;
@@ -801,11 +802,18 @@ data Closed = MkClosed
     -- ^ what in the module a run supplies: 'moduleReads'
   }
 
--- | The reader for one rig, with no cache: one @#EVAL@ for each deadline read.
+-- | The reader for one rig, with no cache: one @#EVAL@ for each deadline
+-- read. It reads the rules of the rig's own module only; 'closedInWith'
+-- reads those of the modules it imports too.
 closedIn :: Rig -> Closed
-closedIn rig = MkClosed
+closedIn = closedInWith []
+
+-- | 'closedIn', reading the rules of these imported modules as well, so a
+-- deadline that names one of them is held to what it reads ('runReadRules').
+closedInWith :: [Module Resolved] -> Rig -> Closed
+closedInWith imported rig = MkClosed
   { clEval = Just (fmap outcomeValue . evalInModule rig)
-  , clReads = moduleReads rig.rigModule
+  , clReads = moduleReads rig.rigModule imported
   }
 
 -- | The reader that works nothing out: a deadline the residual holds as an
@@ -833,10 +841,12 @@ data RunRead
     -- ^ the world outside the file, as written: @FETCH@, @ENV@, @POST@
   deriving stock (Eq, Show)
 
--- | What in one module a run supplies ('RunRead'), read off its source.
+-- | What in a module and its imports a run supplies ('RunRead'), read off
+-- their source.
 data ModuleReads = MkModuleReads
   { mrSectionGivens :: Set Unique
-    -- ^ every section @GIVEN@ of the module ("L4.Discharge".'sectionBinders')
+    -- ^ every section @GIVEN@ of the module and of its imports
+    -- ("L4.Discharge".'sectionBinders')
   , mrRules         :: Map Unique RunRead
     -- ^ 'runReadRules'
   , mrLocals        :: Map Unique Text
@@ -846,13 +856,34 @@ data ModuleReads = MkModuleReads
 noModuleReads :: ModuleReads
 noModuleReads = MkModuleReads {mrSectionGivens = Set.empty, mrRules = Map.empty, mrLocals = Map.empty}
 
-moduleReads :: Module Resolved -> ModuleReads
-moduleReads m = MkModuleReads
+-- | 'ModuleReads' of a module, with the modules it imports: their rules and
+-- section @GIVEN@s count as the module's own do. A unique carries its
+-- module's URI, so the rules of two modules cannot be taken for each other.
+moduleReads :: Module Resolved -> [Module Resolved] -> ModuleReads
+moduleReads m imported = MkModuleReads
   { mrSectionGivens = givens
-  , mrRules = runReadRules givens m
+  , mrRules = runReadRules givens (reachableRules m imported)
   , mrLocals = localKinds m }
   where
-    givens = Map.keysSet (sectionBinders m)
+    givens = foldMap (Map.keysSet . sectionBinders) (m : imported)
+
+-- | Every rule of the module, and every rule of its imports that the module
+-- reaches by name, directly or through another: its name, its inputs and
+-- its body. The imports' other rules are not read, which keeps the prelude
+-- out of the way of a file that names a few of its functions.
+reachableRules :: Module Resolved -> [Module Resolved] -> [(Resolved, [Resolved], Expr Resolved)]
+reachableRules m imported = rulesOf m <> go seeds Set.empty
+  where
+    rulesOf (MkModule _ _ section) =
+      [ (name, args, body) | MkDecide _ _ (MkAppForm _ name args _) body <- decidesOf section ]
+    pool = Map.fromList [ (getUnique name, r) | r@(name, _, _) <- concatMap rulesOf imported ]
+    seeds = map getUnique (Optics.toListOf (Optics.gplate @Resolved) m)
+    go [] _ = []
+    go (u : us) seen
+      | Set.member u seen = go us seen
+      | Just r@(_, _, body) <- Map.lookup u pool =
+          r : go (map getUnique (namesIn body) <> us) (Set.insert u seen)
+      | otherwise = go us (Set.insert u seen)
 
 -- | What each name the module binds locally is, in the words of the reason a
 -- deadline that reads it is given ('closedDeadline'): an input of a rule (a
@@ -914,22 +945,23 @@ directReads givens e =
       , TypeCheck.currentTimeUnique, TypeCheck.rulesEffectiveDateUnique ]
     outside = [TypeCheck.fetchUnique, TypeCheck.envUnique, TypeCheck.postUnique]
 
--- | The module's rules whose answer depends on the run they are forced in,
--- not on the module alone, each with what it reads ('RunRead'): those that
--- read a ledger or a section @GIVEN@, directly or by naming one that does
--- ('namesIn'). An @#EVAL@ outside a run does not see what a run supplies, so
--- a deadline that names one of them is not worked out ('Closed').
-runReadRules :: Set Unique -> Module Resolved -> Map Unique RunRead
-runReadRules givens (MkModule _ _ section) = grow direct
+-- | The rules among these ('reachableRules') whose answer depends on the run
+-- they are forced in, not on the modules alone, each with what it reads
+-- ('RunRead'): those that read a ledger, a section @GIVEN@, the clock or the
+-- world, directly or by naming one that does ('namesIn').
+-- An @#EVAL@ outside a run does not see what a run supplies, so a deadline
+-- that names one of them is not worked out ('Closed').
+runReadRules :: Set Unique -> [(Resolved, [Resolved], Expr Resolved)] -> Map Unique RunRead
+runReadRules givens decides = grow direct
   where
-    rules = [ (getUnique name, body) | MkDecide _ _ (MkAppForm _ name _ _) body <- decidesOf section ]
-    direct = Map.fromList [ (u, r) | (u, body) <- rules, r : _ <- [directReads givens body] ]
+    rules = [ (getUnique name, body, map getUnique (namesIn body)) | (name, _, body) <- decides ]
+    direct = Map.fromList [ (u, r) | (u, body, _) <- rules, r : _ <- [directReads givens body] ]
     grow known =
       let reached = Map.fromList
             [ (u, r)
-            | (u, body) <- rules
+            | (u, _, names) <- rules
             , not (Map.member u known)
-            , r : _ <- [ [ r' | n <- namesIn body, Just r' <- [Map.lookup (getUnique n) known] ] ]
+            , r : _ <- [ [ r' | n <- names, Just r' <- [Map.lookup n known] ] ]
             ]
       in if Map.null reached then known else grow (known <> reached)
 

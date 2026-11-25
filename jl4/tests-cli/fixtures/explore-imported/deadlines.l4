@@ -1,0 +1,30 @@
+-- smucclaw/l4-ide#1107, after review: a deadline that names an imported rule
+-- is held to what that rule reads, as one naming a rule of the file is. Each
+-- of these used to be worked out outside a run: `ledger duty` as 10, against
+-- an empty ledger; `clock duty` and `library clock duty` (the standard
+-- library's `Today serial`) by the day the command ran; `env duty` from the
+-- command's environment; `window duty` at `rate`'s TYPICALLY default, 30.
+
+IMPORT prelude
+IMPORT readers
+IMPORT `excel-date`
+
+TIMEZONE IS "Asia/Singapore"
+
+DECLARE Actor IS ONE OF Alice
+DECLARE Act IS ONE OF pay
+
+GIVETH A DEONTIC Actor Act
+`ledger duty` MEANS PARTY Alice MUST pay WITHIN `recorded period` LEST BREACH BY Alice BECAUSE "late"
+
+GIVETH A DEONTIC Actor Act
+`clock duty` MEANS PARTY Alice MUST pay WITHIN `clocky` LEST BREACH BY Alice BECAUSE "late"
+
+GIVETH A DEONTIC Actor Act
+`library clock duty` MEANS PARTY Alice MUST pay WITHIN (`Today serial` MODULO 7) PLUS 3 LEST BREACH BY Alice BECAUSE "late"
+
+GIVETH A DEONTIC Actor Act
+`env duty` MEANS PARTY Alice MUST pay WITHIN `env period` LEST BREACH BY Alice BECAUSE "late"
+
+GIVETH A DEONTIC Actor Act
+`window duty` MEANS PARTY Alice MUST pay WITHIN `the window` LEST BREACH BY Alice BECAUSE "late"

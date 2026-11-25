@@ -51,6 +51,11 @@ deadlines = "tests-cli" </> "fixtures" </> "explore-deadlines"
 keptAnswers :: FilePath
 keptAnswers = "tests-cli" </> "fixtures" </> "explore-kept-answers"
 
+-- | Review of smucclaw/l4-ide#1107: rules that read the run, in an imported
+-- file.
+imported :: FilePath
+imported = "tests-cli" </> "fixtures" </> "explore-imported"
+
 fixtures :: [FilePath]
 fixtures =
   [ brief </> f | f <- ["d1-naive.l4", "d2-reread.l4", "d3-atomic.l4", "refused-number.l4", "properties.l4"] ]
@@ -59,6 +64,7 @@ fixtures =
   <> [ sections </> f | f <- ["sectioned.l4", "two-sections.l4"] ]
   <> [ deadlines </> f | f <- ["shapes.l4", "given.l4", "carried.l4", "armed.l4", "ledger.l4", "called.l4", "section-given.l4", "section-reader.l4", "clock.l4", "locals.l4", "slow.l4", "dated.l4"] ]
   <> [ keptAnswers </> f | f <- ["positional.l4", "named.l4", "genitive.l4", "wrapper.l4"] ]
+  <> [ imported </> f | f <- ["readers.l4", "deadlines.l4", "kept.l4"] ]
 
 -- | The acceptance run of the fixtures' README: the clock bounded at
 -- closing, the cells the properties read kept.
@@ -1030,6 +1036,28 @@ spec bin = describe "l4 explore" $ do
         out `shouldSatisfy` ("start, explored from its outset at 0: 5 states, 8 transitions" `isInfixOf`)
         out `shouldSatisfy` ("  s0 -> s2  PARTY Bob DOES go OF skip" `isInfixOf`)
         out `shouldSatisfy` ("1 act passed over" `isInfixOf`)
+
+    it "explore-imported/kept.l4: a constant that calls an imported ledger reader is keyed too" $ do
+      Output code out _ <- runL4 bin ["explore", imported </> "kept.l4", "--contract", "start"]
+      code `shouldBe` ExitSuccess
+      out `shouldSatisfy` ("start, explored from its outset at 0: 5 states, 8 transitions" `isInfixOf`)
+      out `shouldSatisfy` ("  s0 -> s2  PARTY Bob DOES go OF skip" `isInfixOf`)
+
+    forM_
+      [ ("ledger duty", "the WITHIN reads `recorded period`, which reads a ledger, so it is worked out only in a run and its deadline is not known here")
+      , ("clock duty", "the WITHIN reads `clocky`, which reads the clock (TODAY), so it is worked out only in a run and its deadline is not known here")
+      , ("library clock duty", "the WITHIN reads `Today serial`, which reads the clock (TODAY), so it is worked out only in a run and its deadline is not known here")
+      , ("env duty", "the WITHIN reads `env period`, which reads the world outside the file (ENV), so it is worked out only in a run and its deadline is not known here")
+      , ("window duty", "the WITHIN reads `the window`, which reads `rate`, a section GIVEN, which a WITH can supply, so it is worked out only in a run and its deadline is not known here")
+      ] \ (contract, why) ->
+        it ("explore-imported/deadlines.l4: " <> contract <> ", a WITHIN naming an imported rule that reads the run, is not worked out") $
+          forM_ ["2025-01-31T15:45:30Z", "2025-02-04T15:45:30Z"] \ now -> do
+            Output code out _ <- runL4 bin ["explore", imported </> "deadlines.l4", "--contract", contract, "--fixed-now", now]
+            code `shouldBe` ExitFailure 2
+            out `shouldSatisfy` (("time runs out on pay, in 1 state: " <> why) `isInfixOf`)
+            Output lcode lout _ <- runL4 bin ["lts", imported </> "deadlines.l4", "--contract", contract, "--fixed-now", now]
+            lcode `shouldBe` ExitSuccess
+            lout `shouldSatisfy` (("time runs out on Alice MUST pay \8212 " <> why) `isInfixOf`)
   where
     liveness =
       [ "--eventually", "Alice has bought or stopped"

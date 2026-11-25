@@ -21,6 +21,7 @@ module L4.Cli.Lts
   ) where
 
 import Base (catMaybes, for)
+import qualified Base.Set as Set
 import qualified Base.Text as Text
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Encode.Pretty as AesonPretty
@@ -35,11 +36,12 @@ import qualified LSP.L4.Rules as Rules
 import Language.LSP.Protocol.Types (normalizedFilePathToUri)
 
 import L4.Lts.List
-import L4.Lts.WhatIf (Rig (..), Trace (..), tracesOf)
+import L4.Lts.WhatIf (Rig (..), Trace (..), closedInWith, tracesOf)
 import L4.Print (prettyLayout)
 import L4.Syntax (Module, Resolved)
 
 import L4.Cli.Common
+import L4.Cli.Explore (importedModules)
 import L4.EvaluateLazy (EvalConfig)
 
 ----------------------------------------------------------------------------
@@ -80,7 +82,7 @@ ltsCmd opts = do
 -- | 'ltsCmd' under the limits its flags set (ruled by Meng 2026-11-21, extending L2).
 ltsWith :: LtsOptions -> EvalConfig -> IO ()
 ltsWith opts evalConfig = do
-  (errs, mRig) <- runOneshot evalConfig opts.ltsFile \nfp -> do
+  (errs, mLoaded) <- runOneshot evalConfig opts.ltsFile \nfp -> do
     let uri = normalizedFilePathToUri nfp
     _ <- Shake.addVirtualFileFromFS nfp
     mTc <- Rules.useEvaluableTypeCheck uri
@@ -93,21 +95,27 @@ ltsWith opts evalConfig = do
         imports <- Shake.use_ Rules.GetImports uri
         deps <- Shake.uses (Shake.AttachCallStack [uri] Rules.GetLazyEvaluationDependencies) (map (.moduleUri) imports)
         let env = mconcat (fst <$> catMaybes deps)
-        pure $ Just MkRig
-          { rigConfig = evalConfig
-          , rigEntityInfo = tcRes.entityInfo
-          , rigEnv = env
-          , rigModule = tcRes.module'
-          }
-  case mRig of
+        -- every module imported, transitively, so that a deadline naming an
+        -- imported rule is held to what that rule reads, as in l4 explore
+        imported <- importedModules (Set.singleton uri) (map (.moduleUri) imports)
+        pure $ Just
+          ( MkRig
+              { rigConfig = evalConfig
+              , rigEntityInfo = tcRes.entityInfo
+              , rigEnv = env
+              , rigModule = tcRes.module'
+              }
+          , imported )
+  case mLoaded of
     Nothing -> do
       putDiagnostics errs
       hPutStrLn stderr "Type checking failed — nothing to list"
       exitFailure
-    Just rig -> do
+    Just (rig, imported) -> do
       (rig', traces) <- selectTraces rig opts.ltsContracts
+      let closed = closedInWith imported rig'
       reports <- fmap catMaybes $ for traces \tr -> do
-        mr <- reportOf rig' tr
+        mr <- reportOfWith closed rig' tr
         case mr of
           Nothing -> do
             hPutStrLn stderr ("A #TRACE produced no result and is not listed: " <> Text.unpack (prettyLayout tr.trContract))

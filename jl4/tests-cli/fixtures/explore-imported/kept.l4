@@ -1,0 +1,41 @@
+-- explore-kept-answers/positional.l4 with the ledger reader `is taken` in an
+-- imported file (readers.l4). `taken now` still reads a ledger, so l4 explore
+-- keys a state on its kept answer: 5 states, as positional.l4 explores to
+-- (smucclaw/l4-ide#1107, after review: on unstable the imported reader was
+-- not followed, and the two states merged into one).
+
+IMPORT prelude
+IMPORT readers
+
+DECLARE Actor IS ONE OF Bob
+DECLARE Mode IS ONE OF peek, skip
+DECLARE Act IS ONE OF
+    go HAS mode IS A Mode
+    buy
+
+GIVETH A BOOLEAN
+`taken now` MEANS `is taken` FALSE
+
+GIVETH A DEONTIC Actor Act
+`shop` MEANS
+    PARTY Bob
+    MAY buy PROVIDED NOT `taken now`
+    WITHIN 10
+    HENCE COMMIT `taken` IS TRUE HENCE `shop`
+    LEST FULFILLED
+
+GIVETH A DEONTIC Actor Act
+`start` MEANS
+    PARTY Bob
+    MAY go m
+    WITHIN 10
+    HENCE COMMIT `taken` IS (IF m EQUALS peek THEN NOT `taken now` ELSE TRUE) HENCE `shop`
+    LEST FULFILLED
+
+#TRACE `start` AT 0 WITH
+    PARTY Bob DOES go peek AT 1
+    PARTY Bob DOES buy AT 2
+
+#TRACE `start` AT 0 WITH
+    PARTY Bob DOES go skip AT 1
+    PARTY Bob DOES buy AT 2
