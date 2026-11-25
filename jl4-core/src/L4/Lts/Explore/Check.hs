@@ -578,7 +578,7 @@ verdictOf opts rig msource g labels p = case p.prKind of
         [] -> ok path
         why : _ -> Unknown ("the path the graph gives did not replay: " <> why) (Just path)
     replayed events = do
-      mpos <- replayPath rig g.gStart events
+      mpos <- replayPath g.gRunHeap rig g.gStart events
       case mpos of
         Nothing -> pure (Left "the replay produced no result")
         Just pos -> decisionArgs p.prDecision pos.posResult.ledger >>= \ case

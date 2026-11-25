@@ -1063,8 +1063,22 @@ spec bin = describe "l4 explore" $ do
       out `shouldSatisfy` ("start, explored from its outset at 0: 5 states, 8 transitions" `isInfixOf`)
       out `shouldSatisfy` ("  s0 -> s2  PARTY Bob DOES go OF skip" `isInfixOf`)
 
+    -- the expected graph is the one each path gives run alone: the file's one
+    -- #TRACE is the skip path, whose buy l4 run passes over (WITHIN 9 left)
+    forM_ [("hop1.l4", "one import away"), ("hop2.l4", "two imports away")] \ (f, away) ->
+      it ("explore-imported/" <> f <> ": a constant that reads a ledger, " <> away <> ", is keyed, and each path forces its own") $
+        forM_ [[], ["--fixed-now", "2025-01-31T15:45:30Z"]] \ now -> do
+          Output code out _ <- runL4 bin (["explore", imported </> f, "--contract", "start"] <> now)
+          code `shouldBe` ExitSuccess
+          out `shouldSatisfy` ("start, explored from its outset at 0: 5 states, 8 transitions" `isInfixOf`)
+          out `shouldSatisfy` ("  s0 -> s2  PARTY Bob DOES go OF skip" `isInfixOf`)
+          out `shouldSatisfy` ("1 act passed over" `isInfixOf`)
+          Output rcode rout _ <- runL4 bin (["run", imported </> f] <> now)
+          rcode `shouldBe` ExitSuccess
+          rout `shouldSatisfy` ("PARTY Bob MAY buy PROVIDED (NOT `taken now`) WITHIN 9 HENCE" `isInfixOf`)
+
     forM_
-      [ ("ledger duty", "the WITHIN reads `recorded period`, which reads a ledger, so it is worked out only in a run and its deadline is not known here")
+      [ ("ledger duty","the WITHIN reads `recorded period`, which reads a ledger, so it is worked out only in a run and its deadline is not known here")
       , ("clock duty", "the WITHIN reads `clocky`, which reads the clock (TODAY), so it is worked out only in a run and its deadline is not known here")
       , ("library clock duty", "the WITHIN reads `Today serial`, which reads the clock (TODAY), so it is worked out only in a run and its deadline is not known here")
       , ("env duty", "the WITHIN reads `env period`, which reads the world outside the file (ENV), so it is worked out only in a run and its deadline is not known here")
