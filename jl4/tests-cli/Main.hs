@@ -6993,6 +6993,22 @@ spec bin = do
       [ m | (nm, f) <- findingObjectsByDecision env, nm == "`x cannot matter, whatever the waiver`"
           , objField f "kind" == Just (String "unreachable-outcome"), Just (String m) <- [objField f "message"] ]
         `shouldSatisfy` \ms -> length ms == 1 && all (\m -> "the constant TRUE." `T.isSuffixOf` m && not ("FALSE." `T.isInfixOf` m)) ms
+      -- Under a NOT a constant stands for the other literal. The constant TRUE
+      -- under a NOT can make a rule TRUE for no input, so it is named there;
+      -- inside a condition reported as entailed, which it cannot make hold,
+      -- it is not. Before this was fixed, the sign ignored the NOT: the first
+      -- named nothing and the second named the constant.
+      names "`needs the rule not in force`" "It reads through VerifyConstantsReadThroughFixture.`the rule is in force`, which is the constant TRUE."
+      let messagesAt nm site =
+            [ T.unpack m
+            | (nm', f) <- findingObjectsByDecision env, nm' == nm
+            , objField f "site" == Just (String site)
+            , Just (String m) <- [objField f "message"]
+            ]
+      messagesAt "`a NOT over the constant TRUE`" "body.and[1]"
+        `shouldSatisfy` \ms -> length ms == 1 && not (any ("reads through" `isInfixOf`) ms)
+      messagesAt "`a NOT over the constant TRUE`" "body.and[1].or[1]"
+        `shouldSatisfy` \ms -> length ms == 1 && all ("which is the constant TRUE." `isSuffixOf`) ms
 
     -- A rule written as DECIDE clauses is analysed as the CONSIDER it stands for.
     -- Before, it was skipped as not boolean; then its generated nesting made

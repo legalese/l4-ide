@@ -208,8 +208,10 @@ propositionalBound =
     , "  such as `y OR NOT y', is a different defect and goes unreported."
     , ""
     , "  A finding on a rule that reads through a constant names the constant"
-    , "  when it could be why: a FALSE one for a finding that something can"
-    , "  never hold, a TRUE one for a finding that something always holds."
+    , "  when it is inside the reported condition and has the finding's sign:"
+    , "  a FALSE one for a finding that something can never hold, a TRUE one"
+    , "  for a finding that something always holds, each the other way round"
+    , "  under a NOT."
     , ""
     , "  Atom identity matters more here than anything else. By default,"
     , "  syntactically identical leaves are MERGED into one variable, keyed by"
@@ -1157,19 +1159,22 @@ analyseBody labels order defs listed body written
     atomLabels labs e = [label labs u | u <- nubOrd (varsOf e)]
     label labs u = stripBackticks (Map.findWithDefault (Text.pack (show u)) u labs)
 
-    -- A sentence naming each constant the subterm reads through that could be
-    -- the cause of the finding: a call atom whose meaning ('cmDefs') is the
-    -- literal of the finding's sign ('constantMeaning'), FALSE for a finding that
-    -- something can never hold, TRUE for one that something always holds. A
-    -- constant of the other sign cannot cause it, and is not named. The constant
-    -- is called one ("which is the constant FALSE") only when the rule called is
-    -- itself listed as one, its body being the literal ('cmListed',
-    -- 'literalBody'); a rule whose meaning comes out a literal only once read
-    -- through has that meaning ("whose meaning is FALSE"). A finding through a
-    -- constant is often what the drafter meant, and the sentence lets a reader
-    -- see that the cause may be the constant and not this rule. The name keeps
-    -- its backticks, which the atoms line drops, so that a name of several
-    -- words reads as one inside the sentence (smucclaw/l4-ide#1095).
+    -- A sentence naming each constant inside the reported condition whose
+    -- value, read where it stands, is the finding's sign: FALSE for a finding
+    -- that something can never hold, TRUE for one that something always holds.
+    -- A call atom whose meaning ('cmDefs') is a literal ('constantMeaning') is
+    -- read as the other literal where it stands under an odd number of NOTs,
+    -- or in the scope of an IMPLIES ('polarities'): `NOT t`, with `t` the
+    -- constant TRUE, can make a condition unsatisfiable, and `t` itself cannot.
+    -- A constant of the other sign is not named. The constant is called one
+    -- ("which is the constant FALSE") only when the rule called is itself
+    -- listed as one, its body being the literal ('cmListed', 'literalBody'); a
+    -- rule whose meaning comes out a literal only once read through has that
+    -- meaning ("whose meaning is FALSE"). A finding through a constant is often
+    -- what the drafter meant, and the sentence lets a reader see that the cause
+    -- may be the constant and not this rule. The name keeps its backticks,
+    -- which the atoms line drops, so that a name of several words reads as one
+    -- inside the sentence (smucclaw/l4-ide#1095).
     -- Wording decided by Claude 2026-11-25, pending Meng's review.
     readsThroughConstants sign labs e =
       mconcat
@@ -1179,8 +1184,21 @@ analyseBody labels order defs listed body written
         | v <- nubOrd (varsOf e)
         , Just meaning <- [Map.lookup v defs]
         , Just b <- [constantMeaning meaning]
-        , b == sign
+        , any (\positive -> (b == positive) == sign) (Map.findWithDefault [] v (polarities e))
         ]
+    -- Each variable, with whether it stands under an even number of negations
+    -- (True) or an odd one (False) at each place it occurs. The scope of an
+    -- IMPLIES counts as negated: @s IMPLIES r@ is @NOT s OR r@.
+    polarities :: BDQ.BoolExpr Int -> Map Int [Bool]
+    polarities = go True
+      where
+        go p = \case
+          BDQ.BVar v -> Map.singleton v [p]
+          BDQ.BNot x -> go (not p) x
+          BDQ.BAnd xs -> Map.unionsWith (<>) (map (go p) xs)
+          BDQ.BOr xs -> Map.unionsWith (<>) (map (go p) xs)
+          BDQ.BImplies sc rq -> Map.unionWith (<>) (go (not p) sc) (go p rq)
+          _ -> Map.empty
     constantMeaning = \case
       BDQ.BTrue -> Just True
       BDQ.BFalse -> Just False

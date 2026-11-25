@@ -57,3 +57,18 @@ GIVEN x IS A BOOLEAN
 GIVETH A BOOLEAN
 DECIDE `x cannot matter, whatever the waiver` x IF
     x OR `the rule is in force` OR `the waiver was signed`
+
+-- TRUE for no input because of a NOT over the constant TRUE: read where it
+-- stands, the constant is FALSE, so it is named.
+GIVEN y IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `needs the rule not in force` y IF
+    y AND (NOT `the rule is in force`)
+
+-- The second condition is entailed by the third, and has the constant TRUE
+-- inside it under a NOT, where it cannot make anything hold: it is not named
+-- for that finding.
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `a NOT over the constant TRUE` a b IF
+    a AND (NOT (b AND `the rule is in force`)) AND (NOT b)
