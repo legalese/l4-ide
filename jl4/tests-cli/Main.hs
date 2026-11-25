@@ -7119,6 +7119,15 @@ spec bin = do
         `shouldSatisfy` \ms -> length ms == 1 && not (any ("reads through" `isInfixOf`) ms)
       messagesAt "`a NOT over the constant TRUE`" "body.and[1].or[1]"
         `shouldSatisfy` \ms -> length ms == 1 && all ("which is the constant TRUE." `isSuffixOf`) ms
+      -- So does a constant in the scope of an IMPLIES, for a finding that the
+      -- scope entails the requirement. Before this was fixed, that finding
+      -- read the scope and the requirement as if both had to hold: the first
+      -- named the constant TRUE, which the scope entails the requirement
+      -- without, and the second named nothing.
+      messagesAt "`in force, and x, means x`" "body"
+        `shouldSatisfy` \ms -> length ms == 1 && not (any ("reads through" `isInfixOf`) ms)
+      messagesAt "`signed, or x, means x`" "body"
+        `shouldSatisfy` \ms -> length ms == 1 && all ("`the waiver was signed`, which is the constant FALSE." `isSuffixOf`) ms
 
     -- A rule written as DECIDE clauses is analysed as the CONSIDER it stands for.
     -- Before, it was skipped as not boolean; then its generated nesting made

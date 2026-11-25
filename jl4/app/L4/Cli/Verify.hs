@@ -229,7 +229,7 @@ propositionalBound =
     , "  when it is inside the reported condition and has the finding's sign:"
     , "  a FALSE one for a finding that something can never hold, a TRUE one"
     , "  for a finding that something always holds, each the other way round"
-    , "  under a NOT."
+    , "  under a NOT or in the scope of an IMPLIES."
     , ""
     , "  Atom identity matters more here than anything else. By default,"
     , "  syntactically identical leaves are MERGED into one variable, keyed by"
@@ -1422,7 +1422,10 @@ analyseBody labels order defs listed body written
                     , interesting req
                     , not (sat' (ctx <> [scope]) req)
                     ]
-                  , [ finding "unreachable-outcome" True site (BDQ.BAnd [scope, req])
+                    -- Built over the implication, which this finding says
+                    -- always holds, so that a constant in the scope is read
+                    -- the other way round, as there ('readsThroughConstants').
+                  , [ finding "unreachable-outcome" True site (BDQ.BImplies scope req)
                         "the scope already entails the requirement, so nothing within scope can breach it and the requirement adds nothing."
                     | normalised
                     , interesting req

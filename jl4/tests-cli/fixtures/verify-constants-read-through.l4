@@ -72,3 +72,17 @@ GIVEN a IS A BOOLEAN, b IS A BOOLEAN
 GIVETH A BOOLEAN
 DECIDE `a NOT over the constant TRUE` a b IF
     a AND (NOT (b AND `the rule is in force`)) AND (NOT b)
+
+-- The scope entails the requirement whatever the constant TRUE is: in the
+-- scope of an IMPLIES, it is read as the other literal, and is not named.
+GIVEN x IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `in force, and x, means x` x IF
+    (x AND `the rule is in force`) IMPLIES x
+
+-- The scope entails the requirement only because the constant FALSE is, so
+-- it is named.
+GIVEN x IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `signed, or x, means x` x IF
+    (x OR `the waiver was signed`) IMPLIES x
