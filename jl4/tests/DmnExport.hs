@@ -30,7 +30,7 @@ module DmnExport (spec, drgAsCli) where
 import Base
 import qualified Base.Text as Text
 
-import L4.API.VirtualFS (TypeCheckWithDepsResult (..), VFS, checkWithImports, emptyVFS)
+import L4.API.VirtualFS (TypeCheckWithDepsResult (..), VFS, checkWithImports, emptyVFS, vfsFromList)
 import qualified Base.Set as Set
 import L4.Annotation (rangeOf)
 import L4.Dmn.Emit (emitDrg, escapeXmlAttr, escapeXmlText)
@@ -38,9 +38,11 @@ import L4.Dmn.IR
 import L4.Dmn.Lower (DmnLowerOptions (..), lowerModule, moduleTitle, resolveMaybePredicates)
 import L4.Dmn.Markdown (emitMarkdown, markdownReport)
 import L4.EvaluateLazy.Exceptions (UserEvalException (..))
+import L4.Import.Resolution (ResolvedImport (..))
 import L4.Interchange.Fidelity
 import L4.Syntax (Module, Resolved)
 import qualified L4.TypeCheck as TC
+import L4.TypeCheck (CheckResult (..))
 import L4.TypeCheck.Types (Severity (..))
 
 import Data.Time.Calendar (fromGregorian)
@@ -3910,6 +3912,131 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       (answerOf src).feText `shouldSatisfy` \t ->
         not (Text.isInfixOf "concatenate" t) && not (Text.isInfixOf "min(x, 1)" t)
 
+  -- smucclaw/l4-ide#1102. The export writes one file and no DMN import, so a
+  -- reference to a value from another module names nothing in the model: KIE
+  -- refuses the file ("Unknown variable") and Camunda answers null. The
+  -- engine-relevant property is that every FEEL name a decision reads is an
+  -- element of the model, or else the reference is refused (Blocking), never
+  -- rendered as a name. The engine legs are in the CLI suite
+  -- (jl4/tests-cli/CliTest/DmnBpmn.hs, fixture export-imported-constant.l4).
+  describe "imported constants (#1102)" $ do
+    let limits =
+          "IMPORT prelude\n\
+          \`hours per day` MEANS 8\n\
+          \`days per week` MEANS 5\n\
+          \`the longest week` MEANS `hours per day` TIMES `days per week` PLUS 2\n\
+          \`the threshold` MEANS 100\n\
+          \`the allowance` MEANS sum (LIST 10, 20)\n\
+          \`an unused constant` MEANS 7\n\
+          \DECLARE Colour IS ONE OF red, green\n\
+          \`default colour` MEANS red\n\
+          \GIVEN f IS A NUMBER\n\
+          \GIVETH A NUMBER\n\
+          \DECIDE `weekly hours at` f IS 42 TIMES f\n"
+        importing body = "IMPORT prelude\nIMPORT limits\n" <> body
+        drgImp = drgGeneral (vfsFromList [("limits", limits)]) id defaultDmnFlavor (const "Test")
+        idOf nm drg = (decisionNamed nm drg).dcnId
+        notesCoded c drg = [n | n <- (dmnReport drg).notes, n.code == c]
+        blockingOf drg = [n | n <- (dmnReport drg).notes, n.severity == Blocking]
+        literalOf nm drg = case (decisionNamed nm drg).dcnLogic of
+          LogicLiteral x -> x
+          _              -> error ("expected a boxed literal for " <> show nm)
+
+    it "copies a closed constant read in a guard, with its requirement edge" $ do
+      let drg = drgImp $ importing
+            "GIVEN hours IS A NUMBER\n\
+            \GIVETH A BOOLEAN\n\
+            \DECIDE `long` hours IS hours GREATER THAN `the threshold`\n"
+      (literalOf "the threshold" drg).feText `shouldBe` "100"
+      (decisionNamed "long" drg).dcnRequirements
+        `shouldSatisfy` elem (RequiredDecision (idOf "the threshold" drg))
+      (literalOf "long" drg).feText `shouldBe` "hours > the_threshold"
+      map (.element) (notesCoded "D-IMPORTED" drg) `shouldBe` [idOf "the threshold" drg]
+      map (.severity) (notesCoded "D-IMPORTED" drg) `shouldBe` [Advisory]
+      blockingOf drg `shouldBe` []
+      -- the copy's type is read against ITS module's substitution: an
+      -- importer's own would leave `MEANS 100` at Any
+      (decisionNamed "the threshold" drg).dcnType `shouldBe` DmnNumber
+
+    it "copies the closed constants a copied constant reads, with the edges between them" $ do
+      let drg = drgImp $ importing
+            "GIVEN hours IS A NUMBER\n\
+            \GIVETH A BOOLEAN\n\
+            \DECIDE `long` hours IS hours GREATER THAN `the longest week`\n"
+      (literalOf "the longest week" drg).feText `shouldBe` "hours_per_day * days_per_week + 2"
+      (decisionNamed "the longest week" drg).dcnRequirements `shouldMatchList`
+        [ RequiredDecision (idOf "hours per day" drg)
+        , RequiredDecision (idOf "days per week" drg)
+        ]
+      -- nothing else from the imported module is copied
+      [d.dcnName | d <- drgDecisions drg] `shouldMatchList`
+        ["long", "the longest week", "hours per day", "days per week"]
+      blockingOf drg `shouldBe` []
+
+    -- A prelude function is closed too: it reads no input. The copy is then
+    -- lowered like any other body, here through #1103's `sum`.
+    it "copies a constant that calls a prelude function" $ do
+      let drg = drgImp $ importing
+            "GIVEN x IS A NUMBER\n\
+            \GIVETH A BOOLEAN\n\
+            \DECIDE `within allowance` x IS x AT MOST `the allowance`\n"
+      (literalOf "the allowance" drg).feText `shouldBe` "sum(concatenate([0], [10, 20]))"
+      blockingOf drg `shouldBe` []
+
+    -- An imported module's own errors are not reported to the importer, so a
+    -- constant there can hold a name that never resolved. It reads something
+    -- unknown, so it is not closed.
+    it "does not copy a constant whose module failed to resolve one of its names" $ do
+      let broken = drgGeneral (vfsFromList [("broken", "`the allowance` MEANS sum (LIST 10, 20)\n")])
+                     id defaultDmnFlavor (const "Test")
+                     "IMPORT broken\n\
+                     \GIVEN x IS A NUMBER\n\
+                     \GIVETH A BOOLEAN\n\
+                     \DECIDE `within allowance` x IS x EQUALS `the allowance`\n"
+      [d.dcnName | d <- drgDecisions broken] `shouldBe` ["within allowance"]
+      (literalOf "within allowance" broken).feFragment `shouldBe` L4Verbatim
+
+    it "passes a copied constant into a BKM that reads it" $ do
+      let drg = drgImp $ importing
+            "GIVEN y IS A NUMBER\n\
+            \GIVETH A NUMBER\n\
+            \DECIDE `scaled` y IS y TIMES `the threshold`\n\
+            \GIVEN x IS A NUMBER\n\
+            \GIVETH A NUMBER\n\
+            \DECIDE `doubled limit` x IS `scaled` (x TIMES 2) PLUS `scaled` 1\n"
+      map (.fpName) (bkmNamed "scaled" drg).bkmParams `shouldBe` ["y", "the_threshold"]
+      (literalOf "doubled limit" drg).feText `shouldBe`
+        "scaled(y: x * 2, the_threshold: the_threshold) + scaled(y: 1, the_threshold: the_threshold)"
+      (decisionNamed "doubled limit" drg).dcnRequirements
+        `shouldSatisfy` elem (RequiredDecision (idOf "the threshold" drg))
+      blockingOf drg `shouldBe` []
+
+    it "refuses an imported constant that reads an imported constructor" $ do
+      let drg = drgImp $ importing
+            "GIVETH A BOOLEAN\n\
+            \DECIDE `is red` IS `default colour` EQUALS red\n"
+      (literalOf "is red" drg).feFragment `shouldBe` L4Verbatim
+      [d.dcnName | d <- drgDecisions drg] `shouldBe` ["is red"]
+      notesCoded "D-IMPORTED" drg `shouldBe` []
+
+    it "still refuses a call to an imported function" $ do
+      let drg = drgImp $ importing
+            "GIVEN h IS A NUMBER\n\
+            \GIVETH A NUMBER\n\
+            \DECIDE `monthly hours at` h IS `weekly hours at` h TIMES 52 DIVIDED BY 12\n"
+      (literalOf "monthly hours at" drg).feFragment `shouldBe` L4Verbatim
+
+    -- An imported constant is never a member of THIS module's population: it
+    -- is not a fixture, not inert, and not listed among the decisions left
+    -- out, which speak of this module only.
+    it "copies nothing for a decision left out as test scaffolding, and does not list the constant as left out" $ do
+      let drg = drgImp $ importing
+            "GIVETH A LIST OF NUMBER\n\
+            \DECIDE `sample limits` IS LIST `the threshold`, 1\n\
+            \#EVAL LIST (`sample limits`)\n"
+      notesCoded "D-IMPORTED" drg `shouldBe` []
+      map fst drg.drgOmitted `shouldBe` ["sample limits"]
+
   -- smucclaw/l4-ide#1101. KIE resolves a typeRef to an enum or an alias only
   -- when that definition comes earlier in the document (TYPE_DEF_NOT_FOUND
   -- otherwise), so the engine-relevant property is: no definition names a
@@ -4579,6 +4706,12 @@ drgGeneral vfs adjust flavor mkName src = case checkWithImports vfs src of
                     , Just r <- [rangeOf e]
                     ]
                 , dloExternalRefNames = Just Set.empty
+                -- #1102: the same transitive import closure the CLI passes
+                -- (jl4/app/L4/Cli/Export.hs), from the same check result.
+                , dloImportedModules =
+                    [ (ri.riTypeChecked.program, ri.riTypeChecked.substitution)
+                    | ri <- tc.tcdResolvedImports
+                    ]
                 }
           )
           tc.tcdModule

@@ -253,6 +253,14 @@ data NameEnv = MkNameEnv
     -- reference nothing beyond @_self@ (no module globals, no sibling
     -- computed reads), so the inline cannot smuggle unliftable environment
     -- references into a BKM body.
+  , neHomeUri :: !(Maybe NormalizedUri)
+    -- ^ the module being exported, when there is one (smucclaw/l4-ide#1102).
+    -- A bare reference to a value defined in ANOTHER module that is not an
+    -- element of this model (not in 'neVars') has no FEEL name behind it:
+    -- rendered as one, it is a variable KIE refuses to compile and Camunda
+    -- answers null for. With this set, such a reference refuses instead
+    -- ('verbatim', Blocking). 'Nothing' for 'renderFeel', which holds an
+    -- expression and no module.
   }
 
 -- | One member of a BKM's λ-lifted closure (§6.2): either a module element
@@ -325,6 +333,7 @@ emptyNameEnv = MkNameEnv
   , neInlineHere = Set.empty
   , neInlineFuel = 16
   , neComputedInline = Map.empty
+  , neHomeUri    = Nothing
   }
 
 -- | A parameterised decide, as a quantifier binder needs to see it: the @GIVEN@
@@ -503,6 +512,16 @@ data DmnLowerOptions = MkDmnLowerOptions
     -- filter then FAILS SAFE (drops nothing, reports what it would have
     -- dropped). The CLI supplies a sibling-directory scan; the golden harness
     -- supplies its VFS's contents.
+  , dloImportedModules :: ![(Module Resolved, TC.Substitution)]
+    -- ^ every module this one reaches through @IMPORT@, transitively, each
+    -- with the substitution ITS OWN check produced (smucclaw/l4-ide#1102): an
+    -- importer starts from an empty substitution, so an imported body's
+    -- inference variables resolve only against its own module's. Read for one
+    -- thing only: a CLOSED constant defined in one of them (see
+    -- 'importedClosedSet') that a decision of this module reads is emitted as
+    -- a decision of this model, with a @D-IMPORTED@ note, because this
+    -- exporter emits no DMN @import@ (spec §18). Empty: no constant is copied,
+    -- and every reference to an imported value refuses (see 'neHomeUri').
   }
 
 defaultDmnLowerOptions :: DmnLowerOptions
@@ -515,6 +534,7 @@ defaultDmnLowerOptions = MkDmnLowerOptions
   , dloMissingMatchRanges = []
   , dloClauseMatrixRanges = []
   , dloExternalRefNames   = Nothing
+  , dloImportedModules    = []
   }
 
 -- | Find the prelude's @isJust@ and @isNothing@ by SHAPE, not by module path.
@@ -1073,13 +1093,21 @@ fromPrelude = definedIn "prelude.l4"
 fromDaydate :: Resolved -> Bool
 fromDaydate = definedIn "daydate.l4"
 
+-- | The URI every builtin 'Unique' carries (@jl4:builtin@), read off one of
+-- them rather than spelled again here.
+builtinModuleUri :: NormalizedUri
+builtinModuleUri = TC.trueUnique.moduleUri
+
 -- | The basename of the module that minted this reference's defining
 -- occurrence. See 'fromDaydate' for why the BASENAME is the right granularity.
 definedIn :: Text -> Resolved -> Bool
-definedIn base r =
-  Text.takeWhileEnd (\c -> c /= '/' && c /= '\\') uriText == base
- where
-  uriText = (fromNormalizedUri (getUnique r).moduleUri).getUri
+definedIn base r = moduleBaseName (getUnique r).moduleUri == base
+
+-- | The last path segment of a module URI (@weeklimit.l4@), which is what a
+-- fidelity note may name: never the directory it was found in.
+moduleBaseName :: NormalizedUri -> Text
+moduleBaseName u =
+  Text.takeWhileEnd (\c -> c /= '/' && c /= '\\') (fromNormalizedUri u).getUri
 
 intLitOf :: Expr Resolved -> Maybe Integer
 intLitOf = \case
@@ -1921,6 +1949,12 @@ renderFeelIn names ctors oracle top = let (_, txt, frag) = go top in MkFeelExpr 
                -- silent wrong answer the issue is about.
                | Set.member (getUnique r) names.neInlineHere  ->
                    maybe (verbatim e) goIn (inlineBody names (getUnique r) [])
+               -- #1102, option 2: a value from another module that is not an
+               -- element of this model. Its FEEL name would name nothing (KIE
+               -- refuses the file, Camunda answers null), so it refuses. A
+               -- CLOSED imported constant never reaches here: 'lowerModule'
+               -- emits it as a decision (option 1), so it is in 'neVars'.
+               | foreignUnbound r                             -> verbatim e
                | otherwise                                    -> (atomPrec, nullaryText r, SFeel)
     -- JUST x IS x. FEEL has one flat null and no tag, so the constructor has no
     -- image; the payload does. (R8-d′)
@@ -2585,6 +2619,17 @@ renderFeelIn names ctors oracle top = let (_, txt, frag) = go top in MkFeelExpr 
     -- The oracle says this expression is a plain NUMBER: not a MAYBE, a list,
     -- an EITHER, or a type it could not read. Fails closed.
     plainNumber x = oracleClassify oracle x == (DmnNumber, Nothing, noTypeFlags)
+
+    -- Defined in another module (not this one, not a builtin), not a
+    -- constructor, and not an element this model emits. See 'neHomeUri'.
+    foreignUnbound r = case names.neHomeUri of
+      Nothing   -> False
+      Just home ->
+        let u = getUnique r
+        in u.moduleUri /= home
+             && u.moduleUri /= builtinModuleUri
+             && not (Map.member u names.neVars)
+             && isNothing (constantRefIn ctors r)
 
     verbatim whole = (atomPrec, prettyLayout whole, L4Verbatim)
 
@@ -3662,6 +3707,7 @@ lowerModule opts modul@(MkModule _ uri _) =
                        <> concatMap snd lowered
                        <> phase4Notes
                        <> serviceNotes
+                       <> importedConstantNotes
     , drgOmitted   =
         [ (decideName d, reason)
         | d <- allDecides
@@ -3820,14 +3866,126 @@ lowerModule opts modul@(MkModule _ uri _) =
   allDecides = map snd allDecidesAnn
   assumes = [a | Assume _ a <- decls]
 
+  -- smucclaw/l4-ide#1102, option 1: the CLOSED constants of imported modules
+  -- that a decide of this module reads. A closed constant is a 0-ary decide
+  -- whose body reads nothing but builtins, prelude and daydate functions, and
+  -- other closed constants (not law time, which is this model's own input; not
+  -- a constructor of an imported type, whose itemDefinition this model does
+  -- not carry), so it can be emitted as a decision of this model whose only
+  -- edges are to other copied constants, and its value cannot depend on
+  -- anything the importing module could supply differently. Each is emitted after this module's own
+  -- decisions, with a D-IMPORTED note, and its body is first resolved against
+  -- its own module's substitution (see 'dloImportedModules').
+  --
+  -- __They join the EMITTED population, never the filtered one.__
+  -- 'popVerdict' classifies this module's decides only, so an imported
+  -- constant is never a fixture, never inert, never in 'drgOmitted' (the
+  -- empty-model refusal speaks of "this module"). The candidate set below is
+  -- what any local body reaches, kept or not, so that 'piForcedRef' can count
+  -- a reference to one without depending on the verdict it feeds; only those
+  -- a KEPT decide (or a computed field) reaches are emitted.
+  --
+  -- Anything else read from another module (a constant that reads an ASSUME,
+  -- law time or an imported constructor; an ASSUME itself; a function used as
+  -- a value) is not copied; the renderer refuses it instead ('neHomeUri'). Both choices are
+  -- decided by Claude 2026-11-25, pending Meng's review.
+  importedConstantPool :: [(Unique, (Anno, Decide Resolved))]
+  importedConstantPool =
+    nubOrdOn fst
+      [ (getUnique (decideResolved d), (ann, over decideBody (TC.applyFinalSubstitution subst mUri) d))
+      | (m@(MkModule _ mUri _), subst) <- opts.dloImportedModules
+      , mUri /= uri
+      , Decide ann d <- topDecls m
+      , null (A.decideParams d)
+      , not (isComputedSelectorKind (decideResolved d))
+      ]
+
+  -- The least fixpoint: closed over builtins first, then over each other.
+  -- A cycle among constants never enters it.
+  importedClosedSet :: Set Unique
+  importedClosedSet = grow Set.empty
+   where
+    grow acc =
+      let acc' = Set.fromList
+            [ u
+            | (u, (_, d)) <- importedConstantPool
+            , all (\r -> libraryRef r || Set.member (getUnique r) acc) (freeRefs d)
+            -- 'freeRefs' sees only 'Ref's. A name that failed to resolve in
+            -- the imported module (which may not have checked: an import's
+            -- errors are not the importer's) reads something unknown.
+            , null [() | OutOfScope {} <- toList (view decideBody d)]
+            ]
+      in if acc' == acc then acc else grow acc'
+    -- A builtin, or a function of the prelude or daydate library (whose
+    -- calls this renderer lowers where it can, and refuses loudly where it
+    -- cannot, so a copy that uses one it cannot lower carries its own
+    -- Blocking note). Not law time, and not a module of the user's.
+    libraryRef r =
+      let u = getUnique r
+      in (u.moduleUri == builtinModuleUri && u /= TC.rulesEffectiveDateUnique)
+           || fromPrelude r || fromDaydate r
+
+  -- The closed constants reached from these bodies, directly or through
+  -- another closed constant.
+  importedConstantsReachedFrom :: [Decide Resolved] -> Set Unique
+  importedConstantsReachedFrom roots = go Set.empty (concatMap refsIn roots)
+   where
+    poolMap = Map.fromList importedConstantPool
+    refsIn d = [u | r <- freeRefs d, let u = getUnique r, Set.member u importedClosedSet]
+    go seen [] = seen
+    go seen (u : us)
+      | Set.member u seen = go seen us
+      | otherwise = go (Set.insert u seen)
+          (maybe [] (refsIn . snd) (Map.lookup u poolMap) <> us)
+
+  importedConstantUniques :: Set Unique
+  importedConstantUniques =
+    importedConstantsReachedFrom (allDecides <> computedSelectorDecides)
+
+  importedClosedConstants :: [(Anno, Decide Resolved)]
+  importedClosedConstants =
+    [p | (u, p) <- importedConstantPool, Set.member u importedConstantUniques]
+
+  importedConstantsAnn =
+    [ p
+    | (u, p) <- importedConstantPool
+    , Set.member u reachedByEmitted
+    ]
+   where
+    reachedByEmitted = importedConstantsReachedFrom
+      (map snd localDecidesAnn <> computedSelectorDecides)
+
+  importedDecides = map snd importedConstantsAnn
+
+  -- Advisory: the value is faithful (closed, so it reads nothing this model
+  -- could supply differently), but the model now carries a COPY, and a later
+  -- edit to the imported module changes nothing here until the export is run
+  -- again.
+  importedConstantNotes :: [FidelityNote]
+  importedConstantNotes =
+    [ dmnNote "D-IMPORTED" Advisory did (getAnno d).range
+        ( "`" <> decideName d <> "` is defined in the imported module `"
+            <> moduleBaseName (getUnique (decideResolved d)).moduleUri
+            <> "`; this model carries its value as a decision of its own, "
+            <> "since the export writes one file and no DMN import"
+        )
+        "the link to the imported module: a later change there reaches this model only when it is exported again"
+    | d <- importedDecides
+    , Just did <- [Map.lookup (getUnique (decideResolved d)) decideByUnique]
+    ]
+
   ------------------------------------------------------------------------
   -- Phase 4: the call-graph analysis (L4.Dmn.Analysis), over the FULL
   -- decide population — the population filter itself is one of its outputs.
   ------------------------------------------------------------------------
 
+  -- The imported constants (#1102) are in the call graph and the safety
+  -- analysis, so a local caller sees its callee and a clock-reading or
+  -- partial constant is certified like a local one; they are not in the
+  -- population filter (see 'importedClosedConstants').
   callGraph :: A.CallGraph
   callGraph =
-    A.buildCallGraph allDecides
+    A.buildCallGraph (allDecides <> map snd importedClosedConstants)
       [dir | Directive _ dir <- decls]
       -- non-Decide top-level expressions whose references keep a decide
       -- alive: TIMEZONE declarations and the computed-field selector bodies
@@ -3862,7 +4020,7 @@ lowerModule opts modul@(MkModule _ uri _) =
         , A.siSubst          = opts.dloSubstitution
         , A.siUri            = uri
         }
-      callGraph allDecides
+      callGraph (allDecides <> map snd importedClosedConstants)
    where
     componentTysOf = \case
       RecordDecl _ _ fs -> [ty | MkTypedName _ _ ty _ _ <- fs]
@@ -3878,7 +4036,8 @@ lowerModule opts modul@(MkModule _ uri _) =
         , A.piExternalRefNames = opts.dloExternalRefNames
         , A.piForcedRef        = \r ->
             let u = getUnique r
-            in (u.moduleUri == uri || u == TC.rulesEffectiveDateUnique)
+            in (u.moduleUri == uri || u == TC.rulesEffectiveDateUnique
+                  || Set.member u importedConstantUniques)
                  && not (Set.member u constructors)
                  && not (Set.member u selectors)
                  && not (Set.member u computedSelfUniques)
@@ -3897,9 +4056,10 @@ lowerModule opts modul@(MkModule _ uri _) =
   -- consumer below reads this list, so a dropped decision mints no node, no
   -- FEEL name and no inputData — and its absence is never silent, because
   -- 'populationNotes' names every drop.
-  decidesAnn = [p | p@(_, d) <- allDecidesAnn, kept d]
+  localDecidesAnn = [p | p@(_, d) <- allDecidesAnn, kept d]
    where
     kept d = not (Map.member (getUnique (decideResolved d)) popVerdict.pvDropped)
+  decidesAnn = localDecidesAnn <> importedConstantsAnn
   decides = map snd decidesAnn
 
   -- Tier-1, DMN-SAFE, parameterised, kept: the un-lift set (§2.1, §2.4).
@@ -5043,6 +5203,7 @@ lowerModule opts modul@(MkModule _ uri _) =
     , neBinderSubst = Map.empty
     , neInlineHere = Set.empty
     , neInlineFuel = 16
+    , neHomeUri    = Just uri
     }
 
   -- #936 Gap 2's raw material: every KEPT, PARAMETERISED decide, with its body

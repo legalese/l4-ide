@@ -472,6 +472,13 @@ dmnDrgFor opts tcRes = do
                 , Just r <- [rangeOf e]
                 ]
             , dloExternalRefNames = externalRefs
+            -- #1102: every module this one imports, transitively and once
+            -- each (the same walk `l4 export catala` takes), so a closed
+            -- imported constant can be carried into the model as a decision.
+            , dloImportedModules =
+                [ (dep.module', dep.substitution)
+                | dep <- Rules.transitiveDependencies tcRes
+                ]
             }
           tcRes.module'
   pure drg

@@ -101,6 +101,19 @@ L4 lets you use a type before you declare it, but KIE does not load a model in w
 A record that refers to itself, or two records that refer to each other, is written in your order: KIE 8.44 and Camunda 8.7.6 both load and run such a model, measured on `jl4/examples/dmn/itemdef-order.l4`.
 No other engine has been checked.
 
+**Values from a file you import.** `l4 export dmn` writes one DMN file and no DMN `<import>`, so a decision can read only what is in that file.
+A constant defined in a module you `IMPORT` is copied into the model as a decision of its own when nothing can change its value: a `MEANS` with no `GIVEN` whose body uses only fixed values, L4's built-in operators, functions of the prelude and `daydate` libraries, and other such constants.
+Each copy carries an advisory `D-IMPORTED` note, because the model now holds the value rather than a link to it: if the imported file changes, export again.
+Everything else read from an imported module is written as L4 text with a Blocking note, which, as the next section says, makes both engines refuse the whole file:
+
+- a constant that reads an `ASSUME`, `RULES EFFECTIVE DATE`, or an `IS ONE OF` value the imported module declares, and an imported `ASSUME` read directly;
+- any function of your own imported module, called or passed.
+
+A copied constant is lowered exactly as it would be in your own file, so one that has no FEEL form there has none here either: a `Date 2024 1 15` constant is written as L4 text with a Blocking note, in your file or in an imported one.
+Before 2026-11-25 a constant or `ASSUME` from an imported module, whether or not it could have been copied, was written as a FEEL name with nothing behind it and no note about it: KIE refused the file (`Unknown variable`) and Camunda answered null.
+A call to an imported function was already written as L4 text.
+Measured on KIE 8.44 and Camunda 8.7.6 with `jl4/tests-cli/fixtures/export-imported-constant.l4`.
+
 ## What doesn't survive
 
 Both emit a **fidelity report**, and reading it is not optional. `Blocking` notes here usually

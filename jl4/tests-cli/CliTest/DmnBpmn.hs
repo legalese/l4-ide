@@ -4,7 +4,7 @@
 -- backend; 'Main.spec' calls 'spec' where these describes always ran.
 module CliTest.DmnBpmn (spec, fixtures) where
 
-import Control.Monad (unless, when)
+import Control.Monad (forM_, unless, when)
 import Data.List (isInfixOf, sort)
 import System.Directory
   ( createDirectoryIfMissing
@@ -148,6 +148,15 @@ exportScaffoldingFixture, exportScaffoldingDutyFixture :: FilePath
 exportScaffoldingFixture     = fixtureDir </> "export-scaffolding-only.l4"
 exportScaffoldingDutyFixture = fixtureDir </> "export-scaffolding-and-duty.l4"
 exportBlockingOnlyFixture = fixtureDir </> "export-blocking-only.l4"
+-- smucclaw/l4-ide#1102: a module reading closed constants from the module
+-- it imports (copied into the model as decisions), and one reading values
+-- from it that are not closed (refused, Blocking). Both import the same file.
+exportImportedConstantFixture, exportImportedOpenFixture :: FilePath
+exportImportedLimitsFixture, exportImportedConstantCases :: FilePath
+exportImportedConstantFixture = fixtureDir </> "export-imported-constant.l4"
+exportImportedOpenFixture     = fixtureDir </> "export-imported-open.l4"
+exportImportedLimitsFixture   = fixtureDir </> "export-imported-limits.l4"
+exportImportedConstantCases   = fixtureDir </> "export-imported-constant.cases.json"
 exportAdvisoryOnlyFixture = fixtureDir </> "export-advisory-only.l4"
 
 -- The FIXTURE(d) backticked-import pair: a HYPHENATED module beside a sibling
@@ -411,6 +420,8 @@ fixtures :: [FilePath]
 fixtures =
   [ exportTwoRulesFixture, exportNothingFixture
   , exportScaffoldingFixture, exportScaffoldingDutyFixture
+  , exportImportedConstantFixture, exportImportedOpenFixture
+  , exportImportedLimitsFixture, exportImportedConstantCases
   , exportBlockingOnlyFixture, exportAdvisoryOnlyFixture
   , bpmnOfferingSource, bpmnOfferingGolden, bpmnOfferingFidelity
   , dmnSource, dmnGolden, dmnMarkdownGolden, dmnEngineCases
@@ -597,6 +608,25 @@ spec bin = do
         let flagLines = [l | l <- lines serr, "--include-tests" `isInfixOf` l]
         flagLines `shouldSatisfy` all ("`sample amounts`" `isInfixOf`)
         length flagLines `shouldBe` 1
+
+      -- smucclaw/l4-ide#1102: a closed constant from an imported module is
+      -- carried into the model as a decision; nothing else from it is.
+      it "carries the closed imported constants a module reads into the model, and no others" $ do
+        Output code sout serr <- runL4 bin ["export", "dmn", exportImportedConstantFixture]
+        code `shouldBe` ExitSuccess
+        forM_ ["the_threshold", "the_longest_week", "hours_per_day", "days_per_week"] \nm ->
+          sout `shouldSatisfy` (("id=\"decision_" <> nm <> "\"") `isInfixOf`)
+        sout `shouldSatisfy` (not . ("an_unused_constant" `isInfixOf`))
+        sout `shouldSatisfy` (not . ("weekly_hours_at" `isInfixOf`))
+        serr `shouldSatisfy` (not . ("blocking" `isInfixOf`))
+
+      it "refuses an imported value that is not a closed constant, rather than naming it" $ do
+        Output code sout serr <- runL4 bin ["export", "dmn", exportImportedOpenFixture]
+        code `shouldBe` ExitSuccess
+        serr `shouldSatisfy` ("2 blocking" `isInfixOf`)
+        -- the name with nothing behind it that the export used to write
+        sout `shouldSatisfy` (not . ("default_colour = " `isInfixOf`))
+        sout `shouldSatisfy` (not . ("id=\"decision_default_colour\"" `isInfixOf`))
 
     -- FIXTURE(d)'s importer view must see a BACKTICKED import. A hyphenated
     -- module name can only be imported as IMPORT `interp-common`, and the
@@ -1204,6 +1234,38 @@ spec bin = do
           -- perfectly valid and KIE builds it without complaint.
           out `shouldSatisfy` ("XSD    valid" `isInfixOf`)
           out `shouldSatisfy` ("BUILD  clean" `isInfixOf`)
+
+  -- smucclaw/l4-ide#1102. Exported fresh (there is no committed golden: the
+  -- golden harness resolves only the embedded libraries, and this subject
+  -- imports a sibling file), then run on both engines. Before #1102, KIE
+  -- refused the file with "Unknown variable 'the_longest_week'" and
+  -- "Unknown variable 'the_threshold'", and Camunda answered null for every
+  -- decision that read one.
+  describe "imported constants (opt-in: L4_DMN_ENGINE_CHECK=1)" $ do
+    let exported = do
+          tmp <- getTemporaryDirectory
+          let outDir  = tmp </> "l4-export-imported-constant"
+              outFile = outDir </> "export-imported-constant.dmn"
+          removePathForcibly outDir
+          createDirectoryIfMissing True outDir
+          Output code _ serr <- runL4 bin ["export", "dmn", exportImportedConstantFixture, "-o", outFile]
+          unless (code == ExitSuccess) $
+            expectationFailure ("l4 export dmn failed:\n" ++ serr)
+          pure outFile
+    it "KIE builds the model and answers every decision that reads an imported constant" $ do
+      dmn <- exported
+      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustPass
+        dmn [dmn, "--cases", exportImportedConstantCases] \out -> do
+          out `shouldSatisfy` ("BUILD  clean" `isInfixOf`)
+          out `shouldSatisfy` ("3 case(s), 0 error(s), 0 warning(s)" `isInfixOf`)
+          out `shouldSatisfy` ("21/21 value(s) as expected" `isInfixOf`)
+
+    it "Camunda answers every decision that reads an imported constant" $ do
+      dmn <- exported
+      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustPass
+        dmn [dmn, "--cases", exportImportedConstantCases] \out -> do
+          out `shouldSatisfy` ("1 parsed, 0 error(s)" `isInfixOf`)
+          out `shouldSatisfy` ("21/21 value(s) as expected" `isInfixOf`)
 
   -- The placement rule's NEGATIVE control (spec §4.3, §9). Everything else in
   -- this file asserts that a gate stays green, which on its own says nothing
