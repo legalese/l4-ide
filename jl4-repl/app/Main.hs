@@ -27,6 +27,12 @@ import Text.Printf (printf)
 import Development.IDE.Graph.Database (shakeRunDatabase)
 import Language.LSP.Protocol.Types (toNormalizedFilePath, normalizedFilePathToUri, fromNormalizedUri, NormalizedUri)
 import qualified Language.LSP.Protocol.Types as LSP
+-- for 'syncStoreWithDisk'
+import Control.Concurrent.STM (atomically, modifyTVar', readTVarIO)
+import Control.Exception (IOException, try)
+import Data.Int (Int32)
+import qualified Data.Text.Utf16.Rope.Mixed as Rope
+import Language.LSP.VFS (VFS (..), VirtualFile (..))
 
 import LSP.Logger (makeDefaultStderrRecorder, cmapWithPrio, cfilter, pretty, Recorder, WithPriority(..), Priority(..))
 import L4.TypeCheck.Types (CheckError(..), CheckErrorWithContext(..))
@@ -126,6 +132,7 @@ data ReplState = ReplState
   , evalCounter :: IORef Int       -- Counter for unique evaluation filenames
   , imports    :: IORef [Text]     -- Accumulated IMPORT statements
   , traceSink  :: IORef (Maybe TraceSink)
+  , storeVersion :: IORef Int32    -- The last version 'syncStoreWithDisk' gave a file
   }
 
 data TraceSink = TraceSink
@@ -171,6 +178,7 @@ main = do
   -- Create mutable list for accumulated imports
   importsRef <- newIORef ([] :: [Text])
   traceSinkRef <- newIORef Nothing
+  storeVersionRef <- newIORef (0 :: Int32)
 
   let replState = ReplState
         { ideState = state
@@ -181,6 +189,7 @@ main = do
         , evalCounter = counter
         , imports = importsRef
         , traceSink = traceSinkRef
+        , storeVersion = storeVersionRef
         }
 
   -- If files provided, load them first
@@ -276,13 +285,58 @@ runRepl replState = do
             then say "Goodbye!"
             else loop readInput say newState
 
+-- | Read the file @loaded@ into the store, and read again every file the store
+-- has read from disk before, so that what is checked next is what is on disk
+-- now (smucclaw/l4-ide#1099). @:load@, @:reload@ and @:reset@ do this, through
+-- 'loadFile', before they check the file; a line of the REPL does not.
+--
+-- The store keeps the text of each file it has read in its virtual file system:
+-- the file loaded here, and every module it imports, directly or not, which the
+-- rules put there the first time they read it (@GetLexTokens@ in
+-- "LSP.L4.Rules"). Whether a file there has changed is read from the version of
+-- its entry alone (@GetModificationTime@, an early cutoff, in
+-- "LSP.Core.FileStore"), and 'Shake.addVirtualFile' gives every entry version
+-- 0, so a new text put there under the old version is never looked at, and
+-- every result built from the old text stands. So here:
+--
+-- * an entry whose text is not the file's is given the file's text, under a
+--   version that no entry has had before in this session, so that the cutoff
+--   cannot mistake it for an older entry for the same file;
+-- * an entry whose text is the file's is left as it is, version and all, so
+--   that the store sees no change in that file;
+-- * an entry whose file cannot be read is dropped, so that the rules look for
+--   the file again and report what they find. The REPL's own module for each
+--   line, which is not on disk, goes the same way, as nothing reads it again.
+syncStoreWithDisk :: ReplState -> LSP.NormalizedFilePath -> IO ()
+syncStoreWithDisk st loaded = do
+  let var = st.ideState.shakeExtras.vfsVar
+      loadedUri = normalizedFilePathToUri loaded
+  VFS entries <- readTVarIO var
+  let held = [ (uri, nfp, Just vf) | (uri, vf) <- MapStrict.toList entries, Just nfp <- [LSP.uriToNormalizedFilePath uri] ]
+      toRead
+        | MapStrict.member loadedUri entries = held
+        | otherwise = (loadedUri, loaded, Nothing) : held
+  changes <- traverse readAgain toRead
+  atomically $ modifyTVar' var \(VFS m) ->
+    VFS (foldr (\(uri, entry) -> MapStrict.alter (const entry) uri) m [ c | Just c <- changes ])
+  where
+    readAgain (uri, nfp, old) = do
+      onDisk <- try (Text.IO.readFile (LSP.fromNormalizedFilePath nfp))
+      case (onDisk, old) of
+        (Left (_ :: IOException), _) -> pure (Just (uri, Nothing))
+        (Right text, Just (VirtualFile _ _ rope)) | text == Rope.toText rope -> pure Nothing
+        (Right text, _) -> do
+          version <- atomicModifyIORef' st.storeVersion (\n -> (n + 1, n + 1))
+          pure (Just (uri, Just (VirtualFile version 0 (Rope.fromText text))))
+
 -- | Load a file and trigger type checking
 loadFile :: ReplState -> FilePath -> IO (Either Text ())
 loadFile st fp = do
   let nfp = toNormalizedFilePath fp
       uri = normalizedFilePathToUri nfp
-  -- Add file to virtual file store
-  _ <- shakeRunDatabase st.ideState.shakeDb [Shake.addVirtualFileFromFS nfp]
+  -- Read the file into the store, and every file the store has read before
+  -- again, from disk (smucclaw/l4-ide#1099)
+  syncStoreWithDisk st nfp
   -- Trigger type check
   [mtc] <- shakeRunDatabase st.ideState.shakeDb [Shake.use Rules.SuccessfulTypeCheck uri]
   case mtc of
@@ -1132,8 +1186,10 @@ helpText = Text.unlines
   , "File management:"
   , "  :load <file>       Load an L4 file"
   , "  :l <file>          Short for :load"
-  , "  :reload, :r        Reload the current file"
-  , "  :reset             Reset REPL (clear imports, reload file)"
+  , "  :reload, :r        Load the current file again"
+  , "  :reset             Remove what :import added, and load the current file again"
+  , "  These three read the file again from disk, and every module it or :import"
+  , "  brings in, so an edit saved since is seen. Evaluating a line does not."
   , ""
   , "Inspection:"
   , "  :decides           List DECIDE declarations in the loaded file"
