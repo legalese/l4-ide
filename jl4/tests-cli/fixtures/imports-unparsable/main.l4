@@ -1,0 +1,5 @@
+-- smucclaw/l4-ide#1025: imports a module that does not parse, so the error on
+-- the IMPORT has its third form.
+IMPORT garbled
+
+#EVAL 1 PLUS 1

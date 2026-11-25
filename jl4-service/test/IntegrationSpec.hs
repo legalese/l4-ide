@@ -323,6 +323,7 @@ spec = describe "integration" do
         forM_ bothPaths \args -> do
           resp <- call baseUrl mgr "answered" args
           statusCode' resp `shouldBe` 422
+          LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "Internal error"
           LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "is not in scope"
 
   describe "MAYBE parameter handling" do

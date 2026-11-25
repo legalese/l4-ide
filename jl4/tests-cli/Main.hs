@@ -4864,11 +4864,19 @@ spec bin = do
       diags `shouldSatisfy` isInfixOf "check/type-mismatch"
       diags `shouldNotSatisfy` isInfixOf "eval/internal-error"
 
-    it "l4 check fails on it, and evaluates nothing, as before" $ do
+    it "l4 check fails on it, with the IMPORT's error and the module's, as before" $ do
       o <- runL4 bin ["check", errDir </> "main.l4"]
       o.outExit `shouldBe` ExitFailure 1
+      both o `shouldSatisfy` isInfixOf "The imported module lib has errors (line 6: The second input of PLUS is expected to be of type)"
+      both o `shouldSatisfy` isInfixOf "check/type-mismatch"
+
+    -- The third form of the error on an IMPORT: the module does not parse.
+    it "l4 run evaluates nothing in a file whose import does not parse, and says the module could not be checked" $ do
+      o <- runL4 bin ["run", fixtureDir </> "imports-unparsable" </> "main.l4"]
+      o.outExit `shouldBe` ExitFailure 1
       both o `shouldNotSatisfy` isInfixOf "Evaluation["
-      noInternalError (both o)
+      both o `shouldSatisfy` isInfixOf "The imported module garbled could not be checked; see the errors in it."
+      both o `shouldSatisfy` isInfixOf "parse/unexpected-WITH"
 
     it "l4 trace fails on it and says that evaluation failed" $ do
       o <- runL4 bin ["trace", errDir </> "trace.l4"]
@@ -4990,6 +4998,9 @@ spec bin = do
       listed.outExit `shouldBe` ExitSuccess
       listed.outStdout `shouldSatisfy` isInfixOf "duty — after 1 event"
       explored <- runL4 bin ["explore", okDir </> "duty.l4"]
+      -- 2, not the refusal's 1: the explorer leaves one act untried, since the
+      -- WITHIN it reads from lib is not a literal
+      explored.outExit `shouldBe` ExitFailure 2
       explored.outStdout `shouldSatisfy` isInfixOf "2 states, 2 transitions"
       proved <- runL4 bin ["prove", okDir </> "duty.l4"]
       proved.outExit `shouldBe` ExitSuccess

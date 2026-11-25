@@ -189,12 +189,16 @@ evaluatedOnce = describe "a module reached by more than one import path, when th
 
   -- With no error anywhere, the run does evaluate the importer, on top of the
   -- heaps of its imports, and its result reads from the module the two paths
-  -- share. The result is published once. The shared module's own #EVAL is
-  -- worked out when its heap is built, but a run of the importer publishes
-  -- only the importer's results (measured: none for bottom), so the store
-  -- cannot count how often bottom was evaluated; the rule that builds its
-  -- heap is keyed by the file alone.
-  it "evaluates the importer over a module that two paths lead to" $ do
+  -- share. This pins the value, and that a run evaluates at all, NOT that the
+  -- shared module is evaluated once: the importer is the entry file, so its
+  -- result is published once however its imports' heaps are built; a run of
+  -- the importer publishes nothing for the shared module (measured: none of
+  -- bottom's results); and the logs the run returns hold diagnostics, not the
+  -- rules it ran. Nothing here grows with the number of paths, so evaluating
+  -- the shared module once per path would pass. What keeps it to once is that
+  -- the rule which builds a module's heap, 'GetLazyEvaluationDependenciesFile',
+  -- is keyed by the file alone.
+  it "evaluates the importer over a module that two paths lead to (how often that module is evaluated is not guarded)" $ do
     let files =
           [ ("bottom", withEval)
           , ("left", "IMPORT bottom\n\n" <> fun "lf" "base x PLUS 1")
