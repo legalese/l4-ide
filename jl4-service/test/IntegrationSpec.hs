@@ -3966,6 +3966,25 @@ spec = describe "integration" do
           call baseUrl mgr "held time" (given extra "h" (held "10:30:00Z" "2026-01-31 10:30:00 UTC")) >>= (`shouldCarry` Answers (str "10:30:00"))
           forM_ ["2026-01-31 10:30:00 UTC", "2026-01-31 10:30", "2026-01-31T10:30:00", "2026-01-31 18:30:00 Asia/Singapore"] \w ->
             call baseUrl mgr "held when" (given extra "h" (held "10:30" w)) >>= (`shouldCarry` Answers (str "2026-01-31 10:30:00 UTC"))
+      -- A TIME followed by an offset is the clock as written, whichever side
+      -- of UTC the offset is, as http-json.md says; a DATETIME followed by
+      -- one is the instant it names (review of #779, 2026-11-25, which found
+      -- "-05:00" refused after a TIME where "+08:00" was read)
+      it "reads a TIME followed by an offset of either sign as the clock written, on both paths" \(baseUrl, mgr) -> do
+        let offsets = ["14:30:00+08:00", "14:30:00-05:00", "14:30:00+00:00", "14:30:00-00:00", "14:30:00Z", "14:30:00+0800", "14:30:00-0500", "14:30-05:00"]
+            held t w = Aeson.object ["f" Aeson..= True, "t" Aeson..= str t, "w" Aeson..= str w]
+        -- the wrapper path cannot take a TIME at the top level (a limit in the
+        -- design note), so the top level is asked of the direct path only
+        forM_ offsets \t ->
+          call baseUrl mgr "clock" (Aeson.object ["t" Aeson..= str t]) >>= (`shouldCarry` Answers (str "14:30:00"))
+        forM_ paths \extra -> do
+          forM_ offsets \t ->
+            call baseUrl mgr "held time" (given extra "h" (held t "2026-01-31T10:30:00Z")) >>= (`shouldCarry` Answers (str "14:30:00"))
+          forM_ ["14:30:00-05", "14:30:00+05"] \t ->
+            call baseUrl mgr "held time" (given extra "h" (held t "2026-01-31T10:30:00Z"))
+              >>= (`shouldCarry` Refuses ("could not read " <> Text.pack (show t) <> " as a TIME"))
+          forM_ [("2026-01-31T10:30:00-05:00", "2026-01-31 15:30:00 UTC"), ("2026-01-31T10:30:00-00:00", "2026-01-31 10:30:00 UTC"), ("2026-01-31T10:30:00+08:00", "2026-01-31 02:30:00 UTC")] \(w, answer) ->
+            call baseUrl mgr "held when" (given extra "h" (held "10:30" w)) >>= (`shouldCarry` Answers (str answer))
 
   -- A type whose only constructor is named like it and carries fields is what
   -- DECLARE T HAS declares, to the evaluator, so JSONDECODE reads it as a

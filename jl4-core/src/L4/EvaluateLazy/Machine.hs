@@ -3334,10 +3334,10 @@ jsonDateText s =
 
 -- | A TIME as JSONDECODE reads it: what TOTIME reads ('parseTimeText'), or
 -- hours, minutes and optionally seconds, each of one or two digits, with a
--- fraction of a second, followed by nothing, @Z@, @" UTC"@, an offset
--- (@"+08:00"@) or the name of a zone (@" Asia/Singapore"@). A TIME has no
--- zone, so the clock is read as written and the zone left out, as the direct
--- path read it (see 'jsonDateText').
+-- fraction of a second, followed by nothing, @Z@, @" UTC"@, an offset on
+-- either side of UTC (@"+08:00"@, @"-05:00"@, @"-0500"@) or the name of a zone
+-- (@" Asia/Singapore"@). A TIME has no zone, so the clock is read as written
+-- and the zone left out, as the direct path read it (see 'jsonDateText').
 jsonTimeText :: Text -> Maybe TimeOfDay
 jsonTimeText s = parseTimeText s <|> do
   (tod, _, rest) <- looseClock s
@@ -3345,8 +3345,9 @@ jsonTimeText s = parseTimeText s <|> do
     then Just tod
     else Nothing
  where
+  -- a negative offset was refused until review of #779, 2026-11-25
   isOffset r = case Text.uncons r of
-    Just ('+', o) -> isHhMm o
+    Just (sign, o) | sign == '+' || sign == '-' -> isHhMm o
     _ -> False
   isHhMm o = case Text.splitOn ":" o of
     [h, m] -> twoDigits h && twoDigits m
