@@ -6280,3 +6280,29 @@ Two smaller notes in the same issue are **not** closed here, and neither is a wr
 - **A gensym leaks into the raw-L4 fallback** — `GIVEN purpose IS purpose254`, an inference
   variable printed in a binder's declared-type slot. Cosmetic, on a refusal path, and it lives in
   `L4.Print` where a repair would move exactprint goldens well outside this exporter.
+
+### 17.8 The rounding builtins and the prelude's numeric aggregates — smucclaw/l4-ide#1103, 2026-11-25
+
+The same class as §17.1's Gap 1, found on a third-party corpus: `FLOOR`, `CEILING` and `ROUND`, and the prelude's `min`, `max`, `sum` and `count`, had no FEEL lowering, so each fell to the raw-L4 fallback, which makes both engines refuse the whole file (Blocking `D-LITERALEXPR`, or `D-NONFEELINPUT` in a table input).
+Until this date only `MODULO` among the numeric builtins was lowered (`modulo`).
+
+**Landed 2026-11-25**, in `renderFeelIn` (`jl4-core/src/L4/Dmn/Lower.hs`), each form chosen by measuring KIE 8.44.0.Final and Camunda 8.7.6 against `l4 run` the same day:
+
+| L4                   | FEEL                        | measured edge                                                                                                     |
+| -------------------- | --------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `FLOOR x`            | `floor(x)`                  | 2.5, -2.5, -0.5, 0.5, -3 agree                                                                                    |
+| `CEILING x`          | `ceiling(x)`                | the same values agree                                                                                             |
+| `ROUND x`            | `decimal(x, 0)`             | L4 rounds a half to even (`round` on `Rational`); so does `decimal`: 0.5, 1.5, -0.5, -1.5, 2.5, 3.5, -2.5 agree   |
+| prelude `sum xs`     | `sum(concatenate([0], xs))` | `sum([])` is null on both engines and L4 gives 0; with the leading 0 both give 0                                  |
+| prelude `count xs`   | `count(xs)`                 | `count([])` is 0 on both                                                                                          |
+| prelude `min`, `max` | `min(a, b)`, `max(a, b)`    | NUMBER overloads only, gated on the type oracle (call and operands plain `number`); the MAYBE NUMBER ones decline |
+
+The prelude ones are recognised by provenance then name (`preludeNamed`, as `elem` and `all`/`any` are), so a module's own `sum` or `min` is not lowered.
+Left as they were, each a raw-L4 refusal: `SQRT` (partial, L5), `TRUNC` (no single FEEL function), `minimum` and `maximum` (`@nonexhaustive` on `EMPTY` in L4, measured `eval/non-exhaustive-patterns`, while FEEL's `min([])` is null on Camunda and a FAILED decision on KIE), and the MAYBE NUMBER `min`/`max` (which skip a `NOTHING`: measured `min (JUST 3) NOTHING` is `JUST 3`).
+The exhibit is `jl4/examples/dmn/rounding.l4`, with cases and an engine baseline (72/72 on both engines; before this change the same file made KIE report `0 case(s), 16 error(s)` and Camunda parse nothing).
+
+**One difference this does not remove, decided by Claude 2026-11-25, pending Meng's review.** §2.4.4 already says a DMN-SAFE decision can answer differently because FEEL's number is a 34-digit decimal and L4's an exact rational.
+A rounding function makes that difference whole: `FLOOR (x DIVIDED BY 3 TIMES 3)` at x = 1 is 1 in L4 and 0 on both engines (measured; `ceiling` of the same expression at x = 2 agreed, which shows only that this one case was not affected, not that `CEILING` or `ROUND` are immune).
+These functions are lowered anyway, with no note for it, because the alternative, the raw-L4 fallback, loses the whole model on both engines to protect a boundary case, and the same 34-digit difference already reaches comparisons with no note: `x DIVIDED BY 3 TIMES 3 AT LEAST 1` at x = 1 is `TRUE` in L4, exports as `x / 3 * 3 >= 1` with one Advisory note, and answers `false` on both engines (measured 2026-11-25, the same export before and after this change).
+The difference is stated on `doc/exports/dmn-bpmn.md`.
+A Lossy note on a rounding function whose argument contains a division would be the narrow repair; it is not built.

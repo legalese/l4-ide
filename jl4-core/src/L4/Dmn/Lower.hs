@@ -2219,6 +2219,56 @@ renderFeelIn names ctors oracle top = let (_, txt, frag) = go top in MkFeelExpr 
     -- not merely reasoned about.
     App _ r [xE, listE]
       | preludeElem r -> call e "list contains" [listE, xE]
+    -- smucclaw/l4-ide#1103: the rounding builtins and the prelude's numeric
+    -- aggregates, which FEEL 1.3 has as builtin functions (DMN 1.3 §10.3.4).
+    -- Before this they fell to 'verbatim', and the L4 text in a FEEL slot made
+    -- BOTH engines refuse the whole file, not only the one decision.
+    --
+    -- __Each form was chosen by measurement, not by name__, on KIE 8.44.0.Final
+    -- and Camunda 8.7.6 on 2026-11-25, against what `l4 run` answers:
+    --
+    --   * @FLOOR x@ is @floor(x)@ and @CEILING x@ is @ceiling(x)@, agreeing at
+    --     2.5, -2.5, -0.5, 0.5 and -3.
+    --   * @ROUND x@ is @decimal(x, 0)@, NOT @round half up(x, 0)@: L4 rounds a
+    --     half to the even neighbour (Haskell's 'round' on a 'Rational', in the
+    --     evaluator), and so does @decimal@; both engines agreed with L4 at 0.5,
+    --     1.5, -0.5, -1.5, 2.5, 3.5, -2.5, 2.7 and -2.7.
+    --   * @sum xs@ is @sum(concatenate([0], xs))@, NOT @sum(xs)@: on an empty
+    --     list L4 answers 0 and FEEL's @sum([])@ answers null on both engines.
+    --     The leading 0 changes no other sum, and gives 0 on both.
+    --   * @count xs@ is @count(xs)@, which answers 0 on an empty list on both.
+    --   * @min a b@ and @max a b@ are @min(a, b)@ and @max(a, b)@, but only on
+    --     the prelude's NUMBER overloads: the MAYBE NUMBER ones (which skip a
+    --     NOTHING) have a different meaning from FEEL's, so the gate is the
+    --     oracle saying the call and both operands are a plain number, and an
+    --     unknown type declines. @minimum@ and @maximum@ are not lowered: L4
+    --     leaves them undefined on an empty list (@nonexhaustive@) where FEEL
+    --     answers null, which on KIE is a FAILED decision.
+    --
+    -- __What none of them fixes__: FEEL's number is a 34-digit decimal and
+    -- L4's an exact rational (spec §2.4.4), and a rounding function turns a
+    -- last-digit difference into a whole unit at a boundary. @FLOOR (x DIVIDED
+    -- BY 3 TIMES 3)@ at x = 1 is 1 in L4 and 0 on both engines (measured).
+    --
+    -- The prelude ones are recognised by PROVENANCE then name, as 'preludeElem'
+    -- and 'listQuantKeyword' are, so a module's own @sum@ or @min@ is left
+    -- alone. SQRT and TRUNC are deliberately absent: SQRT is partial (L5) and
+    -- TRUNC has no single FEEL function, so both keep the 'verbatim' refusal.
+    -- The forms are decided by Claude 2026-11-25, pending Meng's review.
+    App _ r [x]
+      | getUnique r == TC.floorUnique   -> call e "floor" [x]
+      | getUnique r == TC.ceilingUnique -> call e "ceiling" [x]
+      | getUnique r == TC.roundUnique   -> callWith e "decimal" [x] ["0"]
+      | preludeNamed r "count"          -> call e "count" [x]
+      | preludeNamed r "sum", plainNumber e ->
+          let (_, t, f) = go x
+          in if f == L4Verbatim
+               then verbatim e
+               else (atomPrec, "sum(concatenate([0], " <> t <> "))", max FullFeel f)
+    App _ r [a, b]
+      | preludeNamed r "min" || preludeNamed r "max"
+      , all plainNumber [e, a, b] ->
+          call e (if preludeNamed r "min" then "min" else "max") [a, b]
     -- #936 Gap 2, the saturated-call half. Checked BEFORE un-lifting, because
     -- un-lifting is what discards the argument: under a binder that argument is
     -- the bound element and discarding it is the defect.
@@ -2528,6 +2578,14 @@ renderFeelIn names ctors oracle top = let (_, txt, frag) = go top in MkFeelExpr 
     call whole fn args =
       nary whole FullFeel (\ts -> fn <> "(" <> Text.intercalate ", " ts <> ")") args
 
+    -- 'call' with constant FEEL arguments appended after the rendered ones.
+    callWith whole fn args consts =
+      nary whole FullFeel (\ts -> fn <> "(" <> Text.intercalate ", " (ts <> consts) <> ")") args
+
+    -- The oracle says this expression is a plain NUMBER: not a MAYBE, a list,
+    -- an EITHER, or a type it could not read. Fails closed.
+    plainNumber x = oracleClassify oracle x == (DmnNumber, Nothing, noTypeFlags)
+
     verbatim whole = (atomPrec, prettyLayout whole, L4Verbatim)
 
     parenIf True t  = "(" <> t <> ")"
@@ -2554,9 +2612,13 @@ renderFeelIn names ctors oracle top = let (_, txt, frag) = go top in MkFeelExpr 
 
   -- The prelude's list-membership @DECIDE@, and nothing else of that name.
   preludeElem :: Resolved -> Bool
-  preludeElem r =
+  preludeElem r = preludeNamed r "elem"
+
+  -- A prelude @DECIDE@ of this name, and nothing else of that name.
+  preludeNamed :: Resolved -> Text -> Bool
+  preludeNamed r n =
     fromPrelude r
-      && (nameOf r == "elem" || unqualifiedNameToText (getActual r) == "elem")
+      && (nameOf r == n || unqualifiedNameToText (getActual r) == n)
 
   -- The predicate's binder and the body to render under it. Three shapes, and
   -- nothing else — an unrecognised predicate falls to 'verbatim', which is the

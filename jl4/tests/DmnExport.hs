@@ -3840,6 +3840,76 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
         LogicTable _   -> expectationFailure "expected a boxed literal for `excluded`"
         LogicContext _ -> expectationFailure "expected a boxed literal for `excluded`"
 
+  -- smucclaw/l4-ide#1103. Each form below is the one measured to agree with
+  -- `l4 run` on both engines (rounding.l4 and its cases carry that, through
+  -- the engine baseline); these pin the TEXT, and that the refusals stay
+  -- refusals. An unlowered call is L4 text in a FEEL slot, which makes both
+  -- engines reject the whole file, so 'L4Verbatim' is the property to watch.
+  describe "rounding builtins and prelude aggregates (#1103)" $ do
+    let withBody gives body =
+          "IMPORT prelude\n\
+          \GIVEN x IS A NUMBER\n\
+          \      y IS A NUMBER\n\
+          \      xs IS A LIST OF NUMBER\n\
+          \      m IS A MAYBE NUMBER\n\
+          \GIVETH " <> gives <> "\n\
+          \`answer` x y xs m MEANS " <> body <> "\n"
+        answerOf src = case (decisionNamed "answer" (drgOf src)).dcnLogic of
+          LogicLiteral x -> x
+          _              -> error "expected a boxed literal for `answer`"
+        lowersTo body want = do
+          let a = answerOf (withBody "A NUMBER" body)
+          (a.feText, a.feFragment) `shouldBe` (want, FullFeel)
+        refused gives body =
+          (answerOf (withBody gives body)).feFragment `shouldBe` L4Verbatim
+
+    it "lowers FLOOR and CEILING to floor and ceiling" $ do
+      "FLOOR x" `lowersTo` "floor(x)"
+      "CEILING (x MINUS y)" `lowersTo` "ceiling(x - y)"
+
+    it "lowers ROUND to decimal(x, 0), which rounds a half to even as L4 does" $
+      "ROUND (x PLUS y)" `lowersTo` "decimal(x + y, 0)"
+
+    it "lowers prelude sum with a leading 0, so an empty list sums to 0" $
+      "sum xs" `lowersTo` "sum(concatenate([0], xs))"
+
+    it "lowers prelude count, min and max to the FEEL builtins" $ do
+      "count xs" `lowersTo` "count(xs)"
+      "min x y" `lowersTo` "min(x, y)"
+      "max x 1" `lowersTo` "max(x, 1)"
+
+    -- The prelude's MAYBE NUMBER min and max skip a NOTHING; FEEL's do not
+    -- mean that, so the oracle gate must refuse them.
+    it "refuses the prelude's MAYBE NUMBER min and max" $ do
+      refused "A MAYBE NUMBER" "min m (JUST 1)"
+      refused "A MAYBE NUMBER" "max m (JUST 1)"
+
+    -- minimum is undefined on an empty list in L4 and null in FEEL (a FAILED
+    -- decision on KIE); SQRT is partial; TRUNC has no single FEEL function.
+    it "leaves minimum, maximum, SQRT and TRUNC unlowered" $ do
+      refused "A NUMBER" "minimum xs"
+      refused "A NUMBER" "maximum xs"
+      refused "A NUMBER" "SQRT x"
+      refused "A NUMBER" "TRUNC x 2"
+
+    -- Provenance, not the name: a module's own sum and min are not the
+    -- prelude's, whatever they compute.
+    it "declines a locally defined sum and min" $ do
+      let src =
+            "GIVEN list IS A LIST OF NUMBER\n\
+            \GIVETH A NUMBER\n\
+            \sum list MEANS 42\n\
+            \GIVEN a IS A NUMBER\n\
+            \      b IS A NUMBER\n\
+            \GIVETH A NUMBER\n\
+            \min a b MEANS a\n\
+            \GIVEN xs IS A LIST OF NUMBER\n\
+            \      x IS A NUMBER\n\
+            \GIVETH A NUMBER\n\
+            \`answer` xs x MEANS sum xs PLUS min x 1\n"
+      (answerOf src).feText `shouldSatisfy` \t ->
+        not (Text.isInfixOf "concatenate" t) && not (Text.isInfixOf "min(x, 1)" t)
+
   -- smucclaw/l4-ide#1101. KIE resolves a typeRef to an enum or an alias only
   -- when that definition comes earlier in the document (TYPE_DEF_NOT_FOUND
   -- otherwise), so the engine-relevant property is: no definition names a
@@ -4320,6 +4390,13 @@ goldenSubjects =
   , ( "dmn" </> "itemdef-order.l4"
     , "itemdef-order"
     , "the itemDefinition-order exhibit"
+    )
+    -- The ROUNDING exhibit (smucclaw/l4-ide#1103): FLOOR, CEILING, ROUND and
+    -- the prelude's sum, count, min and max, with cases at the edges where
+    -- FEEL could differ from L4. Engine-checked in CI through its baseline.
+  , ( "dmn" </> "rounding.l4"
+    , "rounding"
+    , "the rounding-and-aggregates exhibit"
     )
   ]
 

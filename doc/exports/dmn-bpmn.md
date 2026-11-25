@@ -108,6 +108,28 @@ describe the target notation's limits rather than a defect in your file — DMN 
 substantially less expressive than L4 — which is why `--fail-on` defaults to `none`. A clean exit
 means the export ran, not that everything made it across.
 
+**One kind of Blocking note costs more than the rest.** When a DMN expression has no FEEL form, the export writes the L4 text in its place and reports `D-LITERALEXPR` (or `D-NONFEELINPUT` in a table's input).
+FEEL cannot parse L4, so KIE 8.44 and Camunda 8.7.6 both refuse the whole file, not only that one decision: every other decision in it is lost too.
+Measured on `jl4/examples/dmn/rounding.l4` before its functions were lowered: eight such notes, and neither engine ran a single case.
+`--fail-on blocking` catches it before an engine does.
+
+**Rounding and the prelude's aggregates.** These lower to FEEL's own functions, each checked on both engines against `l4 run`:
+
+| L4                     | FEEL                        | why this form                                                       |
+| ---------------------- | --------------------------- | ------------------------------------------------------------------- |
+| `FLOOR x`, `CEILING x` | `floor(x)`, `ceiling(x)`    | agrees on negatives                                                 |
+| `ROUND x`              | `decimal(x, 0)`             | both round a half to the even neighbour: 2.5 gives 2, -2.5 gives -2 |
+| `sum xs`               | `sum(concatenate([0], xs))` | FEEL's `sum([])` is null; L4's `sum` of an empty list is 0          |
+| `count xs`             | `count(xs)`                 | both give 0 on an empty list                                        |
+| `min a b`, `max a b`   | `min(a, b)`, `max(a, b)`    | on plain numbers only                                               |
+
+They are recognised as the prelude's, so a `sum` or `min` you define yourself is not touched.
+Still written as L4, with a Blocking note, and so still fatal to the whole file on both engines: `SQRT` (undefined below zero), `TRUNC` (no single FEEL function), `minimum` and `maximum` (L4 gives no answer on an empty list, while FEEL gives null), and `min` and `max` over `MAYBE NUMBER`, which skip a `NOTHING`.
+
+**Numbers are not exact in DMN.** An L4 `NUMBER` is an exact fraction; a FEEL number keeps 34 significant digits.
+Usually the difference is far below anything a rule cares about, but a rounding function can turn it into a whole unit: `FLOOR (x DIVIDED BY 3 TIMES 3)` is 1 in L4 at x = 1, and 0 on both engines, because one third is stored as 0.333…3.
+The fidelity report does not flag this. If a rule rounds the result of a division, check the boundary cases on the engine you deploy to.
+
 The recurring case for BPMN is the unitless deadline: L4 permits a `WITHIN` with no unit, and BPMN
 timers require one. `--deadline-unit days` assumes days and records a note saying it did; `refuse`
 emits no timer and records that instead. Neither silently invents a unit.

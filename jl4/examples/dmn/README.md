@@ -21,6 +21,7 @@ difference between them is the deliverable.
 | `not-ok/dated-chain-*.l4`         | six negative fixtures: mis-ordered arms, duplicate dates, a rolling `Date 32 1 2024`, a mixed chain (all `D-DATEDCHAIN`), a law-time-guarded obligation, and a nested `OTHERWISE` (the last two must stay off the dated path entirely) |
 | `expected/regcf-corpus.*`         | the same four artifacts cut from the **real** 1,241-line corpus at `../canon/us/regcf/regcf.l4`  |
 | `itemdef-order.l4`                | the **itemDefinition-order** exhibit (smucclaw/l4-ide#1101): every type is declared after a type that uses it, plus a self- and a mutually recursive record; `itemdef-order.cases.json` and `expected/itemdef-order.engine-baseline.txt` run it on both engines in CI |
+| `rounding.l4`                     | the **rounding-and-aggregates** exhibit (smucclaw/l4-ide#1103): FLOOR, CEILING, ROUND and the prelude's sum, count, min and max, with cases at the edges where FEEL could differ from L4 (halves, negatives, an empty list); `rounding.cases.json` and `expected/rounding.engine-baseline.txt` run it on both engines in CI |
 
 All four sets are produced by `jl4/tests/DmnExport.hs` (`goldenSubjects`); regenerate by
 deleting a golden and re-running `cabal test jl4:jl4-test` twice.
