@@ -1508,14 +1508,15 @@ GIVETH A DEONTIC Party Action
 
 After `MUST`, `DO` or `MAY`, the `LEST` is what follows when the deadline passes without the action.
 This rule has no `WITHIN` and no `BEFORE`, so it has no deadline: it waits for the rent however long it takes, and time alone never takes it to its `LEST`.
-A `#TRACE` that waits a million days still ends with the rent owed and no refund.
+A `#TRACE` that waits a million time units still ends with the rent owed and no refund.
 A forgotten `WITHIN` is the usual cause.
 
 An `AFTER` with no `WITHIN` draws the warning too: it says when the action may begin, not when it is due.
 Under `EVERY`, a `WITHIN` on the `ONCE` or `UPON EACH` line is a deadline, so a rule with one there is not warned about.
 A `MUST NOT` (or `SHANT`) is never warned about: its `LEST` follows the forbidden act, deadline or not.
 
-**How to fix it:** add a `WITHIN` (or a `BEFORE`) to say by when the action is due, or, for a `MAY`, when the permission ends. If nothing should follow, remove the `LEST`.
+**How to fix it:** add a `WITHIN` (or a `BEFORE`) to say by when the action is due, or, for a `MAY`, when the permission ends.
+If nothing should follow, remove the `LEST`.
 See [Deadlines and consequences](../regulative/consequences.md#hence-and-lest) for when a `LEST` is taken.
 
 ---

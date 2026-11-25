@@ -297,7 +297,11 @@ GIVETH A DEONTIC Person Action
     LEST BREACH BY Spouse1 BECAUSE "failed to exchange vows"
 ```
 
-**"To love and to cherish"** binds both spouses at once, so the two obligations are joined with `RAND`. The vow sets no deadline, so they have no `WITHIN` and no `LEST`: on an obligation, a `LEST` is what follows a missed deadline, so with no deadline nothing could ever reach it (`l4 check` warns about such a `LEST`). **"Forsaking all others"** becomes two prohibitions, also joined with `RAND`. A prohibition needs no deadline for its `LEST`, because the forbidden act is what leads there:
+**"To love and to cherish"** binds both spouses at once, so the two obligations are joined with `RAND`.
+The vow sets no deadline, so they have no `WITHIN` and no `LEST`.
+After a `MUST`, `DO` or `MAY`, a `LEST` is what follows when the deadline passes, so with no deadline nothing could ever reach it, and L4 warns about such a `LEST`.
+**"Forsaking all others"** becomes two prohibitions, also joined with `RAND`.
+A prohibition needs no deadline for its `LEST`, because the forbidden act is what leads there:
 
 ```
 GIVETH A DEONTIC Person Action
@@ -442,7 +446,11 @@ The reason is what a reviewer or a downstream system reads.
 
 ### 4. Write Both Paths
 
-`MUST` and `SHANT` have defaults (`HENCE FULFILLED`, `LEST BREACH`), but writing both `HENCE` and `LEST` makes the intent plain to a legal reviewer. Where the text gives a remedy ("pay within 30 days, or pay extra within 60"), write the remedy as an obligation in `LEST` rather than ending in a bare `BREACH`.
+`MUST` and `SHANT` have defaults (`HENCE FULFILLED`, `LEST BREACH`), but writing both `HENCE` and `LEST` makes the intent plain to a legal reviewer.
+For a `MUST`, write both when the rule has a `WITHIN` or a `BEFORE`.
+With no deadline, leave the `LEST` out: nothing can reach it, and L4 warns about it.
+A `SHANT` needs no deadline for its `LEST`, because the forbidden act is what leads there.
+Where the text gives a remedy ("pay within 30 days, or pay extra within 60"), write the remedy as an obligation in `LEST` rather than ending in a bare `BREACH`.
 
 ### 5. Test with Multiple Scenarios
 
