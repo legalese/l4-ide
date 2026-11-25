@@ -25,11 +25,13 @@
 -- @Z3_EXE@ if set, else @z3@ on @PATH@. A missing solver is a named failure,
 -- because the verdicts were the thing asked for.
 --
--- Where z3 gives no answer (a timeout, a failure to run, or its own
+-- Where z3 gives no answer (a timeout, a failure to start, or its own
 -- @unknown@), cvc5 is given the same script, if it is installed: @CVC5_EXE@
--- if set, else @cvc5@ on @PATH@ (smucclaw/l4-ide#1098). Its answers are
--- checked by the evaluator as z3's are; without it, the run is z3's alone.
--- @--solver@ chooses the solvers and their order.
+-- if set, else @cvc5@ on @PATH@ (smucclaw/l4-ide#1098). A z3 that starts and
+-- then prints nothing it can read, a crash among them, is an encoding defect
+-- as before, and cvc5 is not asked. Its answers are checked by the evaluator
+-- as z3's are; without it, the run is z3's alone. @--solver@ chooses the
+-- solvers and their order.
 module L4.Cli.Prove
   ( ProveOptions (..)
   , proveOptionsParser
@@ -122,14 +124,17 @@ proveBound =
     , "  is installed, and the row says which solver answered. Its answers are"
     , "  checked by the evaluator as z3's are, and output from it that cannot"
     , "  be read counts as no answer. Without cvc5, a last line counts any"
-    , "  obligations z3 gave no answer to, which were not retried. --solver"
-    , "  chooses the solvers and their order; a solver it names must be found."
-    , "  An obligation no solver answers takes up to --timeout per solver asked."
+    , "  obligations z3 gave no answer to, which were not retried. A CVC5_EXE"
+    , "  set to a file that does not exist stops the run, as a Z3_EXE does,"
+    , "  even if z3 would have answered everything. --solver chooses the"
+    , "  solvers and their order; a solver it names must be found. An"
+    , "  obligation no solver answers takes up to --timeout per solver asked."
     , ""
-    , "  Exit status: 0 every obligation proved; 1 the file, an option or a"
-    , "  solver it needed could not be used; 2 an obligation refuted, or an"
-    , "  #ASSERT the evaluator itself found FALSE or that raised; 3 an"
-    , "  obligation unknown and none of those; 4 an encoding defect."
+    , "  Exit status: 0 every obligation proved; 1 the file, an option, z3 or a"
+    , "  solver --solver names could not be used, or Z3_EXE or CVC5_EXE names"
+    , "  a file that does not exist; 2 an obligation refuted, or an #ASSERT"
+    , "  the evaluator itself found FALSE or that raised; 3 an obligation"
+    , "  unknown and none of those; 4 an encoding defect."
     ]
 
 ----------------------------------------------------------------------------
@@ -202,11 +207,16 @@ kindEnv = \case
 
 -- | How each solver is told to read SMT-LIB2 on standard input. cvc5 1.4.2
 -- reads it so, and answers as it does given the script as a file (measured
--- 2026-11-25 on every script of the l4 prove fixtures).
+-- 2026-11-25 on every script of the l4 prove fixtures). @--dag-thresh=0@
+-- makes cvc5 print each model value in full: by default it abbreviates a
+-- part that occurs twice with @let@, which 'liftModelValue' does not read,
+-- so a counterexample whose two fields hold equal records was unknown. On
+-- the 26 scripts of the l4 prove fixtures, the flag changes that one model
+-- and no other byte of output (measured 2026-11-25).
 kindArgs :: SolverKind -> [String]
 kindArgs = \case
   Z3 -> ["-smt2", "-in"]
-  Cvc5 -> ["--lang=smt2"]
+  Cvc5 -> ["--lang=smt2", "--dag-thresh=0"]
 
 readSolverKind :: String -> Either String SolverKind
 readSolverKind = \case
@@ -333,10 +343,11 @@ data Row = Row
   }
 
 -- | The solvers an obligation reached, in the order asked: those that gave no
--- answer, with why, and then the one that answered, if one did.
+-- answer, with why, and then the one that answered, if one did, with what it
+-- said (@sat@ or @unsat@).
 data Asked = Asked
   { askedNoAnswer :: [(Text, Text)]
-  , askedBy       :: Maybe Text
+  , askedBy       :: Maybe (Text, Text)
   }
 
 ----------------------------------------------------------------------------
@@ -521,7 +532,7 @@ scriptText mr ob =
 
 -- | What a solver's output says about an obligation.
 data Reply
-  = NoAnswer Text      -- ^ a timeout, a failure to run, @unknown@, and so on
+  = NoAnswer Text      -- ^ a timeout, a failure to start, @unknown@, and so on
   | Unreadable Text    -- ^ output that cannot be read: an encoding defect
   | GotUnsat
   | GotSat [SExpr]     -- ^ the @get-value@ pairs
@@ -569,12 +580,12 @@ solve opts evalConfig tc importEnv chain mr e ob = askSolver True chain.chFirst 
   -- first solver's reason, and the report adds the others'.
   askSolver isFirst solver gaveUp = do
     out <- solver.solverRun opts.proveTimeout (scriptText mr ob)
-    let answered v = (v, Asked gaveUp (Just solver.solverName))
+    let answered said v = (v, Asked gaveUp (Just (solver.solverName, said)))
     case readReply isFirst ob out of
       NoAnswer why -> next isFirst (gaveUp <> [(solver.solverName, why)])
-      Unreadable why -> pure (answered (Defect why))
-      GotUnsat -> answered <$> sampleCheck
-      GotSat pairs -> answered <$> replay pairs
+      Unreadable why -> pure (answered "output that could not be read" (Defect why))
+      GotUnsat -> answered "unsat" <$> sampleCheck
+      GotSat pairs -> answered "sat" <$> replay pairs
 
   next wasFirst gaveUp = case chain.chSecond of
     Just sc | wasFirst -> sc.scGet >>= \case
@@ -750,14 +761,18 @@ render opts rows refusedCount crossNames solverLines =
   -- did, the reasons of all but the first, whose reason is the verdict's.
   attribution v a = case (a.askedNoAnswer, a.askedBy) of
     ([], _) -> []
-    (gaveUp, Just by) ->
-      [ verb v <> " by " <> by <> " after "
+    (gaveUp, Just (by, said)) ->
+      [ lead v by said <> " after "
           <> Text.intercalate "; " [ n <> " gave no answer: " <> why | (n, why) <- gaveUp ] ]
     (_ : later, Nothing) -> [ n <> ", asked next, gave no answer either: " <> why | (n, why) <- later ]
-  verb = \case
-    Proved _ -> "proved"
-    Refuted _ _ -> "refuted"
-    _ -> "answered"
+  -- An answer that leaves the verdict unknown (a model the evaluator cannot
+  -- be given, or a limit it stopped at) settled nothing, so the row says
+  -- what the solver said, and the line above it why that is no verdict.
+  lead v by said = case v of
+    Proved _ -> "proved by " <> by
+    Refuted _ _ -> "refuted by " <> by
+    Unknown _ -> by <> " said " <> said
+    _ -> "answered by " <> by
   coverage =
     "coverage: " <> tshow (length rows) <> " #ASSERT: "
       <> tshow decided <> " decided by evaluation, not re-proved; "

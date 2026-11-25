@@ -35,7 +35,7 @@ import CliTest.Common
 
 numbersFixture, recordsFixture, outOfFragmentFixture, defectFixture, integersFixture, sameLineFixture, assumedFixture,
   collideFixture, localsFixture, decidedFailFixture, exactFixture, hashNameFixture, lazyFieldFixture,
-  secondHoldsFixture, secondFailsFixture, floorMonotoneFixture :: FilePath
+  secondHoldsFixture, secondFailsFixture, floorMonotoneFixture, secondMixedFixture, twinModelFixture :: FilePath
 numbersFixture       = fixtureDir </> "prove" </> "numbers.l4"
 recordsFixture       = fixtureDir </> "prove" </> "records.l4"
 outOfFragmentFixture = fixtureDir </> "prove" </> "out-of-fragment.l4"
@@ -52,11 +52,13 @@ assumedFixture       = fixtureDir </> "assert-assumed.l4"
 secondHoldsFixture   = fixtureDir </> "prove" </> "second-holds.l4"
 secondFailsFixture   = fixtureDir </> "prove" </> "second-fails.l4"
 floorMonotoneFixture = fixtureDir </> "prove" </> "floor-monotone.l4"
+secondMixedFixture   = fixtureDir </> "prove" </> "second-mixed.l4"
+twinModelFixture     = fixtureDir </> "prove" </> "twin-model.l4"
 
 fixtures :: [FilePath]
 fixtures = [numbersFixture, recordsFixture, outOfFragmentFixture, defectFixture, integersFixture, sameLineFixture, assumedFixture
            , collideFixture, localsFixture, decidedFailFixture, exactFixture, hashNameFixture, lazyFieldFixture
-           , secondHoldsFixture, secondFailsFixture, floorMonotoneFixture]
+           , secondHoldsFixture, secondFailsFixture, floorMonotoneFixture, secondMixedFixture, twinModelFixture]
 
 -- | The lines of a run's report that belong to the @#ASSERT@ on this line of
 -- the fixture: its verdict line, and the indented lines under it.
@@ -81,14 +83,21 @@ verdictOf n sout = case rowFor n sout of
 data StubReply
   = Says String Int  -- ^ print this, then exit with this status
   | Hangs            -- ^ never answer, so that the driver's --timeout fires
+  | ByPosition [(String, StubReply)] StubReply
+    -- ^ the reply paired with the first text the script contains, else the
+    -- last; a script's first line names its #ASSERT's position, so
+    -- @"f.l4:7:"@ picks the obligation on line 7
 
 -- | Run the body with stub solvers on a @PATH@ of their own.
 --
 -- Each stub is a POSIX shell script named for the solver it stands in for. It
--- answers @--version@ with @stub-NAME version 0@; asked anything else, it keeps
--- the script it was given in @DIR/NAME.in@ (its standard input, or the file its
--- last argument names) and its arguments in @DIR/NAME.args@, then replies. So
--- @DIR/NAME.in@ exists exactly when that solver was asked about an obligation.
+-- answers @--version@ with @stub-NAME version 0@, adding a line to
+-- @DIR/NAME.version@ each time; asked anything else, it keeps the script it
+-- was given in @DIR/NAME.in@ (its standard input, or the file its last
+-- argument names), adds it to @DIR/NAME.all@, and keeps its arguments in
+-- @DIR/NAME.args@, then replies. So @DIR/NAME.in@ exists exactly when that
+-- solver was asked about an obligation, and @DIR/NAME.version@ exactly when
+-- it was started at all.
 --
 -- The body gets DIR and the child's environment, in which @PATH@ is the stubs'
 -- directory ALONE and @Z3_EXE@ and @CVC5_EXE@ are unset: no solver installed
@@ -109,21 +118,43 @@ writeStub dir path name reply = do
   let record ext = "'" <> (dir </> name) <> ext <> "'"
   writeFile path $ unlines $
     [ "#!/bin/sh"
-    , "if [ \"$1\" = \"--version\" ]; then echo 'stub-" <> name <> " version 0'; exit 0; fi"
+    , "if [ \"$1\" = \"--version\" ]; then echo started >> " <> record ".version"
+        <> "; echo 'stub-" <> name <> " version 0'; exit 0; fi"
     , "printf '%s\\n' \"$*\" > " <> record ".args"
     , "last=; for a in \"$@\"; do last=$a; done"
     , "if [ -n \"$last\" ] && [ -f \"$last\" ]; then /bin/cat \"$last\" > " <> record ".in"
         <> "; else /bin/cat > " <> record ".in" <> "; fi"
+    , "/bin/cat " <> record ".in" <> " >> " <> record ".all"
+    , "script=$(/bin/cat " <> record ".in" <> ")"
     ]
-    <> case reply of
-         Says out code -> ["/bin/cat <<'L4_STUB_END'", out, "L4_STUB_END", "exit " <> show code]
-         Hangs -> ["exec /bin/sleep 60"]
+    <> replyLines reply
   p <- getPermissions path
   setPermissions path (setOwnerExecutable True p)
+ where
+  replyLines = \case
+    Says out code -> ["/bin/cat <<'L4_STUB_END'", out, "L4_STUB_END", "exit " <> show code]
+    Hangs -> ["exec /bin/sleep 60"]
+    ByPosition cases fallback ->
+      ["case \"$script\" in"]
+      <> concat [ ("  *'" <> pat <> "'*)") : replyLines r <> ["  ;;"] | (pat, r) <- cases ]
+      <> ["  *)"] <> replyLines fallback <> ["  ;;", "esac"]
 
 -- | Was this stub asked about an obligation?
 wasAsked :: FilePath -> String -> IO Bool
 wasAsked dir name = doesFileExist (dir </> name <> ".in")
+
+-- | How many times this stub was started to give its version.
+timesStarted :: FilePath -> String -> IO Int
+timesStarted dir name = countLines (dir </> name <> ".version") (const True)
+
+-- | How many obligations this stub was asked about.
+timesAsked :: FilePath -> String -> IO Int
+timesAsked dir name = countLines (dir </> name <> ".all") ("(check-sat)" `isPrefixOf`)
+
+countLines :: FilePath -> (String -> Bool) -> IO Int
+countLines path p = do
+  there <- doesFileExist path
+  if there then length . filter p . lines <$> readUtf8 path else pure 0
 
 -- | Run the body only when a real cvc5 can be found, as @l4 prove@ finds one
 -- (@CVC5_EXE@, then @cvc5@ on @PATH@). Without one it is reported PENDING,
@@ -307,7 +338,8 @@ spec bin = describe "l4 prove" $ do
   secondSolverSpec bin
 
 -- | smucclaw/l4-ide#1098: where z3 gives no answer, cvc5 is asked the same
--- question. Both stub fixtures have their one #ASSERT on line 6.
+-- question. second-holds.l4 and second-fails.l4 have their one #ASSERT on
+-- line 6; second-mixed.l4 has three, on lines 6, 7 and 8.
 secondSolverSpec :: FilePath -> Spec
 secondSolverSpec bin = describe "a second solver (smucclaw/l4-ide#1098)" $ do
   -- The replies are what cvc5 1.4.2 printed for the emitted scripts of this
@@ -339,9 +371,11 @@ secondSolverSpec bin = describe "a second solver (smucclaw/l4-ide#1098)" $ do
         emitCode `shouldBe` ExitSuccess
         emitted <- readUtf8 (out </> "second-holds-6-1.smt2")
         cvc5In `shouldBe` emitted
-      -- cvc5 reads the script on standard input, told only its language
-      -- (z3's `-smt2 -in` would be refused)
-      readUtf8 (dir </> "cvc5.args") `shouldReturn` "--lang=smt2\n"
+      -- cvc5 reads the script on standard input, told its language (z3's
+      -- `-smt2 -in` would be refused), and told to print each model value
+      -- in full: otherwise it abbreviates a repeated part with `let`, which
+      -- the model reader does not read (see "with the real cvc5" below)
+      readUtf8 (dir </> "cvc5.args") `shouldReturn` "--lang=smt2 --dag-thresh=0\n"
 
   it "reads cvc5's unsat even when what follows it cannot be read" $
     withStubSolvers [("z3", unknownReply), ("cvc5", Says "unsat\n(error \"this line is cut off" 1)] \_ env -> do
@@ -375,6 +409,29 @@ secondSolverSpec bin = describe "a second solver (smucclaw/l4-ide#1098)" $ do
       unwords (rowFor 6 sout) `shouldSatisfy` ("but the evaluator says it holds there" `isInfixOf`)
       unwords (rowFor 6 sout) `shouldSatisfy` ("answered by cvc5 after z3 gave no answer" `isInfixOf`)
 
+  -- ... and a proof only once the evaluator says TRUE at every sample point.
+  -- second-fails.l4 is FALSE below zero, so a cvc5 that says unsat is wrong.
+  it "checks cvc5's proof at the sample points, as z3's, and reports a wrong one as an ENCODING DEFECT" $
+    withStubSolvers [("z3", unknownReply), ("cvc5", unsatReply)] \_ env -> do
+      Output code sout _ <- run env [secondFailsFixture]
+      code `shouldBe` ExitFailure 4
+      verdictOf 6 sout `shouldBe` "ENCODING"
+      unwords (rowFor 6 sout) `shouldSatisfy` ("the solver proved it, but at" `isInfixOf`)
+      unwords (rowFor 6 sout) `shouldSatisfy` ("answered by cvc5 after z3 gave no answer" `isInfixOf`)
+
+  -- An answer that still leaves the verdict unknown is not "answered": the
+  -- row says what cvc5 said, and the line above it why that is not a verdict.
+  it "says what cvc5 answered when its answer still leaves the assertion unknown" $
+    withStubSolvers
+      [ ("z3", unknownReply)
+      , ("cvc5", Says "sat\n((l4_x (root-obj (+ (^ x 2) (- 2)) 1)) (l4.defined true) (l4.goal false))" 0) ] \_ env -> do
+      Output code sout _ <- run env [secondFailsFixture]
+      code `shouldBe` ExitFailure 3
+      verdictOf 6 sout `shouldBe` "unknown"
+      unwords (rowFor 6 sout) `shouldSatisfy` ("model value not a rational" `isInfixOf`)
+      unwords (rowFor 6 sout) `shouldSatisfy` ("cvc5 said sat after z3 gave no answer: the solver said unknown" `isInfixOf`)
+      unwords (rowFor 6 sout) `shouldNotSatisfy` ("answered by" `isInfixOf`)
+
   it "names both solvers' reasons when neither answers, and exits 3" $
     withStubSolvers [("z3", unknownReply), ("cvc5", Hangs)] \dir env -> do
       Output code sout _ <- run env [secondHoldsFixture, "--timeout", "1"]
@@ -402,6 +459,61 @@ secondSolverSpec bin = describe "a second solver (smucclaw/l4-ide#1098)" $ do
       verdictOf 6 sout `shouldBe` "unknown"
       drop 1 (rowFor 6 sout) `shouldBe` ["      the solver said unknown"]
       sout `shouldSatisfy` ("second solver: none found (set CVC5_EXE or put cvc5 on PATH), so 1 obligation z3 gave no answer to was not retried" `isInfixOf`)
+
+  -- A file with several obligations: z3 answers the one on line 7, and
+  -- gives no answer to those on lines 6 and 8.
+  it "asks cvc5 only about the obligations z3 gave no answer to, and starts it once" $
+    withStubSolvers
+      [ ("z3", ByPosition [("second-mixed.l4:7:", unsatReply)] unknownReply)
+      , ("cvc5", unsatReply) ] \dir env -> do
+      Output code sout _ <- run env [secondMixedFixture]
+      code `shouldBe` ExitSuccess
+      map (`verdictOf` sout) [6, 7, 8] `shouldBe` ["proved", "proved", "proved"]
+      unwords (rowFor 6 sout) `shouldSatisfy` ("proved by cvc5 after z3 gave no answer: the solver said unknown" `isInfixOf`)
+      rowFor 7 sout `shouldSatisfy` ((== 1) . length)
+      unwords (rowFor 8 sout) `shouldSatisfy` ("proved by cvc5 after z3 gave no answer: the solver said unknown" `isInfixOf`)
+      sout `shouldSatisfy` ("second solver: stub-cvc5 version 0, asked where z3 gave no answer: 2 obligations" `isInfixOf`)
+      timesAsked dir "z3" `shouldReturn` 3
+      timesAsked dir "cvc5" `shouldReturn` 2
+      timesStarted dir "cvc5" `shouldReturn` 1
+
+  it "without cvc5, counts in one line every obligation z3 gave no answer to" $
+    withStubSolvers [("z3", ByPosition [("second-mixed.l4:7:", unsatReply)] unknownReply)] \_ env -> do
+      Output code sout _ <- run env [secondMixedFixture]
+      code `shouldBe` ExitFailure 3
+      map (`verdictOf` sout) [6, 7, 8] `shouldBe` ["unknown", "proved", "unknown"]
+      drop 1 (rowFor 6 sout) `shouldBe` ["      the solver said unknown"]
+      sout `shouldSatisfy` ("second solver: none found (set CVC5_EXE or put cvc5 on PATH), so 2 obligations z3 gave no answer to were not retried" `isInfixOf`)
+      length (filter ("second solver" `isPrefixOf`) (lines sout)) `shouldBe` 1
+
+  it "never starts cvc5 when z3 answers every obligation" $
+    withStubSolvers [("z3", unsatReply), ("cvc5", unsatReply)] \dir env -> do
+      Output code sout _ <- run env [secondMixedFixture]
+      code `shouldBe` ExitSuccess
+      sout `shouldNotSatisfy` ("second solver" `isInfixOf`)
+      timesStarted dir "cvc5" `shouldReturn` 0
+      -- the record works: z3 was started, and asked about all three
+      timesStarted dir "z3" `shouldReturn` 1
+      timesAsked dir "z3" `shouldReturn` 3
+
+  -- z3 is read as strictly as before there was a second solver: output it
+  -- cannot read is an ENCODING DEFECT, and cvc5 is not asked. Only a z3 that
+  -- cannot be started, runs out of time or says unknown has given no answer.
+  it "reports a z3 that exits with no output as an ENCODING DEFECT, as before, and does not ask cvc5" $
+    withStubSolvers [("z3", Says "" 134), ("cvc5", unsatReply)] \dir env -> do
+      Output code sout _ <- run env [secondHoldsFixture]
+      code `shouldBe` ExitFailure 4
+      verdictOf 6 sout `shouldBe` "ENCODING"
+      unwords (rowFor 6 sout) `shouldSatisfy` ("the solver printed nothing" `isInfixOf`)
+      wasAsked dir "cvc5" `shouldReturn` False
+
+  it "reads z3 strictly as the first solver: unsat followed by output it cannot read is an ENCODING DEFECT" $
+    withStubSolvers [("z3", Says "unsat\n(error \"this line is cut off" 0), ("cvc5", unsatReply)] \dir env -> do
+      Output code sout _ <- run env [secondHoldsFixture]
+      code `shouldBe` ExitFailure 4
+      verdictOf 6 sout `shouldBe` "ENCODING"
+      unwords (rowFor 6 sout) `shouldSatisfy` ("could not read the solver's output" `isInfixOf`)
+      wasAsked dir "cvc5" `shouldReturn` False
 
   -- Controls: where z3 answers, nothing about the run changes.
   it "without cvc5, says nothing about a second solver when z3 answers every obligation" $
@@ -446,6 +558,15 @@ secondSolverSpec bin = describe "a second solver (smucclaw/l4-ide#1098)" $ do
       code `shouldBe` ExitSuccess
       verdictOf 6 sout `shouldBe` "proved"
       sout `shouldSatisfy` ("second solver: stub-my-cvc5 version 0" `isInfixOf`)
+
+  it "prefers CVC5_EXE to a cvc5 on PATH" $
+    withStubSolvers [("z3", unknownReply), ("cvc5", unknownReply), ("my-cvc5", unsatReply)] \dir env -> do
+      Output code sout _ <- run (("CVC5_EXE", dir </> "bin" </> "my-cvc5") : env) [secondHoldsFixture]
+      code `shouldBe` ExitSuccess
+      verdictOf 6 sout `shouldBe` "proved"
+      sout `shouldSatisfy` ("second solver: stub-my-cvc5 version 0" `isInfixOf`)
+      timesStarted dir "cvc5" `shouldReturn` 0
+      wasAsked dir "cvc5" `shouldReturn` False
 
   -- A cvc5 that is there but cannot be run is no second solver, not a
   -- failure of the run: cvc5 is optional unless --solver names it.
@@ -544,6 +665,15 @@ secondSolverSpec bin = describe "a second solver (smucclaw/l4-ide#1098)" $ do
       code `shouldBe` ExitFailure 2
       unwords (rowFor 6 sout) `shouldSatisfy` ("counterexample: x = 4 DIVIDED BY 3" `isInfixOf`)
       unwords (rowFor 6 sout) `shouldSatisfy` ("the evaluator agrees" `isInfixOf`)
+
+    -- cvc5 abbreviates a part repeated in a model value with `let` unless it
+    -- is told not to, and the model reader reads only constructors, numbers
+    -- and truth values: this counterexample's two fields hold equal records.
+    it "reads cvc5's own model for a record whose two fields hold equal values" $ withCvc5 $ do
+      Output code sout _ <- runL4 bin ["prove", twinModelFixture, "--solver", "cvc5"]
+      code `shouldBe` ExitFailure 2
+      verdictOf 16 sout `shouldBe` "refuted"
+      unwords (rowFor 16 sout) `shouldSatisfy` ("the evaluator agrees" `isInfixOf`)
 
     it "reads cvc5's own model for a negative counterexample" $ withCvc5 $ do
       Output code sout _ <- runL4 bin ["prove", secondFailsFixture, "--solver", "cvc5"]
