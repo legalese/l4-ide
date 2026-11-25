@@ -683,6 +683,11 @@ verifyWrittenGuardsFixture       = fixtureDir </> "verify-written-guards.l4"
 verifyCoveredAlternativesFixture :: FilePath
 verifyCoveredAlternativesFixture = fixtureDir </> "verify-covered-alternatives.l4"
 
+-- A local definition used more than once: one finding nothing deserves, the
+-- limit the help states, and the true findings beside it.
+verifyDefinitionUsedTwiceFixture :: FilePath
+verifyDefinitionUsedTwiceFixture = fixtureDir </> "verify-definition-used-twice.l4"
+
 -- Referential transparency (specs/todo/WHERE-INLINING-SPEC.md): a zero-arity
 -- WHERE/LET binding is inlined before analysis, so a rule means the same thing
 -- however its limbs are named. The recursive file is the termination control.
@@ -1045,7 +1050,7 @@ coreFixtures =
   , verifyClauseGroupCallFixture, verifyClauseGroupWhereFixture, verifyClauseTableFixture, verifyClauseGroupMaybeFixture
   , verifyClauseTableLargeFixture
   , verifyManufacturedClausesFixture, verifyWrittenGuardsFixture
-  , verifyCoveredAlternativesFixture
+  , verifyCoveredAlternativesFixture, verifyDefinitionUsedTwiceFixture
   , verifyVacuousGuardFixture, verifySeamFixture, verifyNestedFixture
   , verifyWhereTransparencyFixture, verifyWhereRecursiveFixture
   , verifyConstantsFixture, verifyConstantsReadThroughFixture
@@ -6755,6 +6760,10 @@ spec bin = do
       lookup "`a rule that reaches nobody`" found `shouldBe` Just [("vacuous-guard", "body.scope")]
       lookup "`everyone in scope is in breach`" found `shouldBe` Just [("unreachable-outcome", "body")]
       lookup "`a requirement that adds nothing`" found `shouldBe` Just [("unreachable-outcome", "body")]
+      -- An unsatisfiable requirement: the walk over the rule as written reaches
+      -- it too, and would say `unsat` a second time if it reported one.
+      lookup "`a requirement nobody can meet`" found
+        `shouldBe` Just [("unreachable-outcome", "body"), ("unsat", "body.requirement")]
       -- None of them is placed in the source: the normal form is not in it.
       [ nm | (nm, f) <- findingObjectsByDecision env, isJust (objField f "writtenAt") ] `shouldBe` []
 
@@ -6875,15 +6884,48 @@ spec bin = do
       filter ((`notElem` throughCalls) . fst) found'
         `shouldBe` filter ((`notElem` throughCalls) . fst) found
 
+    -- A local definition used more than once. `both qualify` and `either
+    -- qualifies` get a finding nothing in them deserves, at the `c` each use
+    -- repeats: the limit the help and the doc page state, pinned so that its
+    -- fix shows here. The rest are true findings, placed where the definition
+    -- writes each condition. Judging a definition's copies as one, tried
+    -- while smucclaw/l4-ide#1093 was fixed, removed the first two and hid
+    -- every other; this test failed on that build, with no finding on any of
+    -- the seven.
+    it "reports a condition in a local definition used twice, once for each use" $ do
+      env <- jsonEnvelope bin ["verify", verifyDefinitionUsedTwiceFixture, "--format", "json"]
+      let found = findingSitesByDecision env
+          guards sites = Just [("vacuous-guard", site) | site <- sites]
+          at i = "body.and[" ++ show (i :: Int) ++ "]"
+          linesOf nm =
+            [ round line :: Int
+            | (nm', f) <- findingObjectsByDecision env, nm' == nm
+            , Just w <- [objField f "writtenAt"], Just (Number line) <- [objField w "line"] ]
+          alt i = "body.and[1].or[" ++ show (i :: Int) ++ "]"
+      lookup "`both qualify`" found `shouldBe` guards (map at [1, 3])
+      lookup "`either qualifies`" found `shouldBe` guards ["body.or[1]", "body.or[3]"]
+      lookup "`a parameter twice`" found `shouldBe` guards (map at [0, 1])
+      lookup "`the same call twice`" found `shouldBe` guards (map at [0 .. 3])
+      lookup "`a name twice`" found `shouldBe` guards (map at [1 .. 4])
+      lookup "`a LET name twice`" found `shouldBe` guards (map at [1 .. 4])
+      lookup "`a name twice in an OR`" found `shouldBe` guards (map alt [0 .. 3])
+      map linesOf
+          [ "`both qualify`", "`either qualifies`", "`a parameter twice`", "`the same call twice`"
+          , "`a name twice`", "`a LET name twice`", "`a name twice in an OR`" ]
+        `shouldBe` [[18, 18], [30, 30], [38, 38], [52, 52, 52, 52], [60, 60, 60, 60], [65, 65, 65, 65], [76, 76, 76, 76]]
+
     -- An alternative the others already cover adds nothing, and is reported
-    -- where it is written, under a NOT too. Before the fix none of the three
-    -- was reported: the normal form, where the first two used to be found, is
-    -- no longer looked in for redundancy (smucclaw/l4-ide#1093), and the rule
-    -- as written was checked for a redundant condition of a conjunction only.
-    -- The last three decisions are the controls: alternatives that each let a
-    -- case through, one covered only because the condition it sits in is
-    -- itself redundant (reported once, at that condition), and a condition
-    -- true on its own.
+    -- where it is written, under a NOT too. Looking in the normal form, as
+    -- l4 verify did before smucclaw/l4-ide#1093 was fixed, finds all three, at
+    -- clauses with no place in the source. Once the normal form was no longer
+    -- looked in for redundancy, none of the three was reported, because the
+    -- rule as written was checked for a redundant condition of a conjunction
+    -- only; this test failed on that build.
+    -- Decisions 4 to 6 are the controls: alternatives that each let a case
+    -- through, one covered only because the condition it sits in is itself
+    -- redundant (reported once, at that condition), and a condition true on
+    -- its own. The seventh, two alternatives that cover each other, is
+    -- reported at both, as the help says.
     it "reports an alternative the others already cover, once, where it is written" $ do
       env <- jsonEnvelope bin ["verify", verifyCoveredAlternativesFixture, "--format", "json"]
       let found = findingSitesByDecision env
@@ -6893,6 +6935,7 @@ spec bin = do
       lookup "`two ways in`" found `shouldBe` Just []
       lookup "`covered by the context`" found `shouldBe` Just [("vacuous-guard", "body.and[1]")]
       lookup "`a condition true on its own`" found `shouldBe` Just []
+      lookup "`covering each other`" found `shouldBe` Just [("vacuous-guard", "body.or[0]"), ("vacuous-guard", "body.or[1]")]
       let placed =
             [ (nm, line, msg)
             | (nm, f) <- findingObjectsByDecision env

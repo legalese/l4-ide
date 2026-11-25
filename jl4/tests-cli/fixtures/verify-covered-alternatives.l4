@@ -52,3 +52,11 @@ GIVEN x IS A BOOLEAN, y IS A BOOLEAN
 GIVETH A BOOLEAN
 DECIDE `a condition true on its own` x y IF
     x AND (y OR NOT y)
+
+-- (7) Two alternatives that cover each other: each is reported, although
+--     deleting either one alone leaves the rule as it was. The help and the
+--     doc page say so.
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `covering each other` a b IF
+    (a AND b) OR (b AND a)
