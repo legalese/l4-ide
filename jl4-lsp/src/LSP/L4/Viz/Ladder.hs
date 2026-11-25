@@ -27,6 +27,7 @@ module LSP.L4.Viz.Ladder (
   getRefusingAtoms,
   getFreshLeaves,
   getNodeRanges,
+  getNodeStarts,
   irNodeId,
   getVizConfig,
   getKeyEnv,
@@ -58,7 +59,8 @@ import L4.TypeCheck.Types (substituteType)
 import L4.Viz.Ladder (InputRef(..), collectTypicallyDefaults, seamLabel)
 import L4.Viz.AtomKey (KeyEnv, mkKeyEnv, termKey, atomIdOfKey, withTypeExpander, withLocalsInScope, isEffectful, fieldReads)
 import L4.Annotation
-import L4.Parser.SrcSpan (SrcRange)
+import L4.Parser.SrcSpan (SrcPos, SrcRange (..))
+import L4.Lexer (PosToken (..), TokenType (..), TSymbols (..), TKeywords (..))
 import L4.Syntax
 import L4.Print (prettyLayout, mixfixCanonicalByUnique)
 import qualified L4.Transform as Transform (simplify, inlineLetsForViz, writtenAsClauses, clauseGroupLadderBudget, holdsGeneratedNodes, letInliningNodeBudget, Unfoldable (..), unfoldableDecide, substParams, inlineLocalBindingsForDrawing, clausesReadThrough, positionalCall)
@@ -266,6 +268,9 @@ data VizState = MkVizState
   -- from, where that expression has one ('getNodeRanges'). A node the
   -- normal form made ('Transform.simplify' builds every node it makes with no
   -- annotation) or a guarded chain copied has none.
+  , nodeStarts :: IntMap SrcPos
+  -- ^ Node id -> where the text of that expression starts ('writtenStart',
+  -- 'getNodeStarts'), for the same nodes as 'nodeRanges'.
   , expansionNodes :: !Int
   -- ^ IR nodes the expansions so far have added (see 'expansionNodeBudget').
   , expansionOverBudget :: !Bool
@@ -314,6 +319,7 @@ mkInitialVizState cfg =
     , freshLeaves = 0
     , freshLeafIds = IntSet.empty
     , nodeRanges = Map.empty
+    , nodeStarts = Map.empty
     , expansionNodes = 0
     , refusingDefs = Refusal.alwaysRefusing cfg.module'
     , refusingAtoms = Map.empty
@@ -443,10 +449,17 @@ getFreshLeaves vs = vs.freshLeafIds
 -- | The source range each node was drawn from, by node id, where it has one
 -- ('nodeRanges'). In a diagram drawn without the normal form
 -- ('withSimplification' False) every @AND@ operand, @OR@ limb and leaf the
--- drafter wrote has its range here; @l4 verify@ uses that to say where a
--- condition it reports is written.
+-- drafter wrote has its range here, except in the guards of a guarded chain
+-- (IF, BRANCH, CONSIDER), which are drawn as copies ("L4.Viz.GuardedRows") and
+-- have none.
 getNodeRanges :: VizState -> IntMap SrcRange
 getNodeRanges vs = vs.nodeRanges
+
+-- | Where the text of each node starts, by node id, for the nodes
+-- 'getNodeRanges' has ('writtenStart'). @l4 verify@ uses it to say where a
+-- condition it reports is written.
+getNodeStarts :: VizState -> IntMap SrcPos
+getNodeStarts vs = vs.nodeStarts
 
 defsForInliningOf :: Module Resolved -> IntMap (Unique, Transform.Unfoldable)
 defsForInliningOf module' =
@@ -727,12 +740,14 @@ translateGo :: TranslateContext -> Expr Resolved -> Viz IRExpr
 translateGo = go
   where
     -- Each node remembers the range of the expression it was drawn from
-    -- ('getNodeRanges'). Through a WHERE the inner expression is drawn first and
-    -- keeps its own, narrower range.
+    -- ('getNodeRanges') and where its text starts ('getNodeStarts'). Through a
+    -- WHERE the inner expression is drawn first and keeps its own, narrower
+    -- range.
     go :: TranslateContext -> Expr Resolved -> Viz IRExpr
     go ctx e = do
       node <- draw ctx e
       for_ (rangeOf e) \r -> #nodeRanges %= Map.insertWith (\_new old -> old) (irNodeId node).id r
+      for_ (writtenStart e) \p -> #nodeStarts %= Map.insertWith (\_new old -> old) (irNodeId node).id p
       pure node
 
     draw :: TranslateContext -> Expr Resolved -> Viz IRExpr
@@ -868,6 +883,67 @@ scanOr :: Expr Resolved -> [Expr Resolved]
 scanOr (Or _ e1 e2) =
   scanOr e1 <> scanOr e2
 scanOr e = [e]
+
+-- | Where the text of an expression starts: its first word, a bracket before it
+-- not counted. Not the start of 'rangeOf': the type checker reads an operator
+-- as a call and hands the operator's own tokens, its keyword and the brackets
+-- around it, to its operands, so that the call still prints as written
+-- ('L4.TypeCheck.rewriteBinOpAnno', 'L4.TypeCheck.rewriteUnaryOpAnno'). The
+-- first operand of a group then holds every bracket opened before it, its
+-- enclosing groups' too, and the keyword of every NOT it stands first under: in
+-- @a AND ((a AND b) OR c)@ the second @a@'s annotation starts at the first of
+-- the two brackets, and in @NOT ((a AND b) OR b)@ the first @a@'s at the NOT.
+--
+-- An operator node so read has the annotation of the call it was read as, a
+-- hole for the absent function name and one for its operands. A binary one
+-- starts where its first operand does. A NOT starts at its keyword, the last
+-- NOT handed to its operand before the operand's own first word, or, for the
+-- NOT that @UNLESS@ stands for, which has no keyword, where its operand does.
+-- Anything else starts at the first element of its own annotation that is not
+-- a token handed down to it: an opening bracket, or a NOT and its optional OF.
+-- An operator whose first operand is written outside its own text (a
+-- parameter, read through) starts where its own text does.
+--
+-- Not counting the bracket was decided by Claude 2026-11-25, pending Meng's
+-- review: a group can share its bracket with the groups around it, and its first
+-- word is its own.
+writtenStart :: Expr Resolved -> Maybe SrcPos
+writtenStart e = case operands e of
+  Just [operand] ->
+    let inner = writtenStart operand
+     in case [ r.start
+             | AnnoCsn (Just r) cluster <- leading operand
+             , any isNot cluster.payload.tokens
+             , maybe True (r.start <) inner
+             ] of
+          [] -> within inner
+          keywords -> Just (last keywords)
+  Just (operand : _) -> within (writtenStart operand)
+  _ -> listToMaybe (mapMaybe ownStart (getAnno e).payload)
+  where
+    -- A first operand written somewhere else: the argument a definition read
+    -- through ('Transform.inlineLocalBindingsForDrawing') put in place of its
+    -- parameter, so that the operator is in the definition and its first
+    -- operand at the call. The operator is placed where its own text is, in
+    -- the definition, at the bracket that opens it if it has one.
+    within inner = case (inner, rangeOf e) of
+      (Just p, Just r) | p < r.start || p > r.end -> Just r.start
+      _ -> inner
+    -- The operands of an operator node the checker read as a call.
+    operands x = case (getAnno x).payload of
+      [AnnoHole Nothing, AnnoHole _] -> Just (toListOf (gplate @(Expr Resolved)) x)
+      _ -> Nothing
+    -- The tokens handed down to the first word of an expression.
+    leading x = case operands x of
+      Just (operand : _) -> leading operand
+      _ -> takeWhile (\case AnnoCsn {} -> True; AnnoHole _ -> False) (getAnno x).payload
+    ownStart = \case
+      AnnoHole r -> (.start) <$> r
+      AnnoCsn r cluster
+        | all handedDown cluster.payload.tokens -> Nothing
+        | otherwise -> (.start) <$> r
+    handedDown t = t.payload `elem` [TSymbols TPOpen, TKeywords TKNot, TKeywords TKOf]
+    isNot t = t.payload == TKeywords TKNot
 
 -- | A node's own id.
 irNodeId :: IRExpr -> V.ID

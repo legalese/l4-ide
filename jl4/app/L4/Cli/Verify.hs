@@ -90,7 +90,7 @@ import qualified LSP.L4.Viz.Ladder as LadderViz
 import qualified LSP.L4.Viz.QueryPlan as VizQP
 import qualified LSP.L4.Viz.VizExpr as VizExpr
 
-import L4.Parser.SrcSpan (SrcPos (..), SrcRange (..), prettySrcPos)
+import L4.Parser.SrcSpan (SrcPos (..), prettySrcPos)
 import L4.Print (prettyLayout)
 import L4.Syntax
 
@@ -936,7 +936,7 @@ writtenForm opts cfg decide fnName atomIds order labels analysisOrder =
     Left _ -> Nothing
     Right (li, vs) ->
       let (bx, labelsW, orderW) = VizQP.vizExprToBoolExpr li.funDecl.body
-          starts = siteStarts (LadderViz.getNodeRanges vs) li.funDecl.body
+          starts = siteStarts (LadderViz.getNodeStarts vs) li.funDecl.body
        in Just $
             if not opts.verifyCoalesce
               then Written bx labelsW orderW starts
@@ -968,15 +968,16 @@ writtenForm opts cfg decide fnName atomIds order labels analysisOrder =
           Right aid | Just v <- Map.lookup aid analysed -> v
           k -> Map.findWithDefault w k newVar
 
--- | Where each site of a drawing starts in the source: the start of the range
--- of the node at that site, named as 'analyseBody' names sites (@body.and[1].or[0]@, and so
--- on). 'VizQP.vizExprToBoolExpr' keeps the drawing's shape node for node, so a
--- site of the formula is the same site of the drawing.
-siteStarts :: IntMap.IntMap SrcRange -> VizExpr.IRExpr -> Map Text SrcPos
-siteStarts ranges = go "body"
+-- | Where each site of a drawing starts in the source: where the text of the
+-- node at that site starts, its first word ('LadderViz.getNodeStarts'), named as
+-- 'analyseBody' names sites (@body.and[1].or[0]@, and so on).
+-- 'VizQP.vizExprToBoolExpr' keeps the drawing's shape node for node, so a site
+-- of the formula is the same site of the drawing.
+siteStarts :: IntMap.IntMap SrcPos -> VizExpr.IRExpr -> Map Text SrcPos
+siteStarts starts = go "body"
   where
     go site e =
-      maybe Map.empty (Map.singleton site . (.start)) (IntMap.lookup (LadderViz.irNodeId e).id ranges)
+      maybe Map.empty (Map.singleton site) (IntMap.lookup (LadderViz.irNodeId e).id starts)
         <> children site e
     children site = \case
       VizExpr.And _ xs -> Map.unions [go (site <> ".and[" <> Text.pack (show i) <> "]") x | (i, x) <- zip [(0 :: Int) ..] xs]

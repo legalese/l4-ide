@@ -6783,7 +6783,11 @@ spec bin = do
       plain <- jsonEnvelope bin ["verify", verifyVacuousGuardFixture, "--format", "json"]
       lookup "`the second hurdle is not one`" (findingSitesByDecision plain)
         `shouldBe` Just [("vacuous-guard", "body.and[1]")]
-      -- Where each is written: the condition's own text starts there.
+      -- Where each is written: the condition's first word, not a bracket
+      -- before it. The type checker hands an operator's brackets to its first
+      -- operand, so before this was fixed the `a` that opens `(a AND b)` was
+      -- placed at the bracket that opens the group around it.
+      lookup "`a hurdle in two brackets`" found `shouldBe` Just [("vacuous-guard", "body.and[1].or[0].and[0]")]
       source <- lines <$> readFile verifyWrittenGuardsFixture
       let startsWith nm want =
             case [ (line, col)
@@ -6796,12 +6800,19 @@ spec bin = do
                 take (length want) (drop (round col - 1) (headOr "" (drop (round line - 1) source)))
                   `shouldBe` want
               other -> expectationFailure ("expected one writtenAt for " ++ nm ++ ", got " ++ show other)
-      startsWith "`a hurdle in two parts`" "(x OR (q AND r))"
-      startsWith "`a hurdle inside a limb`" "(p OR q)"
-      startsWith "`a hurdle in the requirement`" "(x OR y)"
-      startsWith "`a hurdle in a row`" "(x OR y)"
+      startsWith "`a hurdle in two parts`" "x OR (q AND r))"
+      startsWith "`a hurdle inside a limb`" "p OR q))"
+      startsWith "`a hurdle in the requirement`" "x OR y))"
+      startsWith "`a hurdle in a row`" "x OR y)"
+      startsWith "`a hurdle in two brackets`" "a AND b) OR c)"
+      -- A condition whose first word is a parameter is placed in the local
+      -- definition, where it is written, not at the argument of the call.
+      [ round line :: Int
+        | (nm, f) <- findingObjectsByDecision env, nm == "`a hurdle in a definition`"
+        , Just w <- [objField f "writtenAt"], Just (Number line) <- [objField w "line"] ]
+        `shouldBe` [60, 60]
       Output _ text _ <- runL4 bin ["verify", verifyWrittenGuardsFixture]
-      text `shouldSatisfy` ("[vacuous-guard] at body.or[0].and[1], written at 23:15" `isInfixOf`)
+      text `shouldSatisfy` ("[vacuous-guard] at body.or[0].and[1], written at 23:16" `isInfixOf`)
 
     -- The weaker mode is documented as weaker; pin that it is not SILENTLY
     -- weaker. `x` here is a nullary reference to a GIVEN binder, so the two

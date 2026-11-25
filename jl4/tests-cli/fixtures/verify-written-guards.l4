@@ -37,3 +37,24 @@ GIVETH A BOOLEAN
 DECIDE `a hurdle in a row` s x y IF
   BRANCH IF s THEN x AND (x OR y)
          OTHERWISE FALSE
+
+-- (5) The redundant condition is the first word of a bracket inside another
+--     bracket. Its place is that word, not the bracket before it, which opens
+--     the group around it.
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN, c IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `a hurdle in two brackets` a b c IF
+    a AND ((a AND b) OR c)
+
+-- (6) The redundant condition is in a local definition with a parameter, and
+--     its first word is the parameter. Read through, that word is the argument
+--     at the call; the condition is placed in the definition, where it is
+--     written, once for each use.
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN, d IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `a hurdle in a definition` a b d IF
+    `qualifies` a AND `qualifies` b
+  WHERE
+    GIVEN x IS A BOOLEAN
+    GIVETH A BOOLEAN
+    `qualifies` x MEANS x AND (x OR d)
