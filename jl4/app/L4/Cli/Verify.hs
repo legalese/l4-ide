@@ -217,10 +217,14 @@ propositionalBound =
     , "  negations of the tests before it, which nobody wrote, so the tests are"
     , "  not checked for this, only what each row's THEN, the ELSE and the"
     , "  OTHERWISE say: a redundant condition inside a test goes unreported."
-    , "  An alternative is judged without the negations of the alternatives"
-    , "  beside the OR it sits inside, so in `d OR (a AND (b OR (c AND d)))'"
-    , "  the `c AND d', which can hold only where `d' has already let the case"
-    , "  through, goes unreported too."
+    -- A limit, stated here and on the doc page, not a choice (the note on
+    -- the OR case of the walk in 'analyseBody' says where it comes from).
+    , "  Nothing inside an alternative is judged against the negations of the"
+    , "  alternatives beside it, so what only those make redundant goes"
+    , "  unreported too: the `a', or the `NOT a', of"
+    , "  `(a AND b) OR ((NOT a) AND b)', which means just `b', and the"
+    , "  `c AND d' of `d OR (a AND (b OR (c AND d)))', which can hold only"
+    , "  where `d' has already let the case through."
     -- A limit, stated here and on the doc page, not a choice (the note on
     -- 'covered' in 'analyseBody' says why).
     , "  An alternative that can never hold is reported only where the normal"
@@ -1398,6 +1402,12 @@ analyseBody labels order defs listed body written
                         "this limb cannot hold in the context that reaches it; the rule reads identically with it deleted."
                     | normalised
                     ]
+                  -- Into the alternative with the context of the OR, and
+                  -- not the negations of the alternatives beside it, so a
+                  -- condition that only they make redundant, such as the @a@
+                  -- of @(a AND b) OR ((NOT a) AND b)@, is not reported. That
+                  -- is a limit, stated in the help and the doc page, not a
+                  -- choice.
                   else go nv ctx arm ei
               | (i, ei) <- zip [(0 :: Int) ..] es
               , let arm = site <> ".or[" <> Text.pack (show i) <> "]"
