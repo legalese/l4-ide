@@ -63,6 +63,10 @@ import System.Process
 import System.Timeout (timeout)
 import Test.Hspec
 import qualified Language.LSP.Protocol.Types as LSP
+-- for 'replSession' and the tests of the REPL after a file changes on disk
+import System.Directory (removeFile, renameFile)
+import System.IO (IOMode (..), withFile)
+import System.Process (withCreateProcess)
 
 import CliTest.Common
 import qualified CliTest.Blawx as Blawx
@@ -2528,6 +2532,200 @@ spec bin = do
               , "same: FUNCTION FROM NUMBER TO FUNCTION FROM a TO a"
               ]
           other -> expectationFailure ("Expected 3 replies, got " ++ show other)
+
+  -- The REPL reads a file again from disk at :reload, :load and :reset: the
+  -- file it has loaded, every module that file imports, directly or not, and
+  -- a module added with :import (smucclaw/l4-ide#1099). Each session stays
+  -- open across the changes, which are made between two of its lines, and the
+  -- tests check the answers it gives after them. Where a test also starts a
+  -- fresh REPL on the files as they are at the end, it checks that the two
+  -- agree.
+  describe "the REPL after a file changes on disk" $ do
+    mRepl <- runIO locateReplBinary
+    let withRepl act = maybe (pendingWith "jl4-repl was not found: set L4_REPL_BIN, or build it with `cabal build jl4-repl`") act mRepl
+        inDir work name text = OnDisk (writeFile (work </> name) text)
+        -- the replies to the lines, numbered from 0, that ask for an answer
+        answers ixs rs = [ r | (i, r) <- zip [0 :: Int ..] rs, i `elem` ixs ]
+        -- A fresh REPL on main.l4, started in its folder, as the session is
+        fresh repl work queries = replRepliesFor work repl (work </> "main.l4") queries
+
+    it "reads the loaded file again at :reload, at :load and at :reset" $ withRepl \repl ->
+      withSystemTempDirectory "l4-repl-edit" \work -> do
+        writeFile (work </> "main.l4") "x MEANS 1\n"
+        rs <- replSession repl work ["main.l4"]
+          [ Send "x"
+          , inDir work "main.l4" "x MEANS 2\n", Send ":reload", Send "x"
+          , inDir work "main.l4" "x MEANS 3\n", Send ":load main.l4", Send "x"
+          , inDir work "main.l4" "x MEANS 4\n", Send ":reset", Send "x"
+          ]
+        answers [0, 2, 4, 6] rs `shouldBe` ["1", "2", "3", "4"]
+        map (T.takeWhile (/= ':')) (answers [1, 3, 5] rs) `shouldBe` ["Reloaded", "Loaded", "REPL reset. Reloaded"]
+        fresh repl work ["x"] `shouldReturn` ["4"]
+
+    it "sees a definition added to the loaded file, at :reload" $ withRepl \repl ->
+      withSystemTempDirectory "l4-repl-edit" \work -> do
+        writeFile (work </> "main.l4") "x MEANS 1\n"
+        rs <- replSession repl work ["main.l4"]
+          [ Send "x"
+          , inDir work "main.l4" "x MEANS 1\n\nfoo MEANS 5\n", Send ":reload", Send "foo", Send "x"
+          ]
+        answers [0, 2, 3] rs `shouldBe` ["1", "5", "1"]
+
+    -- `the other` is imported and never changed: the control, which checks
+    -- that it still gives its answer.
+    it "reads again a module the loaded file imports, directly or not, and still answers from one nobody changed" $ withRepl \repl ->
+      withSystemTempDirectory "l4-repl-edit" \work -> do
+        writeFile (work </> "leaf.l4") "`the leaf` MEANS 10\n"
+        writeFile (work </> "mid.l4") "IMPORT leaf\n\n`the mid` MEANS `the leaf` PLUS 1\n"
+        writeFile (work </> "other.l4") "`the other` MEANS 7\n"
+        writeFile (work </> "main.l4") "IMPORT mid\nIMPORT other\n\nx MEANS `the mid`\n"
+        rs <- replSession repl work ["main.l4"]
+          [ Send "x"
+          , inDir work "leaf.l4" "`the leaf` MEANS 20\n", Send ":reload", Send "x"
+          , inDir work "mid.l4" "IMPORT leaf\n\n`the mid` MEANS `the leaf` PLUS 2\n", Send ":load main.l4", Send "x"
+          , inDir work "leaf.l4" "`the leaf` MEANS 30\n", Send ":reset", Send "x"
+          , Send "`the other`"
+          ]
+        answers [0, 2, 4, 6, 7] rs `shouldBe` ["11", "21", "22", "32", "7"]
+        fresh repl work ["x", "`the other`"] `shouldReturn` ["32", "7"]
+
+    -- What the REPL says while the import is broken is #1025's to decide, so
+    -- only the answer once it is fixed is pinned here. Loading the fixed
+    -- module itself is case (b) of the issue.
+    it "takes a fix to a module the loaded file imports, and loads the fixed module" $ withRepl \repl ->
+      withSystemTempDirectory "l4-repl-edit" \work -> do
+        writeFile (work </> "lib.l4") "`the answer` MEANS `no such name`\n"
+        writeFile (work </> "main.l4") "IMPORT lib\n\nx MEANS 1\n"
+        rs <- replSession repl work ["main.l4"]
+          [ Send "`the answer`"
+          , inDir work "lib.l4" "`the answer` MEANS 42\n", Send ":reload", Send "`the answer`"
+          , Send ":load lib.l4", Send "`the answer`"
+          ]
+        case rs of
+          [broken, reloaded, fixed, loadedLib, inLib] -> do
+            broken `shouldNotBe` "42"
+            T.takeWhile (/= ':') reloaded `shouldBe` "Reloaded"
+            fixed `shouldBe` "42"
+            T.takeWhile (/= ':') loadedLib `shouldBe` "Loaded"
+            inLib `shouldBe` "42"
+          other -> expectationFailure ("Expected 5 replies, got " ++ show other)
+
+    it "says the loaded file has errors once it has, and answers once they are fixed" $ withRepl \repl ->
+      withSystemTempDirectory "l4-repl-edit" \work -> do
+        writeFile (work </> "main.l4") "x MEANS 1\n"
+        rs <- replSession repl work ["main.l4"]
+          [ Send "x"
+          , inDir work "main.l4" "x MEANS 1 PLUS\n", Send ":reload"
+          , inDir work "main.l4" "x MEANS 2\n", Send ":reload", Send "x"
+          ]
+        case rs of
+          [first, broken, fixed, answer] -> do
+            first `shouldBe` "1"
+            T.takeWhile (/= ':') broken `shouldBe` "Error reloading"
+            T.takeWhile (/= ':') fixed `shouldBe` "Reloaded"
+            answer `shouldBe` "2"
+          other -> expectationFailure ("Expected 4 replies, got " ++ show other)
+
+    it "takes a fix to a loaded file that had errors when it was first loaded" $ withRepl \repl ->
+      withSystemTempDirectory "l4-repl-edit" \work -> do
+        writeFile (work </> "main.l4") "x MEANS 1 PLUS\n"
+        rs <- replSession repl work ["main.l4"]
+          [ inDir work "main.l4" "x MEANS 2\n", Send ":reload", Send "x" ]
+        map (T.takeWhile (/= ':')) (take 1 rs) `shouldBe` ["Reloaded"]
+        drop 1 rs `shouldBe` ["2"]
+
+    it "reads again a module added with :import" $ withRepl \repl ->
+      withSystemTempDirectory "l4-repl-edit" \work -> do
+        writeFile (work </> "lib.l4") "`the answer` MEANS 42\n"
+        writeFile (work </> "main.l4") "x MEANS 1\n"
+        rs <- replSession repl work ["main.l4"]
+          [ Send ":import lib", Send "`the answer`"
+          , inDir work "lib.l4" "`the answer` MEANS 43\n", Send ":reload", Send "`the answer`"
+          ]
+        answers [1, 3] rs `shouldBe` ["42", "43"]
+
+    -- A module deleted from disk is not answered from what the REPL read of it
+    -- before: the reply is the one a fresh REPL gives without it.
+    it "stops answering from a module that has been deleted" $ withRepl \repl ->
+      withSystemTempDirectory "l4-repl-edit" \work -> do
+        writeFile (work </> "lib.l4") "`the answer` MEANS 42\n"
+        writeFile (work </> "main.l4") "IMPORT lib\n\nx MEANS 1\n"
+        rs <- replSession repl work ["main.l4"]
+          [ Send "`the answer`"
+          , OnDisk (removeFile (work </> "lib.l4")), Send ":reload", Send "`the answer`"
+          ]
+        freshReply <- fresh repl work ["`the answer`"]
+        answers [0] rs `shouldBe` ["42"]
+        answers [2] rs `shouldBe` freshReply
+        freshReply `shouldNotBe` ["42"]
+
+    -- A file that is not there does not end the session: :load says so and
+    -- keeps the file loaded before, and a line after the loaded file was
+    -- deleted is still answered (decided by Claude 2026-11-25, pending Meng's
+    -- review). 'replSession' fails the test if the REPL ends.
+    it "keeps the file it had loaded when :load names a file that is not there" $ withRepl \repl ->
+      withSystemTempDirectory "l4-repl-edit" \work -> do
+        writeFile (work </> "main.l4") "x MEANS 1\n"
+        rs <- replSession repl work ["main.l4"] [Send ":load nosuch.l4", Send "x", Send ":l nosuch.l4", Send "x"]
+        map (saysNoFile "Error: " "nosuch.l4") (answers [0, 2] rs) `shouldBe` [True, True]
+        answers [1, 3] rs `shouldBe` ["1", "1"]
+
+    -- The same words for a loaded file that has gone, at :reload and :reset,
+    -- and at start-up for one that was never there.
+    it "goes on answering after the loaded file is deleted" $ withRepl \repl ->
+      withSystemTempDirectory "l4-repl-edit" \work -> do
+        writeFile (work </> "main.l4") "x MEANS 1\n"
+        rs <- replSession repl work ["main.l4"]
+          [ Send "x", OnDisk (removeFile (work </> "main.l4")), Send ":reload", Send "x", Send ":reset", Send "1 PLUS 1" ]
+        case rs of
+          [before', reloaded, _x, reset, sum'] -> do
+            before' `shouldBe` "1"
+            reloaded `shouldSatisfy` saysNoFile "Error reloading: " "main.l4"
+            reset `shouldSatisfy` saysNoFile "Error reloading: " "main.l4"
+            sum' `shouldBe` "2"
+          other -> expectationFailure ("Expected 5 replies, got " ++ show other)
+
+    it "says so when it is started on a file that is not there, and goes on answering" $ withRepl \repl ->
+      withSystemTempDirectory "l4-repl-edit" \work -> do
+        (banner, rs) <- replSessionWithBanner repl work ["nosuch.l4"] [Send "1 PLUS 1"]
+        filter ("Error" `T.isPrefixOf`) (T.lines banner) `shouldSatisfy` \case
+          [line] -> saysNoFile "Error loading file: " "nosuch.l4" line
+          _ -> False
+        rs `shouldBe` ["2"]
+
+    -- On a disk that ignores capitals, lib.l4 renamed to Lib.l4 can still be
+    -- read as lib.l4, but `IMPORT lib` does not find it (smucclaw/l4-ide#1080).
+    -- On a disk that does not ignore them it cannot be read, and the test
+    -- checks the same answers. `the other` is imported under its own capitals
+    -- and never changed: the control, which checks that it still gives its
+    -- answer.
+    it "stops answering from a module renamed to other capitals, as a fresh REPL does" $ withRepl \repl ->
+      withSystemTempDirectory "l4-repl-edit" \work -> do
+        writeFile (work </> "lib.l4") "`the answer` MEANS 42\n"
+        writeFile (work </> "other.l4") "`the other` MEANS 7\n"
+        writeFile (work </> "main.l4") "IMPORT lib\nIMPORT other\n\nx MEANS 1\n"
+        rs <- replSession repl work ["main.l4"]
+          [ Send "`the answer`"
+          , OnDisk (renameFile (work </> "lib.l4") (work </> "Lib.l4")), Send ":reload", Send "`the answer`", Send "`the other`"
+          ]
+        freshReplies <- fresh repl work ["`the answer`", "`the other`"]
+        answers [0] rs `shouldBe` ["42"]
+        answers [2, 3] rs `shouldBe` freshReplies
+        freshReplies `shouldBe` ["Failed to type check expression", "7"]
+
+    -- A line reads no file again: it answers from the files as the last
+    -- :load, :reload or :reset read them (decided by Claude 2026-11-25,
+    -- pending Meng's review), and :reload then sees both changes.
+    it "answers a line from the files as they were read, until :reload" $ withRepl \repl ->
+      withSystemTempDirectory "l4-repl-edit" \work -> do
+        writeFile (work </> "lib.l4") "`the answer` MEANS 42\n"
+        writeFile (work </> "main.l4") "IMPORT lib\n\nx MEANS 1\n"
+        rs <- replSession repl work ["main.l4"]
+          [ Send "x", Send "`the answer`"
+          , inDir work "main.l4" "IMPORT lib\n\nx MEANS 2\n", inDir work "lib.l4" "`the answer` MEANS 43\n"
+          , Send "x", Send "`the answer`", Send ":reload", Send "x", Send "`the answer`"
+          ]
+        answers [0, 1, 2, 3, 5, 6] rs `shouldBe` ["1", "42", "1", "42", "2", "43"]
 
   -- A rule that may refuse to answer gets no query plan, from the REPL or from
   -- the language server: each says why in the one sentence core gives, which
@@ -7717,3 +7915,60 @@ headOr :: a -> [a] -> a
 headOr d xs = case xs of
   x : _ -> x
   []    -> d
+
+-- | One step of a REPL session that stays open: a line to send, whose reply is
+-- kept, or a change to make on disk before the next line.
+data ReplStep = Send String | OnDisk (IO ())
+
+-- | Start @repl@ in @work@ with @args@ and take the steps in turn, sending each
+-- line only once the REPL has printed the prompt for it, so that a change on
+-- disk falls between two lines of one session, and give back the reply to each
+-- line (smucclaw/l4-ide#1099). The REPL's stderr goes to a file in @work@, so
+-- that nothing blocks on it. A prompt that does not come within two minutes,
+-- or a REPL that ends before it, fails the test with what the REPL printed.
+replSession :: FilePath -> FilePath -> [String] -> [ReplStep] -> IO [T.Text]
+replSession repl work args steps = snd <$> replSessionWithBanner repl work args steps
+
+-- | 'replSession', with what the REPL printed before its first prompt.
+replSessionWithBanner :: FilePath -> FilePath -> [String] -> [ReplStep] -> IO (T.Text, [T.Text])
+replSessionWithBanner repl work args steps =
+  withFile (work </> "repl-stderr.log") WriteMode \herr ->
+    withCreateProcess (proc repl args)
+      { std_in = CreatePipe, std_out = CreatePipe, std_err = UseHandle herr, cwd = Just work } \mIn mOut _ ph ->
+        case (mIn, mOut) of
+          (Just hin, Just hout) -> do
+            hSetBinaryMode hout True
+            banner <- toPrompt hout "the first prompt"
+            replies <- forM steps \case
+              OnDisk change -> Nothing <$ change
+              Send line -> do
+                BS.hPut hin (TE.encodeUtf8 (T.pack (line <> "\n")))
+                hFlush hin
+                Just <$> toPrompt hout line
+            BS.hPut hin ":quit\n" >> hClose hin
+            _ <- waitForProcess ph
+            pure (banner, [ r | Just r <- replies ])
+          _ -> fail "replSession: no pipes to the REPL"
+  where
+    prompt = "jl4> "
+    toPrompt hout what = do
+      got <- timeout (120 * 1000000) (readTo hout BS.empty)
+      case got of
+        Just (Right out) ->
+          pure (T.strip (T.filter (/= '\r') (TE.decodeUtf8Lenient (BS.take (BS.length out - BS.length prompt) out))))
+        Just (Left out) -> fail ("the REPL ended before the prompt after " <> what <> "; it printed: " <> show out)
+        Nothing -> fail ("no prompt within two minutes after " <> what)
+    readTo h acc
+      | prompt `BS.isSuffixOf` acc = pure (Right acc)
+      | otherwise = do
+          chunk <- BS.hGetSome h 4096
+          if BS.null chunk then pure (Left acc) else readTo h (acc <> chunk)
+
+-- | Whether @reply@ is the REPL's word that the file @name@ is not there,
+-- after @prefix@. The REPL names the file by an absolute path made from the
+-- folder it runs in, which can be spelled otherwise than the test's own name
+-- for it (on macOS a temporary folder under @/var@ is @/private/var@ to the
+-- REPL), so only the end of the path is compared.
+saysNoFile :: T.Text -> String -> T.Text -> Bool
+saysNoFile prefix name reply =
+  (prefix <> "there is no file ") `T.isPrefixOf` reply && T.pack name `T.isSuffixOf` reply

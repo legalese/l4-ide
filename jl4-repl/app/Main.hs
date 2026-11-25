@@ -27,6 +27,15 @@ import Text.Printf (printf)
 import Development.IDE.Graph.Database (shakeRunDatabase)
 import Language.LSP.Protocol.Types (toNormalizedFilePath, normalizedFilePathToUri, fromNormalizedUri, NormalizedUri)
 import qualified Language.LSP.Protocol.Types as LSP
+-- for 'syncStoreWithDisk', 'listedAsSpelled', 'loadNamed' and 'loadedFileFromDisk'
+import Control.Concurrent.STM (atomically, modifyTVar', readTVarIO)
+import Control.Exception (IOException, try)
+import Data.Int (Int32)
+import qualified Data.Text.Utf16.Rope.Mixed as Rope
+import Language.LSP.VFS (VFS (..), VirtualFile (..))
+import System.Directory (doesFileExist, listDirectory)
+import System.FilePath (takeFileName)
+import qualified L4.Import.ModuleNameCase as ModuleNameCase
 
 import LSP.Logger (makeDefaultStderrRecorder, cmapWithPrio, cfilter, pretty, Recorder, WithPriority(..), Priority(..))
 import L4.TypeCheck.Types (CheckError(..), CheckErrorWithContext(..))
@@ -126,6 +135,7 @@ data ReplState = ReplState
   , evalCounter :: IORef Int       -- Counter for unique evaluation filenames
   , imports    :: IORef [Text]     -- Accumulated IMPORT statements
   , traceSink  :: IORef (Maybe TraceSink)
+  , storeVersion :: IORef Int32    -- The last version 'syncStoreWithDisk' gave a file
   }
 
 data TraceSink = TraceSink
@@ -171,6 +181,7 @@ main = do
   -- Create mutable list for accumulated imports
   importsRef <- newIORef ([] :: [Text])
   traceSinkRef <- newIORef Nothing
+  storeVersionRef <- newIORef (0 :: Int32)
 
   let replState = ReplState
         { ideState = state
@@ -181,6 +192,7 @@ main = do
         , evalCounter = counter
         , imports = importsRef
         , traceSink = traceSinkRef
+        , storeVersion = storeVersionRef
         }
 
   -- If files provided, load them first
@@ -276,13 +288,116 @@ runRepl replState = do
             then say "Goodbye!"
             else loop readInput say newState
 
+-- | @:load@ and @:l@: load the file named. When there is no file of that name
+-- the REPL says so, and the file loaded before stays loaded (smucclaw/l4-ide#1099;
+-- decided by Claude 2026-11-25, pending Meng's review). It used to end the
+-- session.
+loadNamed :: ReplState -> Text -> IO (Text, ReplState, Bool)
+loadNamed st name = do
+  absPath <- makeAbsolute (Text.unpack (Text.strip name))
+  exists <- doesFileExist absPath
+  if not exists
+    then pure ("Error: " <> noFile absPath, st, False)
+    else do
+      let newState = st { loadedFile = Just absPath }
+      result <- loadFile newState absPath
+      case result of
+        Left err -> pure ("Error: " <> err, newState, False)
+        Right _ -> pure ("Loaded: " <> Text.pack absPath, newState, False)
+
+-- | What the REPL says of a file it was asked to load that is not there, at
+-- start-up, @:load@, @:reload@ and @:reset@ alike (decided by Claude
+-- 2026-11-25, pending Meng's review).
+noFile :: FilePath -> Text
+noFile fp = "there is no file " <> Text.pack fp
+
+-- | The loaded file's text from disk, for a line to be read against when the
+-- store holds no copy of it, or nothing when it cannot be read: the file was
+-- deleted since it was loaded, or was never there. Reading it used to end the
+-- session (smucclaw/l4-ide#1099).
+loadedFileFromDisk :: FilePath -> IO Text
+loadedFileFromDisk fp = either (\ (_ :: IOException) -> "") id <$> try (Text.IO.readFile fp)
+
+-- | Read the file @loaded@ into the store, and read again every file the store
+-- has read from disk before, so that what is checked next is what is on disk
+-- now (smucclaw/l4-ide#1099). @:load@, @:reload@ and @:reset@ do this, through
+-- 'loadFile', before they check the file; a line of the REPL does not.
+--
+-- The store keeps the text of each file it has read in its virtual file system:
+-- the file loaded here, and every module it imports, directly or not, which the
+-- rules put there the first time they read it (@GetLexTokens@ in
+-- "LSP.L4.Rules"). Whether a file there has changed is read from the version of
+-- its entry alone (@GetModificationTime@, an early cutoff, in
+-- "LSP.Core.FileStore"), and 'Shake.addVirtualFile' gives every entry version
+-- 0, so a new text put there under the old version is never looked at, and
+-- every result built from the old text stands. So here:
+--
+-- * an entry whose text is not the file's is given the file's text, under a
+--   version that no entry has had before in this session, so that the cutoff
+--   cannot mistake it for an older entry for the same file;
+-- * an entry whose text is the file's is left as it is, version and all, so
+--   that the store sees no change in that file;
+-- * an entry whose file cannot be read is dropped, so that the rules look for
+--   the file again and report what they find. The REPL's own module for each
+--   line, which is not on disk, goes the same way, as nothing reads it again.
+--   So does a module whose folder no longer lists it under the capitals it was
+--   found by ('listedAsSpelled'), though it can still be read under them.
+syncStoreWithDisk :: ReplState -> LSP.NormalizedFilePath -> IO ()
+syncStoreWithDisk st loaded = do
+  let var = st.ideState.shakeExtras.vfsVar
+      loadedUri = normalizedFilePathToUri loaded
+  VFS entries <- readTVarIO var
+  let held = [ (uri, nfp, Just vf) | (uri, vf) <- MapStrict.toList entries, Just nfp <- [LSP.uriToNormalizedFilePath uri] ]
+      toRead
+        | MapStrict.member loadedUri entries = held
+        | otherwise = (loadedUri, loaded, Nothing) : held
+  changes <- traverse readAgain toRead
+  atomically $ modifyTVar' var \(VFS m) ->
+    VFS (foldr (\(uri, entry) -> MapStrict.alter (const entry) uri) m [ c | Just c <- changes ])
+  where
+    readAgain (uri, nfp, old) = do
+      let path = LSP.fromNormalizedFilePath nfp
+      onDisk <- try (Text.IO.readFile path)
+      listed <- if uri == normalizedFilePathToUri loaded then pure True else listedAsSpelled path
+      case (onDisk, old) of
+        (Left (_ :: IOException), _) -> pure (Just (uri, Nothing))
+        _ | not listed -> pure (Just (uri, Nothing))
+        (Right text, Just (VirtualFile _ _ rope)) | text == Rope.toText rope -> pure Nothing
+        (Right text, _) -> do
+          version <- atomicModifyIORef' st.storeVersion (\n -> (n + 1, n + 1))
+          pure (Just (uri, Just (VirtualFile version 0 (Rope.fromText text))))
+
+-- | Whether the folder of @path@ lists its file under the capitals @path@ has.
+-- On a disk that ignores capitals, as macOS and Windows disks do by default, a
+-- file renamed from @lib.l4@ to @Lib.l4@ can still be read as @lib.l4@, but an
+-- @IMPORT lib@ no longer finds it: the import ladder asks the folder's listing
+-- too ('ModuleNameCase.classifyEntry', in "LSP.L4.Rules"), and this asks it
+-- the same way. A name the folder lists in another Unicode form, as HFS+ does,
+-- still counts as listed, and so does a folder that cannot be listed.
+listedAsSpelled :: FilePath -> IO Bool
+listedAsSpelled path = do
+  listing <- try (listDirectory (takeDirectory path))
+  pure $ case listing of
+    Left (_ :: IOException) -> True
+    Right entries -> case ModuleNameCase.classifyEntry entries (takeFileName path) of
+      ModuleNameCase.CaseVariantEntries _ -> False
+      _ -> True
+
 -- | Load a file and trigger type checking
 loadFile :: ReplState -> FilePath -> IO (Either Text ())
 loadFile st fp = do
   let nfp = toNormalizedFilePath fp
       uri = normalizedFilePathToUri nfp
-  -- Add file to virtual file store
-  _ <- shakeRunDatabase st.ideState.shakeDb [Shake.addVirtualFileFromFS nfp]
+  -- Read the file into the store, and every file the store has read before
+  -- again, from disk (smucclaw/l4-ide#1099)
+  syncStoreWithDisk st nfp
+  -- A file that is not there is said to be gone, not to have failed its check
+  exists <- doesFileExist fp
+  if exists then checkLoadedFile st uri else pure (Left (noFile fp))
+
+-- | Check the file just read into the store, for 'loadFile'
+checkLoadedFile :: ReplState -> NormalizedUri -> IO (Either Text ())
+checkLoadedFile st uri = do
   -- Trigger type check
   [mtc] <- shakeRunDatabase st.ideState.shakeDb [Shake.use Rules.SuccessfulTypeCheck uri]
   case mtc of
@@ -339,22 +454,8 @@ processInput st input
       let arg = Text.strip $ Text.drop (Text.length (":tracefile " :: Text)) stripped
       msg <- configureTraceSink st arg
       pure (msg, st, False)
-  | ":load " `Text.isPrefixOf` stripped = do
-      let fp = Text.unpack $ Text.strip $ Text.drop 6 stripped
-      absPath <- makeAbsolute fp
-      let newState = st { loadedFile = Just absPath }
-      result <- loadFile newState absPath
-      case result of
-        Left err -> pure ("Error: " <> err, newState, False)
-        Right _ -> pure ("Loaded: " <> Text.pack absPath, newState, False)
-  | ":l " `Text.isPrefixOf` stripped = do
-      let fp = Text.unpack $ Text.strip $ Text.drop 3 stripped
-      absPath <- makeAbsolute fp
-      let newState = st { loadedFile = Just absPath }
-      result <- loadFile newState absPath
-      case result of
-        Left err -> pure ("Error: " <> err, newState, False)
-        Right _ -> pure ("Loaded: " <> Text.pack absPath, newState, False)
+  | ":load " `Text.isPrefixOf` stripped = loadNamed st (Text.drop 6 stripped)
+  | ":l " `Text.isPrefixOf` stripped = loadNamed st (Text.drop 3 stripped)
   | ":reload" `Text.isPrefixOf` stripped || ":r" == stripped = do
       case st.loadedFile of
         Nothing -> pure ("No file loaded", st, False)
@@ -687,7 +788,7 @@ evalExpression st contextFile exprText = do
       mContent <- Shake.getVirtualFileText st.ideState contextUri
       case mContent of
         Just content -> pure content
-        Nothing -> Text.IO.readFile contextFile
+        Nothing -> loadedFileFromDisk contextFile
   let replContent = importPreamble <> originalContent <> "\n\n-- REPL expression " <> Text.pack (show evalNum) <> "\n" <> actualExpr <> "\n"
   
   -- Create a unique virtual file for REPL evaluation
@@ -789,7 +890,7 @@ evalWithTrace st contextFile exprText = do
       mContent <- Shake.getVirtualFileText st.ideState contextUri
       case mContent of
         Just content -> pure content
-        Nothing -> Text.IO.readFile contextFile
+        Nothing -> loadedFileFromDisk contextFile
   
   let replContent = importPreamble <> originalContent <> "\n\n-- REPL trace " <> Text.pack (show evalNum) <> "\n" <> actualExpr <> "\n"
   
@@ -839,7 +940,7 @@ evalWithTraceAscii st contextFile exprText = do
       mContent <- Shake.getVirtualFileText st.ideState contextUri
       case mContent of
         Just content -> pure content
-        Nothing -> Text.IO.readFile contextFile
+        Nothing -> loadedFileFromDisk contextFile
 
   let replContent = importPreamble <> originalContent <> "\n\n-- REPL trace " <> Text.pack (show evalNum) <> "\n" <> actualExpr <> "\n"
 
@@ -1092,7 +1193,7 @@ getExpressionType st contextFile exprText = do
       mContent <- Shake.getVirtualFileText st.ideState contextUri
       case mContent of
         Just content -> pure content
-        Nothing -> Text.IO.readFile contextFile
+        Nothing -> loadedFileFromDisk contextFile
   -- Build the virtual file content with #CHECK directive
   let replContent = importPreamble <> originalContent <> "\n\n-- REPL type query " <> Text.pack (show evalNum) <> "\n#CHECK " <> exprText <> "\n"
   
@@ -1132,8 +1233,11 @@ helpText = Text.unlines
   , "File management:"
   , "  :load <file>       Load an L4 file"
   , "  :l <file>          Short for :load"
-  , "  :reload, :r        Reload the current file"
-  , "  :reset             Reset REPL (clear imports, reload file)"
+  , "  :reload, :r        Load the current file again"
+  , "  :reset             Remove what :import added, and load the current file again"
+  , "  These three read the file again from disk, and every module it or :import"
+  , "  brings in, so an edit saved since is seen. Until then, a line answers from"
+  , "  the files as the REPL last read them, so :reload after an edit."
   , ""
   , "Inspection:"
   , "  :decides           List DECIDE declarations in the loaded file"
