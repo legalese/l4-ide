@@ -8,7 +8,7 @@ import Control.Monad (unless)
 import Control.Monad.IO.Class (liftIO)
 import qualified Data.ByteString.Char8 as BS8
 import Data.IORef
-import Data.List (sortOn, isPrefixOf)
+import Data.List (nub, sortOn, isPrefixOf)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text.Encoding
@@ -286,7 +286,7 @@ loadFile st fp = do
   -- Trigger type check
   [mtc] <- shakeRunDatabase st.ideState.shakeDb [Shake.use Rules.SuccessfulTypeCheck uri]
   case mtc of
-    Just tc | tc.success, not tc.importsOk -> pure (Left importsHaveErrors)
+    Just tc | tc.success, not tc.importsOk -> Left <$> fileImportsHaveErrors st uri
     Just tc | tc.success -> pure (Right ())
     Just _tc -> pure (Left "Type checking failed (see diagnostics above)")
     Nothing -> pure (Left "Failed to type check file")
@@ -294,7 +294,57 @@ loadFile st fp = do
 -- | What the REPL says, on loading a file and instead of evaluating a line, when
 -- a module the file imports, directly or not, has errors: nothing is evaluated
 -- then, as nothing is in a file with errors of its own (smucclaw/l4-ide#1025,
--- 'Rules.evaluable'; decided by Claude 2026-11-25, pending Meng's review).
+-- 'Rules.evaluable'). It names the module, and says how to get past it: for a
+-- module the file imports, fixing it and starting the REPL again, since the
+-- REPL does not see a change to a file it has already checked, even on
+-- @:reload@; for one that @:import@ added, @:reset@ (decided by Claude
+-- 2026-11-25, pending Meng's review).
+fileImportsHaveErrors :: ReplState -> NormalizedUri -> IO Text
+fileImportsHaveErrors st uri = brokenImports st uri >>= \case
+  [] -> pure importsHaveErrors
+  broken -> pure $
+    "This file imports " <> describeBroken broken <> ", so nothing is evaluated; `l4 check` on the file shows the errors."
+      <> " If you have fixed that since, start the REPL again: it does not see a change to a file it has already checked, even on `:reload`."
+
+-- | The same, for a line of the REPL: when the loaded file's own imports are
+-- fine, the broken module came in through @:import@.
+lineImportsHaveErrors :: ReplState -> FilePath -> NormalizedUri -> IO Text
+lineImportsHaveErrors st contextFile lineUri = do
+  let contextUri = normalizedFilePathToUri (toNormalizedFilePath contextFile)
+  [mTc] <- shakeRunDatabase st.ideState.shakeDb [Shake.use Rules.SuccessfulTypeCheck contextUri]
+  case mTc of
+    Just tc | Rules.evaluable tc -> do
+      added <- map (Text.strip . Text.drop (Text.length "IMPORT ")) <$> readIORef st.imports
+      broken <- brokenImports st lineUri
+      pure $ case filter ((`elem` added) . fst) broken of
+        [] -> importsHaveErrors
+        fromImport ->
+          "`:import` added " <> describeBroken fromImport <> ", so nothing is evaluated;"
+            <> " `:imports` lists what `:import` added, and `:reset` removes it."
+    _ -> fileImportsHaveErrors st contextUri
+
+-- | The modules a file imports directly that stop it being evaluated, each with
+-- what is wrong with it, as the error on its IMPORT says.
+brokenImports :: ReplState -> NormalizedUri -> IO [(Text, Text)]
+brokenImports st uri = do
+  [mDeps] <- shakeRunDatabase st.ideState.shakeDb [Shake.use Rules.GetTypeCheckDependencies uri]
+  pure $ nub
+    [ (rawNameToText (rawName imp.importName), why)
+    | (imp, mTc) <- maybe [] id mDeps
+    , Just why <- [problem mTc]
+    ]
+  where
+    problem = \case
+      Nothing -> Just "could not be checked"
+      Just tc
+        | not tc.success -> Just "has errors"
+        | not tc.importsOk -> Just "imports a module with errors"
+        | otherwise -> Nothing
+
+describeBroken :: [(Text, Text)] -> Text
+describeBroken = Text.intercalate " and " . map (\(name, why) -> "`" <> name <> "`, which " <> why)
+
+-- | The words for when no module can be named.
 importsHaveErrors :: Text
 importsHaveErrors = "A module this file imports has errors, so nothing is evaluated; `l4 check` on the file shows them."
 
@@ -715,7 +765,7 @@ evalExpression st contextFile exprText = do
       -- Extract error messages
       let errors = tc.infos
       pure $ "Type error:\n" <> Text.unlines (map (Text.pack . show) $ take 3 errors)
-    Just tc | not tc.importsOk -> pure importsHaveErrors
+    Just tc | not tc.importsOk -> lineImportsHaveErrors st contextFile replUri
     Just _tc -> do
       -- Get evaluation results
       [meval] <- shakeRunDatabase st.ideState.shakeDb [Shake.use Rules.EvaluateLazy replUri]
@@ -817,7 +867,7 @@ evalWithTrace st contextFile exprText = do
     Just tc | not tc.success -> do
       let errors = tc.infos
       pure $ "Type error:\n" <> Text.unlines (map (Text.pack . show) $ take 3 errors)
-    Just tc | not tc.importsOk -> pure importsHaveErrors
+    Just tc | not tc.importsOk -> lineImportsHaveErrors st contextFile replUri
     Just tc -> do
       -- Get evaluation results WITH trace
       meval <- traceLine st replUri tc
@@ -868,7 +918,7 @@ evalWithTraceAscii st contextFile exprText = do
     Just tc | not tc.success -> do
       let errors = tc.infos
       pure $ "Type error:\n" <> Text.unlines (map (Text.pack . show) $ take 3 errors)
-    Just tc | not tc.importsOk -> pure importsHaveErrors
+    Just tc | not tc.importsOk -> lineImportsHaveErrors st contextFile replUri
     Just tc -> do
       -- Get evaluation results WITH trace
       meval <- traceLine st replUri tc

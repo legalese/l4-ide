@@ -199,7 +199,12 @@ locateReplBinary = do
 -- | The REPL's reply to each query, with the file loaded, run in @work@
 -- because the REPL keeps a history file in the directory it is in.
 replRepliesFor :: FilePath -> FilePath -> FilePath -> [String] -> IO [T.Text]
-replRepliesFor work repl file queries = do
+replRepliesFor work repl file queries = snd <$> replSessionFor work repl file queries
+
+-- | The same, with what the REPL printed before its first prompt: its banner,
+-- and what it said on loading the file.
+replSessionFor :: FilePath -> FilePath -> FilePath -> [String] -> IO (T.Text, [T.Text])
+replSessionFor work repl file queries = do
   absFile <- makeAbsolute file
   (Just hin, Just hout, Just herr, ph) <- createProcess (proc repl [absFile])
     { std_in = CreatePipe, std_out = CreatePipe, std_err = CreatePipe, cwd = Just work }
@@ -211,7 +216,8 @@ replRepliesFor work repl file queries = do
   _ <- BS.hGetContents herr
   _ <- waitForProcess ph
   let out = T.pack (filter (/= '\r') (T.unpack (TE.decodeUtf8Lenient soutBytes)))
-  pure (map T.strip (take (length queries) (drop 1 (T.splitOn "jl4> " out))))
+      (loaded, prompts) = T.breakOn "jl4> " out
+  pure (T.strip loaded, map T.strip (take (length queries) (drop 1 (T.splitOn "jl4> " prompts))))
 
 -- | Start @jl4-lsp@, initialize it and open the file in it, then hand the
 -- action the file's URI, a way to send a notification, and a way to send a
@@ -4790,11 +4796,18 @@ spec bin = do
           out `shouldNotSatisfy` isInfixOf "eval/internal-error"
         withRepl act = maybe (pendingWith "jl4-repl was not found: set L4_REPL_BIN, or build it with `cabal build jl4-repl`") act mRepl
         -- The REPL keeps a history file in the directory it runs in, and an
-        -- IMPORT on a line resolves from there, so it runs in a copy.
-        replies repl dir queries = withSystemTempDirectory "l4-repl-imports" \work -> do
-          forM_ ["lib.l4", "main.l4"] \f -> copyFile (dir </> f) (work </> f)
-          replRepliesFor work repl (work </> "main.l4") queries
+        -- IMPORT on a line resolves from there, so it runs in a copy, of each
+        -- file under the name given, with main.l4 loaded.
+        session repl files queries = withSystemTempDirectory "l4-repl-imports" \work -> do
+          forM_ files \(from, to) -> copyFile from (work </> to)
+          replSessionFor work repl (work </> "main.l4") queries
+        libAndMain dir = [(dir </> f, f) | f <- ["lib.l4", "main.l4"]]
         replQueries = ["`the answer`", "1 PLUS 1", ":trace `the answer`", ":traceascii `the answer`"]
+        -- What the REPL says, on loading main.l4 and for each line, while the
+        -- lib.l4 it imports has errors.
+        fileMessage :: T.Text
+        fileMessage = "This file imports `lib`, which has errors, so nothing is evaluated; `l4 check` on the file shows the errors."
+          <> " If you have fixed that since, start the REPL again: it does not see a change to a file it has already checked, even on `:reload`."
         withLsp act = maybe (pendingWith "no jl4-lsp binary (set JL4_LSP_BIN, or run under cabal test)") act mLsp
         -- Draw the decision graph of `we agree` in ladder.l4 from its lens,
         -- then ask the language server to evaluate the call in it to a rule
@@ -4881,10 +4894,24 @@ spec bin = do
       said `shouldNotSatisfy` isInfixOf "Internal error"
       said `shouldSatisfy` isInfixOf "A module this file imports has errors, so nothing is evaluated"
 
-    it "the REPL evaluates no line of it, and says why" $ withRepl \repl -> do
-      rs <- replies repl errDir replQueries
-      rs `shouldBe` replicate (length replQueries)
-        "A module this file imports has errors, so nothing is evaluated; `l4 check` on the file shows them."
+    it "the REPL evaluates no line of it, and names the module that stops it, on loading the file and for each line" $ withRepl \repl -> do
+      (loaded, rs) <- session repl (libAndMain errDir) replQueries
+      loaded `shouldSatisfy` T.isSuffixOf ("Error loading file: " <> fileMessage)
+      rs `shouldBe` replicate (length replQueries) fileMessage
+
+    -- A module that :import added stops every line too, though the loaded
+    -- file's own imports are clean, and `l4 check` on the file passes; so the
+    -- REPL says that :import added it, and :reset gets past it.
+    it "the REPL names a module that :import added and that has errors, and evaluates again after :reset" $ withRepl \repl -> do
+      (_, rs) <- session repl (libAndMain okDir <> [(errDir </> "lib.l4", "broken.l4")])
+        [":import broken", "1 PLUS 1", ":reset", "1 PLUS 1"]
+      case rs of
+        [added, refused, reset, again] -> do
+          added `shouldBe` "Added: IMPORT broken"
+          refused `shouldBe` "`:import` added `broken`, which has errors, so nothing is evaluated; `:imports` lists what `:import` added, and `:reset` removes it."
+          reset `shouldSatisfy` T.isPrefixOf "REPL reset."
+          again `shouldBe` "2"
+        _ -> expectationFailure ("four replies were expected, not " <> show rs)
 
     -- A file that imports a ring of imports without being in it is checked
     -- without the ring, and was evaluated; it is not now. A file on the ring
@@ -4946,7 +4973,8 @@ spec bin = do
       (answer >>= (`objField` "value")) `shouldBe` Just (String "TrueV")
 
     it "the REPL still evaluates every line over a clean import" $ withRepl \repl -> do
-      rs <- replies repl okDir replQueries
+      (loaded, rs) <- session repl (libAndMain okDir) replQueries
+      loaded `shouldSatisfy` T.isSuffixOf "File loaded successfully."
       take 2 rs `shouldBe` ["42", "2"]
       mapM_ (`shouldSatisfy` T.isInfixOf "42") (drop 2 rs)
 
