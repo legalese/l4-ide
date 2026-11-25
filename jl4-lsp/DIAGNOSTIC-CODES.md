@@ -171,6 +171,9 @@ Warnings, except `lint/redundant-lang-en`, which is a hint.
 | `lint/not-shown-to-end`                | `check`  | A rule whose HENCE or LEST leads back to it, not shown to come to an end.                  |
 | `lint/starts-again-with-no-time`       | `check`  | A rule that starts itself again with no time passing.                                      |
 | `lint/starts-copies-at-once`           | `check`  | A rule that starts two or more copies of itself at once.                                   |
+| `lint/lest-without-deadline`           | `check`  | A LEST on a MUST, DO or MAY with no deadline, which nothing can reach.                     |
+
+- `lint/lest-without-deadline`: Scope ruled HOURGLASS, Meng 2026-11-25: MUST, DO and MAY with neither WITHIN nor BEFORE; not MUST NOT; not an EVERY with no join line.
 
 ## eval/
 

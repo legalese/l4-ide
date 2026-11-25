@@ -1,0 +1,87 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+lest-without-deadline.l4:31:5-9:
+  I found a problem while checking the definition of `rent, no deadline`:
+    This LEST can never be reached, because the rule has no deadline.
+    
+    After MUST, the LEST is what follows when the deadline passes without the action.
+    This rule has no WITHIN and no BEFORE, so it waits for its action however long it takes, and time alone never takes it to this LEST.
+    
+    To say by when the action is due, add a WITHIN (or a BEFORE). Otherwise, remove the LEST.
+lest-without-deadline.l4:33:1-34:22:
+  PARTY Tenant OF "Alice" MUST payRent HENCE FULFILLED LEST (PARTY Landlord MUST refund WITHIN 10)
+lest-without-deadline.l4:40:5-9:
+  I found a problem while checking the definition of `DO, no deadline`:
+    This LEST can never be reached, because the rule has no deadline.
+    
+    After DO, the LEST is what follows when the deadline passes without the action.
+    This rule has no WITHIN and no BEFORE, so it waits for its action however long it takes, and time alone never takes it to this LEST.
+    
+    To say by when the action is due, add a WITHIN (or a BEFORE). Otherwise, remove the LEST.
+lest-without-deadline.l4:42:1-43:22:
+  PARTY Tenant OF "Alice" DO payRent HENCE FULFILLED LEST BREACH
+lest-without-deadline.l4:50:5-9:
+  I found a problem while checking the definition of `MAY, no deadline`:
+    This LEST can never be reached, because the rule has no deadline.
+    
+    After MAY, the LEST is what follows when the permission goes unused until its deadline passes.
+    This rule has no WITHIN and no BEFORE, so the permission never runs out, and this LEST never follows.
+    
+    To say when the permission ends, add a WITHIN (or a BEFORE). Otherwise, remove the LEST.
+lest-without-deadline.l4:52:1-53:22:
+  PARTY Tenant OF "Alice" MAY payRent HENCE FULFILLED LEST BREACH
+lest-without-deadline.l4:61:5-9:
+  I found a problem while checking the definition of `AFTER alone`:
+    This LEST can never be reached, because the rule has no deadline.
+    
+    After MUST, the LEST is what follows when the deadline passes without the action.
+    This rule has no WITHIN and no BEFORE (its AFTER says when the action may begin, not when it is due), so it waits for its action however long it takes, and time alone never takes it to this LEST.
+    
+    To say by when the action is due, add a WITHIN (or a BEFORE). Otherwise, remove the LEST.
+lest-without-deadline.l4:63:1-64:22:
+  PARTY Tenant OF "Alice" MUST payRent HENCE FULFILLED LEST BREACH
+lest-without-deadline.l4:71:9-13:
+  I found a problem while checking the definition of `everyone, no deadline`:
+    This LEST can never be reached, because the rule has no deadline.
+    
+    After MUST, the LEST is what follows when the deadline passes without the action.
+    This rule has no WITHIN or BEFORE on its action and no WITHIN on its ONCE or UPON EACH line, so it waits for its action however long it takes, and time alone never takes it to this LEST.
+    
+    To say by when the action is due, add a WITHIN (or a BEFORE) to the action, or a WITHIN to the ONCE or UPON EACH line. Otherwise, remove the LEST.
+lest-without-deadline.l4:73:1-74:22:
+  PARTY Tenant OF "Alice" MUST payRent HENCE `the join` LEST `the join fails`
+lest-without-deadline.l4:85:9-13:
+  I found a problem while checking the definition of `nested, inner has none`:
+    This LEST can never be reached, because the rule has no deadline.
+    
+    After MUST, the LEST is what follows when the deadline passes without the action.
+    This rule has no WITHIN and no BEFORE, so it waits for its action however long it takes, and time alone never takes it to this LEST.
+    
+    To say by when the action is due, add a WITHIN (or a BEFORE). Otherwise, remove the LEST.
+lest-without-deadline.l4:87:1-88:22:
+  PARTY Tenant OF "Alice" MUST refund HENCE FULFILLED LEST BREACH
+lest-without-deadline.l4:99:1-100:22:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      1000000
+    surpassed the deadline of party
+      Landlord
+    who had to do obligatory action
+      MUST refund
+    before their deadline, which was at
+      40
+lest-without-deadline.l4:109:1-110:43:
+  DEONTIC BREACHED:
+    BREACH
+lest-without-deadline.l4:120:1-121:22:
+  DEONTIC BREACHED:
+    BREACH
+lest-without-deadline.l4:130:1-131:30:
+  PARTY Landlord MUST refund WITHIN 10 HENCE FULFILLED
+lest-without-deadline.l4:140:1-141:32:
+  FULFILLED

@@ -343,9 +343,10 @@ GIVETH A DEONTIC Actor Action
 `enforcement response` MEANS
     IF violation's `the severity` EQUALS Critical
     THEN
-        -- Immediate suspension for critical violations
+        -- Immediate suspension for critical violations, within a day
         PARTY `the regulator`
         MUST `suspend immediately`
+        WITHIN 1
         HENCE FULFILLED
         LEST BREACH BY `the regulator` BECAUSE "failed to suspend critical violation"
     ELSE IF violation's `the severity` EQUALS Serious
@@ -422,7 +423,8 @@ GIVETH A DEONTIC `Licence Party` `Licence Action`
         LEST
             -- Reinstatement period after suspension
             -- DO: an option. Doing it leads to HENCE, letting the time pass to LEST.
-            -- (A MAY would never reach its LEST.)
+            -- (A MAY would do the same here. Left without a LEST, a MAY's
+            -- passed deadline ends FULFILLED, and a DO's ends in a breach.)
             PARTY holder
             DO `apply for reinstatement`
             WITHIN 60
