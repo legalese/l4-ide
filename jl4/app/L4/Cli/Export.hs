@@ -80,7 +80,7 @@ import L4.Bpmn.IR (BpmnExport (..), BpmnOptions (..), DeadlineUnitPolicy (..))
 import L4.Bpmn.Lower (stateGraphToBpmn)
 import L4.Bpmn.Wiring (wiringFromDrg)
 import L4.Dmn.Emit (emitDrg)
-import L4.Dmn.IR (Drg, DmnFlavor (..), defaultDmnFlavor, dmnReport, drgDecisions)
+import L4.Dmn.IR (Drg (..), DmnFlavor (..), DropReason (..), defaultDmnFlavor, dmnReport, drgDecisions)
 import L4.Dmn.Lower (DmnLowerOptions (..), lowerModule, moduleTitle, resolveMaybePredicates)
 import L4.Dmn.Markdown (emitMarkdown, markdownReport)
 import L4.Annotation (rangeOf)
@@ -480,10 +480,7 @@ exportDmn :: ExportOptions -> Rules.TypeCheckResult -> IO FidelityReport
 exportDmn opts tcRes = do
   drg <- dmnDrgFor opts tcRes
   when (null (drgDecisions drg)) do
-    hPutStrLn stderr
-      "No decisions found in module — nothing to export as DMN \
-      \(a DMN decision comes from a DECIDE / MEANS definition; a module of bare \
-      \DECLAREs and IMPORTs has none)"
+    hPutStr stderr (Text.unpack (noDecisionsMessage drg))
     exitFailure
   case opts.exportTarget of
     TargetDmnMarkdown -> do
@@ -492,6 +489,55 @@ exportDmn opts tcRes = do
     _ -> do
       emitArtifact opts (emitDrg drg)
       pure (dmnReport drg)
+
+-- | Why the model has no decisions, in the reader's words.
+--
+-- A module with no @DECIDE@ or @MEANS@ at all gets the old one-line refusal.
+-- But the model can also be empty because the population filter (spec §2.5.6)
+-- left out every decision the module has, and saying "no DECIDE or MEANS" to
+-- that module is false (smucclaw/l4-ide#1104). So the refusal names what was
+-- left out and why, grouped by reason, and points at @--include-tests@ only
+-- for the reason it cures: a regulative rule or a rule-date rebind stays out
+-- with the flag set too.
+--
+-- Read from 'drgOmitted', never from the notes: one form of @D-FIXTURE@
+-- reports a decision that was KEPT.
+--
+-- The wording is decided by Claude 2026-11-25, pending Meng's review.
+noDecisionsMessage :: Drg -> Text
+noDecisionsMessage drg
+  | null drg.drgOmitted =
+      "No decisions found in module — nothing to export as DMN \
+      \(a DMN decision comes from a DECIDE / MEANS definition; a module of bare \
+      \DECLAREs and IMPORTs has none)\n"
+  | otherwise =
+      Text.unlines $
+        "No decisions to export: every decision in this module was left out of the DMN model."
+          : concat
+              [ reasonLine scaffolding
+                  "as test scaffolding, because each is used only by directives such as \
+                  \#EVAL and #ASSERT, or by other test scaffolding"
+                  " Pass --include-tests to export them."
+              , reasonLine regulative
+                  "as regulative rules (MUST, MAY, SHANT) that no decision calls"
+                  " DMN describes decisions, not obligations: export these with \
+                  \`l4 export bpmn` instead."
+              , reasonLine rebinding
+                  "because each evaluates under its own rule date (EVAL UNDER RULES \
+                  \EFFECTIVE AT), and a DMN model has one rule-date input and no way to \
+                  \rebind it"
+                  ""
+              ]
+ where
+  scaffolding = [n | (n, r) <- drg.drgOmitted, r `elem` [DroppedFixture, DroppedFixtureHelper]]
+  regulative  = [n | (n, DroppedRegulative) <- drg.drgOmitted]
+  rebinding   = [n | (n, DroppedRuleDateRebind) <- drg.drgOmitted]
+  reasonLine names why after
+    | null names = []
+    | otherwise =
+        [ "  - " <> Text.intercalate ", " ["`" <> n <> "`" | n <- names]
+            <> ": left out " <> why <> "." <> after
+        ]
 
 ----------------------------------------------------------------------------
 -- The process side

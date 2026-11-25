@@ -141,6 +141,12 @@ exportTwoRulesFixture, exportNothingFixture :: FilePath
 exportBlockingOnlyFixture, exportAdvisoryOnlyFixture :: FilePath
 exportTwoRulesFixture     = fixtureDir </> "export-two-rules.l4"
 exportNothingFixture      = fixtureDir </> "export-nothing.l4"
+-- The two empty-model refusals of smucclaw/l4-ide#1104: every decision left
+-- out as test scaffolding; and scaffolding beside an uncalled regulative rule,
+-- which --include-tests does not bring back.
+exportScaffoldingFixture, exportScaffoldingDutyFixture :: FilePath
+exportScaffoldingFixture     = fixtureDir </> "export-scaffolding-only.l4"
+exportScaffoldingDutyFixture = fixtureDir </> "export-scaffolding-and-duty.l4"
 exportBlockingOnlyFixture = fixtureDir </> "export-blocking-only.l4"
 exportAdvisoryOnlyFixture = fixtureDir </> "export-advisory-only.l4"
 
@@ -404,6 +410,7 @@ dmnNullProbeDir = fixtureDir </> "dmn-null-probe"
 fixtures :: [FilePath]
 fixtures =
   [ exportTwoRulesFixture, exportNothingFixture
+  , exportScaffoldingFixture, exportScaffoldingDutyFixture
   , exportBlockingOnlyFixture, exportAdvisoryOnlyFixture
   , bpmnOfferingSource, bpmnOfferingGolden, bpmnOfferingFidelity
   , dmnSource, dmnGolden, dmnMarkdownGolden, dmnEngineCases
@@ -552,8 +559,44 @@ spec bin = do
       -- exports an empty model, which the CLI refuses loudly rather than
       -- writing a decision-free document. This is the behaviour change that
       -- retired export-two-rules.l4 from the blocking-only role above.
-      it "refuses an all-regulative module as DMN (empty model after the population filter)" $
-        expectFail bin ["export", "dmn", exportTwoRulesFixture]
+      --
+      -- The refusal says WHY (smucclaw/l4-ide#1104): the module has DECIDEs,
+      -- so "no DECIDE or MEANS" would be false, and --include-tests would not
+      -- bring a regulative rule back, so it must not be offered.
+      it "refuses an all-regulative module as DMN (empty model after the population filter)" $ do
+        Output code _ serr <- runL4 bin ["export", "dmn", exportTwoRulesFixture]
+        code `shouldSatisfy` (/= ExitSuccess)
+        serr `shouldSatisfy` ("every decision in this module was left out" `isInfixOf`)
+        serr `shouldSatisfy` ("`the filing`, `the fee`: left out as regulative rules" `isInfixOf`)
+        serr `shouldSatisfy` ("l4 export bpmn" `isInfixOf`)
+        serr `shouldSatisfy` (not . ("--include-tests" `isInfixOf`))
+        serr `shouldSatisfy` (not . ("No decisions found" `isInfixOf`))
+
+      -- smucclaw/l4-ide#1104: a module whose decisions are all test
+      -- scaffolding is refused with the reason, the names, and the flag
+      -- that puts them back, and the flag does put them back.
+      it "refuses an all-scaffolding module by naming the scaffolding and --include-tests" $ do
+        Output code _ serr <- runL4 bin ["export", "dmn", exportScaffoldingFixture]
+        code `shouldSatisfy` (/= ExitSuccess)
+        serr `shouldSatisfy`
+          ("`sample prices`, `price with tax`: left out as test scaffolding" `isInfixOf`)
+        serr `shouldSatisfy` ("Pass --include-tests to export them." `isInfixOf`)
+        serr `shouldSatisfy` (not . ("No decisions found" `isInfixOf`))
+        Output code' sout' _ <- runL4 bin ["export", "dmn", "--include-tests", exportScaffoldingFixture]
+        code' `shouldBe` ExitSuccess
+        sout' `shouldSatisfy` ("id=\"decision_sample_prices\"" `isInfixOf`)
+        sout' `shouldSatisfy` ("id=\"decision_price_with_tax\"" `isInfixOf`)
+
+      it "names each reason separately when scaffolding sits beside an uncalled duty" $ do
+        Output code _ serr <- runL4 bin ["export", "dmn", exportScaffoldingDutyFixture]
+        code `shouldSatisfy` (/= ExitSuccess)
+        serr `shouldSatisfy`
+          ("`sample amounts`: left out as test scaffolding" `isInfixOf`)
+        serr `shouldSatisfy` ("`the payment`: left out as regulative rules" `isInfixOf`)
+        -- the flag is offered on the scaffolding line, and only there
+        let flagLines = [l | l <- lines serr, "--include-tests" `isInfixOf` l]
+        flagLines `shouldSatisfy` all ("`sample amounts`" `isInfixOf`)
+        length flagLines `shouldBe` 1
 
     -- FIXTURE(d)'s importer view must see a BACKTICKED import. A hyphenated
     -- module name can only be imported as IMPORT `interp-common`, and the
@@ -608,6 +651,9 @@ spec bin = do
       Output code _ serr <- runL4 bin ["export", "dmn", exportNothingFixture]
       code `shouldSatisfy` (/= ExitSuccess)
       serr `shouldSatisfy` ("No decisions found" `isInfixOf`)
+      -- the wording for a module that really has no DECIDE or MEANS is
+      -- unchanged, and says nothing about a filter that did not run
+      serr `shouldSatisfy` (not . ("--include-tests" `isInfixOf`))
 
     it "refuses to guess which process to draw, and names the candidates" $ do
       -- renderBpmn writes its own XML prolog, so two processes concatenated is

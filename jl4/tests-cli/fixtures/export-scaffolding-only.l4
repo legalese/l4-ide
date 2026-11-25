@@ -1,0 +1,17 @@
+-- Fixture for `l4 export dmn`'s empty-model refusal (smucclaw/l4-ide#1104).
+--
+-- The module has one MEANS and one DECIDE, and the population filter (spec
+-- §2.5.6) leaves both out: `sample prices` is referenced only from the
+-- #ASSERT, and `price with tax` only from that test scaffolding. The refusal
+-- must say so, name both, and point at --include-tests, which puts them back;
+-- it must not say the module has no DECIDE or MEANS.
+
+IMPORT prelude
+
+`sample prices` MEANS LIST 10, 20
+
+GIVEN p IS A NUMBER
+GIVETH A NUMBER
+DECIDE `price with tax` p IS p TIMES 1.1
+
+#ASSERT count (map `price with tax` `sample prices`) EQUALS 2

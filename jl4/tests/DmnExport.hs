@@ -2737,6 +2737,15 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
         [n.code | n <- notes, n.element == "the fixture-shaped rebind"]
           `shouldBe` ["D-RULEDATE-UNBOUND"]
 
+      -- smucclaw/l4-ide#1104: 'drgOmitted' is the data the CLI's empty-model
+      -- refusal reads, so it must name exactly the decides the population
+      -- notes name, each with its own reason.
+      it "records every population drop in drgOmitted, with the reason the note gives" $ do
+        drg <- rebindDrg
+        let unbound = [n.element | n <- (dmnReport drg).notes, n.code == "D-RULEDATE-UNBOUND"]
+        [n | (n, DroppedRuleDateRebind) <- drg.drgOmitted] `shouldBe` unbound
+        length drg.drgOmitted `shouldBe` 3
+
       it "still drops on --include-tests: the gate is structural, not test-ness" $ do
         src <- Text.readFile (examplesRoot </> "dmn" </> "not-ok" </> "ruledate-rebind.l4")
         let drg = drgAdjusted (\o -> o { dloIncludeTests = True }) src
@@ -3998,7 +4007,7 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
     let testDrg ns = MkDrg
           { drgId = "definitions_t", drgName = "t"
           , drgNamespace = "ns", drgFlavor = FlavorCamunda
-          , drgItemDefs = [], drgNodes = ns, drgNotes = []
+          , drgItemDefs = [], drgNodes = ns, drgNotes = [], drgOmitted = []
           }
         lit frag t = LogicLiteral (MkFeelExpr t frag)
         bkmNode nm krs body = NodeBkm MkBkm

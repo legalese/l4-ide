@@ -3600,6 +3600,11 @@ lowerModule opts modul@(MkModule _ uri _) =
                        <> concatMap snd lowered
                        <> phase4Notes
                        <> serviceNotes
+    , drgOmitted   =
+        [ (decideName d, reason)
+        | d <- allDecides
+        , Just reason <- [Map.lookup (getUnique (decideResolved d)) popVerdict.pvDropped]
+        ]
     }
  where
   modelId = sanitiseId opts.dloModelName

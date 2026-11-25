@@ -85,6 +85,17 @@ By default DMN's population filter omits decisions that are only test scaffoldin
 directive arguments with no real callers. Emitting a fixture as a `<decision>` would misdescribe
 the rule set, so you must ask for it with `--include-tests`.
 
+The filter also leaves out a regulative rule that no decision calls, which belongs to the BPMN export, and a rule that evaluates under its own rule date (`EVAL UNDER RULES EFFECTIVE AT`), which a DMN model cannot express.
+When it leaves out every decision in the file, `l4 export dmn` exits 1 and lists what it left out under each reason:
+
+```
+No decisions to export: every decision in this module was left out of the DMN model.
+  - `sample prices`, `price with tax`: left out as test scaffolding, because each is used only by directives such as #EVAL and #ASSERT, or by other test scaffolding. Pass --include-tests to export them.
+```
+
+`--include-tests` is offered only for the scaffolding; it does not bring back the other two kinds.
+A file with no `DECIDE` or `MEANS` at all gets a one-line refusal saying so.
+
 ## What doesn't survive
 
 Both emit a **fidelity report**, and reading it is not optional. `Blocking` notes here usually

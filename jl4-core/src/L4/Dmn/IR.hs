@@ -65,6 +65,7 @@ module L4.Dmn.IR
   , dmnFlavorName
     -- * The decision requirements graph
   , Drg (..)
+  , DropReason (..)
   , DrgNode (..)
   , Decision (..)
   , DecisionLogic (..)
@@ -1009,7 +1010,27 @@ data Drg = MkDrg
     -- unlike a base definition one with no referrer says nothing.
   , drgNodes     :: ![DrgNode]
   , drgNotes     :: ![FidelityNote]  -- ^ module-level notes; per-table ones live on the table
+  , drgOmitted   :: ![(Text, DropReason)]
+    -- ^ the L4 name of every decide the population filter (§2.5.6) left out
+    -- of the model, in source order, with the reason. These are the facts the
+    -- population notes (@D-FIXTURE@, @D-REGULATIVE@, @D-RULEDATE-UNBOUND@)
+    -- report, kept as data so that a caller that finds 'drgDecisions' empty
+    -- can say WHY without reading a note's message (smucclaw/l4-ide#1104).
+    -- Matching note text would be wrong as well as fragile: one form of
+    -- @D-FIXTURE@ reports a decision that was KEPT.
   }
+  deriving stock (Eq, Show, Generic)
+
+-- | Why the population filter (spec §2.5.6) left a decide out of the model.
+--
+-- Computed by "L4.Dmn.Analysis" ('L4.Dmn.Analysis.classifyPopulation', which
+-- re-exports it) and defined here because the 'Drg' carries it in
+-- 'drgOmitted'.
+data DropReason
+  = DroppedFixture        -- ^ satisfied @FIXTURE(a)–(d)@
+  | DroppedFixtureHelper  -- ^ in the fixture-side transitive closure
+  | DroppedRegulative     -- ^ uncalled regulative body
+  | DroppedRuleDateRebind -- ^ rebinds law time (@EVAL UNDER RULES EFFECTIVE AT@), §15.12
   deriving stock (Eq, Show, Generic)
 
 drgDecisions :: Drg -> [Decision]
