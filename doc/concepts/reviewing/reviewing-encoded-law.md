@@ -106,6 +106,9 @@ Each row of a `BRANCH`, and the `ELSE` of an `IF`, also carries “none of the r
 Nothing inside an alternative is judged against the negations of the alternatives beside it, so what only those make redundant goes unreported too: the `a`, or the `NOT a`, of `(a AND b) OR ((NOT a) AND b)`, which means just `b`, and the `c AND d` of `d OR (a AND (b OR (c AND d)))`, which can hold only where `d` has already let the case through.
 An alternative that can never hold is reported only where the rewritten rule keeps a part of it that is a dead branch there, so in `b OR (a AND c AND (NOT a))` the second alternative, which can never hold, goes unreported, and the rule gets no finding.
 The other findings name a place in the rewritten rule, such as `body.and[1].or[0]`, which need not appear in the source as written, and so does a vacuous guard that is a scope nobody can be in; these carry no line and column.
+For anyone reading the JSON report, that is a change: a finding's `site` is now a place in one of two drawings of the rule, and only the presence of `writtenAt` tells which.
+A finding with a `writtenAt` has its `site` in the rule as written; one without has it in the rewritten rule, which is where every `site` was until vacuous guards were looked for in the rule as written.
+The same `site` can name different conditions in the two: for `p AND (p OR c)`, where `p` means `a AND b`, `body.and[2]` is `(p OR c)` as written, and the clause `a OR c` in the rewritten rule.
 
 A rule that calls another rule is read through to what that rule means, in the same file or an imported one. So if an encoding writes an exception as its own rule and the offence calls it as a defeater, asking for both at once is reported as a contradiction, not passed over. Findings are still reported at the sites of the rule you are looking at; the called rule has its own entry. A call whose meaning is too large to draw stays opaque, and the report names it.
 
