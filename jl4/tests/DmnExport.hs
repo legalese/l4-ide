@@ -3881,6 +3881,13 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       "min x y" `lowersTo` "min(x, y)"
       "max x 1" `lowersTo` "max(x, 1)"
 
+    -- EMPTY is FEEL's empty list, never the string "EMPTY": FEEL reads a
+    -- non-list argument as a list of one, so count("EMPTY") answered 1 where
+    -- `count EMPTY` is 0 in L4.
+    it "renders EMPTY under count and sum as the empty list" $ do
+      "count EMPTY" `lowersTo` "count([])"
+      "sum EMPTY" `lowersTo` "sum(concatenate([0], []))"
+
     -- The prelude's MAYBE NUMBER min and max skip a NOTHING; FEEL's do not
     -- mean that, so the oracle gate must refuse them.
     it "refuses the prelude's MAYBE NUMBER min and max" $ do
@@ -3912,6 +3919,38 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
             \`answer` xs x MEANS sum xs PLUS min x 1\n"
       (answerOf src).feText `shouldSatisfy` \t ->
         not (Text.isInfixOf "concatenate" t) && not (Text.isInfixOf "min(x, 1)" t)
+
+  -- EMPTY, the empty list. The typechecker stamps it a constructor like any
+  -- other, so it used to become the string constant "EMPTY" wherever a
+  -- constructor does, a wrong answer in every position: `count EMPTY` as
+  -- count("EMPTY"), `xs EQUALS EMPTY` as xs = "EMPTY", and a WHEN EMPTY clause
+  -- as an input entry "EMPTY" that no list equals. It is FEEL's `[]` in an
+  -- expression, and never a cell, whose simple values have no list form.
+  describe "EMPTY, the empty list" $ do
+    let literalNamed nm src = case (decisionNamed nm (drgOf src)).dcnLogic of
+          LogicLiteral x -> x
+          _              -> error ("expected a boxed literal for " <> show nm)
+
+    it "renders a constant defined as EMPTY, and an equality test against it, as FEEL's []" $ do
+      let src =
+            "GIVETH A LIST OF NUMBER\n\
+            \`no amounts` MEANS EMPTY\n\
+            \GIVEN xs IS A LIST OF NUMBER\n\
+            \GIVETH A BOOLEAN\n\
+            \DECIDE `is empty` xs IS xs EQUALS EMPTY\n"
+      (literalNamed "no amounts" src).feText `shouldBe` "[]"
+      (literalNamed "is empty" src).feText `shouldBe` "xs = []"
+
+    it "makes a WHEN EMPTY clause a boolean column, never an input entry of EMPTY or []" $ do
+      let src =
+            "GIVEN list IS A LIST OF NUMBER\n\
+            \GIVETH A STRING\n\
+            \DECIDE `size of` EMPTY IS \"none\"\n\
+            \DECIDE `size of` (x FOLLOWED BY xs) IS \"some\"\n"
+          xml = emitDrg (drgOf src)
+      xml `shouldSatisfy` (not . Text.isInfixOf "\"EMPTY\"")
+      xml `shouldSatisfy` (not . Text.isInfixOf "<text>[]</text>")
+      xml `shouldSatisfy` Text.isInfixOf "list_ = []"
 
   -- smucclaw/l4-ide#1102. The export writes one file and no DMN import, so a
   -- reference to a value from another module names nothing in the model: KIE

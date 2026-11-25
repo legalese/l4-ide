@@ -164,6 +164,10 @@ exportImportedPartialFixture = fixtureDir </> "export-imported-partial.l4"
 -- A constant read from an imported module that does not type-check.
 exportImportedUncheckedFixture :: FilePath
 exportImportedUncheckedFixture = fixtureDir </> "export-imported-unchecked.l4"
+-- EMPTY, the empty list, read by count, sum and an equality test.
+exportEmptyListFixture, exportEmptyListCases :: FilePath
+exportEmptyListFixture = fixtureDir </> "export-empty-list.l4"
+exportEmptyListCases   = fixtureDir </> "export-empty-list.cases.json"
 exportAdvisoryOnlyFixture = fixtureDir </> "export-advisory-only.l4"
 
 -- The FIXTURE(d) backticked-import pair: a HYPHENATED module beside a sibling
@@ -646,6 +650,16 @@ spec bin = do
         serr `shouldSatisfy` ("[D-PARTIAL] blocking — decision_first_of_nothing" `isInfixOf`)
         serr `shouldSatisfy` ("[D-PARTIAL] blocking — decision_g2" `isInfixOf`)
         serr `shouldSatisfy` ("the checker reports this CONSIDER non-exhaustive" `isInfixOf`)
+
+      -- EMPTY is FEEL's empty list. It used to be written as the string
+      -- "EMPTY", which FEEL reads as a list of one under count, and which no
+      -- list equals.
+      it "writes EMPTY as FEEL's empty list, never the string \"EMPTY\"" $ do
+        Output code sout _ <- runL4 bin ["export", "dmn", exportEmptyListFixture]
+        code `shouldBe` ExitSuccess
+        sout `shouldSatisfy` (not . ("\"EMPTY\"" `isInfixOf`))
+        sout `shouldSatisfy` ("h + count([])" `isInfixOf`)
+        sout `shouldSatisfy` ("xs = []" `isInfixOf`)
 
       -- `l4 check` refuses the importer of a module with errors, so a constant
       -- from one is no value L4 has: it is refused, not copied.
@@ -1294,6 +1308,35 @@ spec bin = do
         dmn [dmn, "--cases", exportImportedConstantCases] \out -> do
           out `shouldSatisfy` ("1 parsed, 0 error(s)" `isInfixOf`)
           out `shouldSatisfy` ("21/21 value(s) as expected" `isInfixOf`)
+
+  -- EMPTY, the empty list. Before it was FEEL's [], KIE answered 0 of these
+  -- 10 values as expected (count("EMPTY") is 1, the prelude's sum of it fails, and
+  -- xs = "EMPTY" is null), and Camunda answered null for every decision but
+  -- `no amounts`, which it answered with the string.
+  describe "EMPTY as the empty list (opt-in: L4_DMN_ENGINE_CHECK=1)" $ do
+    let exported = do
+          tmp <- getTemporaryDirectory
+          let outDir  = tmp </> "l4-export-empty-list"
+              outFile = outDir </> "export-empty-list.dmn"
+          removePathForcibly outDir
+          createDirectoryIfMissing True outDir
+          Output code _ serr <- runL4 bin ["export", "dmn", exportEmptyListFixture, "-o", outFile]
+          unless (code == ExitSuccess) $
+            expectationFailure ("l4 export dmn failed:\n" ++ serr)
+          pure outFile
+    it "KIE answers count, sum and an equality test over EMPTY as L4 does" $ do
+      dmn <- exported
+      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustPass
+        dmn [dmn, "--cases", exportEmptyListCases] \out -> do
+          out `shouldSatisfy` ("2 case(s), 0 error(s), 0 warning(s)" `isInfixOf`)
+          out `shouldSatisfy` ("10/10 value(s) as expected" `isInfixOf`)
+
+    it "Camunda answers count, sum and an equality test over EMPTY as L4 does" $ do
+      dmn <- exported
+      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustPass
+        dmn [dmn, "--cases", exportEmptyListCases] \out -> do
+          out `shouldSatisfy` ("1 parsed, 0 error(s)" `isInfixOf`)
+          out `shouldSatisfy` ("10/10 value(s) as expected" `isInfixOf`)
 
   -- The placement rule's NEGATIVE control (spec §4.3, §9). Everything else in
   -- this file asserts that a gate stays green, which on its own says nothing

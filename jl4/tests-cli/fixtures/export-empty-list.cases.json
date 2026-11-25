@@ -1,0 +1,26 @@
+{
+  "cases": [
+    {
+      "name": "an empty list",
+      "context": { "h": 1, "xs": [] },
+      "expect": {
+        "no_amounts": [],
+        "h_plus_how_many": 1,
+        "h_plus_how_much": 1,
+        "h_plus_none": 1,
+        "is_empty": true
+      }
+    },
+    {
+      "name": "a list of one",
+      "context": { "h": 2, "xs": [3] },
+      "expect": {
+        "no_amounts": [],
+        "h_plus_how_many": 2,
+        "h_plus_how_much": 2,
+        "h_plus_none": 2,
+        "is_empty": false
+      }
+    }
+  ]
+}

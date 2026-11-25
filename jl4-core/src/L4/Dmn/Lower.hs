@@ -1165,6 +1165,17 @@ constantRefIn ctors r
   | u == TC.trueUnique    = Just (VBool True)
   | u == TC.falseUnique   = Just (VBool False)
   | isBuiltinSumCon r     = Nothing
+  -- EMPTY, the empty list. The typechecker stamps it @Constructor@ like any
+  -- other, so 'isConstantRef' used to make it the string constant @"EMPTY"@:
+  -- @count EMPTY@ exported as @count("EMPTY")@, which is 1 in FEEL where L4
+  -- says 0, and a @WHEN EMPTY@ arm as an input entry @"EMPTY"@, which no list
+  -- equals. It has no simple value: FEEL's @[]@ is a list, and S-FEEL's
+  -- simple literals are numbers, strings, booleans and dates only (DMN 1.3
+  -- grammar rule 33), so it can never be a cell endpoint. 'renderFeelIn'
+  -- renders it @[]@ in an expression, where @xs = []@ is FEEL's list
+  -- equality, and a test of it becomes its own boolean column (see
+  -- 'fallbackCell'), never an input entry.
+  | u == TC.emptyUnique   = Nothing
   | isConstantRef ctors r = Just (VStr (nameOf r))
   | otherwise             = Nothing
  where
@@ -1975,6 +1986,12 @@ renderFeelIn names ctors oracle top = let (_, txt, frag) = go top in MkFeelExpr 
     -- R8-d′. Refused here, the expression falls through to 'verbatim' and the
     -- refusal stays loud.
     App _ r [] | getUnique r == TC.nothingUnique, flatMaybe e -> (atomPrec, "null", FullFeel)
+               -- EMPTY is FEEL's empty list. 'FullFeel', never 'SFeel', for
+               -- the reason NOTHING's `null` is: a list is not a simple
+               -- literal (grammar rule 33), so it must not reach a cell
+               -- endpoint. 'constantRefIn' refuses it a 'FeelValue' for the
+               -- same reason.
+               | getUnique r == TC.emptyUnique                -> (atomPrec, "[]", FullFeel)
                | isBuiltinSumCon r                            -> verbatim e
                -- A BARE reference to an emitted BKM (§6.3-2): a BKM is an
                -- invocable, not a variable, and its FEEL name no longer names

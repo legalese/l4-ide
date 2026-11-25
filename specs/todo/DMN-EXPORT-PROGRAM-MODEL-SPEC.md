@@ -6310,6 +6310,12 @@ These functions are lowered anyway, with no note for it, because the alternative
 The difference is stated on `doc/exports/dmn-bpmn.md`.
 A Lossy note on a rounding function whose argument contains a division would be the narrow repair; it is not built.
 
+**`EMPTY` is FEEL's `[]`.** Found by the review of #1103's `count` and `sum`, and older than either: `EMPTY` is stamped `Constructor` by the typechecker like any user constructor, so `constantRefIn` made it the string constant `"EMPTY"` in every position.
+`count EMPTY` exported as `count("EMPTY")`, which FEEL reads as a list of one, `xs EQUALS EMPTY` as `xs = "EMPTY"`, and a `WHEN EMPTY` clause as an input entry `"EMPTY"` that no list equals.
+Measured on `jl4/tests-cli/fixtures/export-empty-list.l4` (`count`, `sum` and an equality test over `EMPTY`) on the build before the change: KIE `0/10 value(s) as expected` (`count` answered 1 more than L4, the prelude's `sum` FAILED, the equality null) and Camunda null for every decision but the constant itself; after it, `10/10` on both.
+`constantRefIn` now gives `EMPTY` no `FeelValue`, and `renderFeelIn` renders it `[]`, tagged `FullFeel` as `NOTHING`'s `null` is, because grammar rule 33's simple literals have no list, so `[]` must never reach a cell endpoint.
+A test against `EMPTY` in a table therefore falls to `fallbackCell`, a boolean column holding the whole test (`list_ = []`) with a `true` entry, rather than an input entry; that choice, over refusing such a row, is decided by Claude 2026-11-26, pending Meng's review.
+
 ## 18. Values read from an imported module — smucclaw/l4-ide#1102, 2026-11-25
 
 The exporter writes one `<definitions>` per module and emits no DMN `<import>` (§2.5.7's "module-local, for v1").
