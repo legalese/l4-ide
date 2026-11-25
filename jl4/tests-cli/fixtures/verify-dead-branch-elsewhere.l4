@@ -48,3 +48,13 @@ GIVEN a IS A BOOLEAN, b IS A BOOLEAN, c IS A BOOLEAN
 GIVETH A BOOLEAN
 DECIDE `the dead branch is the call under the NOT` a b c IF
     a AND NOT ((`either` a b) AND c)
+
+-- Two NOTs cancel, so a condition under two is a conjunct again. The `a` of
+-- `a AND b`, under one NOT, is the dead branch `NOT a`, read the other way
+-- round, and is reported as that alone. The `a` of `a AND c`, under two, is
+-- redundant beside the first `a`, as that one is beside it, and both are
+-- reported: the dead branch means the negation of each, but is neither.
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN, c IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `a condition under two NOTs` a b c IF
+    a AND (NOT (a AND b)) AND (NOT (NOT (a AND c)))

@@ -6915,8 +6915,11 @@ spec bin = do
     -- failed on that build. unstable reports the first and the third, at the
     -- normal form's clauses, and not the fourth. The first needs either
     -- bound, the third the bound on atoms and the fourth the bound on the
-    -- part. The second and the last are the controls: the dead branch is the
-    -- condition's own, and is reported alone.
+    -- part. The second and the fifth are the controls: the dead branch is the
+    -- condition's own, and is reported alone. The sixth needs the NOTs
+    -- counted: under two, a condition is not read the other way round, and
+    -- leaving it out under any number of NOTs lost its `a`
+    -- (`body.and[2].not.not.and[0]`); this test failed on that build.
     it "reports a condition under a NOT that a dead branch elsewhere in the rule means" $ do
       env <- jsonEnvelope bin ["verify", verifyDeadBranchElsewhereFixture, "--format", "json"]
       let found = findingSitesByDecision env
@@ -6932,13 +6935,15 @@ spec bin = do
         `shouldBe` Just [dead "body.requirement.and[1].or[0]", guard "body.scope.or[0].and[1].not.and[0]"]
       lookup "`the dead branch is the call under the NOT`" found
         `shouldBe` Just [dead "body.and[1].or[0]"]
+      lookup "`a condition under two NOTs`" found
+        `shouldBe` Just [dead "body.and[1].or[0]", guard "body.and[0]", guard "body.and[2].not.not.and[0]"]
       lookup "either" found `shouldBe` Just []
       [ (round line, round col) :: (Int, Int)
         | (_, f) <- findingObjectsByDecision env
         , Just w <- [objField f "writtenAt"]
         , Just (Number line) <- [objField w "line"]
         , Just (Number col) <- [objField w "column"] ]
-        `shouldBe` [(20, 66), (26, 42), (33, 24), (43, 18)]
+        `shouldBe` [(20, 66), (26, 42), (33, 24), (43, 18), (60, 5), (60, 42)]
 
     -- A local definition used more than once. `both qualify` and `either
     -- qualifies` get a finding nothing in them deserves, at the `c` each use
