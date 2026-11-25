@@ -1,0 +1,44 @@
+-- Review of smucclaw/l4-ide#1107: explore-property-readers/with.l4 with the
+-- ledger reader `is taken` in an imported file (readers.l4). The property
+-- reads a ledger through it, so `--always "never taken"` refuses it
+-- (exit 1); on unstable it held in every state, exit 0.
+
+IMPORT prelude
+IMPORT readers
+
+DECLARE Actor IS ONE OF Bob
+DECLARE Mode IS ONE OF peek, skip
+DECLARE Act IS ONE OF
+    go HAS mode IS A Mode
+    buy
+
+GIVETH A BOOLEAN
+`taken now` MEANS `is taken` FALSE
+
+GIVETH A DEONTIC Actor Act
+`shop` MEANS
+    PARTY Bob
+    MAY buy PROVIDED NOT `taken now`
+    WITHIN 10
+    HENCE COMMIT `taken` IS TRUE HENCE `shop`
+    LEST FULFILLED
+
+GIVETH A DEONTIC Actor Act
+`start` MEANS
+    PARTY Bob
+    MAY go m
+    WITHIN 10
+    HENCE COMMIT `taken` IS (IF m EQUALS peek THEN NOT `taken now` ELSE TRUE) HENCE `shop`
+    LEST FULFILLED
+
+#TRACE `start` AT 0 WITH
+    PARTY Bob DOES go peek AT 1
+    PARTY Bob DOES buy AT 2
+
+#TRACE `start` AT 0 WITH
+    PARTY Bob DOES go skip AT 1
+    PARTY Bob DOES buy AT 2
+
+GIVEN taken IS A MAYBE BOOLEAN
+GIVETH A BOOLEAN
+`never taken` taken MEANS NOT (`is taken` WITH dflt IS FALSE)

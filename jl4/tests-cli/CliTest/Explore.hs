@@ -56,6 +56,11 @@ keptAnswers = "tests-cli" </> "fixtures" </> "explore-kept-answers"
 imported :: FilePath
 imported = "tests-cli" </> "fixtures" </> "explore-imported"
 
+-- | Review of smucclaw/l4-ide#1107: properties that read a ledger through a
+-- rule, called three ways.
+propertyReaders :: FilePath
+propertyReaders = "tests-cli" </> "fixtures" </> "explore-property-readers"
+
 -- | Review of smucclaw/l4-ide#1107: acts the what-if cannot replay.
 actions :: FilePath
 actions = "tests-cli" </> "fixtures" </> "explore-actions"
@@ -68,7 +73,8 @@ fixtures =
   <> [ sections </> f | f <- ["sectioned.l4", "two-sections.l4"] ]
   <> [ deadlines </> f | f <- ["shapes.l4", "given.l4", "carried.l4", "armed.l4", "ledger.l4", "called.l4", "section-given.l4", "section-reader.l4", "clock.l4", "locals.l4", "slow.l4", "dated.l4"] ]
   <> [ keptAnswers </> f | f <- ["positional.l4", "named.l4", "genitive.l4", "wrapper.l4"] ]
-  <> [ imported </> f | f <- ["readers.l4", "deadlines.l4", "kept.l4"] ]
+  <> [ imported </> f | f <- ["readers.l4", "deadlines.l4", "kept.l4", "property.l4"] ]
+  <> [ propertyReaders </> f | f <- ["positional.l4", "with.l4", "genitive.l4"] ]
   <> [ actions </> f | f <- ["section-given.l4", "section-party.l4", "local-function.l4"] ]
 
 -- | The acceptance run of the fixtures' README: the clock bounded at
@@ -1041,6 +1047,15 @@ spec bin = describe "l4 explore" $ do
         out `shouldSatisfy` ("start, explored from its outset at 0: 5 states, 8 transitions" `isInfixOf`)
         out `shouldSatisfy` ("  s0 -> s2  PARTY Bob DOES go OF skip" `isInfixOf`)
         out `shouldSatisfy` ("1 act passed over" `isInfixOf`)
+
+    let readsItself = "--always never taken: `never taken` reads a ledger itself (a RECALL in it, or in a rule it names); a property is evaluated outside any run"
+    forM_ ([ (propertyReaders </> f, "explore-property-readers/" <> f) | f <- ["positional.l4", "with.l4", "genitive.l4"] ]
+           <> [ (imported </> "property.l4", "explore-imported/property.l4") ]) \ (path, f) ->
+      it (f <> ": a property that reads a ledger through a rule is refused however it calls the rule") $ do
+        Output code out err <- runL4 bin ["explore", path, "--contract", "start", "--always", "never taken"]
+        code `shouldBe` ExitFailure 1
+        (out <> err) `shouldSatisfy` (readsItself `isInfixOf`)
+        (out <> err) `shouldNotSatisfy` ("holds in every one" `isInfixOf`)
 
     it "explore-imported/kept.l4: a constant that calls an imported ledger reader is keyed too" $ do
       Output code out _ <- runL4 bin ["explore", imported </> "kept.l4", "--contract", "start"]

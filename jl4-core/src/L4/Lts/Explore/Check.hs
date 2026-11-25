@@ -131,7 +131,7 @@ import L4.EvaluateLazy
   )
 import L4.EvaluateLazy.Machine (pattern ValBool)
 import L4.Lts.Explore
-import L4.Lts.WhatIf (Position (..), Rig (..), reifyRef, reifyValue)
+import L4.Lts.WhatIf (Position (..), Rig (..), namesIn, reifyRef, reifyValue)
 import L4.Print (prettyLayout)
 import L4.Syntax
 import qualified L4.TypeCheck as TypeCheck
@@ -316,20 +316,21 @@ decisionOf info modules u n = do
     writes = [ cell | Record _ _ cell _ _ _ <- everyExpr ]
     written = Set.fromList [ s | Lit _ (StringLit _ s) <- writes ]
     writesKnown = all (\ case Lit _ (StringLit _ _) -> True; _ -> False) writes
-    -- the rules of every module that read a ledger, directly or by naming
-    -- one that does (as 'readSitesOf' finds them for one module)
+    -- the rules of every module, the file's and those it imports, that read
+    -- a ledger, directly or by naming one that does, however it is spelt
+    -- ('namesIn', every name at every node, as 'readSitesOf' follows them).
+    -- On unstable only variables and positional calls were followed, so a
+    -- property that called its reader with WITH or as a genitive was not
+    -- refused, and was evaluated outside a run, where the RECALL reads
+    -- nothing: `--always` said it held in every state (measured 2026-11-25,
+    -- explore-property-readers/).
     topDecides =
-      [ (getUnique name, body)
+      [ (getUnique name, body, Set.fromList (map getUnique (namesIn body)))
       | MkModule _ _ section <- modules
       , MkDecide _ _ (MkAppForm _ name _ _) body <- decidesOf section ]
-    readers = fixpoint (Set.fromList [ u' | (u', body) <- topDecides, not (null [ () | ReadCell {} <- subExprsIn body ]) ])
-    refsOf body = Set.fromList (concat [ heads e | e <- subExprsIn body ])
-    heads = \ case
-      Var _ r   -> [getUnique r]
-      App _ r _ -> [getUnique r]
-      _         -> []
+    readers = fixpoint (Set.fromList [ u' | (u', body, _) <- topDecides, not (null [ () | ReadCell {} <- subExprsIn body ]) ])
     fixpoint s =
-      let s' = s <> Set.fromList [ u' | (u', body) <- topDecides, not (Set.disjoint (refsOf body) s) ]
+      let s' = s <> Set.fromList [ u' | (u', _, refs) <- topDecides, not (Set.disjoint refs s) ]
       in if s' == s then s else fixpoint s'
 
 exprsIn :: Module Resolved -> [Expr Resolved]
