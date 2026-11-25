@@ -829,15 +829,46 @@ data ModuleReads = MkModuleReads
     -- ^ every section @GIVEN@ of the module ("L4.Discharge".'sectionBinders')
   , mrRules         :: Map Unique RunRead
     -- ^ 'runReadRules'
+  , mrLocals        :: Map Unique Text
+    -- ^ what each name the module binds locally is, for a reason: 'localKinds'
   }
 
 noModuleReads :: ModuleReads
-noModuleReads = MkModuleReads {mrSectionGivens = Set.empty, mrRules = Map.empty}
+noModuleReads = MkModuleReads {mrSectionGivens = Set.empty, mrRules = Map.empty, mrLocals = Map.empty}
 
 moduleReads :: Module Resolved -> ModuleReads
-moduleReads m = MkModuleReads {mrSectionGivens = givens, mrRules = runReadRules givens m}
+moduleReads m = MkModuleReads
+  { mrSectionGivens = givens
+  , mrRules = runReadRules givens m
+  , mrLocals = localKinds m }
   where
     givens = Map.keysSet (sectionBinders m)
+
+-- | What each name the module binds locally is, in the words of the reason a
+-- deadline that reads it is given ('closedDeadline'): an input of a rule (a
+-- @GIVEN@, of a rule or of a definition under a @WHERE@), a name a @WHERE@ or
+-- a @LET@ defines, or a value an event carried (bound by the act an
+-- obligation names, @PARTY Alice MUST Pay n@). A name bound any other way (a
+-- lambda's input, a @CONSIDER@ pattern) is not here, and the reason calls it
+-- a name local to the rule. (Until review of smucclaw/l4-ide#1107 every one of
+-- them was "an input of the rule, or a name local to it".)
+localKinds :: Module Resolved -> Map Unique Text
+localKinds m = Map.fromList (events <> definitions <> inputs)
+  where
+    everywhere :: forall a. Optics.GPlate a a => [a] -> [a]
+    everywhere = concatMap (Optics.toListOf (Optics.cosmosOf (Optics.gplate @a)))
+    decides = everywhere (Optics.toListOf (Optics.gplate @(Decide Resolved)) m)
+    inputs =
+      [ (getUnique n, "an input of the rule")
+      | MkDecide _ (MkTypeSig _ (MkGivenSig _ otns) _) (MkAppForm _ _ args _) _ <- decides
+      , n <- [ o | MkOptionallyTypedName _ o _ _ <- otns ] <> args ]
+    definitions =
+      [ (getUnique n, "a name the rule defines with WHERE or LET")
+      | LocalDecide _ (MkDecide _ _ (MkAppForm _ n _ _) _) <- everywhere (Optics.toListOf (Optics.gplate @(LocalDecl Resolved)) m) ]
+    events =
+      [ (getUnique n, "a value an event carried")
+      | act <- everywhere (Optics.toListOf (Optics.gplate @(RAction Resolved)) m)
+      , PatVar _ n <- Optics.toListOf (Optics.cosmosOf (Optics.gplate @(Pattern Resolved))) act.action ]
 
 -- | What an expression itself reads that a run supplies, in the order met:
 -- first what a construct of its own reads (a @RECALL@, a @FETCH@, an @ENV@, a
@@ -943,7 +974,7 @@ closedDeadline eval known pos raw what e = do
   case e' of
     Lit _ (NumericLit _ r) -> pure (Right (ValNumber r))
     _ | (v : _) <- openRefs pos.posReplayScope raw.roEnv e' ->
-          pure (Left (what <> " reads " <> quoted v <> ", which the contract has not worked out yet (an input of the rule, or a name local to it), so its deadline is not known here"))
+          pure (Left (what <> " reads " <> quoted v <> ", " <> Map.findWithDefault "a name local to the rule" (getUnique v) known.mrLocals <> ", which the contract has not worked out yet, so its deadline is not known here"))
       | not (null [ () | Lifecycle {} <- subExprs e' ]) ->
           pure (Left (what <> " is not a literal, so its deadline is not known here"))
       -- a rule first, so that the reason names what the rule wrote: after
