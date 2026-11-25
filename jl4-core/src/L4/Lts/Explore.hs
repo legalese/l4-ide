@@ -941,9 +941,12 @@ liveDeadlines ex pos = for (obligationsOf pos) \ raw -> case raw.roDue of
 -- exploration under the expression's printed form and the names it refers
 -- to. An evaluation stopped at a limit raises 'LimitStopped' rather than
 -- answer: a deadline read as unknown would leave its tick out, and the graph
--- would be missing positions with nothing to say so. Any other failure (a
--- division by zero) is the reason the deadline is not known, and the tick is
--- listed as untried with it.
+-- would be missing positions with nothing to say so. The 2026-11-21 budget
+-- ruling had that for an anchor; that a stop working out a @WITHIN@ refuses
+-- the exploration too is decided by Claude 2026-11-25, pending Meng's review
+-- (@l4 lts@ lists the same stop as the reason, and exits 0). Any other
+-- failure (a division by zero) is the reason the deadline is not known, and
+-- the tick is listed as untried with it.
 exploreClosed :: Rig -> IORef (Map (Text, [Unique]) (Either Text (Value NF))) -> Closed
 exploreClosed rig cache = (closedIn rig) {clEval = Just evalCached}
   where

@@ -77,6 +77,10 @@ The routes exist in the long form only, because a short `/{id}/instances` would 
 | `POST` | `/deployments/{id}/instances/{name}/events`   | Proposes an act. The body has `party`, `action` and `idempotencyKey`, and optionally `decidedAgainst`, `strict`, `cells` and `claimedAt`.         |
 | `GET`  | `/deployments/{id}/instances/{name}/position` | Says the head, whether the contract is finished, the next deadline, and what is owed, would discharge, or would breach, in the words of `l4 lts`. |
 
+The position differs from `l4 lts` in one place.
+A deadline written as a name or as arithmetic (`` WITHIN `ten days` ``, `WITHIN 5 PLUS 5`), which `l4 lts` works out when nothing in it is left to a run, is not worked out here: until its obligation has seen an event, the position lists it as one "whose deadline is not known here", and the ledger does not tick past it, as both did before smucclaw/l4-ide#1107 (read from the code, not measured; decided by Claude 2026-11-25, pending Meng's review).
+Once the obligation has seen an event, the contract carries its deadline as a number, and the position dates it.
+
 The tool `what-may-I-do-now` takes the `instance`, the `deployment` (left out on a deployment's own endpoint), and optionally a `party` and an `action` to try.
 Given an act, the answer's `ifProposedNow` carries the `commits` the act would make, with `applied` `false`.
 A request that carries `X-Include-Functions: false` or `X-Include-Evaluate: false` is not shown the tool (measured: it is absent from `tools/list` with the second header).
@@ -371,7 +375,7 @@ The silent ones are the ones to build around.
 
 ## See also
 
-- [What is owed now: `l4 lts`](lts-list.md), whose words the position uses.
+- [What is owed now: `l4 lts`](lts-list.md), whose words the position uses, except for a deadline written as a name (above).
 - [Deadlines and consequences](consequences.md), for `WITHIN`, `HENCE` and `LEST`, which the deadlines and verdicts above come from.
 - The routes, flags and limits as the service lists them: [jl4-service README, Instance Ledger](../../../jl4-service/README.md#instance-ledger).
 - The reasons and the open questions behind the design: [OPERATIONAL-LOWERING-SPEC.md](../../../specs/proposals/OPERATIONAL-LOWERING-SPEC.md).

@@ -523,7 +523,11 @@ data BoundScope
 -- callers read deadlines as they did before smucclaw/l4-ide#1107: the durable
 -- ledger ("L4.Ledger.Replay"), whose due ticks would otherwise change, opted
 -- in to nothing. @l4 lts@ gives 'closedIn' ('enabledSetWith'), and @l4
--- explore@ its own cached one.
+-- explore@ its own cached one. That the ledger stays literal-only is decided
+-- by Claude 2026-11-25, pending Meng's review, and it covers both of the
+-- ledger's readings: its due ticks (through this function) and the
+-- service's @/position@ ('enabledSet', from @Replay.positionAt@), which so
+-- says "not known here" of a deadline @l4 lts@ now dates.
 candidatesOf :: Rig -> Trace -> Position -> IO [Candidate]
 candidatesOf = candidatesWith literalOnly
 
@@ -802,7 +806,9 @@ closedIn rig = MkClosed
 
 -- | The reader that works nothing out: a deadline the residual holds as an
 -- expression is known only when it is a literal, word for word as before
--- smucclaw/l4-ide#1107 ('candidatesOf', 'enabledSet').
+-- smucclaw/l4-ide#1107 ('candidatesOf', 'enabledSet'). The durable ledger's
+-- due ticks and the service's @/position@ read with it (decided by Claude
+-- 2026-11-25, pending Meng's review; 'candidatesOf' says why).
 literalOnly :: Closed
 literalOnly = MkClosed {clEval = Nothing, clReads = noModuleReads}
 
