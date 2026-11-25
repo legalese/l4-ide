@@ -274,33 +274,56 @@ spec = describe "integration" do
   -- import has errors. The service deploys a bundle whose imported file's only
   -- error is a name it reads and never declares, which 'Compiler' tolerates as
   -- an implicit input, and it builds a deployed file's environment as it did
-  -- before. So a function that reads nothing from that file is answered on the
-  -- direct path, and the wrapper path, which a `{}` for an input takes, must
-  -- answer it too, not refuse what the direct path answers.
+  -- before, without the imported file. So a function that reads nothing from
+  -- that file is answered on the direct path, and the wrapper path, which a
+  -- `{}` for an input takes, must answer it too, not refuse what the direct path
+  -- answers.
+  --
+  -- A function that does read a name from the imported file is the limit
+  -- doc/reference/errors/README.md documents: on both paths it answers an
+  -- internal error that the name is not in scope. This pins today's answer, not
+  -- the right one; `l4 deploy` and the editor's Deploy refuse such a bundle,
+  -- so only one posted straight to the service reaches it.
   describe "a function over an import whose only error is an implicit input (#1025)" do
-    it "is answered alike on the direct path and on the wrapper path" do
-      withServiceFromSources
-        "implicit-import"
-        [ ("implicit_lib.l4", "`the flag value` MEANS flag\n")
-        , ("implicit_main.l4", Text.unlines
-            [ "IMPORT implicit_lib.l4"
-            , ""
-            , "@export Whether b holds"
-            , "GIVEN b IS A BOOLEAN"
-            , "      pad IS A BOOLEAN"
-            , "GIVETH A BOOLEAN"
-            , "DECIDE holds IF b"
-            ])
-        ] \baseUrl mgr -> do
-          let answer args = do
-                resp <- evalFunction baseUrl mgr "implicit-import" "holds"
-                  (Aeson.object [ "arguments" Aeson..= Aeson.object args ])
-                pure ( statusCode' resp
-                     , case Aeson.decode (responseBody resp) of
-                         Just (SimpleResponse r) -> Map.lookup "value" r.fnResult
-                         _ -> Nothing )
-          answer [ "b" Aeson..= True, "pad" Aeson..= False ] >>= (`shouldBe` (200, Just (FnLitBool True)))
-          answer [ "b" Aeson..= True, "pad" Aeson..= Aeson.object [] ] >>= (`shouldBe` (200, Just (FnLitBool True)))
+    let implicitBundle =
+          [ ("implicit_lib.l4", "`the answer` MEANS 42\n\n`the flag value` MEANS flag\n")
+          , ("implicit_main.l4", Text.unlines
+              [ "IMPORT implicit_lib.l4"
+              , ""
+              , "@export Whether b holds"
+              , "GIVEN b IS A BOOLEAN"
+              , "      pad IS A BOOLEAN"
+              , "GIVETH A BOOLEAN"
+              , "DECIDE holds IF b"
+              , ""
+              , "@export Whether b holds and the answer is 42"
+              , "GIVEN b IS A BOOLEAN"
+              , "      pad IS A BOOLEAN"
+              , "GIVETH A BOOLEAN"
+              , "DECIDE answered IF b AND `the answer` EQUALS 42"
+              ])
+          ]
+        call baseUrl mgr fn args =
+          evalFunction baseUrl mgr "implicit-import" fn
+            (Aeson.object [ "arguments" Aeson..= Aeson.object args ])
+        bothPaths = [ [ "b" Aeson..= True, "pad" Aeson..= False ], [ "b" Aeson..= True, "pad" Aeson..= Aeson.object [] ] ]
+
+    it "answers a function that reads nothing from the import alike on the direct path and on the wrapper path" do
+      withServiceFromSources "implicit-import" implicitBundle \baseUrl mgr ->
+        forM_ bothPaths \args -> do
+          resp <- call baseUrl mgr "holds" args
+          ( statusCode' resp
+            , case Aeson.decode (responseBody resp) of
+                Just (SimpleResponse r) -> Map.lookup "value" r.fnResult
+                _ -> Nothing )
+            `shouldBe` (200, Just (FnLitBool True))
+
+    it "answers a function that reads a name from the import with an internal error, on both paths (a documented limit)" do
+      withServiceFromSources "implicit-import" implicitBundle \baseUrl mgr ->
+        forM_ bothPaths \args -> do
+          resp <- call baseUrl mgr "answered" args
+          statusCode' resp `shouldBe` 422
+          LBS.toStrict (responseBody resp) `shouldSatisfy` BS.isInfixOf "is not in scope"
 
   describe "MAYBE parameter handling" do
     it "handles NOTHING (null) for a MAYBE parameter" do
