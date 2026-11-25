@@ -983,6 +983,7 @@ siteStarts starts = go "body"
       VizExpr.And _ xs -> Map.unions [go (site <> ".and[" <> Text.pack (show i) <> "]") x | (i, x) <- zip [(0 :: Int) ..] xs]
       VizExpr.Or _ xs -> Map.unions [go (site <> ".or[" <> Text.pack (show i) <> "]") x | (i, x) <- zip [(0 :: Int) ..] xs]
       VizExpr.Implies _ s r _ -> go (site <> ".scope") s <> go (site <> ".requirement") r
+      VizExpr.Not _ x -> go (site <> ".not") x
       _ -> Map.empty
 
 ----------------------------------------------------------------------------
@@ -1239,7 +1240,8 @@ analyseBody labels order defs body written
                   ]
           BDQ.BOr es ->
             concat
-              [ if interesting ei && not (sat' ctx ei)
+              [ covered <>
+                if interesting ei && not (sat' ctx ei)
                   then
                     [ finding "dead-branch" arm ei
                         "this limb cannot hold in the context that reaches it; the rule reads identically with it deleted."
@@ -1248,6 +1250,28 @@ analyseBody labels order defs body written
                   else go ctx arm ei
               | (i, ei) <- zip [(0 :: Int) ..] es
               , let arm = site <> ".or[" <> Text.pack (show i) <> "]"
+              , let others = [ej | (j, ej) <- zip [(0 :: Int) ..] es, j /= i]
+                -- The dual of a redundant condition: an alternative every case
+                -- of which the others already let through, so the rule reads
+                -- the same with it deleted. It is reported as a vacuous guard,
+                -- the kind the normal form's clauses used to report it under,
+                -- with a message of its own (decided by Claude 2026-11-25,
+                -- pending Meng's review). A dead limb is covered vacuously and
+                -- is the dead branch the other pass reports. Where the context
+                -- already entails the whole disjunction, every alternative is
+                -- covered: that is the condition the disjunction makes being
+                -- redundant, or true on its own, and is not said again here.
+              , let covered =
+                      [ finding "vacuous-guard" arm ei
+                          "this alternative is already covered by the ones it is joined with, so it admits nothing new."
+                      | not normalised
+                      , Map.member arm starts
+                      , interesting ei
+                      , not (null others)
+                      , sat' ctx ei
+                      , sat' ctx (BDQ.BNot (BDQ.BOr es))
+                      , not (sat' (ctx <> [ei]) (BDQ.BNot (BDQ.BOr others)))
+                      ]
               ]
           BDQ.BImplies scope req
             | not (sat' ctx scope) ->
@@ -1273,10 +1297,16 @@ analyseBody labels order defs body written
                   , go ctx (site <> ".scope") scope
                   , go (ctx <> [scope]) (site <> ".requirement") req
                   ]
-          -- Not descended into: under a negation the polarity flips, and "dead
-          -- branch" would come to mean its own opposite. Reporting that under the
-          -- same word would be worse than not reporting it.
-          BDQ.BNot _ -> []
+          -- Not descended into for the normal form's findings: under a negation
+          -- the polarity flips, and "dead branch" would come to mean its own
+          -- opposite. Reporting that under the same word would be worse than
+          -- not reporting it. A redundant condition or a covered alternative is
+          -- looked for under it, in the same context: deleting one leaves what
+          -- the negation applies to unchanged, so it leaves the negation
+          -- unchanged too (decided by Claude 2026-11-25, pending Meng's review).
+          BDQ.BNot e
+            | normalised -> []
+            | otherwise -> go ctx (site <> ".not") e
           BDQ.BVar _ -> []
           BDQ.BRefuse _ -> []
           BDQ.BTrue -> []

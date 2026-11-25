@@ -1,0 +1,54 @@
+§ `VerifyCoveredAlternativesFixture`
+
+-- An alternative the drafter wrote that the others already cover: every case
+-- it lets through, the alternatives beside it let through too, so the rule
+-- reads the same without it. This is the dual of a condition its siblings
+-- already entail (verify-written-guards.l4), and it is reported the same way,
+-- as a `vacuous-guard`, at the place it sits in the rule as written.
+
+-- Reported.
+
+-- (1) The first alternative is absorbed by the second.
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `absorbed` a b IF
+    (a AND b) OR b
+
+-- (2) The same, under a NOT. Deleting the alternative leaves what the NOT
+--     applies to unchanged, so it leaves the rule unchanged too.
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `absorbed under a NOT` a b IF
+    NOT ((a AND b) OR b)
+
+-- (3) Inside a condition, with a third alternative beside the two.
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN, c IS A BOOLEAN, d IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `absorbed inside a condition` a b c d IF
+    d AND (a OR c OR (a AND b))
+
+-- Not reported.
+
+-- (4) Each alternative lets through a case the other does not.
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN, c IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `two ways in` a b c IF
+    (a AND b) OR (a AND c)
+
+-- (5) The whole alternative is redundant here, and is reported as a condition
+--     of the conjunction. Inside it, `b` is covered by `a` only because the
+--     context already holds `a`, which makes every alternative covered; that
+--     is the finding one level up, and it is not reported again.
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `covered by the context` a b IF
+    a AND (b OR a)
+
+-- (6) Two alternatives that between them let every case through: the
+--     condition they make is true on its own and excludes nothing, which is a
+--     different defect, and is not looked for (see the note on what a clean
+--     run proves). Neither alternative is covered by the other.
+GIVEN x IS A BOOLEAN, y IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `a condition true on its own` x y IF
+    x AND (y OR NOT y)

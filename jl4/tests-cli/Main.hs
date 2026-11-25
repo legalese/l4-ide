@@ -678,6 +678,11 @@ verifyManufacturedClausesFixture, verifyWrittenGuardsFixture :: FilePath
 verifyManufacturedClausesFixture = fixtureDir </> "verify-manufactured-clauses.l4"
 verifyWrittenGuardsFixture       = fixtureDir </> "verify-written-guards.l4"
 
+-- The dual: an alternative the others already cover, reported where it is
+-- written, and the alternatives that must not be.
+verifyCoveredAlternativesFixture :: FilePath
+verifyCoveredAlternativesFixture = fixtureDir </> "verify-covered-alternatives.l4"
+
 -- Referential transparency (specs/todo/WHERE-INLINING-SPEC.md): a zero-arity
 -- WHERE/LET binding is inlined before analysis, so a rule means the same thing
 -- however its limbs are named. The recursive file is the termination control.
@@ -1040,6 +1045,7 @@ coreFixtures =
   , verifyClauseGroupCallFixture, verifyClauseGroupWhereFixture, verifyClauseTableFixture, verifyClauseGroupMaybeFixture
   , verifyClauseTableLargeFixture
   , verifyManufacturedClausesFixture, verifyWrittenGuardsFixture
+  , verifyCoveredAlternativesFixture
   , verifyVacuousGuardFixture, verifySeamFixture, verifyNestedFixture
   , verifyWhereTransparencyFixture, verifyWhereRecursiveFixture
   , verifyConstantsFixture, verifyConstantsReadThroughFixture
@@ -6813,6 +6819,38 @@ spec bin = do
         `shouldBe` [60, 60]
       Output _ text _ <- runL4 bin ["verify", verifyWrittenGuardsFixture]
       text `shouldSatisfy` ("[vacuous-guard] at body.or[0].and[1], written at 23:16" `isInfixOf`)
+
+    -- An alternative the others already cover adds nothing, and is reported
+    -- where it is written, under a NOT too. Before the fix none of the three
+    -- was reported: the normal form, where the first two used to be found, is
+    -- no longer looked in for redundancy (smucclaw/l4-ide#1093), and the rule
+    -- as written was checked for a redundant condition of a conjunction only.
+    -- The last three decisions are the controls: alternatives that each let a
+    -- case through, one covered only because the condition it sits in is
+    -- itself redundant (reported once, at that condition), and a condition
+    -- true on its own.
+    it "reports an alternative the others already cover, once, where it is written" $ do
+      env <- jsonEnvelope bin ["verify", verifyCoveredAlternativesFixture, "--format", "json"]
+      let found = findingSitesByDecision env
+      lookup "absorbed" found `shouldBe` Just [("vacuous-guard", "body.or[0]")]
+      lookup "`absorbed under a NOT`" found `shouldBe` Just [("vacuous-guard", "body.not.or[0]")]
+      lookup "`absorbed inside a condition`" found `shouldBe` Just [("vacuous-guard", "body.and[1].or[2]")]
+      lookup "`two ways in`" found `shouldBe` Just []
+      lookup "`covered by the context`" found `shouldBe` Just [("vacuous-guard", "body.and[1]")]
+      lookup "`a condition true on its own`" found `shouldBe` Just []
+      let placed =
+            [ (nm, line, msg)
+            | (nm, f) <- findingObjectsByDecision env
+            , Just w <- [objField f "writtenAt"]
+            , Just (Number line) <- [objField w "line"]
+            , Just (String msg) <- [objField f "message"]
+            ]
+          lineOf nm = [round line :: Int | (nm', line, _) <- placed, nm' == nm]
+      lineOf "absorbed" `shouldBe` [15]
+      lineOf "`absorbed under a NOT`" `shouldBe` [22]
+      lineOf "`absorbed inside a condition`" `shouldBe` [28]
+      [msg | (nm, _, msg) <- placed, nm == "absorbed"]
+        `shouldSatisfy` all ("this alternative is already covered by the ones it is joined with" `T.isPrefixOf`)
 
     -- The weaker mode is documented as weaker; pin that it is not SILENTLY
     -- weaker. `x` here is a nullary reference to a GIVEN binder, so the two
