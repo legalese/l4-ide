@@ -759,7 +759,8 @@ openingOf clock raw = case raw.roOpens of
 -- * a rule of the module that reads one of those, directly or through
 --   another ('runReadRules').
 --
--- A closed expression means the same in every run, so one @#EVAL@ of it in
+-- A closed expression means the same in every run (except through a rule of
+-- an imported module, which is not checked: below), so one @#EVAL@ of it in
 -- the module ('evalInModule') is the evaluator's own answer for it, which
 -- §2.4 asks for: nothing here re-derives arithmetic. Anything not closed is
 -- not known here, and the reason says what it reads. The tick the answer
