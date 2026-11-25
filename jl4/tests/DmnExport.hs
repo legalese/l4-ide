@@ -4165,14 +4165,18 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
     -- Not closed, so not copied: a constant that reads law time (this model's
     -- own input, which the copy would read under the importer's rule date),
     -- one that reads an ASSUME, and the ASSUME itself read directly. Each
-    -- reader is refused, Blocking.
+    -- reader is refused, Blocking. The positive control is a closed constant
+    -- of the same module, which IS copied: it shows the module checked, so
+    -- the refusals are not F2's refusal of a module with errors.
     it "refuses an imported constant that reads RULES EFFECTIVE DATE or an ASSUME, and an imported ASSUME" $ do
       let lawLib =
             "ASSUME `the base rate` IS A NUMBER\n\
             \GIVETH A NUMBER\n\
             \`the doubled base` MEANS `the base rate` TIMES 2\n\
             \GIVETH A DATE\n\
-            \`the rule date` MEANS `RULES EFFECTIVE DATE`\n"
+            \`the rule date` MEANS `RULES EFFECTIVE DATE`\n\
+            \GIVETH A NUMBER\n\
+            \`the fixed rate` MEANS 4\n"
           drg = drgGeneral (vfsFromList [("lawlib", lawLib)]) id defaultDmnFlavor (const "Test")
                   "IMPORT lawlib\n\
                   \GIVETH A DATE\n\
@@ -4182,10 +4186,14 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
                   \DECIDE `pay` h IS h TIMES `the base rate`\n\
                   \GIVEN h IS A NUMBER\n\
                   \GIVETH A NUMBER\n\
-                  \DECIDE `pay twice` h IS h TIMES `the doubled base`\n"
+                  \DECIDE `pay twice` h IS h TIMES `the doubled base`\n\
+                  \GIVEN h IS A NUMBER\n\
+                  \GIVETH A NUMBER\n\
+                  \DECIDE `pay fixed` h IS h TIMES `the fixed rate`\n"
           readers = ["in force from", "pay", "pay twice"]
-      [d.dcnName | d <- drgDecisions drg] `shouldMatchList` readers
-      notesCoded "D-IMPORTED" drg `shouldBe` []
+      [d.dcnName | d <- drgDecisions drg] `shouldMatchList` (readers <> ["pay fixed", "the fixed rate"])
+      map (.element) (notesCoded "D-IMPORTED" drg) `shouldBe` [idOf "the fixed rate" drg]
+      (literalOf "pay fixed" drg).feText `shouldBe` "h * the_fixed_rate"
       forM_ readers \nm -> (literalOf nm drg).feFragment `shouldBe` L4Verbatim
       [n.element | n <- blockingOf drg] `shouldMatchList` map (`idOf` drg) readers
 
