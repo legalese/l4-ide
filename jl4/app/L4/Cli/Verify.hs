@@ -221,6 +221,12 @@ propositionalBound =
     , "  beside the OR it sits inside, so in `d OR (a AND (b OR (c AND d)))'"
     , "  the `c AND d', which can hold only where `d' has already let the case"
     , "  through, goes unreported too."
+    -- A limit, stated here and on the doc page, not a choice (the note on
+    -- 'covered' in 'analyseBody' says why).
+    , "  An alternative that can never hold is reported only where the normal"
+    , "  form keeps a part of it that is a dead branch there, so in"
+    , "  `b OR (a AND c AND (NOT a))' the second alternative, which can never"
+    , "  hold, goes unreported, and the rule gets no finding."
     , "  The sites of the other findings, and of the vacuous guard that is a"
     , "  scope nobody can be in, are places in the normal form, which need not"
     , "  exist in the source, and they carry no line and column. Only"
@@ -1401,11 +1407,18 @@ analyseBody labels order defs listed body written
                 -- the same with it deleted. It is reported as a vacuous guard,
                 -- the kind the normal form's clauses used to report it under,
                 -- with a message of its own (decided by Claude 2026-11-25,
-                -- pending Meng's review). A dead limb is covered vacuously and
-                -- is the dead branch the other pass reports. Where the context
-                -- already entails the whole disjunction, every alternative is
-                -- covered: that is the condition the disjunction makes being
-                -- redundant, or true on its own, and is not said again here.
+                -- pending Meng's review). A dead limb is covered vacuously, and
+                -- is not reported here: it is left to the other pass, whose
+                -- dead branch is a literal of the normal form's clauses. That
+                -- pass reports the limb only where a literal of it survives in
+                -- a clause and is dead there, so an alternative that can never
+                -- hold, such as the @a AND c AND (NOT a)@ of
+                -- @b OR (a AND c AND (NOT a))@, goes unreported. That is a
+                -- limit, stated in the help and the doc page, not a choice.
+                -- Where the context already entails the whole disjunction,
+                -- every alternative is covered: that is the condition the
+                -- disjunction makes being redundant, or true on its own, and
+                -- is not said again here.
               , let covered =
                       [ finding "vacuous-guard" False arm ei
                           "this alternative is already covered by the ones it is joined with, so it admits nothing new."
