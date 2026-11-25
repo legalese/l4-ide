@@ -1,0 +1,20 @@
+-- smucclaw/l4-ide#1107: a WITHIN counted OF a named date is worked out as
+-- its literal twin is. The traces start at a date serial, as a date anchor
+-- needs.
+
+IMPORT prelude
+IMPORT daydate
+
+DECLARE Actor IS ONE OF Alice
+DECLARE Act IS ONE OF pay
+
+`the kickoff` MEANS YMD 2026 7 1
+
+GIVETH A DEONTIC Actor Act
+`dated` MEANS PARTY Alice MUST pay WITHIN 14 OF `the kickoff` LEST BREACH BY Alice BECAUSE "late"
+
+GIVETH A DEONTIC Actor Act
+`dated literal` MEANS PARTY Alice MUST pay WITHIN 14 OF YMD 2026 7 1 LEST BREACH BY Alice BECAUSE "late"
+
+#TRACE `dated` AT DATE_SERIAL (YMD 2026 6 20) WITH
+#TRACE `dated literal` AT DATE_SERIAL (YMD 2026 6 20) WITH

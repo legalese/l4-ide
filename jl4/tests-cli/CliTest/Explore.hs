@@ -52,7 +52,7 @@ fixtures =
   <> [ instants </> f | f <- ["clocks.l4", "window.l4", "half.l4", "adjacent.l4", "open.l4", "flip3.l4", "room.l4", "lapse.l4", "merged.l4", "lapse-fixed.l4", "cap-re.l4", "own-lapse.l4", "frac-re.l4", "fx-fork.l4", "fx-barrier.l4", "succ2.l4", "hidden.l4", "succ4.l4", "cap-shift.l4", "frac-start.l4", "frac-wait.l4", "frac-stamp.l4"] ]
   <> [ breached </> f | f <- ["sale.l4", "resell.l4", "continuation.l4"] ]
   <> [ sections </> f | f <- ["sectioned.l4", "two-sections.l4"] ]
-  <> [ deadlines </> f | f <- ["shapes.l4", "given.l4", "carried.l4", "armed.l4", "ledger.l4", "called.l4", "section-given.l4", "section-reader.l4", "clock.l4", "locals.l4"] ]
+  <> [ deadlines </> f | f <- ["shapes.l4", "given.l4", "carried.l4", "armed.l4", "ledger.l4", "called.l4", "section-given.l4", "section-reader.l4", "clock.l4", "locals.l4", "slow.l4", "dated.l4"] ]
 
 -- | The acceptance run of the fixtures' README: the clock bounded at
 -- closing, the cells the properties read kept.
@@ -986,6 +986,35 @@ spec bin = describe "l4 explore" $ do
       tcode `shouldBe` ExitSuccess
       tout `shouldSatisfy` (("time runs out on Bob MUST ship \8212 " <> eventWhy) `isInfixOf`)
       tout `shouldSatisfy` ("Next deadline: not known here" `isInfixOf`)
+
+    it "ledger.l4: a rule that reads a ledger through another rule is not worked out" $ do
+      let why = "the WITHIN reads `via another`, which reads a ledger, so it is worked out only in a run and its deadline is not known here"
+      Output code out _ <- explored "through another" "ledger.l4"
+      code `shouldBe` ExitFailure 2
+      out `shouldSatisfy` (("time runs out on pay, in 1 state: " <> why) `isInfixOf`)
+      Output lcode lout _ <- listed "through another" "ledger.l4"
+      lcode `shouldBe` ExitSuccess
+      lout `shouldSatisfy` (why `isInfixOf`)
+
+    it "slow.l4: working out a deadline stopped at a limit refuses the exploration (exit 1), and l4 lts lists it (exit 0)" $ do
+      let stopped = "I stopped evaluating: it took more than 500 steps"
+      Output code out err <- runL4 bin ["explore", deadlines </> "slow.l4", "--contract", "slow", "--max-steps", "500"]
+      code `shouldBe` ExitFailure 1
+      (out <> err) `shouldSatisfy` (("the evaluator stopped at a limit working out a deadline: " <> stopped) `isInfixOf`)
+      Output lcode lout _ <- runL4 bin ["lts", deadlines </> "slow.l4", "--contract", "slow", "--max-steps", "500"]
+      lcode `shouldBe` ExitSuccess
+      lout `shouldSatisfy` (("time runs out on Alice MUST pay \8212 working out the WITHIN failed (" <> stopped) `isInfixOf`)
+      lout `shouldSatisfy` ("Next deadline: not known here" `isInfixOf`)
+
+    it "dated.l4: a WITHIN counted OF a named date is worked out as its literal twin is" $ do
+      Output code out _ <- runL4 bin ["explore", deadlines </> "dated.l4"]
+      code `shouldBe` ExitSuccess
+      length (filter ("time passes the deadline 740176 (WAITUNTIL 740177)" `isInfixOf`) (lines out)) `shouldBe` 2
+      Output lcode lout _ <- runL4 bin ["lts", deadlines </> "dated.l4"]
+      lcode `shouldBe` ExitSuccess
+      lout `shouldSatisfy` ("Alice MUST pay \8212 due by 740176 (WITHIN 14 OF `the kickoff`)" `isInfixOf`)
+      lout `shouldSatisfy` ("Alice MUST pay \8212 due by 740176 (WITHIN 14 OF (YMD OF 2026, 7, 1))" `isInfixOf`)
+      length (filter ("Next deadline: 740176 (Alice: pay)" `isInfixOf`) (lines lout)) `shouldBe` 2
   where
     liveness =
       [ "--eventually", "Alice has bought or stopped"
