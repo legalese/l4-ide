@@ -32,7 +32,11 @@
 --      candidate's own comparison matched and a match forces every field;
 --   8. 'freshTrace' finds a rule under a @§@ heading, at any depth, as
 --      @l4 explore@'s 'startNamed' does, and of two rules of one name in two
---      sections both take the first (smucclaw/l4-ide#1106).
+--      sections both take the first (smucclaw/l4-ide#1106);
+--   9. an act that reads a section @GIVEN@ the residual has not forced is
+--      untried in 'enabledSet' too, which reads with 'literalOnly' as the
+--      service's position does ('actionReads'), and not tried at the
+--      @GIVEN@'s default (review of smucclaw/l4-ide#1107).
 module LtsListSpec (spec) where
 
 import Data.Foldable (for_)
@@ -95,6 +99,20 @@ untracedSrc = Text.unlines $ prologue <>
 
 -- 8. two sections each define `the duty`, and a third, nested one defines
 --    `the nested duty`
+-- | Review of smucclaw/l4-ide#1107: the act's amount is a section GIVEN
+-- that a WITH supplies; its default, 30, is not what the run is owed.
+sectionGivenActSrc :: Text.Text
+sectionGivenActSrc = Text.unlines $ prologue <>
+  [ "GIVETH A DEONTIC Person Action"
+  , "`the deal` MEANS `the duty` WITH `the price` IS 10 PLUS 10"
+  , ""
+  , "§ `Terms`"
+  , "    GIVEN `the price` IS A NUMBER TYPICALLY 30"
+  , ""
+  , "GIVETH A DEONTIC Person Action"
+  , "`the duty` MEANS PARTY B MUST payment `the price` WITHIN 10 HENCE FULFILLED LEST BREACH BY B BECAUSE \"late\""
+  ]
+
 sectionedSrc :: Text.Text
 sectionedSrc = Text.unlines $ prologue <>
   [ "§ `First`"
@@ -343,6 +361,15 @@ spec = describe "LTS-VISUALISER §1.1a / P2a′: the list" $ do
     -- and a name no section defines is refused in explore's words
     either id (const "found") (fst <$> freshTrace rig.rigModule "the missing duty")
       `shouldBe` "no rule named `the missing duty` that takes no inputs"
+
+  it "9. an act that reads a section GIVEN is untried in the position the service reads too (literalOnly), not tried at its default" $ do
+    rig <- rigOf sectionGivenActSrc
+    (m', tr) <- either (fail . Text.unpack) pure (freshTrace rig.rigModule "the deal")
+    -- 'enabledSet' is what /position reads, with 'literalOnly'
+    es <- enabledSet rig {rigModule = m'} tr >>= maybe (fail "no enabled set") pure
+    [ why | o <- es.esOutcomes, ActBy _ <- [o.ocCandidate.cdKind], Untried why <- [o.ocVerdict] ]
+      `shouldBe` ["the action reads `the price`, a section GIVEN, which a WITH can supply, so the act is known only in a run and the what-if cannot try it"]
+    length (passedOver es) `shouldBe` 0
   where
     bearerText :: LiveNorm -> Text.Text
     bearerText n = case n.lnBearer of

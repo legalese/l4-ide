@@ -56,6 +56,10 @@ keptAnswers = "tests-cli" </> "fixtures" </> "explore-kept-answers"
 imported :: FilePath
 imported = "tests-cli" </> "fixtures" </> "explore-imported"
 
+-- | Review of smucclaw/l4-ide#1107: acts the what-if cannot replay.
+actions :: FilePath
+actions = "tests-cli" </> "fixtures" </> "explore-actions"
+
 fixtures :: [FilePath]
 fixtures =
   [ brief </> f | f <- ["d1-naive.l4", "d2-reread.l4", "d3-atomic.l4", "refused-number.l4", "properties.l4"] ]
@@ -65,6 +69,7 @@ fixtures =
   <> [ deadlines </> f | f <- ["shapes.l4", "given.l4", "carried.l4", "armed.l4", "ledger.l4", "called.l4", "section-given.l4", "section-reader.l4", "clock.l4", "locals.l4", "slow.l4", "dated.l4"] ]
   <> [ keptAnswers </> f | f <- ["positional.l4", "named.l4", "genitive.l4", "wrapper.l4"] ]
   <> [ imported </> f | f <- ["readers.l4", "deadlines.l4", "kept.l4"] ]
+  <> [ actions </> f | f <- ["section-given.l4", "section-party.l4"] ]
 
 -- | The acceptance run of the fixtures' README: the clock bounded at
 -- closing, the cells the properties read kept.
@@ -1058,6 +1063,31 @@ spec bin = describe "l4 explore" $ do
             Output lcode lout _ <- runL4 bin ["lts", imported </> "deadlines.l4", "--contract", contract, "--fixed-now", now]
             lcode `shouldBe` ExitSuccess
             lout `shouldSatisfy` (("time runs out on Alice MUST pay \8212 " <> why) `isInfixOf`)
+
+    let sectionWhy = "the action reads `the price`, a section GIVEN, which a WITH can supply, so the act is known only in a run and the what-if cannot try it"
+        ruleWhy = "the action reads `the total`, which reads `the price`, a section GIVEN, which a WITH can supply, so the act is known only in a run and the what-if cannot try it"
+    forM_
+      [ ("the deal", "PARTY Alice MUST pay `the price`", "pay OF `the price`", sectionWhy)
+      , ("the deal through a rule", "PARTY Alice MUST pay (`the total` OF `the price`)", "pay OF (`the total` OF `the price`)", ruleWhy)
+      , ("the plain deal", "PARTY Alice MUST pay `the price`", "pay OF `the price`", sectionWhy)
+      ] \ (contract, residual, act, why) ->
+        it ("explore-actions/section-given.l4: " <> contract <> ", an act reading a section GIVEN, is untried and not replayed at its default") $ do
+          Output code out _ <- runL4 bin ["explore", actions </> "section-given.l4", "--contract", contract]
+          code `shouldBe` ExitFailure 2
+          out `shouldSatisfy` (("UNTRIED 1: " <> residual <> " (" <> why <> ")") `isInfixOf`)
+          out `shouldSatisfy` ("0 acts passed over" `isInfixOf`)
+          out `shouldNotSatisfy` ("Internal error" `isInfixOf`)
+          Output lcode lout _ <- runL4 bin ["lts", actions </> "section-given.l4", "--contract", contract]
+          lcode `shouldBe` ExitSuccess
+          lout `shouldSatisfy` (("Alice does " <> act <> " \8212 " <> why) `isInfixOf`)
+          lout `shouldNotSatisfy` ("it is not the act awaited" `isInfixOf`)
+          lout `shouldNotSatisfy` ("Internal error" `isInfixOf`)
+
+    it "explore-actions/section-party.l4: a party a section GIVEN names, supplied by a WITH, still explores to the act the run takes" $ do
+      Output code out _ <- runL4 bin ["explore", actions </> "section-party.l4", "--contract", "the deal"]
+      code `shouldBe` ExitSuccess
+      out `shouldSatisfy` ("the deal, explored from its outset at 0: 3 states, 4 transitions" `isInfixOf`)
+      out `shouldSatisfy` ("  s0 -> s1  PARTY Bob DOES pay" `isInfixOf`)
   where
     liveness =
       [ "--eventually", "Alice has bought or stopped"

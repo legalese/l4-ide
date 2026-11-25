@@ -2033,7 +2033,7 @@ actsOf ex pos raw cand = case cand.cdBound of
                 , "they name " <> Text.pack (show size) <> " acts, more than the bound of " <> Text.pack (show ex.exOptions.eoMaxActs)) ])
             else do
               let choices = traverse (\ (v, vals) -> map (v,) vals) domains
-              actions <- traverse (closedAction pos.posReplayScope raw.roEnv . (`fillBinders` shape)) choices
+              actions <- traverse (closedAction ex.exClosed.clReads pos.posReplayScope raw.roEnv . (`fillBinders` shape)) choices
               Right (actions, refusedNested)
   where
     info = ex.exRig.rigEntityInfo

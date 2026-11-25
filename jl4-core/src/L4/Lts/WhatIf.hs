@@ -123,6 +123,7 @@ module L4.Lts.WhatIf
   , binderTypes
   , fillBinders
   , closedAction
+  , actionReads
   , openLocals
   , reifyExpr
   , reifyNF
@@ -539,6 +540,7 @@ candidatesWith closed rig tr pos = case pos.posResidual of
   Just _ -> do
     let raws   = obligationsOf pos
         paired = [ (raw, renderLive pos.posContext raw) | raw <- raws ]
+        known  = actionReads closed rig
     acts <- for paired \ (raw, live) -> do
       party <- either (fmap Just . reifyExpr raw.roEnv) (reifyValue reifyNF) raw.roParty
       shape <- patternExpr raw.roEnv raw.roAction.action
@@ -551,7 +553,7 @@ candidatesWith closed rig tr pos = case pos.posResidual of
               Just b  -> case b.baWitness of
                 Left why -> Left (noWitness b why)
                 Right vs -> Right (fillBinders vs s)
-            a <- closedAction pos.posReplayScope raw.roEnv filled
+            a <- closedAction known pos.posReplayScope raw.roEnv filled
             pure Act {hyParty = p, hyAction = a, hyAt = pos.posClock}
       pure MkCandidate
         { cdKind = ActBy live
@@ -849,12 +851,16 @@ data ModuleReads = MkModuleReads
     -- ("L4.Discharge".'sectionBinders')
   , mrRules         :: Map Unique RunRead
     -- ^ 'runReadRules'
+  , mrSectionRules  :: Map Unique Name
+    -- ^ the rules that read a section @GIVEN@, directly or through another,
+    -- each with the first it reads; an action is held to these
+    -- ('closedAction'), and 'mrRules' may name another read first
   , mrLocals        :: Map Unique Text
     -- ^ what each name the module binds locally is, for a reason: 'localKinds'
   }
 
 noModuleReads :: ModuleReads
-noModuleReads = MkModuleReads {mrSectionGivens = Set.empty, mrRules = Map.empty, mrLocals = Map.empty}
+noModuleReads = MkModuleReads {mrSectionGivens = Set.empty, mrRules = Map.empty, mrSectionRules = Map.empty, mrLocals = Map.empty}
 
 -- | 'ModuleReads' of a module, with the modules it imports: their rules and
 -- section @GIVEN@s count as the module's own do. A unique carries its
@@ -862,10 +868,12 @@ noModuleReads = MkModuleReads {mrSectionGivens = Set.empty, mrRules = Map.empty,
 moduleReads :: Module Resolved -> [Module Resolved] -> ModuleReads
 moduleReads m imported = MkModuleReads
   { mrSectionGivens = givens
-  , mrRules = runReadRules givens (reachableRules m imported)
+  , mrRules = runReadRules givens rules
+  , mrSectionRules = rulesReaching (\ body -> listToMaybe [ getOriginal r | r <- namesIn body, Set.member (getUnique r) givens ]) rules
   , mrLocals = localKinds m }
   where
     givens = foldMap (Map.keysSet . sectionBinders) (m : imported)
+    rules = reachableRules m imported
 
 -- | Every rule of the module, and every rule of its imports that the module
 -- reaches by name, directly or through another: its name, its inputs and
@@ -952,10 +960,15 @@ directReads givens e =
 -- An @#EVAL@ outside a run does not see what a run supplies, so a deadline
 -- that names one of them is not worked out ('Closed').
 runReadRules :: Set Unique -> [(Resolved, [Resolved], Expr Resolved)] -> Map Unique RunRead
-runReadRules givens decides = grow direct
+runReadRules givens = rulesReaching (listToMaybe . directReads givens)
+
+-- | The rules among these whose body has what @direct@ finds, or that name
+-- one that does, directly or through another, each with what was found.
+rulesReaching :: (Expr Resolved -> Maybe a) -> [(Resolved, [Resolved], Expr Resolved)] -> Map Unique a
+rulesReaching found decides = grow direct
   where
     rules = [ (getUnique name, body, map getUnique (namesIn body)) | (name, _, body) <- decides ]
-    direct = Map.fromList [ (u, r) | (u, body, _) <- rules, r : _ <- [directReads givens body] ]
+    direct = Map.fromList [ (u, r) | (u, body, _) <- rules, Just r <- [found body] ]
     grow known =
       let reached = Map.fromList
             [ (u, r)
@@ -1767,10 +1780,48 @@ cannotChoose v = "the action binds `" <> unqualifiedNameToText v <> "`, which th
 -- refusal is the what-if's own sentence and never the evaluator's
 -- "Internal error: amount is not in scope" (which is what a replay of such
 -- an action produced until 2026-09-19).
-closedAction :: Set Unique -> Environment -> Expr Resolved -> Either Text (Expr Resolved)
-closedAction scope env e = case openLocals scope env e of
+--
+-- Nor may it read a section @GIVEN@ the residual has not forced, itself or
+-- through a rule ('actionReads'), the rule a deadline is held to too
+-- ('closedDeadline'). "L4.Discharge" makes the @GIVEN@ a parameter under
+-- its own unique, which is also a top-level name, so 'openLocals' passes it,
+-- and the replay, which evaluates the act in the module's scope, read its
+-- @TYPICALLY@ default and not what a @WITH@ supplied: under @`the deal`
+-- MEANS `the duty` WITH `the price` IS 10 PLUS 10@ the act @pay `the price`@
+-- was tried as @pay 30@ and passed over, so @l4 explore@ drew no pay edge
+-- and @l4 lts@ said it was not the act awaited, where the run is fulfilled
+-- by @pay 20@ (measured 2026-11-25, on unstable as on #1107; through a rule,
+-- the replay stopped with an internal error instead). The cost is an act
+-- whose @GIVEN@ nothing supplies, which the replay would have tried at the
+-- default the run uses too: it is untried as well. Both are decided by
+-- Claude 2026-11-25, pending Meng's review, as for a deadline.
+closedAction :: ModuleReads -> Set Unique -> Environment -> Expr Resolved -> Either Text (Expr Resolved)
+closedAction known scope env e = case openLocals scope env e of
   (v : _) -> Left (cannotChoose v)
-  []      -> Right e
+  []
+    | Set.null known.mrSectionGivens -> Right e
+    -- a rule first, as for a deadline: after "L4.Discharge" a call of a rule
+    -- that reads a section GIVEN passes the GIVEN too, which the act did not
+    -- spell
+    | ((r, g) : _) <- [ (r, g) | r <- names, Just g <- [Map.lookup (getUnique r) known.mrSectionRules] ] ->
+        Left ("the action reads " <> quoted r <> ", which reads " <> runReadText False (ReadsSectionGiven g) <> inARun)
+    | (r : _) <- [ r | r <- names, Set.member (getUnique r) known.mrSectionGivens ] ->
+        Left ("the action reads " <> runReadText True (ReadsSectionGiven (getOriginal r)) <> inARun)
+    | otherwise -> Right e
+  where
+    names = namesIn e
+    quoted r = "`" <> unqualifiedNameToText (getOriginal r) <> "`"
+    inARun = ", so the act is known only in a run and the what-if cannot try it"
+
+-- | What an action is held to ('closedAction'): the reader's 'ModuleReads'
+-- when it has them, and the rig's own module's when it works nothing out
+-- ('literalOnly', which @/position@ and the durable ledger read with), so
+-- that the service's position does not try a section @GIVEN@ at its default
+-- either (decided by Claude 2026-11-25, pending Meng's review).
+actionReads :: Closed -> Rig -> ModuleReads
+actionReads closed rig = case closed.clEval of
+  Just _  -> closed.clReads
+  Nothing -> moduleReads rig.rigModule []
 
 -- | The names in an expression that the replay cannot resolve and the
 -- residual cannot supply: each @Var@ whose unique the obligation's

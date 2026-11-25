@@ -1,0 +1,18 @@
+-- The control for section-given.l4: a party named by a section GIVEN that
+-- a WITH supplies. The party is read back from what the residual forced, not
+-- replayed, so this explores to Bob's pay, as the run of the #TRACE has it.
+
+DECLARE Actor IS ONE OF Alice, Bob
+DECLARE Act IS ONE OF pay
+
+GIVETH A DEONTIC Actor Act
+`the deal` MEANS `the duty` WITH `the payer` IS Bob
+
+§ `Terms`
+    GIVEN `the payer` IS AN Actor TYPICALLY Alice
+
+GIVETH A DEONTIC Actor Act
+`the duty` MEANS PARTY `the payer` MUST pay WITHIN 5 HENCE FULFILLED LEST BREACH BY `the payer` BECAUSE "late"
+
+#TRACE `the deal` AT 0 WITH
+    PARTY Bob DOES pay AT 1
