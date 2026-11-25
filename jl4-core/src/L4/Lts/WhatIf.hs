@@ -202,7 +202,7 @@ decidesOf (MkSection _ _ _ _ decls) = concatMap go decls
 -- MEANS …@. @l4 lts@ ("L4.Lts.List.freshTrace") and @l4 explore@
 -- ("L4.Lts.Explore.startNamed") both look a name up here, so they find the
 -- same rule, and refuse the same names in the same words
--- (smucclaw/l4-ide#1106: until 2026-11-25 @l4 lts@ looked only at the top
+-- (before smucclaw/l4-ide#1106 @l4 lts@ looked only at the top
 -- level and said "no top-level rule named …" of a rule under a @§@).
 --
 -- When rules in two sections share the name, the first in source order is
@@ -590,7 +590,7 @@ candidatesWith closed rig tr pos = case pos.posResidual of
 -- not a literal — a name (@WITHIN `ten days`@) or arithmetic (@WITHIN 5
 -- PLUS 5@) — it is worked out by the evaluator when it is CLOSED, and is
 -- otherwise not known here, the reason saying why ('closedDeadline'; since
--- 2026-11-25, smucclaw/l4-ide#1107: until then any such @WITHIN@ was "never
+-- smucclaw/l4-ide#1107: before it any such @WITHIN@ was "never
 -- evaluated and is not a literal", and its breach was never explored).
 --
 -- An ANCHORED unforced @WITHIN d OF …@ (R-Q7B\/C) is absolute: the anchor's
@@ -960,7 +960,7 @@ outcomeValue = \ case
 -- IS 1@), the rule a genitive applies (@Bob's `period for`@), and any other
 -- place a constructor of 'Expr' or of what it holds keeps a name, in the
 -- order a generic traversal meets them. It is generic on purpose: until review
--- on 2026-11-25 this matched only variables and positional applications, so
+-- of smucclaw/l4-ide#1107 this matched only variables and positional applications, so
 -- a rule that reads a ledger, named with @WITH@ or as a genitive, was not
 -- seen, and its deadline was worked out against an empty ledger. A
 -- constructor added to 'Expr' later cannot hide a name from it.

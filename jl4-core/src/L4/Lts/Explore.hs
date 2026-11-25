@@ -1854,7 +1854,7 @@ expand ex node = do
         TickPast d _ -> let cand' = retimed d cand in tick (tickLabel cand' d) d cand'
         -- the what-if read the deadline with the exploration's own reader
         -- ('candidatesWith', 'liveDeadlines'), so one it could not read is not
-        -- known here either; until 2026-11-25 the two read differently, and a
+        -- known here either; before smucclaw/l4-ide#1107 the two read differently, and a
         -- NoTick whose anchor this module could work out was turned into a
         -- tick here
         NoTick live -> pure ([TriedUntried ("time runs out on " <> live.lnAction) (either id (const "") cand.cdHypothetical)], [])

@@ -5807,7 +5807,7 @@ spec bin = do
       listed.outStdout `shouldSatisfy` isInfixOf "duty — after 1 event"
       explored <- runL4 bin ["explore", okDir </> "duty.l4"]
       -- the WITHIN reads `the answer` from lib, which the explorer works out
-      -- as 42 and ticks past (smucclaw/l4-ide#1107; until 2026-11-25 it left
+      -- as 42 and ticks past (smucclaw/l4-ide#1107; before it, it left
       -- that tick untried, and exited 2 with 2 states and 2 transitions)
       explored.outExit `shouldBe` ExitSuccess
       explored.outStdout `shouldSatisfy` isInfixOf "3 states, 4 transitions"

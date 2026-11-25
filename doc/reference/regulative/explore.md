@@ -300,7 +300,7 @@ GIVETH A DEONTIC Person Action
 
 `l4 explore --contract "the refund duty"` explores it as it explores `WITHIN 14`: 3 states and 4 transitions, among them `time passes the deadline 14 (WAITUNTIL 15)`, and exit 0 (measured 2026-11-25).
 The same holds for `WITHIN 5 PLUS 5`, for a name for `5 PLUS 5`, for a constant an imported file defines, for an `OF` anchor that is a name, for a deadline beside a literal `AFTER`, and for one armed by a `HENCE` or carried past a breach: each explores to the graph of its literal twin (`jl4/tests-cli/fixtures/explore-deadlines/`).
-Before 2026-11-25 the explorer worked out a `WITHIN` only when it was a literal number (it already worked out a closed `OF` anchor with no `AFTER` beside it), so this contract explored to 2 states, its breach was never reached, and the line said `UNTRIED 1: time runs out on refund (the WITHIN was never evaluated and is not a literal, so its deadline is not known here)`.
+Before smucclaw/l4-ide#1107 the explorer worked out a `WITHIN` only when it was a literal number (it already worked out a closed `OF` anchor with no `AFTER` beside it), so this contract explored to 2 states, its breach was never reached, and the line said `UNTRIED 1: time runs out on refund (the WITHIN was never evaluated and is not a literal, so its deadline is not known here)`.
 
 What is still not worked out is listed as untried (exit 2), and the reason in brackets says which it is:
 
