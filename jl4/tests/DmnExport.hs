@@ -3954,21 +3954,29 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
 
     -- Provenance, not the name: a module's own sum and min are not the
     -- prelude's, whatever they compute.
-    it "declines a locally defined sum and min" $ do
+    it "declines a locally defined sum, count, min and max" $ do
       let src =
             "GIVEN list IS A LIST OF NUMBER\n\
             \GIVETH A NUMBER\n\
             \sum list MEANS 42\n\
+            \GIVEN list IS A LIST OF NUMBER\n\
+            \GIVETH A NUMBER\n\
+            \count list MEANS 7\n\
             \GIVEN a IS A NUMBER\n\
             \      b IS A NUMBER\n\
             \GIVETH A NUMBER\n\
             \min a b MEANS a\n\
+            \GIVEN a IS A NUMBER\n\
+            \      b IS A NUMBER\n\
+            \GIVETH A NUMBER\n\
+            \max a b MEANS b\n\
             \GIVEN xs IS A LIST OF NUMBER\n\
             \      x IS A NUMBER\n\
             \GIVETH A NUMBER\n\
-            \`answer` xs x MEANS sum xs PLUS min x 1\n"
+            \`answer` xs x MEANS sum xs PLUS count xs PLUS min x 1 PLUS max x 2\n"
       (answerOf src).feText `shouldSatisfy` \t ->
-        not (Text.isInfixOf "concatenate" t) && not (Text.isInfixOf "min(x, 1)" t)
+        not (Text.isInfixOf "concatenate" t) && not (Text.isInfixOf "count(xs)" t)
+          && not (Text.isInfixOf "min(x, 1)" t) && not (Text.isInfixOf "max(x, 2)" t)
 
   -- EMPTY, the empty list. The typechecker stamps it a constructor like any
   -- other, so it used to become the string constant "EMPTY" wherever a
@@ -4152,6 +4160,33 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       (literalOf "is red" drg).feFragment `shouldBe` L4Verbatim
       [d.dcnName | d <- drgDecisions drg] `shouldBe` ["is red"]
       notesCoded "D-IMPORTED" drg `shouldBe` []
+
+    -- Not closed, so not copied: a constant that reads law time (this model's
+    -- own input, which the copy would read under the importer's rule date),
+    -- one that reads an ASSUME, and the ASSUME itself read directly. Each
+    -- reader is refused, Blocking.
+    it "refuses an imported constant that reads RULES EFFECTIVE DATE or an ASSUME, and an imported ASSUME" $ do
+      let lawLib =
+            "ASSUME `the base rate` IS A NUMBER\n\
+            \GIVETH A NUMBER\n\
+            \`the doubled base` MEANS `the base rate` TIMES 2\n\
+            \GIVETH A DATE\n\
+            \`the rule date` MEANS `RULES EFFECTIVE DATE`\n"
+          drg = drgGeneral (vfsFromList [("lawlib", lawLib)]) id defaultDmnFlavor (const "Test")
+                  "IMPORT lawlib\n\
+                  \GIVETH A DATE\n\
+                  \DECIDE `in force from` IS `the rule date`\n\
+                  \GIVEN h IS A NUMBER\n\
+                  \GIVETH A NUMBER\n\
+                  \DECIDE `pay` h IS h TIMES `the base rate`\n\
+                  \GIVEN h IS A NUMBER\n\
+                  \GIVETH A NUMBER\n\
+                  \DECIDE `pay twice` h IS h TIMES `the doubled base`\n"
+          readers = ["in force from", "pay", "pay twice"]
+      [d.dcnName | d <- drgDecisions drg] `shouldMatchList` readers
+      notesCoded "D-IMPORTED" drg `shouldBe` []
+      forM_ readers \nm -> (literalOf nm drg).feFragment `shouldBe` L4Verbatim
+      [n.element | n <- blockingOf drg] `shouldMatchList` map (`idOf` drg) readers
 
     it "still refuses a call to an imported function" $ do
       let drg = drgImp $ importing

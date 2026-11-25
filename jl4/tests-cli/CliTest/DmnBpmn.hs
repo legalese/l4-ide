@@ -149,6 +149,9 @@ exportNothingFixture      = fixtureDir </> "export-nothing.l4"
 exportScaffoldingFixture, exportScaffoldingDutyFixture :: FilePath
 exportScaffoldingFixture     = fixtureDir </> "export-scaffolding-only.l4"
 exportScaffoldingDutyFixture = fixtureDir </> "export-scaffolding-and-duty.l4"
+-- every decision rebinds the rule date, which --include-tests does not cure
+exportRebindOnlyFixture :: FilePath
+exportRebindOnlyFixture = fixtureDir </> "export-rebind-only.l4"
 exportBlockingOnlyFixture = fixtureDir </> "export-blocking-only.l4"
 -- smucclaw/l4-ide#1102: a module reading closed constants from the module
 -- it imports (copied into the model as decisions), and one reading values
@@ -655,6 +658,20 @@ spec bin = do
         let flagLines = [l | l <- lines serr, "--include-tests" `isInfixOf` l]
         flagLines `shouldSatisfy` all ("`sample amounts`" `isInfixOf`)
         length flagLines `shouldBe` 1
+
+      -- The third reason, alone: a rule-date rebind stays out with the flag
+      -- set too, so the flag is not offered, and setting it changes nothing.
+      it "refuses a module whose every decision rebinds the rule date, without offering --include-tests" $ do
+        Output code _ serr <- runL4 bin ["export", "dmn", exportRebindOnlyFixture]
+        code `shouldSatisfy` (/= ExitSuccess)
+        serr `shouldSatisfy` ("every decision in this module was left out" `isInfixOf`)
+        serr `shouldSatisfy`
+          ("`the rule date in 2016`, `the rule date in 2021`: left out because each evaluates under its own rule date" `isInfixOf`)
+        serr `shouldSatisfy` (not . ("--include-tests" `isInfixOf`))
+        serr `shouldSatisfy` (not . ("No decisions found" `isInfixOf`))
+        Output code' _ serr' <- runL4 bin ["export", "dmn", "--include-tests", exportRebindOnlyFixture]
+        code' `shouldSatisfy` (/= ExitSuccess)
+        serr' `shouldSatisfy` ("left out because each evaluates under its own rule date" `isInfixOf`)
 
       -- A raw-L4 note says what it costs: the whole file, on both engines.
       it "says in each raw-L4 note that both engines refuse the whole file" $ do
