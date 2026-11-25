@@ -1,8 +1,8 @@
 -- smucclaw/l4-ide#1107, after review: a deadline that reads the clock, or
 -- the world outside the file, is not worked out, written in the WITHIN or
--- reached through a rule. Worked out in the module, `clock duty` came out 8
--- under one fixed clock and 5 under another, so the answer was the day the
--- command ran on, not the contract's; `env duty` came out of the
+-- reached through a rule. Worked out in the module, `clock duty` comes out 8
+-- under one fixed clock and 5 under another, so the answer is the day the
+-- command ran on, not the contract's; `env duty` comes out of the
 -- environment the command ran in.
 
 IMPORT prelude

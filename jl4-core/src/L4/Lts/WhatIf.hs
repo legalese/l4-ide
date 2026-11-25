@@ -769,19 +769,21 @@ openingOf clock raw = case raw.roOpens of
 -- not known here, and the reason says what it reads. The tick the answer
 -- leads to is still held to 'confirmTick'.
 --
--- What review on 2026-11-25 changed: a @RECALL@ written in the @WITHIN@
--- itself was missed, and so was a rule reached by a named call or a
--- genitive ('namesIn'); and a section @GIVEN@ was taken for a module
+-- Three of those are easy to miss, and an @#EVAL@ gets each wrong: a
+-- @RECALL@ written in the @WITHIN@ itself, a rule reached by a named call or
+-- a genitive ('namesIn'), and a section @GIVEN@, which is not a module
 -- constant. "L4.Discharge" makes a section @GIVEN@ a parameter of every rule
 -- that reads it UNDER THE GIVEN'S OWN UNIQUE, which is also a top-level name
--- ('posReplayScope'), so the check let it through, and the @#EVAL@ read it
--- at its @TYPICALLY@ default: @`the duty` WITH `the period` IS 10 PLUS 10@
--- explored with the deadline 30, where the run's is 20. An @OF@ anchor that
--- reads one was read the same way, and @l4 explore@ had read it so before
--- smucclaw/l4-ide#1107 too. A rule that reads one, worked out in the module,
--- stopped with the evaluator's internal error ("given signatures' values'
--- lengths do not match"), the discharged call meeting a second discharge.
--- Now every read of a section @GIVEN@ is open (decided by Claude 2026-11-25,
+-- ('posReplayScope'), so a check on scope alone lets it through, and an
+-- @#EVAL@ reads it at its @TYPICALLY@ default: under @`the duty` WITH `the
+-- period` IS 10 PLUS 10@ the run's deadline is 20 and the @#EVAL@'s 30. On
+-- unstable, @l4 explore@ works an @OF@ anchor that reads one out so, and gets
+-- 35 where the run has 20 (measured 2026-11-25, the 30 as an @#EVAL@ on
+-- unstable). A call of a rule that reads one, evaluated outside the run as
+-- the residual holds it, with the @GIVEN@ already passed, stops with the
+-- evaluator's internal error ("given signatures' values' lengths do not
+-- match"), the discharged call meeting a second discharge (on unstable the
+-- replay of the act @pay (`the total` OF 20)@ gives it). Every read of a section @GIVEN@ is open (decided by Claude 2026-11-25,
 -- pending Meng's review): that also leaves unknown the deadline of a rule
 -- whose @GIVEN@ nothing supplies, which its @TYPICALLY@ default gives a run
 -- too, and of a rule that supplies the @GIVEN@ itself with @WITH@.
@@ -791,11 +793,11 @@ openingOf clock raw = case raw.roOpens of
 -- checker's resolved modules, as @l4 explore@ already did for its @RECALL@
 -- sites). The rig holds the imports as heaps, not as source, so without
 -- them a deadline naming an imported rule that reads a ledger, the clock,
--- the world outside the file or a section @GIVEN@ was worked out outside a
--- run (measured 2026-11-25: an imported @fromMaybe 10 (RECALL `period`)@
--- explored and listed as @WITHIN 10@, and an imported @TODAY@ reader, the
--- standard library's @`Today serial`@ among them, as 8 or 5 by
--- @--fixed-now@).
+-- the world outside the file or a section @GIVEN@ would be worked out
+-- outside a run: an imported @fromMaybe 10 (RECALL `period`)@ as 10, and an
+-- imported @TODAY@ reader, the standard library's @`Today serial`@ among
+-- them, as 8 or 5 by @--fixed-now@ (measured 2026-11-25, each as an @#EVAL@
+-- on unstable).
 data Closed = MkClosed
   { clEval  :: Maybe (Expr Resolved -> IO (Either Text (Value NF)))
     -- ^ the evaluator's answer for a closed expression, or what stopped it;
@@ -923,9 +925,9 @@ localKinds m = Map.fromList (events <> definitions <> inputs)
 -- first what a construct of its own reads (a @RECALL@, a @FETCH@, an @ENV@, a
 -- @POST@), then a name that is a section @GIVEN@ or a builtin that reads the
 -- clock or the world ('namesIn'). The clock and the world are open by a
--- choice decided by Claude 2026-11-25, pending Meng's review: until review of
--- smucclaw/l4-ide#1107 they counted as closed, and a @WITHIN@ of @(DATE_SERIAL
--- TODAY) MODULO 7 PLUS 3@ explored with the deadline 8 under one
+-- choice decided by Claude 2026-11-25, pending Meng's review: an @#EVAL@
+-- answers for the day and the environment the command ran in, so a @WITHIN@
+-- of @(DATE_SERIAL TODAY) MODULO 7 PLUS 3@ comes out 8 under one
 -- @--fixed-now@ and 5 under another. The builtins that only switch the time
 -- an expression is read at (@EVAL UNDER VALID TIME@, @EVER BETWEEN@ and their
 -- kin) are not open on their own: they take the time as an argument.
@@ -1008,11 +1010,12 @@ outcomeValue = \ case
 -- an application whether its arguments are positional or named (@`f` WITH x
 -- IS 1@), the rule a genitive applies (@Bob's `period for`@), and any other
 -- place a constructor of 'Expr' or of what it holds keeps a name, in the
--- order a generic traversal meets them. It is generic on purpose: until review
--- of smucclaw/l4-ide#1107 this matched only variables and positional applications, so
--- a rule that reads a ledger, named with @WITH@ or as a genitive, was not
--- seen, and its deadline was worked out against an empty ledger. A
--- constructor added to 'Expr' later cannot hide a name from it.
+-- order a generic traversal meets them. It is generic on purpose: one that
+-- matches only variables and positional applications, as @l4 explore@'s
+-- kept answers did on unstable, does not see a rule that reads a ledger
+-- named with @WITH@ or as a genitive, and a deadline naming it would be
+-- worked out against an empty ledger. A constructor added to 'Expr' later
+-- cannot hide a name from it.
 namesIn :: Expr Resolved -> [Resolved]
 namesIn = Optics.toListOf (Optics.gplate @Resolved)
 

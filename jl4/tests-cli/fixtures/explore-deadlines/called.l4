@@ -1,7 +1,7 @@
 -- smucclaw/l4-ide#1107, after review: a rule that reads a ledger is not
--- worked out however the WITHIN names it. Named with WITH, through a rule
--- that names it so, or as a genitive, it was missed, and the deadline was
--- worked out against an empty ledger: 50, the fallback, whatever the run had
+-- worked out however the WITHIN names it: with WITH, through a rule that
+-- names it so, or as a genitive. Worked out outside a run, against an empty
+-- ledger, each deadline would be 50, the fallback, whatever the run had
 -- recorded.
 
 IMPORT prelude

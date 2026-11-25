@@ -1,8 +1,8 @@
 -- smucclaw/l4-ide#1107, after review: a WITHIN that names a rule reading a
--- section GIVEN. Worked out in the module, it stopped with the evaluator's
--- "Internal error ... given signatures' values' lengths do not match. Please
--- report this as a bug."; it is not worked out now, and the reason says what
--- it reads.
+-- section GIVEN. Evaluated outside a run as the contract holds it, with
+-- the GIVEN already passed, the call stops with the evaluator's "Internal
+-- error ... given signatures' values' lengths do not match"; it is not
+-- worked out, and the reason says what it reads.
 
 DECLARE Actor IS ONE OF Alice
 DECLARE Act IS ONE OF pay

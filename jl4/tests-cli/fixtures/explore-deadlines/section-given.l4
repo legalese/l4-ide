@@ -1,9 +1,9 @@
 -- smucclaw/l4-ide#1107, after review: a deadline that reads a section GIVEN
 -- is not worked out. `the deal` supplies `the period` with WITH, so its run's
--- deadline is 20; worked out in the module, the GIVEN read its TYPICALLY
--- default, and the deadline came out 30. `anchored deal` is the same through
--- an OF anchor (20 in the run, 35 worked out), which l4 explore already got
--- wrong before #1107. `the plain deal` supplies nothing, so 30 is its run's
+-- deadline is 20; worked out in the module, the GIVEN reads its TYPICALLY
+-- default, and the deadline comes out 30. `anchored deal` is the same through
+-- an OF anchor (20 in the run, 35 worked out), which l4 explore on unstable
+-- works out so. `the plain deal` supplies nothing, so 30 is its run's
 -- answer too; it is not worked out either.
 
 DECLARE Actor IS ONE OF Alice

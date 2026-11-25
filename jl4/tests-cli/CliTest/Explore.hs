@@ -971,8 +971,8 @@ spec bin = describe "l4 explore" $ do
         lout `shouldSatisfy` (why `isInfixOf`)
         (lout <> lerr) `shouldNotSatisfy` ("Internal error" `isInfixOf`)
 
-    -- review of #1107: a deadline that read the clock was worked out, so it
-    -- came out 8 under one --fixed-now and 5 under another
+    -- review of #1107: worked out outside a run, a deadline that reads the
+    -- clock comes out 8 under one --fixed-now and 5 under another
     it "clock.l4: a WITHIN that reads the clock or the environment, itself or through a rule, is not worked out, under any --fixed-now" $
       forM_ [ ("clock duty", "the WITHIN reads `clocky`, which reads the clock (TODAY)")
             , ("today duty", "the WITHIN reads the clock (TODAY)")
