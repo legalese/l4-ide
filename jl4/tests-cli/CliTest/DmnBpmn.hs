@@ -171,6 +171,9 @@ exportImportedUncheckedFixture = fixtureDir </> "export-imported-unchecked.l4"
 exportRawL4Fixture, exportRawL4Cases :: FilePath
 exportRawL4Fixture = fixtureDir </> "export-raw-l4.l4"
 exportRawL4Cases   = fixtureDir </> "export-raw-l4.cases.json"
+exportRawL4DefaultFixture, exportRawL4DefaultCases :: FilePath
+exportRawL4DefaultFixture = fixtureDir </> "export-raw-l4-default.l4"
+exportRawL4DefaultCases   = fixtureDir </> "export-raw-l4-default.cases.json"
 -- A rule with the name of a computed field (smucclaw/l4-ide#1038), alone and
 -- beside scaffolding, and a computed field with no rule.
 exportTakenForFieldFixture, exportTakenForFieldMixFixture, exportComputedFieldOnlyFixture :: FilePath
@@ -663,6 +666,14 @@ spec bin = do
         length says `shouldBe` 2
         serr `shouldSatisfy` ("execution of every decision in the file" `isInfixOf`)
         serr `shouldSatisfy` (not . ("silently treated as non-matching" `isInfixOf`))
+
+      it "says in a raw-L4 output note what each engine does with the file" $ do
+        Output code _ serr <- runL4 bin ["export", "dmn", exportRawL4DefaultFixture, "--fidelity-report"]
+        code `shouldBe` ExitSuccess
+        serr `shouldSatisfy` ("[D-NONFEELOUTPUT] blocking" `isInfixOf`)
+        serr `shouldSatisfy`
+          ("execution of every decision in the file: Camunda 8.7.6 refuses to parse the file" `isInfixOf`)
+        serr `shouldSatisfy` (not . ("loudly when the rule fires" `isInfixOf`))
 
       -- smucclaw/l4-ide#1038: the checker takes a rule with a computed
       -- field's name for that field, and the export leaves the rule out.
@@ -1448,6 +1459,31 @@ spec bin = do
       dmn <- exported
       dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustFail
         dmn [dmn, "--cases", exportRawL4Cases] \out ->
+          out `shouldSatisfy` ("0 parsed" `isInfixOf`)
+
+  -- What the D-NONFEELOUTPUT note claims for a default output entry.
+  describe "raw L4 in a default output entry (opt-in: L4_DMN_ENGINE_CHECK=1)" $ do
+    let exported = do
+          tmp <- getTemporaryDirectory
+          let outDir  = tmp </> "l4-export-raw-l4-default"
+              outFile = outDir </> "export-raw-l4-default.dmn"
+          removePathForcibly outDir
+          createDirectoryIfMissing True outDir
+          Output code _ serr <- runL4 bin ["export", "dmn", exportRawL4DefaultFixture, "-o", outFile]
+          unless (code == ExitSuccess) $
+            expectationFailure ("l4 export dmn failed:\n" ++ serr)
+          pure outFile
+    it "KIE loads the file and answers null for the decision, reported as success" $ do
+      dmn <- exported
+      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustFail
+        dmn [dmn, "--cases", exportRawL4DefaultCases] \out -> do
+          out `shouldSatisfy` ("1 case(s), 0 error(s)" `isInfixOf`)
+          out `shouldSatisfy` ("SUCCEEDED-BUT-NULL" `isInfixOf`)
+
+    it "Camunda refuses to parse the file" $ do
+      dmn <- exported
+      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustFail
+        dmn [dmn, "--cases", exportRawL4DefaultCases] \out ->
           out `shouldSatisfy` ("0 parsed" `isInfixOf`)
 
   -- Before these names were reserved, KIE refused all three decisions

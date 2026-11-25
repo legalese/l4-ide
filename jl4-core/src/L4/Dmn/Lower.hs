@@ -3513,14 +3513,22 @@ dmnNote c sev el rng msg lostWhat =
 -- Shared by the decision-table path and the boxed-literal select-idiom path,
 -- because the failure is the same in both and a reader must not have to know
 -- which shape the exporter chose.
+--
+-- What it costs, measured 2026-11-26 on KIE 8.44.0.Final and Camunda 8.7.6
+-- (spec §7): Camunda refuses to parse the whole file, and so does KIE to load
+-- it, except a file whose only such text is a table's defaultOutputEntry,
+-- which KIE loads and answers null for, reported as success. The consequence
+-- this note used to give, a failure "loudly when the rule fires", was not
+-- what KIE does: it refuses the file before any rule fires.
 nonFeelOutput :: Text -> Maybe SrcRange -> FeelExpr -> FidelityNote
 nonFeelOutput el rng fe =
   dmnNote "D-NONFEELOUTPUT" Blocking el rng
     ("the output entry `" <> fe.feText
        <> "` is L4 source, not FEEL: this backend has no FEEL rendering for it, so the text \
           \was emitted verbatim and NO DMN engine can evaluate it")
-    "execution: an engine fails to compile the entry -- loudly when the rule fires, but \
-    \SILENTLY (a null result, reported as success) when it is the defaultOutputEntry"
+    "execution of every decision in the file: Camunda 8.7.6 refuses to parse the file, and \
+    \KIE 8.44 to load it, except that KIE loads a file whose only such text is a table's \
+    \defaultOutputEntry and SILENTLY answers null for that decision, reported as success"
 
 -- | @D-MAYBE-NULL@ (R8-a, R8-b): a @MAYBE τ@ was lowered to τ's own @typeRef@.
 --
@@ -4734,8 +4742,8 @@ lowerModule opts modul@(MkModule _ uri _) =
            <> "` (hydrated) is L4 source, not FEEL (`" <> ce.ceExpr.feText
            <> "`): it is a DERIVED field whose MEANS body this backend has no FEEL rendering \
               \for, so the text was emitted verbatim and NO DMN engine can evaluate it")
-        "execution: an engine fails to compile the hydrated record, and with it every decision \
-        \that reads a component through it"
+        "execution of every decision in the file, not only those that read a component \
+        \through the record: KIE 8.44 refuses to load the file and Camunda 8.7.6 to parse it"
     | h <- hydratorNodes
     , LogicContext es <- [h.dcnLogic]
     , ce <- es

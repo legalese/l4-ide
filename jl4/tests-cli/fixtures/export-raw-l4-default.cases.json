@@ -1,0 +1,9 @@
+{
+  "cases": [
+    {
+      "name": "the default entry fires",
+      "context": { "h": 1, "x": 1 },
+      "expect": { "pay": 2, "banded": "1" }
+    }
+  ]
+}
