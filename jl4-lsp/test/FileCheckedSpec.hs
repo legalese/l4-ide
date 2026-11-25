@@ -275,8 +275,11 @@ spec = describe "l4/fileChecked" do
       open server "lib" 1 (lib "\nDECIDE `broken` IS 1 PLUS TRUE\n")
       _ <- awaitChecked server "lib" (ofVersion 1)
       open server "main" 1 "IMPORT lib\n\n#EVAL `the answer`\n"
-      (_, checked) <- awaitChecked server "main" (ofVersion 1)
+      (earlier, checked) <- awaitChecked server "main" (ofVersion 1)
       codes checked `shouldBe` ["import/module-has-errors"]
+      -- nor are directive results pushed for it, as they are not for a file
+      -- that does not type-check
+      filter (isFor server "main" . (.uri)) (mapMaybe directiveResults earlier) `shouldBe` []
       change server "lib" 2 (lib "")
       (_, mended) <- awaitChecked server "main" (\p -> messages p == ["42"])
       mended.version `shouldBe` Just 1

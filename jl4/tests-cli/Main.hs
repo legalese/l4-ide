@@ -111,6 +111,11 @@ evalBlockIn n out =
       (_, fromHere) = T.breakOn marker (T.pack out)
   in fst (T.breakOn "Evaluation[" (T.drop (T.length marker) fromHere))
 
+-- | The @n@th @Evaluation[n]@ block of what @l4 run@ printed, with any @\r@
+-- dropped, so that a result can be matched as @Result:\n  42\n@.
+resultIn :: Int -> Output -> T.Text
+resultIn n o = evalBlockIn n (filter (/= '\r') o.outStdout)
+
 -- | The diagnostic that @l4 run@ printed on standard error against a range
 -- starting at column 1 of the given line: from its @Range:@ row to the next
 -- @File:@ row. Empty when none starts there.
@@ -4851,7 +4856,7 @@ spec bin = do
       noInternalError (both o)
 
     it "l4 trace fails on it and says that evaluation failed" $ do
-      o <- runL4 bin ["trace", errDir </> "main.l4"]
+      o <- runL4 bin ["trace", errDir </> "trace.l4"]
       o.outExit `shouldBe` ExitFailure 1
       noInternalError (both o)
       both o `shouldSatisfy` isInfixOf "evaluation failed"
@@ -4900,22 +4905,24 @@ spec bin = do
     it "still evaluates a file whose import is clean" $ do
       o <- runL4 bin ["run", okDir </> "main.l4"]
       o.outExit `shouldBe` ExitSuccess
-      evalBlockIn 1 o.outStdout `shouldSatisfy` T.isInfixOf "42"
-      evalBlockIn 2 o.outStdout `shouldSatisfy` T.isInfixOf "assertion satisfied"
+      resultIn 1 o `shouldSatisfy` T.isInfixOf "Result:\n  42\n"
+      resultIn 2 o `shouldSatisfy` T.isInfixOf "assertion satisfied"
 
     it "still evaluates a line that reads nothing from a clean import" $ do
       o <- runL4 bin ["run", okDir </> "plain.l4"]
       o.outExit `shouldBe` ExitSuccess
-      evalBlockIn 1 o.outStdout `shouldSatisfy` T.isInfixOf "2"
+      resultIn 1 o `shouldSatisfy` T.isInfixOf "Result:\n  2\n"
 
     it "still evaluates a file whose import only warns" $ do
       o <- runL4 bin ["run", fixtureDir </> "imports-warning" </> "eval.l4"]
       o.outExit `shouldBe` ExitSuccess
-      evalBlockIn 1 o.outStdout `shouldSatisfy` T.isInfixOf "1"
+      resultIn 1 o `shouldSatisfy` T.isInfixOf "Result:\n  1\n"
 
     it "still traces, lists, explores, proves and covers over a clean import" $ do
-      traced <- runL4 bin ["trace", okDir </> "main.l4"]
+      traced <- runL4 bin ["trace", okDir </> "trace.l4"]
       traced.outExit `shouldBe` ExitSuccess
+      -- the traced directive's value, 42 PLUS 1, at the root of its graph
+      traced.outStdout `shouldSatisfy` isInfixOf "\\n43\""
       listed <- runL4 bin ["lts", okDir </> "duty.l4"]
       listed.outExit `shouldBe` ExitSuccess
       listed.outStdout `shouldSatisfy` isInfixOf "duty — after 1 event"
@@ -4926,6 +4933,7 @@ spec bin = do
       proved.outStdout `shouldSatisfy` isInfixOf "by evaluation: assertion satisfied"
       covered <- runL4 bin ["coverage", okDir </> "duty.l4"]
       covered.outExit `shouldBe` ExitSuccess
+      covered.outStdout `shouldSatisfy` isInfixOf "2 witnessed"
       mapM_ (noInternalError . both) [traced, listed, explored, proved, covered]
 
     it "still runs l4 batch over a clean import" $ do
@@ -5001,7 +5009,10 @@ spec bin = do
   -- Regression test for smucclaw/l4-ide#1008: every module used to be checked
   -- (and evaluated) once per import PATH, so a type error in a module reached by
   -- several paths was reported once per path (10 times under `check`, 36 under
-  -- `run` on this fixture). It must be reported exactly once.
+  -- `run` on this fixture). It must be reported exactly once. Since
+  -- smucclaw/l4-ide#1025, `run` does not evaluate a file whose import has
+  -- errors, so the `run` arm only type-checks, as `check` does; the evaluation
+  -- of a diamond is covered by jl4-lsp's ImportOnceSpec, over one with no error.
   describe "l4 diagnostics in a shared imported module" $
     for_ ["check", "run"] \cmd ->
       it ("reports a type error in a diamond's bottom module once under " <> cmd) $ do
