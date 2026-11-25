@@ -1,8 +1,9 @@
 # Verification Backend Lowering Specification
 
-**Status:** Proposal. **Phase 1 is ruled, and partly built on a branch not yet merged.** R-V1–R-V10 were answered by Meng on 2026-09-07 (§"Phase 1 rulings").
-`l4 prove` is built on `feat/l4-prove`, draft legalese/l4-ide#784 (2026-10-30), not merged into `unstable`; until it merges, `l4 prove` does not exist in the tree, and this document's present-tense mentions of it are still plans.
-What #784 builds, by ruling: R-V2's unfolding (every reached `DECIDE` a `define-fun`), not its generated obligations; R-V3's selection of obligations (an `#ASSERT` that reads a section binder and that the evaluator did not decide), not its diagnostic reword; R-V4 (each `analyzeSafety` clause a side condition or a named refusal); R-V5; R-V6 with z3 only; R-V7 except `STRING`; R-V8.
+**Status:** Proposal. **Phase 1 is ruled, and partly built: `l4 prove` is on `unstable`.** R-V1–R-V10 were answered by Meng on 2026-09-07 (§"Phase 1 rulings").
+`l4 prove` was built on `feat/l4-prove` and merged into `unstable` by legalese/l4-ide#784 on 2026-11-12 (merge commit `2818cc21e`).
+What #784 built, by ruling: R-V2's unfolding (every reached `DECIDE` a `define-fun`), not its generated obligations; R-V3's selection of obligations (an `#ASSERT` that reads a section binder and that the evaluator did not decide), not its diagnostic reword; R-V4 (each `analyzeSafety` clause a side condition or a named refusal); R-V5; R-V6 with z3 only; R-V7 except `STRING`; R-V8.
+`l4 prove` has since gained cvc5 as a second solver, asked where z3 gives no answer (2026-11-25, smucclaw/l4-ide#1098; decided by Claude 2026-11-25, pending Meng's review; see the note under R-V6).
 **R-V10 is discharged as a design** in #784 (2026-10-30): the Mode A/B gate now calls the real emitted scope at a witness per realisable combination; executing it needs catala, which runs on nye and not in CI (`pr-checks.yml:212-218`). See CATALA-EXPORT-SPEC §8.4's discharge note.
 R-V3's `deferred` outcome and its `l4 run` exit-code change are withdrawn: UNKNOWN-EVALUATION-SPEC U1b (ruled 2026-10-01) supersedes them, by Meng's firing of PECKINGORDER on 2026-10-30; see the note under R-V3.
 **Author:** Meng Wong
@@ -408,14 +409,16 @@ One lowering from that language to SMT-LIB2 serves both `l4 prove` and the query
 Nothing else in this ruling changes.
 
 **A second solver, 2026-11-25 (smucclaw/l4-ide#1098; decided by Claude 2026-11-25, pending Meng's review).**
-`l4 prove` gives cvc5 the same script where z3 gives no answer (a timeout, a failure to run, or z3's own `unknown`), when cvc5 is installed: `CVC5_EXE` first, where a set path that does not exist is a hard failure as `Z3_EXE`'s is, then `cvc5` on `PATH`.
+`l4 prove` gives cvc5 the same script where z3 gives no answer (a timeout, a failure to start, or z3's own `unknown`), when cvc5 is installed: `CVC5_EXE` first, where a set path that does not exist is a hard failure as `Z3_EXE`'s is, even in a run z3 answers completely, then `cvc5` on `PATH`.
+A z3 that starts and then prints nothing it can read, a crash among them, is an encoding defect as it was before, and cvc5 is not asked.
 The two are asked one after the other, each with the whole `--timeout`, not raced: the two solvers give different models for the same script (on `hash-name.l4`'s, cvc5 gives `x = -1` and z3 `x = 0`), so a race would make the printed counterexample depend on which finished first.
-cvc5's answers pass through R-V5's two checks unchanged.
+cvc5's answers pass through R-V5's two checks, as z3's do.
+For that, cvc5 is run with `--dag-thresh=0`, which makes it print each model value in full: by default it abbreviates a part that occurs twice with `let`, which the model reader does not read, so a counterexample whose two fields held equal records was `unknown` (found by review, 2026-11-25).
 Output from cvc5 that cannot be read is no answer, not an encoding defect, so unreadable output from it never turns an `unknown` into a defect; a cvc5 answer the evaluator disagrees with is still one, and z3's output is read as strictly as before.
 Strictness goes by the order asked, not by the solver: under `--solver`, whichever solver is asked first is read strictly, and only the one asked second leniently.
 Without cvc5, a run is z3's alone and its report is unchanged, except for one line counting the obligations z3 gave no answer to, printed only when there are any.
 `--solver` chooses the solvers and their order, and a solver it names is required.
-What drove it: the issue's claim about a rounded product, where z3 4.16.0 gives no answer in 30 s and cvc5 1.4.2 proves the same emitted script in 0.02 to 0.19 s (measured 2026-11-25); and, as the issue reports and not re-measured here, 10 of 5,146 scripts from a public L4 corpus where z3 gives no answer in 150 s and cvc5 says `unsat` in under 0.5 s, and 12 where cvc5 gives up and z3 answers. With z3 asked first and cvc5 after it, an obligation either solver answers within `--timeout` is answered, whichever of the two it is.
+What drove it: the issue's claim about a rounded product, where z3 4.16.0 gives no answer in 30 s and cvc5 1.4.2 proves the same emitted script in 0.02 to 0.19 s (measured 2026-11-25); and, as the issue reports and not re-measured here, 10 of 5,146 scripts from a public L4 corpus where z3 gives no answer in 150 s and cvc5 says `unsat` in under 0.5 s, and 12 where cvc5 gives up and z3 answers. With z3 asked first and cvc5 after it, an obligation either solver answers within `--timeout` is answered, whichever of the two it is, except where z3's own answer settles the row: a z3 model with a value that is not a rational stays `unknown`, and z3 output that cannot be read stays an encoding defect, and cvc5 is asked about neither.
 This uses the ruling's "free second opinion" as a second chance: cvc5 is not asked to confirm z3's `unsat`.
 `l4 coverage` and `l4 export catala` still ask z3 alone.
 

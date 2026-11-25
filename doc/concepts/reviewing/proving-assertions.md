@@ -51,6 +51,8 @@ If it finds none, it stops and says so (`l4 prove: no SMT solver found: set Z3_E
 cvc5 is optional.
 To use it, install it from [its releases page](https://github.com/cvc5/cvc5/releases), which publishes ready-built programs for Linux, macOS and Windows, and put it on your `PATH` or set `CVC5_EXE` to it.
 Without it, `l4 prove` works as it does with z3 alone; [Two solvers](#two-solvers) says what changes when it is there.
+A `CVC5_EXE` you set is taken as an instruction, though: if it names a file that does not exist, `l4 prove` stops and exits 1, as it does for `Z3_EXE`, even when z3 would have answered everything.
+A cvc5 that is there but cannot be run is treated as absent, and the last line of the report says why.
 
 This is the report for `assert-raises.l4`, a file in L4's own test corpus whose section takes `x IS A NUMBER` and `b IS A BOOLEAN`:
 
@@ -99,8 +101,9 @@ Both checks apply to every answer, whichever solver gave it.
 ### Two solvers
 
 z3 is asked first, about every assertion sent to a solver.
-cvc5 is asked only about an assertion z3 gave no answer to: z3 ran out of time, or said itself that it does not know.
+cvc5 is asked only about an assertion z3 gave no answer to: z3 ran out of time, could not be started, or said itself that it does not know.
 Where z3 answered, cvc5 is not asked, and the report is what it would have been without cvc5.
+A z3 that starts and then prints something `l4 prove` cannot read, or nothing at all because it crashed, is not taken to have given no answer: that is an `ENCODING DEFECT`, as it was before there was a second solver, and cvc5 is not asked.
 
 cvc5 is given exactly the script z3 was given, and the same time: `--timeout` is the time each solver gets for each assertion, so an assertion neither solver can settle takes up to twice that.
 When cvc5 settles one, its line says so, and gives z3's reason.
@@ -115,7 +118,8 @@ solver: Z3 version 4.16.0 - 64 bit
 second solver: cvc5 1.4.2 [git 282d5e0 on branch HEAD], asked where z3 gave no answer: 1 obligation
 ```
 
-When neither settles an assertion, the verdict is `unknown`, with z3's reason first and then cvc5's:
+When neither settles an assertion, the verdict is `unknown`, with z3's reason first and then cvc5's.
+In outline, for an assertion on line 12 of a file `rules.l4` (the name, the position and the elided assertion are made up; the two reason lines are what `l4 prove` prints):
 
 ```
   unknown  rules.l4:12:1-60  #ASSERT …
@@ -128,6 +132,8 @@ If z3 answered everything, that line is not printed.
 
 Output from cvc5 that `l4 prove` cannot read counts as no answer, so a cvc5 that prints something unexpected leaves an `unknown` as it was rather than turning it into a failure.
 An answer from cvc5 that the evaluator disagrees with is still an `ENCODING DEFECT`, as one from z3 is.
+An answer from cvc5 that cannot be checked leaves the verdict `unknown`: a counterexample with a value that is not a rational number, say (see the limits below).
+Its row gives that reason, and then what cvc5 said, as in `cvc5 said sat after z3 gave no answer: timeout after 10s`.
 
 `--solver` chooses the solvers and the order to ask them in:
 
@@ -144,13 +150,13 @@ Only the solver asked second gets the leniency above, so with `--solver cvc5` al
 
 ### Exit status
 
-| status | meaning                                                                                     |
-| ------ | ------------------------------------------------------------------------------------------- |
-| 0      | every assertion sent to the solver was proved, or none was sent                             |
-| 1      | the file did not check, an option was wrong, or a solver it needed was not found            |
-| 2      | at least one assertion was refuted, or the evaluator itself found one FALSE or saw it raise |
-| 3      | at least one assertion is unknown, and none of the above                                    |
-| 4      | an encoding defect (outranks the others)                                                    |
+| status | meaning                                                                                                                                                                 |
+| ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0      | every assertion sent to the solver was proved, or none was sent                                                                                                         |
+| 1      | the file did not check, an option was wrong, z3 or a solver named with `--solver` could not be found or run, or `Z3_EXE` or `CVC5_EXE` names a file that does not exist |
+| 2      | at least one assertion was refuted, or the evaluator itself found one FALSE or saw it raise                                                                             |
+| 3      | at least one assertion is unknown, and none of the above                                                                                                                |
+| 4      | an encoding defect (outranks the others)                                                                                                                                |
 
 ### Seeing what was sent to the solver
 
@@ -172,6 +178,9 @@ These are stated here because you would otherwise find them out from a wrong con
 - **Rules from other files are followed but not pre-checked.** A safety check that runs before the solver (for side effects, refusals and the like) sees only the file you named; when a proof relies on rules from an imported file, the report names them.
 - **A counterexample that needs an irrational number** (for `x TIMES x EQUALS 2`, say) cannot be given as an L4 value, so the verdict is `unknown (model value not a rational: …)`, even though the assertion is refutable.
 - **Arithmetic that multiplies two unknowns together** is harder for any solver; z3 often still decides it, cvc5 sometimes decides what z3 cannot, and when neither does the verdict is `unknown` with that reason.
-- **cvc5 is a second chance, not a second opinion.** It is not asked to confirm what z3 proved or refuted; the evaluator's checks above are what stand behind every answer. And when z3 finds a counterexample that cannot be written as an L4 number (above), cvc5 is not asked for another.
-- **Only `l4 prove` asks cvc5.** [`l4 coverage`](coverage.md) and `l4 export catala` use z3 alone.
+- **cvc5 is a second chance, not a second opinion.**
+  It is not asked to confirm what z3 proved or refuted; the evaluator's checks above are what stand behind every answer.
+  And when z3 finds a counterexample that cannot be written as an L4 number (above), cvc5 is not asked for another.
+- **Only `l4 prove` asks cvc5.**
+  [`l4 coverage`](coverage.md) and `l4 export catala` use z3 alone.
 - **A record built from a value that would raise, and then passed to another rule,** is treated as raising, even when that rule never reads the field. L4 itself is lazier than that. (A field read straight out of the record needs only that field to be defined, as in L4.) The replay catches the difference and reports it as an `ENCODING DEFECT` rather than a counterexample, so it can cost you a verdict but cannot give you a wrong one.
