@@ -193,7 +193,7 @@ Long routes only.
 | `POST` | `/deployments/{id}/instances/{instance}/events`   | `party`, `action`, `idempotencyKey`; optionally `decidedAgainst`, `strict`, `cells`, `claimedAt` | `200` and the row; `409` for a strict proposal whose cell moved; `422` refused |
 | `GET`  | `/deployments/{id}/instances/{instance}/position` |                                                                                                  | `200`: the head, the enabled set in the words of `l4 lts`, the next deadline   |
 
-The position reads a deadline as `l4 lts` did before smucclaw/l4-ide#1107: one written as a name or as arithmetic (`` WITHIN `ten days` ``) is "not known here" until its obligation has seen an event, where `l4 lts` now works it out, and the ledger does not tick past it (decided by Claude 2026-11-25, pending Meng's review; [the ledger page](../doc/reference/regulative/ledger.md) says the same).
+The position reads a deadline as `l4 lts` did before smucclaw/l4-ide#1107: one written as a name or as arithmetic (`` WITHIN `ten days` ``), which `l4 lts` now works out, is left out of `nextDeadline` and listed under `deadlineNotKnown`, and the ledger does not tick past it (read from the code, not measured ; decided by Claude 2026-11-25, pending Meng's review; [the ledger page](../doc/reference/regulative/ledger.md) says the same).
 Every reply is JSON and says whether it `applied` anything.
 `404` is an instance the ledger does not hold: an append or a read never creates one.
 `503` applied nothing: the evaluator could not decide, a limit stopped the request, every one of the ledger's slots was taken, or the store could not be opened.
