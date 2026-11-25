@@ -2777,6 +2777,22 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       -- smucclaw/l4-ide#1104: 'drgOmitted' is the data the CLI's empty-model
       -- refusal reads, so it must name exactly the decides the population
       -- notes name, each with its own reason.
+      -- smucclaw/l4-ide#1038: a rule the checker took for a computed field is
+      -- named in drgTakenForFields; the function the desugaring made out of
+      -- the computed field itself is not.
+      it "names a rule taken for a computed field, and not the computed field" $ do
+        let field =
+              "DECLARE Employee HAS salary IS A NUMBER\n\
+              \                     bonus IS A NUMBER MEANS salary * 0.1\n"
+            rule =
+              "GIVEN n IS A NUMBER\n\
+              \GIVETH A NUMBER\n\
+              \DECIDE bonus n IS n * 2\n"
+        (drgOf (field <> "\n" <> rule)).drgTakenForFields `shouldBe` ["bonus"]
+        (drgOf field).drgTakenForFields `shouldBe` []
+        (drgOf (field <> "\nGIVEN h IS A NUMBER\nGIVETH A NUMBER\nDECIDE `pay` h IS h PLUS 1\n")).drgTakenForFields
+          `shouldBe` []
+
       it "records every population drop in drgOmitted, with the reason the note gives" $ do
         drg <- rebindDrg
         let unbound = [n.element | n <- (dmnReport drg).notes, n.code == "D-RULEDATE-UNBOUND"]
@@ -4401,6 +4417,7 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
           { drgId = "definitions_t", drgName = "t"
           , drgNamespace = "ns", drgFlavor = FlavorCamunda
           , drgItemDefs = [], drgNodes = ns, drgNotes = [], drgOmitted = []
+          , drgTakenForFields = []
           }
         lit frag t = LogicLiteral (MkFeelExpr t frag)
         bkmNode nm krs body = NodeBkm MkBkm

@@ -3441,6 +3441,12 @@ the census showed 0 cyclic files. The census is blind to suppressed self-edges b
 > The `Drg` now carries the drops as data (`drgOmitted`, `L4/Dmn/IR.hs`, filled in `lowerModule` from the same `pvDropped` the notes read), and the refusal (`noDecisionsMessage`, `jl4/app/L4/Cli/Export.hs`) names the dropped decisions under their reason, offering `--include-tests` only on the scaffolding line, since the flag does not restore the other two.
 > The old one-line refusal is kept for a module with no `DECIDE` or `MEANS` at all.
 > The wording is decided by Claude 2026-11-25, pending Meng's review; the severities and predicates of the three codes are unchanged.
+>
+> **One more way a module's rules all leave, found by the review of #1104.** A rule with the name of a computed record field is taken by the checker for that field (smucclaw/l4-ide#1038, open), so `lowerModule` puts it with the functions the desugaring made out of computed fields, which become hydrators (§4.4) and never decisions; it is not a population drop and no note names it.
+> With #1104 as first written, a module whose only rule was such a one was still told it had no `DECIDE` or `MEANS`, and one that also had scaffolding was given a list naming the scaffolding alone (`jl4/tests-cli/fixtures/export-taken-for-field.l4` and `export-taken-for-field-mix.l4`).
+> The `Drg` now also carries those rules (`drgTakenForFields`), told apart from the synthetic functions by their last `GIVEN` binder, which `makeComputedDecide` builds with no source range and an author's has, and the refusal lists them under their own reason, naming #1038 and saying that renaming the rule brings it back (measured: renamed `bonus rule`, it is exported).
+> Listing them, rather than rewording the header, is decided by Claude 2026-11-26, pending Meng's review, because the reader can act on a name and cannot act on a vaguer sentence.
+> Beside other decisions such a rule still leaves the model with no note (measured 2026-11-26: `jl4/tests-cli/fixtures/export-taken-for-field.l4` plus a second rule exports only the second); that is #1038's to fix, and this change does not touch it.
 
 ---
 

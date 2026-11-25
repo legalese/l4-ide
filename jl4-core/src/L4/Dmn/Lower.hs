@@ -3814,6 +3814,7 @@ lowerModule opts modul@(MkModule _ uri _) =
         | d <- allDecides
         , Just reason <- [Map.lookup (getUnique (decideResolved d)) popVerdict.pvDropped]
         ]
+    , drgTakenForFields = map decideName (filter authoredDecide computedSelectorDecides)
     }
  where
   modelId = sanitiseId opts.dloModelName
@@ -3966,6 +3967,20 @@ lowerModule opts modul@(MkModule _ uri _) =
       ]
   allDecides = map snd allDecidesAnn
   assumes = [a | Assume _ a <- decls]
+
+  -- smucclaw/l4-ide#1038 (open): the checker stamps a rule 'ComputedSelector'
+  -- when it shares its name with a computed field of a record, so the rule is
+  -- in 'computedSelectorDecides' and leaves the model with the functions the
+  -- desugaring made out of computed fields. Told apart from those by its last
+  -- @GIVEN@ binder: 'L4.Desugar.makeComputedDecide' builds that binder
+  -- (@_self@) with no source range, and one the author wrote has one. A rule
+  -- with no @GIVEN@ at all is the author's too, since every synthetic one has
+  -- @_self@. Only the refusal for an empty model reads this ('drgTakenForFields');
+  -- beside other decisions such a rule still leaves the model with no note,
+  -- which is #1038's to fix.
+  authoredDecide (MkDecide _ (MkTypeSig _ (MkGivenSig _ gs) _) _ _) = case reverse gs of
+    []           -> True
+    (self' : _)  -> isJust (rangeOf (getAnno self'))
 
   -- smucclaw/l4-ide#1102, option 1: the CLOSED constants of imported modules
   -- that a decide of this module reads. A closed constant is a 0-ary decide

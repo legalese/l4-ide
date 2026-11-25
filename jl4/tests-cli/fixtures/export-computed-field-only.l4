@@ -1,0 +1,5 @@
+-- A control for `export-taken-for-field.l4`: a computed field and no rule.
+-- A computed field becomes part of a record's value in DMN, not a decision,
+-- so the module has none and gets the one-line refusal.
+DECLARE Employee HAS salary IS A NUMBER
+                     bonus IS A NUMBER MEANS salary * 0.1

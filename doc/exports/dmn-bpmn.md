@@ -93,7 +93,9 @@ No decisions to export: every decision in this module was left out of the DMN mo
   - `sample prices`, `price with tax`: left out as test scaffolding, because each is used only by directives such as #EVAL and #ASSERT, or by other test scaffolding. Pass --include-tests to export them.
 ```
 
-`--include-tests` is offered only for the scaffolding; it does not bring back the other two kinds.
+`--include-tests` is offered only for the scaffolding; it does not bring back the other kinds.
+A rule with the same name as a computed field of a record (a field with a `MEANS` in a `DECLARE`) is left out too, because the checker takes it for that field, a known defect ([smucclaw/l4-ide#1038](https://github.com/smucclaw/l4-ide/issues/1038)); the list names it, and giving the rule a name of its own brings it back.
+Beside other decisions such a rule is left out with no note, so do not give a rule a computed field's name.
 A file with no `DECIDE` or `MEANS` at all gets a one-line refusal saying so.
 
 **Types.** Each record (`DECLARE … HAS`) and each `IS ONE OF` becomes a DMN `<itemDefinition>`.

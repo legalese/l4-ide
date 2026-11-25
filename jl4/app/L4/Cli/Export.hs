@@ -538,12 +538,17 @@ exportDmn opts tcRes = do
 -- with the flag set too.
 --
 -- Read from 'drgOmitted', never from the notes: one form of @D-FIXTURE@
--- reports a decision that was KEPT.
+-- reports a decision that was KEPT. A rule the checker took for a computed
+-- field (smucclaw/l4-ide#1038) is not a population drop and comes from
+-- 'drgTakenForFields'; before it was listed, a module whose only rule was
+-- such a one was told it had no DECIDE or MEANS, and one that also had
+-- scaffolding was given a list without it.
 --
--- The wording is decided by Claude 2026-11-25, pending Meng's review.
+-- The wording is decided by Claude 2026-11-25, pending Meng's review; the
+-- #1038 line is decided by Claude 2026-11-26, pending Meng's review.
 noDecisionsMessage :: Drg -> Text
 noDecisionsMessage drg
-  | null drg.drgOmitted =
+  | null drg.drgOmitted && null drg.drgTakenForFields =
       "No decisions found in module — nothing to export as DMN \
       \(a DMN decision comes from a DECIDE / MEANS definition; a module of bare \
       \DECLAREs and IMPORTs has none)\n"
@@ -564,6 +569,11 @@ noDecisionsMessage drg
                   \EFFECTIVE AT), and a DMN model has one rule-date input and no way to \
                   \rebind it"
                   ""
+              , reasonLine drg.drgTakenForFields
+                  "because each has the name of a computed field of a record (a field \
+                  \with a MEANS in a DECLARE), and the checker takes each for that field \
+                  \(smucclaw/l4-ide#1038, not yet fixed)"
+                  " Rename them to export them."
               ]
  where
   scaffolding = [n | (n, r) <- drg.drgOmitted, r `elem` [DroppedFixture, DroppedFixtureHelper]]

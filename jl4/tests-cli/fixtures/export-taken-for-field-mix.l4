@@ -1,0 +1,13 @@
+-- `export-taken-for-field.l4` with test scaffolding beside it. Before, the
+-- refusal listed the scaffolding and not the rule.
+IMPORT prelude
+
+DECLARE Employee HAS salary IS A NUMBER
+                     bonus IS A NUMBER MEANS salary * 0.1
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE bonus n IS n * 2
+
+`sample prices` MEANS LIST 10, 20
+#ASSERT count `sample prices` EQUALS 2

@@ -167,6 +167,12 @@ exportImportedPartialFixture = fixtureDir </> "export-imported-partial.l4"
 exportImportedUncheckedFixture :: FilePath
 exportImportedUncheckedFixture = fixtureDir </> "export-imported-unchecked.l4"
 -- Inputs spelled like a FEEL function the export calls.
+-- A rule with the name of a computed field (smucclaw/l4-ide#1038), alone and
+-- beside scaffolding, and a computed field with no rule.
+exportTakenForFieldFixture, exportTakenForFieldMixFixture, exportComputedFieldOnlyFixture :: FilePath
+exportTakenForFieldFixture     = fixtureDir </> "export-taken-for-field.l4"
+exportTakenForFieldMixFixture  = fixtureDir </> "export-taken-for-field-mix.l4"
+exportComputedFieldOnlyFixture = fixtureDir </> "export-computed-field-only.l4"
 -- A prelude.l4 and a daydate.l4 of the author's own, beside the importer,
 -- and the same calls against the real libraries.
 exportShadowPreludeFixture, exportPreludeCallsFixture :: FilePath
@@ -642,6 +648,29 @@ spec bin = do
         let flagLines = [l | l <- lines serr, "--include-tests" `isInfixOf` l]
         flagLines `shouldSatisfy` all ("`sample amounts`" `isInfixOf`)
         length flagLines `shouldBe` 1
+
+      -- smucclaw/l4-ide#1038: the checker takes a rule with a computed
+      -- field's name for that field, and the export leaves the rule out.
+      it "names a rule taken for a computed field, rather than saying the module has no DECIDE" $ do
+        Output code _ serr <- runL4 bin ["export", "dmn", exportTakenForFieldFixture]
+        code `shouldSatisfy` (/= ExitSuccess)
+        serr `shouldSatisfy` ("every decision in this module was left out" `isInfixOf`)
+        serr `shouldSatisfy`
+          ("`bonus`: left out because each has the name of a computed field of a record" `isInfixOf`)
+        serr `shouldSatisfy` ("smucclaw/l4-ide#1038" `isInfixOf`)
+        serr `shouldSatisfy` (not . ("No decisions found" `isInfixOf`))
+
+      it "names a rule taken for a computed field beside the scaffolding" $ do
+        Output code _ serr <- runL4 bin ["export", "dmn", exportTakenForFieldMixFixture]
+        code `shouldSatisfy` (/= ExitSuccess)
+        serr `shouldSatisfy` ("`sample prices`: left out as test scaffolding" `isInfixOf`)
+        serr `shouldSatisfy` ("`bonus`: left out because each has the name of a computed field" `isInfixOf`)
+
+      it "keeps the one-line refusal for a module whose only MEANS is a computed field" $ do
+        Output code _ serr <- runL4 bin ["export", "dmn", exportComputedFieldOnlyFixture]
+        code `shouldSatisfy` (/= ExitSuccess)
+        serr `shouldSatisfy` ("No decisions found in module" `isInfixOf`)
+        serr `shouldSatisfy` (not . ("left out" `isInfixOf`))
 
       -- smucclaw/l4-ide#1102: a closed constant from an imported module is
       -- carried into the model as a decision; nothing else from it is.

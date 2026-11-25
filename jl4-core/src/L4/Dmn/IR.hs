@@ -1104,6 +1104,13 @@ data Drg = MkDrg
     -- can say WHY without reading a note's message (smucclaw/l4-ide#1104).
     -- Matching note text would be wrong as well as fragile: one form of
     -- @D-FIXTURE@ reports a decision that was KEPT.
+  , drgTakenForFields :: ![Text]
+    -- ^ the L4 name of every rule the author wrote that left the model
+    -- because the checker took it for a computed record field of the same
+    -- name (smucclaw/l4-ide#1038, open), in source order. Not a population
+    -- drop, so not in 'drgOmitted': the rule leaves with the computed-field
+    -- functions the desugaring makes, which become hydrators (§4.4). Read by
+    -- the refusal for an empty model, so that it names these rules too.
   }
   deriving stock (Eq, Show, Generic)
 
