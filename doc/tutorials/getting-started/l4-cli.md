@@ -796,9 +796,10 @@ Then evaluate expressions live:
 50
 ```
 
-Useful REPL commands: `:help`, `:load <file>` / `:reload`, `:type <expr>`, `:info <name>` / `:env`, `:decides` and `:queryplan` (query planning), and `:trace` / `:traceascii` / `:tracefile` (evaluation traces). See [jl4-repl's README](https://github.com/legalese/l4-ide/tree/main/jl4-repl) for the full list.
+Useful REPL commands: `:help`, `:load <file>` / `:reload`, `:import <lib>` (which adds an `IMPORT` of that module to every line you type after it, without changing your file), `:type <expr>`, `:info <name>` / `:env`, `:decides` and `:queryplan` (query planning), and `:trace` / `:traceascii` / `:tracefile` (evaluation traces). See [jl4-repl's README](https://github.com/legalese/l4-ide/tree/main/jl4-repl) for the full list.
 `:load` and `:reload` read the file again from disk, with every file it imports, so a change you save while the REPL runs is seen; `:reset` does the same, and also removes what `:import` added.
-Evaluating a line does not read the files again, so after a change, `:reload` before you ask.
+Until you use one of them, a line answers from the files as the REPL last read them, so after a change, `:reload` before you ask.
+Only a fresh REPL sees a module added where `IMPORT` looks before the one in use, such as a `lib.l4` put in the `JL4_LIBRARY_PATH` folder while the `lib.l4` beside your file is in use (see [How IMPORT finds libraries](../../reference/libraries/resolution.md)).
 
 ---
 
