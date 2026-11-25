@@ -751,24 +751,27 @@ The same holds for every file that imports this one, directly or not, since its 
   A results panel that was open keeps the last results it had, as it does while a file has an error of its own.
   A decision graph of a rule in the file can still be drawn.
   Where the rule calls another rule, answering the graph's questions makes it say that evaluation failed: `A module this file imports has errors, so nothing is evaluated; the error on its IMPORT names it.`
-- The REPL names the module when it loads the file, and again for each line you ask it to evaluate: ``This file imports `lib`, which has errors, so nothing is evaluated; `l4 check` on the file shows the errors.``
-  The REPL does not see a change to a file it has already checked, even on `:reload`, so once the module is fixed, start the REPL again.
-- A module that `:import` added in the REPL stops every line in the same way, and the REPL says so: `` `:import` added `lib`, which has errors, so nothing is evaluated; `:imports` lists what `:import` added, and `:reset` removes it. ``
+- The REPL names the module when it loads the file, and again for each line you ask it to evaluate, in a message that begins ``This file imports `lib`, which has errors, so nothing is evaluated; `l4 check` on the file shows the errors.``
+  The REPL does not see a change to a file it has already checked, even on `:reload` or `:reset`, so once the module is fixed, start the REPL again; the message says so too.
+- A module that `:import` added in the REPL stops every line in the same way, and the REPL says so, in a message that begins `` `:import` added `lib`, which has errors, so nothing is evaluated; `:imports` lists what `:import` added, and `:reset` removes it. ``
 
 What this does not cover:
 
 - An `IMPORT` that finds no module gets a different error, [Module not found](#import-module-not-found), and it does not stop evaluation.
   The rest of that file is still evaluated, and so is a file that imports it.
-- `l4 export catala`, `l4 export dmn` and `l4 export dmn-md` still write their output over a module whose import has errors, and exit with status 0.
-  The tests in the Catala output then have no expected values, and `l4 export catala` says that L4 produced no value for them.
+- `l4 export`, in every format, `l4 verify` and `l4 state-graph` still write their output over a module whose import has errors.
+  The error does not make them fail: each exits with status 0 on a file it can convert, as it does when the import is clean.
+  `l4 export` and `l4 verify` print the error, and `l4 state-graph` does not.
+- In the output of `l4 export catala`, the test that comes from each `#EVAL` or `#ASSERT` then has no expected value, and `l4 export catala` says that L4 produced no value for it.
 - A bundle posted straight to a jl4-service you run yourself, as a zip of files sent to its `/deployments` endpoint, is still evaluated in one case.
   When the only errors in a module its file imports are names that module reads and never declares, which the service takes as inputs, the service accepts the bundle and evaluates its functions: one that reads nothing from that module answers as usual, and one that reads a name from it answers `Internal error: ... is not in scope.`
-  `l4 deploy`, with or without `--server`, and the editor's **Deploy** refuse such a file before they upload anything, as [Exporting rules for deployment](../../tutorials/deploying-rules/exporting-rules-for-deployment.md) says.
+  `l4 deploy` and `l4 redeploy`, with or without `--server`, refuse such a file before they upload anything, as [Using the l4 CLI](../../tutorials/getting-started/l4-cli.md#deploy-update-list-remove) says of `l4 deploy`, and the editor's **Deploy** stays off for it, as [Deploy your rules](../../tutorials/deploying-rules/exporting-rules-for-deployment.md#step-3-deploy) says.
 
-Older versions of L4 evaluated the file without the broken module, and every line that used a name from it answered `Internal error: ... is not in scope. Please report this as a bug.`
+Older versions of L4 evaluated the file without the broken module, and every line that used a name from it answered with an internal error, on four lines: `Internal error:`, the name, `is not in scope.`, and `Please report this as a bug.`
 If you see that beside this error, it is not a bug in your file: the error to read is the one in the imported module.
 
-**How to fix it:** fix the error in the imported module. The file's `#EVAL` lines run again once every module it imports, directly or not, checks.
+**How to fix it:** fix the error in the imported module.
+The file's `#EVAL` lines run again once every module it imports, directly or not, checks.
 
 ---
 

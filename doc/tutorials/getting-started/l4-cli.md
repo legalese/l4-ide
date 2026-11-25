@@ -174,7 +174,10 @@ Trace:
 
 Each `Evaluation[n]` block shows the result of one `#EVAL` (or `#EVALTRACE`), in file order. The `Trace:` line under each result is explained in the next section. Results go to standard output; errors and warnings go to standard error.
 
-`l4 run` fails when the file, or a file it imports, has an error, when a directive can't be worked out, such as a `CONSIDER` with no matching branch or a division by zero, or when an `#ASSERT` comes out false. The other directives still show their results. Warnings don't make it fail, and neither does an `#ASSERT` that the rules refuse to answer.
+`l4 run` fails when the file, or a file it imports, has an error, when a directive can't be worked out, such as a `CONSIDER` with no matching branch or a division by zero, or when an `#ASSERT` comes out false.
+When a directive can't be worked out or an `#ASSERT` comes out false, the other directives still show their results.
+When the file or a file it imports has an error, no directive is worked out, unless the only error is an `IMPORT` that finds no module.
+Warnings don't make it fail, and neither does an `#ASSERT` that the rules refuse to answer.
 
 As a convenience, `l4 late-fee.l4` (no subcommand) is shorthand for `l4 run late-fee.l4`.
 
@@ -361,7 +364,7 @@ Check succeeded.
 Exit code `0` means the file is valid L4; non-zero means there were errors (printed as diagnostics).
 `--json` and `--fixed-now` work here too.
 `l4 check` also checks every file your file imports, so use it as the check in CI for a project of several files.
-When a file your file imports has an error, other than an `IMPORT` that finds no module, nothing in your file is evaluated.
+When a file your file imports has an error, nothing in your file is evaluated; an `IMPORT` that finds no module does not count as one.
 `l4 run` and `l4 check` fail, `l4 trace` says that evaluation failed, and `l4 lts`, `l4 explore`, `l4 prove`, `l4 coverage` and `l4 batch` refuse the file; each prints the error and exits with status 1.
 `l4 render` still writes its document, and then exits with status 1.
 `l4 nlg` does not stop: it prints the error and its sentences, and exits with status 0.
