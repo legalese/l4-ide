@@ -3355,8 +3355,10 @@ steps, what the contract did with each event so far.
   and then reported as passed over; an event nobody's obligation names — a wrong-amount
   payment, a third party's act — is not listed at all, though it would advance the clock. "No
   listed act breaches" is sound; "nothing else could happen" is not something the list says.
-- **Some shapes cannot be tried** (a binding pattern, an unevaluated non-literal `WITHIN`) and
-  are listed with the reason. The reason text is P2c's and still says "binds".
+- **Some shapes cannot be tried** (a binding pattern, an unevaluated `WITHIN` that is not
+  closed: since smucclaw/l4-ide#1107 a closed one, a name or arithmetic, is worked out, §2's
+  amendment at `deadlineOf`) and are listed with the reason. The reason text is P2c's and
+  still says "binds".
 - **Replay is per candidate**, so the cost is _k + d_ full runs per trace (§2.4); measured
   above on small casts, and stated on the page as proportional to the live obligations.
 - **Nothing about where in the contract you are, or what happens after** the one step "move
