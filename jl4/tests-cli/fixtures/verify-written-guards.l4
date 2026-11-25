@@ -124,3 +124,20 @@ GIVEN a IS A BOOLEAN, b IS A BOOLEAN, c IS A BOOLEAN
 GIVETH A BOOLEAN
 DECIDE `a hurdle in an alternative under a NOT` a b c IF
     a AND NOT (b OR (a AND c))
+
+-- Reported as a redundant condition under a NOT.
+
+-- (14) Under a NOT, a condition only its sibling entails: read the other way
+--      round, `NOT (a AND (a OR b))` is `(NOT a) OR ((NOT a) AND (NOT b))`,
+--      whose second alternative the first already covers. No branch is dead.
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN, c IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `a hurdle inside a NOT` a b c IF
+    c AND NOT (a AND (a OR b))
+
+-- (15) The case of (11) inside an alternative. The normal form distributes
+--      the NOT away and has no dead branch for it, so it is reported here.
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN, c IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `a hurdle under a NOT in an alternative` a b c IF
+    (a AND NOT (a AND b)) OR c

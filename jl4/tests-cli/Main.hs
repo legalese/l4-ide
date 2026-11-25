@@ -6842,6 +6842,13 @@ spec bin = do
       -- reported twice, also as a redundant condition under the NOT.
       lookup "`a hurdle under a NOT`" found `shouldBe` Just [("dead-branch", "body.and[1].or[0]")]
       lookup "`a hurdle in an alternative under a NOT`" found `shouldBe` Just [("dead-branch", "body.and[2].or[0]")]
+      -- A conjunct under a NOT that the normal form reports no dead branch for
+      -- is reported as a redundant condition: one only its sibling entails,
+      -- and one whose NOT sits in an alternative, which the normal form
+      -- distributes away. Skipping every entailed conjunct under a NOT lost
+      -- both, and skipping those the outer context entails lost the second.
+      lookup "`a hurdle inside a NOT`" found `shouldBe` Just [("vacuous-guard", "body.and[1].not.and[1]")]
+      lookup "`a hurdle under a NOT in an alternative`" found `shouldBe` Just [("vacuous-guard", "body.or[0].and[1].not.and[0]")]
       source <- lines <$> readFile verifyWrittenGuardsFixture
       let startsWith nm want =
             case [ (line, col)
@@ -6866,6 +6873,7 @@ spec bin = do
       -- its first argument.
       lookup "`a hurdle through an infix call`" found `shouldBe` Just [("vacuous-guard", "body.and[2]")]
       startsWith "`a hurdle through an infix call`" "a AND b) `or else` c)"
+      startsWith "`a hurdle inside a NOT`" "a OR b))"
       -- A condition whose first word is a parameter is placed in the local
       -- definition, where it is written, not at the argument of the call.
       [ round line :: Int

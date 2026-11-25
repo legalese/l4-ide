@@ -190,8 +190,8 @@ propositionalBound =
     , "  there, with the line and column of its first word in the source: a"
     , "  condition its siblings already entail, or an alternative the others"
     , "  already cover. It is looked for under a NOT too, at a site such as"
-    , "  `body.not.or[0]'; there a condition the others already entail is a"
-    , "  dead branch of the normal form, and is reported as that alone. Two"
+    , "  `body.not.or[0]'; there a condition the normal form has, negated, as"
+    , "  a dead branch is reported as that dead branch alone. Two"
     , "  conditions that entail each other, such as the two `x' of `x AND x',"
     , "  are both reported, and so are two alternatives that cover each other,"
     , "  although deleting either one alone leaves the rule as it was."
@@ -1165,9 +1165,18 @@ analyseBody labels order defs listed body written
       ]
   | otherwise =
       topTautology
-        <> walk Normalised sat labels Map.empty [] "body" body
-        <> foldMap (\w -> walk AsWritten (satisfiable w.wOrder defs) w.wLabels w.wStarts [] "body" w.wBody) written
+        <> map fst normal
+        <> foldMap
+             (\w -> map fst (walk AsWritten (satisfiable (nubOrd (w.wOrder <> order)) defs) w.wLabels w.wStarts deadLimbs [] "body" w.wBody))
+             written
   where
+    normal = walk Normalised sat labels Map.empty [] [] "body" body
+    -- The limbs the normal form reports as dead branches, for the walk over
+    -- the rule as written not to report the same condition again ('walk').
+    -- Both drawings' atoms are in one atom space, so a limb can be compared
+    -- with a written condition; the written walk's order is widened by the
+    -- analysis's to cover both.
+    deadLimbs = [e | (f, e) <- normal, f.findingKind == "dead-branch"]
     sat = satisfiable order defs
     atomLabels labs e = [label labs u | u <- nubOrd (varsOf e)]
     label labs u = stripBackticks (Map.findWithDefault (Text.pack (show u)) u labs)
@@ -1240,29 +1249,36 @@ analyseBody labels order defs listed body written
     -- unsatisfiable conjunction, a dead limb or an unsatisfiable scope,
     -- everything is entailed (anything follows from a contradiction), so a walk
     -- that went on would report every condition there as redundant.
+    --
+    -- Each finding comes with the subterm it is about. The written walk is
+    -- given the normal form's dead limbs ('deadLimbs'; none for the normal
+    -- form's own walk).
     walk
       :: Pass
       -> ([BDQ.BoolExpr Int] -> BDQ.BoolExpr Int -> Bool)
       -> Map Int Text
       -> Map Text SrcPos
       -> [BDQ.BoolExpr Int]
+      -> [BDQ.BoolExpr Int]
       -> Text
       -> BDQ.BoolExpr Int
-      -> [Finding]
-    walk pass sat' labs starts = go
+      -> [(Finding, BDQ.BoolExpr Int)]
+    walk pass sat' labs starts dead = go
       where
         normalised = pass == Normalised
         -- The sign is the finding's: False for one that says something can
         -- never hold, True for one that says something always holds
         -- ('readsThroughConstants').
         finding kind sign site e message =
-          Finding
-            { findingKind = kind
-            , findingSite = site
-            , findingAtoms = atomLabels labs e
-            , findingMessage = message <> readsThroughConstants sign labs e
-            , findingWrittenAt = Map.lookup site starts
-            }
+          ( Finding
+              { findingKind = kind
+              , findingSite = site
+              , findingAtoms = atomLabels labs e
+              , findingMessage = message <> readsThroughConstants sign labs e
+              , findingWrittenAt = Map.lookup site starts
+              }
+          , e
+          )
 
         -- Is this subterm capable of being false at all?
         --
@@ -1278,17 +1294,23 @@ analyseBody labels order defs listed body written
 
         -- Whether a site stands under an odd number of NOTs: its path is how it
         -- was reached, and @.not@ is the one step of it that negates. Under
-        -- one, a condition its siblings entail is, read the other way round,
-        -- an alternative that cannot hold where it sits, and the normal form
-        -- already reports that as a dead branch: @a AND NOT (a AND b)@ is
-        -- @a AND ((NOT a) OR (NOT b))@, whose @NOT a@ is dead. So a conjunct is
-        -- not also reported there as entailed. An alternative the others cover
-        -- is still looked for under a NOT: read the other way round it is a
-        -- condition its siblings entail, which only this walk reports
-        -- (decided by Claude 2026-11-25, pending Meng's review).
+        -- one, a conjunct is read the other way round, as an alternative, and
+        -- an entailed conjunct can be an alternative that cannot hold where it
+        -- sits, which the normal form reports as a dead branch:
+        -- @a AND NOT (a AND b)@ is @a AND ((NOT a) OR (NOT b))@, whose @NOT a@
+        -- is dead. So a conjunct under an odd number of NOTs whose negation is
+        -- a limb the normal form reports dead ('deadLimbs') is not reported
+        -- again here. Any other entailed conjunct is: one entailed only with
+        -- its siblings' help is, read the other way round, an alternative the
+        -- others cover (@NOT (a AND (a OR b))@ is
+        -- @(NOT a) OR ((NOT a) AND (NOT b))@), and inside an OR the normal
+        -- form distributes the NOT away and reports no dead branch for it.
+        -- An alternative the others cover is looked for under a NOT as
+        -- anywhere (decided by Claude 2026-11-25, pending Meng's review).
         underOddNot site = odd (Text.count ".not" site)
+        reportedDead ei = any (\d -> not (sat' [d] ei) && not (sat' [BDQ.BNot d] (BDQ.BNot ei))) dead
 
-        go :: [BDQ.BoolExpr Int] -> Text -> BDQ.BoolExpr Int -> [Finding]
+        go :: [BDQ.BoolExpr Int] -> Text -> BDQ.BoolExpr Int -> [(Finding, BDQ.BoolExpr Int)]
         go ctx site = \case
           e@(BDQ.BAnd es)
             | not (sat' ctx e) ->
@@ -1319,7 +1341,7 @@ analyseBody labels order defs listed body written
                             -- guard (decided by Claude 2026-11-25, pending
                             -- Meng's review).
                           , Map.member arm starts
-                          , not (underOddNot site)
+                          , not (underOddNot site && reportedDead ei)
                           , interesting ei
                           , contingent ei
                           , not (sat' ctx' (BDQ.BNot ei))
