@@ -237,6 +237,11 @@ data ItemDefinition = MkItemDefinition
 -- references lie inside a cycle, never for the order, because it promises
 -- none for definitions with no edge between them (the same lesson as the
 -- computed-field walk of spec §4.4.2).
+--
+-- __Wider than KIE needs__: a record is also put before a record whose field
+-- it types, which KIE accepts in either order (@fwdrecord@ above). Ordering
+-- every reference, rather than only those to an enum or an alias, is decided
+-- by Claude 2026-11-25, pending Meng's review.
 itemDefsInDependencyOrder :: [ItemDefinition] -> [ItemDefinition]
 itemDefsInDependencyOrder defs =
   [d | i <- reverse (snd (foldl' visit (Set.empty, []) (Map.keys byIndex))), Just d <- [Map.lookup i byIndex]]

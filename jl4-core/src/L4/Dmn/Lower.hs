@@ -4101,7 +4101,9 @@ lowerModule opts modul@(MkModule _ uri _) =
   -- Advisory: the value is faithful (closed, so it reads nothing this model
   -- could supply differently), but the model now carries a COPY, and a later
   -- edit to the imported module changes nothing here until the export is run
-  -- again.
+  -- again. Advisory rather than Lossy, and the copies' place after this
+  -- module's own decisions, are decided by Claude 2026-11-25, pending Meng's
+  -- review (spec §18).
   importedConstantNotes :: [FidelityNote]
   importedConstantNotes =
     [ dmnNote "D-IMPORTED" Advisory did (getAnno d).range
