@@ -6943,11 +6943,12 @@ spec bin = do
     -- A local definition used more than once. `both qualify` and `either
     -- qualifies` get a finding nothing in them deserves, at the `c` each use
     -- repeats: the limit the help and the doc page state, pinned so that its
-    -- fix shows here. The rest are true findings, placed where the definition
-    -- writes each condition. Judging a definition's copies as one, tried
-    -- while smucclaw/l4-ide#1093 was fixed, removed the first two and hid
-    -- every other; this test failed on that build, with no finding on any of
-    -- the seven.
+    -- fix shows here. The rest are true findings, each placed where the
+    -- definition writes it, or, for a bare parameter (`a parameter twice`),
+    -- at the argument the use passes in. Judging a definition's copies as
+    -- one, tried while smucclaw/l4-ide#1093 was fixed, removed the first two
+    -- and hid every other; this test failed on that build, with no finding on
+    -- any of the seven.
     it "reports a condition in a local definition used twice, once for each use" $ do
       env <- jsonEnvelope bin ["verify", verifyDefinitionUsedTwiceFixture, "--format", "json"]
       let found = findingSitesByDecision env

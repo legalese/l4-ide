@@ -1,8 +1,8 @@
 § `VerifyWrittenGuardsFixture`
 
 -- Negative controls: conditions the drafter DID write that exclude nothing
--- (smucclaw/l4-ide#1093). Each is a `vacuous-guard` at each place it sits in
--- the rule as written, not one per clause: once, but (6) twice, used twice.
+-- (smucclaw/l4-ide#1093). Most are a `vacuous-guard`, once, where the rule as
+-- written has it; (6) twice, (11) and (12) as a dead branch, (10) not at all.
 --
 -- verify-vacuous-guard.l4 has the plainest case, `x AND (x OR y)`, whose
 -- normal form is the rule itself. These are the cases where the normal form

@@ -201,9 +201,12 @@ propositionalBound =
     , "  although deleting either one alone leaves the rule as it was."
     , "  A condition written in a local definition (WHERE or LET) is placed"
     , "  where the definition writes it, at its opening bracket if its first"
-    , "  word is one of the definition's parameters. A bracketed group whose"
-    , "  first word is a use of a local definition is placed at its bracket,"
-    , "  not at that word."
+    , "  word is one of the definition's parameters, and at the argument the"
+    , "  use passes in if it is a parameter and nothing else."
+    -- Placing the next one at its bracket was decided by Claude 2026-11-25,
+    -- pending Meng's review ('LadderViz.writtenStart').
+    , "  A bracketed group whose first word is a use of a local definition is"
+    , "  placed at its bracket, not at that word."
     , "  When a local definition is used more than once, a condition inside it"
     , "  can be reported because another use repeats it, and l4 verify cannot"
     , "  tell such a finding from a real one: `qualifies a AND qualifies b',"
@@ -962,9 +965,16 @@ data Written = Written
 -- With @--no-coalesce-atoms@ there are no call meanings and no join: the drawing
 -- is analysed in its own atom space.
 --
--- 'Nothing' if the rule cannot be drawn this way, in which case no redundant
--- condition is reported for it. The analysed drawing is the same rule with
--- more nodes, so this is not expected to happen.
+-- 'Nothing' if the rule cannot be drawn this way. Then the check for a
+-- redundant condition, a conjunct its siblings entail or an alternative the
+-- others cover, is not run on the rule, and the report does not say so; the
+-- normal form's findings are reported as usual. The drawing here is the one
+-- the analysis drew, without its simplification, so it fails for the reasons
+-- that one would have failed for first, with one exception: a rule written as
+-- DECIDE clauses that reads through, whose ladder, unsimplified, is larger
+-- than 'Transform.clauseGroupLadderBudget' when the simplified one is not
+-- ('LadderViz.ClauseGroupTooLarge'). That is read from the code, not
+-- measured.
 writtenForm
   :: VerifyOptions
   -> LadderViz.VizConfig

@@ -92,12 +92,13 @@ The pipeline’s output lands in [**legalese/canon**](https://github.com/legales
 If OPA’s rule-completeness warnings are your reference point, this is the same instinct with a stricter engine behind it.
 
 To check a rule, the tool first rewrites it as one long list of “all of these must hold” clauses, and that rewriting creates clauses the drafter never wrote.
-So a vacuous guard is looked for only among the conditions the rule actually writes: `(a AND b) OR ((NOT a) AND e)` gets no finding, however the rewriting splits it up, while `x AND (x OR y)` is reported once, with the line and column of the first word of `(x OR y)`, its `x`.
+So a vacuous guard is looked for only among the conditions the rule actually writes: `(a AND b) OR ((NOT a) AND e)` gets no finding, however the rewriting splits it up, while `x AND (x OR y)` is reported once, with the line and column of the first word of `(x OR y)`, its `x` (in the JSON report, the finding's `writtenAt`, with its `line` and `column`).
 The same holds for an alternative the others already cover: `(a AND b) OR b` is reported at `a AND b`, which lets nothing through that `b` does not.
 Both are looked for under a `NOT` as well; there, a condition the rewritten rule has, negated, as a dead branch is reported as that dead branch alone, if the dead branch is in the same part of the rule (its scope or its requirement, when the rule is an `IMPLIES`; otherwise the whole rule) and names no atom outside the `NOT`.
 Within those bounds the match is by meaning, not by place.
 Two conditions that entail each other, such as the two `x` of `x AND x`, are both reported, and so are two alternatives that cover each other, although deleting either one alone leaves the rule as it was.
 A condition written in a local definition (`WHERE` or `LET`) is placed where the definition writes it, at its opening bracket if its first word is one of the definition's parameters, which stands for whatever each use passes in.
+A condition that is a parameter and nothing else is placed at the argument the use passes in.
 A bracketed group whose first word is a use of a local definition is placed at its bracket, not at that word.
 When a local definition is used more than once, a condition inside it can be reported because another use repeats it, and `l4 verify` cannot tell such a finding from a real one: `qualifies a AND qualifies b`, where `qualifies x` means `x AND c`, reports `c` twice, although nothing in the rule is redundant.
 This is a known limit of this check and is not fixed here.
@@ -109,6 +110,7 @@ A rule that calls another rule is read through to what that rule means, in the s
 
 A rule whose whole body is `FALSE` or `TRUE` is often deliberate: an encoding records “the text says no” this way, or switches a provision off.
 `l4 verify` lists such a rule as a **constant** and checks nothing in it, so `DECIDE x IF FALSE` is not reported as a requirement nobody can meet.
+In the JSON report such a rule's entry has a `constant` key, `"TRUE"` or `"FALSE"`, and `summary.constants` counts them.
 Only the bare word counts: a rule that is false for some other reason, such as one that asks for a constant `FALSE` rule and something else, is still reported.
 A finding on a rule that reads through a constant names the constant when it is inside the reported condition and has the finding’s sign: a `FALSE` one for a finding that something can never hold, a `TRUE` one for a finding that something always holds, each the other way round under a `NOT` or in the scope of an `IMPLIES`.
 It says “which is the constant `FALSE`” when the rule called is itself listed as a constant, and “whose meaning is `FALSE`” when that rule comes out `FALSE` only once it is read through.

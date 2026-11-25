@@ -905,7 +905,9 @@ scanOr e = [e]
 -- first argument first), it starts where that part does.
 -- An operator whose first operand is written outside its own text (a
 -- parameter or a local definition's use, read through) starts where its own
--- text does.
+-- text does. For a local definition's use, that is its bracket and not the
+-- use, which the reading through leaves no place for (decided by Claude
+-- 2026-11-25, pending Meng's review).
 --
 -- Not counting the bracket was decided by Claude 2026-11-25, pending Meng's
 -- review: a group can share its bracket with the groups around it, and its first
