@@ -136,6 +136,7 @@ import qualified Base.Map as Map
 import qualified Base.Set as Set
 import qualified Base.Text as Text
 import qualified Optics
+import System.FilePath (takeFileName)
 
 import L4.Annotation (emptyAnno)
 import L4.Discharge (sectionBinders)
@@ -833,9 +834,12 @@ literalOnly = MkClosed {clEval = Nothing, clReads = noModuleReads}
 data RunRead
   = ReadsLedger
     -- ^ a @RECALL@: outside a run the ledger is empty
-  | ReadsSectionGiven Name
+  | ReadsSectionGiven Name (Maybe Text)
     -- ^ a section @GIVEN@, which a @WITH@ supplies in a run; outside one it
-    -- is its @TYPICALLY@ default, or nothing
+    -- is its @TYPICALLY@ default, or nothing. With the name of the imported
+    -- file that declares it, when it is not the module's own: only a @WITH@
+    -- inside that file can supply it, and the module itself gets
+    -- @check/not-a-function@ for trying
   | ReadsClock Text
     -- ^ the clock, as written: @TODAY@, @NOW@, @CURRENTTIME@, and @RULES
     -- EFFECTIVE DATE@, which falls back to today. The machine reads the
@@ -848,12 +852,13 @@ data RunRead
 -- | What in a module and its imports a run supplies ('RunRead'), read off
 -- their source.
 data ModuleReads = MkModuleReads
-  { mrSectionGivens :: Set Unique
+  { mrSectionGivens :: Map Unique (Maybe Text)
     -- ^ every section @GIVEN@ of the module and of its imports
-    -- ("L4.Discharge".'sectionBinders')
+    -- ("L4.Discharge".'sectionBinders'), an imported one with the name of
+    -- the file that declares it ('ReadsSectionGiven')
   , mrRules         :: Map Unique RunRead
     -- ^ 'runReadRules'
-  , mrSectionRules  :: Map Unique Name
+  , mrSectionRules  :: Map Unique RunRead
     -- ^ the rules that read a section @GIVEN@, directly or through another,
     -- each with the first it reads; an action is held to these
     -- ('closedAction'), and 'mrRules' may name another read first
@@ -862,7 +867,7 @@ data ModuleReads = MkModuleReads
   }
 
 noModuleReads :: ModuleReads
-noModuleReads = MkModuleReads {mrSectionGivens = Set.empty, mrRules = Map.empty, mrSectionRules = Map.empty, mrLocals = Map.empty}
+noModuleReads = MkModuleReads {mrSectionGivens = Map.empty, mrRules = Map.empty, mrSectionRules = Map.empty, mrLocals = Map.empty}
 
 -- | 'ModuleReads' of a module, with the modules it imports: their rules and
 -- section @GIVEN@s count as the module's own do. A unique carries its
@@ -871,11 +876,21 @@ moduleReads :: Module Resolved -> [Module Resolved] -> ModuleReads
 moduleReads m imported = MkModuleReads
   { mrSectionGivens = givens
   , mrRules = runReadRules givens rules
-  , mrSectionRules = rulesReaching (\ body -> listToMaybe [ getOriginal r | r <- namesIn body, Set.member (getUnique r) givens ]) rules
+  , mrSectionRules = rulesReaching (\ body -> listToMaybe [ ReadsSectionGiven (getOriginal r) f | r <- namesIn body, Just f <- [Map.lookup (getUnique r) givens] ]) rules
   , mrLocals = localKinds m }
   where
-    givens = foldMap (Map.keysSet . sectionBinders) (m : imported)
+    -- the module's own last, so that it wins should it be among the imports
+    givens = Map.fromList
+      ([ (u, Just (moduleFileName i)) | i <- imported, u <- Map.keys (sectionBinders i) ]
+       <> [ (u, Nothing) | u <- Map.keys (sectionBinders m) ])
     rules = reachableRules m imported
+
+-- | A module's file name without its directory, as a source range prints it
+-- ("L4.Parser.SrcSpan".'prettySrcRange').
+moduleFileName :: Module Resolved -> Text
+moduleFileName (MkModule _ uri _) =
+  let full = (fromNormalizedUri uri).getUri
+  in Text.pack (takeFileName (Text.unpack (fromMaybe full (Text.stripPrefix "file://" full))))
 
 -- | Every rule of the module, and every rule of its imports that the module
 -- reaches by name, directly or through another: its name, its inputs and
@@ -931,7 +946,7 @@ localKinds m = Map.fromList (events <> definitions <> inputs)
 -- @--fixed-now@ and 5 under another. The builtins that only switch the time
 -- an expression is read at (@EVAL UNDER VALID TIME@, @EVER BETWEEN@ and their
 -- kin) are not open on their own: they take the time as an argument.
-directReads :: Set Unique -> Expr Resolved -> [RunRead]
+directReads :: Map Unique (Maybe Text) -> Expr Resolved -> [RunRead]
 directReads givens e =
   [ r | x <- subExprs e, Just r <- [construct x] ]
   <> [ r | n <- namesIn e, Just r <- [named n] ]
@@ -943,7 +958,7 @@ directReads givens e =
       Post {}     -> Just (ReadsOutside "POST")
       _           -> Nothing
     named r
-      | Set.member u givens = Just (ReadsSectionGiven (getOriginal r))
+      | Just f <- Map.lookup u givens = Just (ReadsSectionGiven (getOriginal r) f)
       | u `elem` clock = Just (ReadsClock spelt)
       | u `elem` outside = Just (ReadsOutside spelt)
       | otherwise = Nothing
@@ -961,7 +976,7 @@ directReads givens e =
 -- world, directly or by naming one that does ('namesIn').
 -- An @#EVAL@ outside a run does not see what a run supplies, so a deadline
 -- that names one of them is not worked out ('Closed').
-runReadRules :: Set Unique -> [(Resolved, [Resolved], Expr Resolved)] -> Map Unique RunRead
+runReadRules :: Map Unique (Maybe Text) -> [(Resolved, [Resolved], Expr Resolved)] -> Map Unique RunRead
 runReadRules givens = rulesReaching (listToMaybe . directReads givens)
 
 -- | The rules among these whose body has what @direct@ finds, or that name
@@ -1050,12 +1065,16 @@ closedDeadline eval known pos raw what e = do
     inARun = ", so it is worked out only in a run and its deadline is not known here"
 
 -- | What a 'RunRead' is, for a reason line: @written@ when the deadline
--- itself has it, rather than a rule it names.
+-- itself has it, rather than a rule it names. A section @GIVEN@ an imported
+-- file declares is said to be that file's: the file the reason is read in
+-- cannot supply it with a @WITH@ (review of smucclaw/l4-ide#1107, measured
+-- 2026-11-25: it gets @check/not-a-function@).
 runReadText :: Bool -> RunRead -> Text
 runReadText written = \ case
   ReadsLedger | written   -> "a ledger with RECALL"
               | otherwise -> "a ledger"
-  ReadsSectionGiven n -> "`" <> unqualifiedNameToText n <> "`, a section GIVEN, which a WITH can supply"
+  ReadsSectionGiven n Nothing -> "`" <> unqualifiedNameToText n <> "`, a section GIVEN, which a WITH can supply"
+  ReadsSectionGiven n (Just f) -> "`" <> unqualifiedNameToText n <> "`, a section GIVEN of " <> f <> ", which a WITH can supply only inside that file"
   ReadsClock t -> "the clock (" <> t <> ")"
   ReadsOutside t -> "the world outside the file (" <> t <> ")"
 
@@ -1817,14 +1836,14 @@ closedAction known scope env e = case openLocals scope env e of
     -- application (@f 3@, @`twice` WITH y IS 3@): 'cannotChoose' would say
     -- the act binds it, which it does not
     | (f : _) <- openRefs scope env e -> Left (appliesLocal (getOriginal f))
-    | Set.null known.mrSectionGivens -> Right e
+    | Map.null known.mrSectionGivens -> Right e
     -- a rule first, as for a deadline: after "L4.Discharge" a call of a rule
     -- that reads a section GIVEN passes the GIVEN too, which the act did not
     -- spell
     | ((r, g) : _) <- [ (r, g) | r <- names, Just g <- [Map.lookup (getUnique r) known.mrSectionRules] ] ->
-        Left ("the action reads " <> quoted r <> ", which reads " <> runReadText False (ReadsSectionGiven g) <> inARun)
-    | (r : _) <- [ r | r <- names, Set.member (getUnique r) known.mrSectionGivens ] ->
-        Left ("the action reads " <> runReadText True (ReadsSectionGiven (getOriginal r)) <> inARun)
+        Left ("the action reads " <> quoted r <> ", which reads " <> runReadText False g <> inARun)
+    | ((r, f) : _) <- [ (r, f) | r <- names, Just f <- [Map.lookup (getUnique r) known.mrSectionGivens] ] ->
+        Left ("the action reads " <> runReadText True (ReadsSectionGiven (getOriginal r) f) <> inARun)
     | otherwise -> Right e
   where
     names = namesIn e

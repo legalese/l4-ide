@@ -1082,7 +1082,7 @@ spec bin = describe "l4 explore" $ do
       , ("clock duty", "the WITHIN reads `clocky`, which reads the clock (TODAY), so it is worked out only in a run and its deadline is not known here")
       , ("library clock duty", "the WITHIN reads `Today serial`, which reads the clock (TODAY), so it is worked out only in a run and its deadline is not known here")
       , ("env duty", "the WITHIN reads `env period`, which reads the world outside the file (ENV), so it is worked out only in a run and its deadline is not known here")
-      , ("window duty", "the WITHIN reads `the window`, which reads `rate`, a section GIVEN, which a WITH can supply, so it is worked out only in a run and its deadline is not known here")
+      , ("window duty", "the WITHIN reads `the window`, which reads `rate`, a section GIVEN of readers.l4, which a WITH can supply only inside that file, so it is worked out only in a run and its deadline is not known here")
       ] \ (contract, why) ->
         it ("explore-imported/deadlines.l4: " <> contract <> ", a WITHIN naming an imported rule that reads the run, is not worked out") $
           forM_ ["2025-01-31T15:45:30Z", "2025-02-04T15:45:30Z"] \ now -> do
@@ -1111,6 +1111,18 @@ spec bin = describe "l4 explore" $ do
           lout `shouldSatisfy` (("Alice does " <> act <> " \8212 " <> why) `isInfixOf`)
           lout `shouldNotSatisfy` ("it is not the act awaited" `isInfixOf`)
           lout `shouldNotSatisfy` ("Internal error" `isInfixOf`)
+
+    -- the importing file cannot supply an imported section GIVEN, so the
+    -- reason says whose it is
+    forM_
+      [ ("direct", "PARTY Alice MUST pay rate", "the action reads `rate`, a section GIVEN of readers.l4, which a WITH can supply only inside that file, so the act is known only in a run and the what-if cannot try it")
+      , ("via rule", "PARTY Alice MUST pay `the window`", "the action reads `the window`, which reads `rate`, a section GIVEN of readers.l4, which a WITH can supply only inside that file, so the act is known only in a run and the what-if cannot try it")
+      ] \ (contract, residual, why) ->
+        it ("explore-imported/section-act.l4: " <> contract <> ", an act reading an imported section GIVEN, is untried, and the reason names its file") $ do
+          Output code out _ <- runL4 bin ["explore", imported </> "section-act.l4", "--contract", contract]
+          code `shouldBe` ExitFailure 2
+          out `shouldSatisfy` (("UNTRIED 1: " <> residual <> " (" <> why <> ")") `isInfixOf`)
+          out `shouldNotSatisfy` ("Internal error" `isInfixOf`)
 
     forM_
       [ ("applied", "PARTY Alice MUST pay (f OF 3)", "pay OF (f OF 3)", "the action applies `f`, a function local to the rule, which the what-if cannot supply")
