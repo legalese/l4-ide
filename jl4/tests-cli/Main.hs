@@ -6954,7 +6954,7 @@ spec bin = do
     -- #1095's third ask: a finding on a rule that reads through a constant names
     -- the constant, because the cause is usually intended, and "x cannot
     -- matter" alone does not say why. A finding that reads through no constant
-    -- says nothing of the kind.
+    -- says nothing of the kind, and one is named only where it can be why.
     it "names the constant a finding reads through" $ do
       env <- jsonEnvelope bin ["verify", verifyConstantsReadThroughFixture, "--format", "json"]
       let messages nm =
@@ -6972,6 +6972,17 @@ spec bin = do
       names "`x cannot matter`" "It reads through VerifyConstantsReadThroughFixture.`the rule is in force`, which is the constant TRUE."
       namesNone "`nobody can satisfy this`"
       namesNone "`false either way`"
+      -- A rule whose meaning is FALSE only once read through is not called a
+      -- constant: the listing does not list it as one.
+      names "`needs the recorded waiver`" "It reads through VerifyConstantsReadThroughFixture.`the waiver, as recorded`, whose meaning is FALSE."
+      -- Only a constant of the finding's sign is named: the FALSE one for a
+      -- rule TRUE for no input, the TRUE one for a rule TRUE for every input.
+      -- Before this was fixed, both were named on each.
+      names "`needs the waiver while in force`" "the constant FALSE."
+      messages "`needs the waiver while in force`" `shouldSatisfy` all (not . ("TRUE." `isSuffixOf`))
+      [ m | (nm, f) <- findingObjectsByDecision env, nm == "`x cannot matter, whatever the waiver`"
+          , objField f "kind" == Just (String "unreachable-outcome"), Just (String m) <- [objField f "message"] ]
+        `shouldSatisfy` \ms -> length ms == 1 && all (\m -> "the constant TRUE." `T.isSuffixOf` m && not ("FALSE." `T.isInfixOf` m)) ms
 
     -- A rule written as DECIDE clauses is analysed as the CONSIDER it stands for.
     -- Before, it was skipped as not boolean; then its generated nesting made

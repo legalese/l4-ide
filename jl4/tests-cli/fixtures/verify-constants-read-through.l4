@@ -33,3 +33,27 @@ GIVEN x IS A BOOLEAN
 GIVETH A BOOLEAN
 DECIDE `x cannot matter` x IF
     x OR `the rule is in force`
+
+-- A rule whose meaning is FALSE once it is read through, but which is not
+-- itself a constant: its body is a call. Reading through it says so.
+GIVETH A BOOLEAN
+`the waiver, as recorded` MEANS `the waiver was signed`
+
+GIVEN y IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `needs the recorded waiver` y IF
+    y AND `the waiver, as recorded`
+
+-- Reads through both constants, and is TRUE for no input. The FALSE one can
+-- be why; the TRUE one cannot, and is not named.
+GIVEN y IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `needs the waiver while in force` y IF
+    y AND `the waiver was signed` AND `the rule is in force`
+
+-- Reads through both, and is TRUE for every input. Only the TRUE one is named
+-- for that; the FALSE one is a dead branch, which it is named for.
+GIVEN x IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `x cannot matter, whatever the waiver` x IF
+    x OR `the rule is in force` OR `the waiver was signed`

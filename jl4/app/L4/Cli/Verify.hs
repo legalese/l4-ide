@@ -575,7 +575,7 @@ analyseDecide opts callees cfg decide0 =
                             , anAtomClasses = length order'
                             , anLadderNodes = nodes
                             , anFindings =
-                                analyseBody labels' analysisOrder meanings.cmDefs expr' written
+                                analyseBody labels' analysisOrder meanings.cmDefs meanings.cmListed expr' written
                             }
                     , drUnfolding = Unfolding (Map.size meanings.cmDefs) meanings.cmOpaque
                     }
@@ -624,10 +624,13 @@ data CallMeanings = CallMeanings
   -- ten minutes. Measured 2026-09-29.
   , cmOpaque :: [Text]
   -- ^ Call atoms that stayed opaque, each with the reason.
+  , cmListed :: Set Int
+  -- ^ Call atoms whose called rule is itself listed as a constant: its body is
+  -- the literal TRUE or FALSE ('literalBody').
   }
 
 noMeanings :: CallMeanings
-noMeanings = CallMeanings Map.empty [] []
+noMeanings = CallMeanings Map.empty [] [] Set.empty
 
 -- | Work out what each call atom of a decision means.
 --
@@ -658,6 +661,15 @@ callMeanings opts callees cfg (MkDecide ann sig appForm _) fnName atomIds labels
     { cmDefs = Map.fromList [(v, renumber d) | (v, Right d) <- attempts]
     , cmOrder = placed
     , cmOpaque = [label v <> " \8212 " <> why | (v, Left why) <- attempts]
+    , cmListed =
+        Set.fromList
+          [ v
+          | v <- order
+          , Just e <- [LadderViz.getLeafExpr vizState v]
+          , Just (r, _) <- [Transform.positionalCall e]
+          , Just (Transform.MkUnfoldable _ body) <- [Map.lookup (getUnique r) callees.readable]
+          , isJust (GR.literalBool body)
+          ]
     }
   where
     label v = stripBackticks (Map.findWithDefault (Text.pack (show v)) v labels)
@@ -1257,8 +1269,8 @@ data Pass
   deriving stock Eq
 
 analyseBody
-  :: Map Int Text -> [Int] -> Map Int (BDQ.BoolExpr Int) -> BDQ.BoolExpr Int -> Maybe Written -> [Finding]
-analyseBody labels order defs body written
+  :: Map Int Text -> [Int] -> Map Int (BDQ.BoolExpr Int) -> Set Int -> BDQ.BoolExpr Int -> Maybe Written -> [Finding]
+analyseBody labels order defs listed body written
   | not (sat [] body) =
       [ Finding
           { findingKind = "unsat"
@@ -1266,7 +1278,7 @@ analyseBody labels order defs body written
           , findingAtoms = atomLabels labels body
           , findingMessage =
               "the decision is TRUE for no assignment of its atoms: as drafting, a requirement nobody can meet."
-                <> readsThroughConstants labels body
+                <> readsThroughConstants False labels body
           , findingWrittenAt = Nothing
           }
       ]
@@ -1279,18 +1291,29 @@ analyseBody labels order defs body written
     atomLabels labs e = [label labs u | u <- nubOrd (varsOf e)]
     label labs u = stripBackticks (Map.findWithDefault (Text.pack (show u)) u labs)
 
-    -- A sentence naming each constant the subterm reads through: a call atom whose
-    -- meaning is the literal TRUE or FALSE ('literalBody', smucclaw/l4-ide#1095).
-    -- A finding through one is usually what the drafter meant, and says so. The
-    -- name keeps its backticks, which the atoms line drops, so that a name of
-    -- several words reads as one inside the sentence.
+    -- A sentence naming each constant the subterm reads through that could be
+    -- the cause of the finding: a call atom whose meaning ('cmDefs') is the
+    -- literal of the finding's sign ('constantMeaning'), FALSE for a finding that
+    -- something can never hold, TRUE for one that something always holds. A
+    -- constant of the other sign cannot cause it, and is not named. The constant
+    -- is called one ("which is the constant FALSE") only when the rule called is
+    -- itself listed as one, its body being the literal ('cmListed',
+    -- 'literalBody'); a rule whose meaning comes out a literal only once read
+    -- through has that meaning ("whose meaning is FALSE"). A finding through a
+    -- constant is often what the drafter meant, and the sentence lets a reader
+    -- see that the cause may be the constant and not this rule. The name keeps
+    -- its backticks, which the atoms line drops, so that a name of several
+    -- words reads as one inside the sentence (smucclaw/l4-ide#1095).
     -- Wording decided by Claude 2026-11-25, pending Meng's review.
-    readsThroughConstants labs e =
+    readsThroughConstants sign labs e =
       mconcat
-        [ " It reads through " <> Map.findWithDefault (Text.pack (show v)) v labs <> ", which is the constant " <> literalText b <> "."
+        [ " It reads through " <> Map.findWithDefault (Text.pack (show v)) v labs
+            <> (if Set.member v listed then ", which is the constant " else ", whose meaning is ")
+            <> literalText b <> "."
         | v <- nubOrd (varsOf e)
         , Just meaning <- [Map.lookup v defs]
         , Just b <- [constantMeaning meaning]
+        , b == sign
         ]
     constantMeaning = \case
       BDQ.BTrue -> Just True
@@ -1310,7 +1333,7 @@ analyseBody labels order defs body written
               , findingAtoms = atomLabels labels body
               , findingMessage =
                   "the decision is TRUE for every assignment of its atoms, so its FALSE outcome is unreachable and the atoms it names do not affect the answer."
-                    <> readsThroughConstants labels body
+                    <> readsThroughConstants True labels body
               , findingWrittenAt = Nothing
               }
           ]
@@ -1333,12 +1356,15 @@ analyseBody labels order defs body written
     walk pass sat' labs starts copies = go
       where
         normalised = pass == Normalised
-        finding kind site e message =
+        -- The sign is the finding's: False for one that says something can
+        -- never hold, True for one that says something always holds
+        -- ('readsThroughConstants').
+        finding kind sign site e message =
           Finding
             { findingKind = kind
             , findingSite = site
             , findingAtoms = atomLabels labs e
-            , findingMessage = message <> readsThroughConstants labs e
+            , findingMessage = message <> readsThroughConstants sign labs e
             , findingWrittenAt = Map.lookup site starts
             }
 
@@ -1360,7 +1386,7 @@ analyseBody labels order defs body written
             | not (sat' ctx e) ->
                 -- Stop here. Everything below an unsatisfiable conjunction is
                 -- vacuously dead, and saying so once per descendant is noise.
-                [ finding "unsat" site e
+                [ finding "unsat" False site e
                     "these conditions cannot all hold at once in the context that reaches them — a double bind."
                 | normalised
                 ]
@@ -1376,7 +1402,7 @@ analyseBody labels order defs body written
                     -- than one place ('withCopies').
                   , let judged = maybe ctx' (uncurry (<>)) (Map.lookup arm copies)
                   , let entailed =
-                          [ finding "vacuous-guard" arm ei
+                          [ finding "vacuous-guard" True arm ei
                               "this condition is already entailed by the ones it is conjoined with, so it excludes nothing."
                           | not normalised
                             -- Only a node drawn from source has a place in it.
@@ -1400,7 +1426,7 @@ analyseBody labels order defs body written
               [ covered <>
                 if interesting ei && not (sat' ctx ei)
                   then
-                    [ finding "dead-branch" arm ei
+                    [ finding "dead-branch" False arm ei
                         "this limb cannot hold in the context that reaches it; the rule reads identically with it deleted."
                     | normalised
                     ]
@@ -1420,7 +1446,7 @@ analyseBody labels order defs body written
                 -- covered: that is the condition the disjunction makes being
                 -- redundant, or true on its own, and is not said again here.
               , let covered =
-                      [ finding "vacuous-guard" arm ei
+                      [ finding "vacuous-guard" False arm ei
                           "this alternative is already covered by the ones it is joined with, so it admits nothing new."
                       | not normalised
                       , Map.member arm starts
@@ -1433,19 +1459,19 @@ analyseBody labels order defs body written
               ]
           BDQ.BImplies scope req
             | not (sat' ctx scope) ->
-                [ finding "vacuous-guard" (site <> ".scope") scope
+                [ finding "vacuous-guard" False (site <> ".scope") scope
                     "the scope of this rule is unsatisfiable, so it reaches nobody and its requirement is never tested. Note the decision still evaluates TRUE — vacuously."
                 | normalised
                 ]
             | otherwise ->
                 concat
-                  [ [ finding "unreachable-outcome" site (BDQ.BAnd [scope, req])
+                  [ [ finding "unreachable-outcome" False site (BDQ.BAnd [scope, req])
                         "no case both falls within the scope and meets the requirement: whoever this rule reaches is necessarily in breach."
                     | normalised
                     , interesting req
                     , not (sat' (ctx <> [scope]) req)
                     ]
-                  , [ finding "unreachable-outcome" site (BDQ.BAnd [scope, req])
+                  , [ finding "unreachable-outcome" True site (BDQ.BAnd [scope, req])
                         "the scope already entails the requirement, so nothing within scope can breach it and the requirement adds nothing."
                     | normalised
                     , interesting req
