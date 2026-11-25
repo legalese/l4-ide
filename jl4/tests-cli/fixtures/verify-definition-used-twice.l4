@@ -4,7 +4,7 @@
 -- use is a copy of the definition, and a condition inside it is judged beside
 -- the other copies. The first decision shows what that costs: nothing in it is
 -- redundant, yet `c` is reported once for each use, because the other use
--- repeats it. `l4 verify` cannot yet tell that finding from the true ones
+-- repeats it. `l4 verify` cannot tell that finding from the true ones
 -- below, and its help and the doc page say so. The fix needs the drawing to
 -- keep one node for each use, so that a repeat is reported at the use.
 

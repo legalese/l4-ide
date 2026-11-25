@@ -98,8 +98,8 @@ Both are looked for under a `NOT` as well; there, a condition the rewritten rule
 Two conditions that entail each other, such as the two `x` of `x AND x`, are both reported, and so are two alternatives that cover each other, although deleting either one alone leaves the rule as it was.
 A condition written in a local definition (`WHERE` or `LET`) is placed where the definition writes it, at its opening bracket if its first word is one of the definition's parameters, which stands for whatever each use passes in.
 A bracketed group whose first word is a use of a local definition is placed at its bracket, not at that word.
-When a local definition is used more than once, a condition inside it can be reported because another use repeats it, and `l4 verify` cannot yet tell such a finding from a real one: `qualifies a AND qualifies b`, where `qualifies x` means `x AND c`, reports `c` twice, although nothing in the rule is redundant.
-A separate issue tracks the fix.
+When a local definition is used more than once, a condition inside it can be reported because another use repeats it, and `l4 verify` cannot tell such a finding from a real one: `qualifies a AND qualifies b`, where `qualifies x` means `x AND c`, reports `c` twice, although nothing in the rule is redundant.
+This is a known limit of this check and is not fixed here.
 Each row of a `BRANCH`, and the `ELSE` of an `IF`, also carries “none of the rows above applied”, which nobody wrote, so the tests themselves are not checked for this, only what each `THEN`, `ELSE` and `OTHERWISE` says: a redundant condition inside a test goes unreported.
 An alternative is judged without the negations of the alternatives beside the `OR` it sits inside, so in `d OR (a AND (b OR (c AND d)))` the `c AND d`, which can hold only where `d` has already let the case through, goes unreported too.
 The other findings name a place in the rewritten rule, such as `body.and[1].or[0]`, which need not appear in the source as written, and so does a vacuous guard that is a scope nobody can be in; these carry no line and column.
