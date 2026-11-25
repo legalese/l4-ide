@@ -1058,8 +1058,9 @@ runReadText written = \ case
 
 -- | 'openLocals' over every name in the expression ('namesIn'), not only its
 -- variables: a local applied as a function (@`f` 3@, @`f` WITH x IS 3@) is
--- one too. The deadline's check uses this; an action's ('closedAction') keeps
--- 'openLocals', whose refusals the list's consumers key on.
+-- one too. The deadline's check uses this; an action's ('closedAction') asks
+-- 'openLocals' first, whose refusal the list's consumers key on, and this
+-- only for a local it applies.
 openRefs :: Set Unique -> Environment -> Expr Resolved -> [Resolved]
 openRefs scope env e =
   [ r
@@ -1774,6 +1775,16 @@ nullaryConstructors info ty =
 cannotChoose :: Name -> Text
 cannotChoose v = "the action binds `" <> unqualifiedNameToText v <> "`, which the what-if cannot choose"
 
+-- | The refusal wording for a function local to the rule that the action
+-- applies (@pay (f 3)@, with @f@ an input of the rule or a @WHERE@ local),
+-- which the replay cannot resolve and the residual cannot read back: a
+-- function is not a value 'reifyRef' can spell. Until review of
+-- smucclaw/l4-ide#1107 such an act reached the replay, and its reason was
+-- the evaluator's "Internal error: f is not in scope. Please report this as
+-- a bug." (measured 2026-11-25, on unstable as on #1107).
+appliesLocal :: Name -> Text
+appliesLocal f = "the action applies `" <> unqualifiedNameToText f <> "`, a function local to the rule, which the what-if cannot supply"
+
 -- | An instantiated action the replay can evaluate, or the reason it
 -- cannot: the first local it still names that the residual holds unforced
 -- and the replay's scope does not resolve. Asked BEFORE the replay, so the
@@ -1799,6 +1810,10 @@ closedAction :: ModuleReads -> Set Unique -> Environment -> Expr Resolved -> Eit
 closedAction known scope env e = case openLocals scope env e of
   (v : _) -> Left (cannotChoose v)
   []
+    -- a local named where 'openLocals' does not look, the head of an
+    -- application (@f 3@, @`twice` WITH y IS 3@): 'cannotChoose' would say
+    -- the act binds it, which it does not
+    | (f : _) <- openRefs scope env e -> Left (appliesLocal (getOriginal f))
     | Set.null known.mrSectionGivens -> Right e
     -- a rule first, as for a deadline: after "L4.Discharge" a call of a rule
     -- that reads a section GIVEN passes the GIVEN too, which the act did not

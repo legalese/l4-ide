@@ -469,6 +469,8 @@ These are sorted by which signal carries them.
   The cost, decided by Claude 2026-11-25, pending Meng's review: an act whose `GIVEN` nothing supplies, which a run takes at the default, is untried as well.
   An act that reads one through a rule stays untried even in a state where the contract has worked the `GIVEN` out (``pay OF (`the total` OF 20)``), with the same reason, which is then less exact: the rule, called as the contract holds it, cannot be evaluated outside the run, and on `unstable` that act's reason is the evaluator's internal error.
   A party that a section's `GIVEN` names is not affected, because the explorer reads the party back from the contract: `explore-actions/section-party.l4` explores to Bob's act, as its run has it.
+- **An act that applies a function local to the rule (exit 2).** `pay (f 3)`, with `f` an input of the rule or a function a `WHERE` defines, however it is applied (``pay (`twice` WITH y IS 3)``), is untried with ``the action applies `f`, a function local to the rule, which the what-if cannot supply``.
+  It was untried on `unstable` too, but with the evaluator's `Internal error: f is not in scope. Please report this as a bug.` as its reason, over four lines (`jl4/tests-cli/fixtures/explore-actions/local-function.l4`, measured 2026-11-25).
 - **A norm armed behind a breach (exit 2).** The coverage line has `UNTRIED` and `(unread)`, as above: a part of the contract that the evaluator is still waiting on after a breach, and that the explorer holds no obligation for.
   Nothing was explored from it, and the state is not called terminal.
 - **A bound stopped it (exit 3).** `frontier NOT exhausted`, with the number of states left.

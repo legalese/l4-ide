@@ -69,7 +69,7 @@ fixtures =
   <> [ deadlines </> f | f <- ["shapes.l4", "given.l4", "carried.l4", "armed.l4", "ledger.l4", "called.l4", "section-given.l4", "section-reader.l4", "clock.l4", "locals.l4", "slow.l4", "dated.l4"] ]
   <> [ keptAnswers </> f | f <- ["positional.l4", "named.l4", "genitive.l4", "wrapper.l4"] ]
   <> [ imported </> f | f <- ["readers.l4", "deadlines.l4", "kept.l4"] ]
-  <> [ actions </> f | f <- ["section-given.l4", "section-party.l4"] ]
+  <> [ actions </> f | f <- ["section-given.l4", "section-party.l4", "local-function.l4"] ]
 
 -- | The acceptance run of the fixtures' README: the clock bounded at
 -- closing, the cells the properties read kept.
@@ -1081,6 +1081,23 @@ spec bin = describe "l4 explore" $ do
           lcode `shouldBe` ExitSuccess
           lout `shouldSatisfy` (("Alice does " <> act <> " \8212 " <> why) `isInfixOf`)
           lout `shouldNotSatisfy` ("it is not the act awaited" `isInfixOf`)
+          lout `shouldNotSatisfy` ("Internal error" `isInfixOf`)
+
+    forM_
+      [ ("applied", "PARTY Alice MUST pay (f OF 3)", "pay OF (f OF 3)", "the action applies `f`, a function local to the rule, which the what-if cannot supply")
+      , ("where positional", "PARTY Alice MUST pay (twice OF 3)", "pay OF (twice OF 3)", "the action applies `twice`, a function local to the rule, which the what-if cannot supply")
+      , ("where named", "PARTY Alice MUST pay (twice WITH y IS 3)", "pay OF (twice WITH y IS 3)", "the action applies `twice`, a function local to the rule, which the what-if cannot supply")
+      , ("plain", "PARTY Alice MUST pay n", "pay OF n", "the action binds `n`, which the what-if cannot choose")
+      , ("where plain", "PARTY Alice MUST pay six", "pay OF six", "the action binds `six`, which the what-if cannot choose")
+      ] \ (contract, residual, act, why) ->
+        it ("explore-actions/local-function.l4: " <> contract <> ", an act naming a local, is untried with the what-if's own reason") $ do
+          Output code out _ <- runL4 bin ["explore", actions </> "local-function.l4", "--contract", contract]
+          code `shouldBe` ExitFailure 2
+          out `shouldSatisfy` (("UNTRIED 1: " <> residual <> " (" <> why <> ")") `isInfixOf`)
+          out `shouldNotSatisfy` ("Internal error" `isInfixOf`)
+          Output lcode lout _ <- runL4 bin ["lts", actions </> "local-function.l4", "--contract", contract]
+          lcode `shouldBe` ExitSuccess
+          lout `shouldSatisfy` (("Alice does " <> act <> " \8212 " <> why) `isInfixOf`)
           lout `shouldNotSatisfy` ("Internal error" `isInfixOf`)
 
     it "explore-actions/section-party.l4: a party a section GIVEN names, supplied by a WITH, still explores to the act the run takes" $ do
