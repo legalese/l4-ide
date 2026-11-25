@@ -52,7 +52,7 @@ fixtures =
   <> [ instants </> f | f <- ["clocks.l4", "window.l4", "half.l4", "adjacent.l4", "open.l4", "flip3.l4", "room.l4", "lapse.l4", "merged.l4", "lapse-fixed.l4", "cap-re.l4", "own-lapse.l4", "frac-re.l4", "fx-fork.l4", "fx-barrier.l4", "succ2.l4", "hidden.l4", "succ4.l4", "cap-shift.l4", "frac-start.l4", "frac-wait.l4", "frac-stamp.l4"] ]
   <> [ breached </> f | f <- ["sale.l4", "resell.l4", "continuation.l4"] ]
   <> [ sections </> f | f <- ["sectioned.l4", "two-sections.l4"] ]
-  <> [ deadlines </> f | f <- ["shapes.l4", "given.l4", "carried.l4", "armed.l4", "ledger.l4"] ]
+  <> [ deadlines </> f | f <- ["shapes.l4", "given.l4", "carried.l4", "armed.l4", "ledger.l4", "called.l4"] ]
 
 -- | The acceptance run of the fixtures' README: the clock bounded at
 -- closing, the cells the properties read kept.
@@ -905,6 +905,20 @@ spec bin = describe "l4 explore" $ do
         code `shouldBe` ExitFailure 2
         out `shouldSatisfy` (why `isInfixOf`)
         Output lcode lout _ <- listed c "ledger.l4"
+        lcode `shouldBe` ExitSuccess
+        lout `shouldSatisfy` (why `isInfixOf`)
+        lout `shouldSatisfy` ("Next deadline: not known here" `isInfixOf`)
+
+    -- review of #1107: a name the check met only as a variable or the head
+    -- of a positional application missed a ledger read reached any other way
+    it "called.l4: a rule that reads a ledger, named with WITH, through a wrapper, or as a genitive, is not worked out" $
+      forM_ [("named call", "recorded period"), ("wrapped", "wrapper"), ("genitive", "period for")] \ (c, rule) -> do
+        let why = "the WITHIN reads `" <> rule <> "`, which reads a ledger, so it is worked out only in a run and its deadline is not known here"
+        Output code out _ <- explored c "called.l4"
+        code `shouldBe` ExitFailure 2
+        out `shouldSatisfy` (("time runs out on pay, in 1 state: " <> why) `isInfixOf`)
+        out `shouldNotSatisfy` ("time passes the deadline 50" `isInfixOf`)
+        Output lcode lout _ <- listed c "called.l4"
         lcode `shouldBe` ExitSuccess
         lout `shouldSatisfy` (why `isInfixOf`)
         lout `shouldSatisfy` ("Next deadline: not known here" `isInfixOf`)

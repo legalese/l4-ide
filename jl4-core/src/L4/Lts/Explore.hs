@@ -948,7 +948,7 @@ exploreClosed :: Rig -> IORef (Map (Text, [Unique]) (Either Text (Value NF))) ->
 exploreClosed rig cache = (closedIn rig) {clEval = Just evalCached}
   where
     evalCached e = do
-      let key = (prettyLayout e, [ getUnique r | x <- subExprsOf e, r <- refsOf x ])
+      let key = (prettyLayout e, map getUnique (namesIn e))
       known <- Map.lookup key <$> readIORef cache
       case known of
         Just v -> pure v
@@ -961,10 +961,6 @@ exploreClosed rig cache = (closedIn rig) {clEval = Just evalCached}
               let v = outcomeValue r
               modifyIORef' cache (Map.insert key v)
               pure v
-    refsOf = \ case
-      Var _ r   -> [r]
-      App _ r _ -> [r]
-      _         -> []
 
 -- | One @#EVAL@ of a closed expression in the module, read as an instant: a
 -- NUMBER as it is, a DATE by its serial (as the machine lowers an anchor).

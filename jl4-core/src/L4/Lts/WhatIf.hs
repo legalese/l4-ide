@@ -90,6 +90,7 @@ module L4.Lts.WhatIf
   , evalInModule
   , outcomeValue
   , runStateRules
+  , namesIn
     -- * The replay
   , whatIf
   , tryCandidate
@@ -814,13 +815,20 @@ runStateRules (MkModule _ _ section) = grow direct
     rules = [ (getUnique name, body) | MkDecide _ _ (MkAppForm _ name _ _) body <- decidesOf section ]
     direct = Set.fromList [ u | (u, body) <- rules, not (null [ () | ReadCell {} <- subExprs body ]) ]
     grow s =
-      let s' = s <> Set.fromList [ u | (u, body) <- rules, any (`Set.member` s) (namesIn body) ]
+      let s' = s <> Set.fromList [ u | (u, body) <- rules, any ((`Set.member` s) . getUnique) (namesIn body) ]
       in if s' == s then s else grow s'
 
--- | Every name an expression refers to, as a variable or as the head of an
--- application.
-namesIn :: Expr Resolved -> [Unique]
-namesIn e = [ getUnique r | x <- subExprs e, r <- case x of { Var _ r -> [r]; App _ r _ -> [r]; _ -> [] } ]
+-- | Every name an expression mentions, at every node: a variable, the head of
+-- an application whether its arguments are positional or named (@`f` WITH x
+-- IS 1@), the rule a genitive applies (@Bob's `period for`@), and any other
+-- place a constructor of 'Expr' or of what it holds keeps a name, in the
+-- order a generic traversal meets them. It is generic on purpose: until review
+-- on 2026-11-25 this matched only variables and positional applications, so
+-- a rule that reads a ledger, named with @WITH@ or as a genitive, was not
+-- seen, and its deadline was worked out against an empty ledger. A
+-- constructor added to 'Expr' later cannot hide a name from it.
+namesIn :: Expr Resolved -> [Resolved]
+namesIn = Optics.toListOf (Optics.gplate @Resolved)
 
 -- | The expression of a deadline the residual has not forced, worked out when
 -- it is closed ('Closed'): its value, or why it is not known here. @what@
@@ -834,22 +842,31 @@ closedDeadline eval readsRun pos raw what e = do
   e' <- reifyExpr raw.roEnv e
   case e' of
     Lit _ (NumericLit _ r) -> pure (Right (ValNumber r))
-    _ | (v : _) <- openLocals pos.posReplayScope raw.roEnv e' ->
-          pure (Left (what <> " reads `" <> unqualifiedNameToText v <> "`, which the contract has not worked out yet (an input of the rule, or a name local to it), so its deadline is not known here"))
+    _ | (v : _) <- openRefs pos.posReplayScope raw.roEnv e' ->
+          pure (Left (what <> " reads `" <> unqualifiedNameToText (getOriginal v) <> "`, which the contract has not worked out yet (an input of the rule, or a name local to it), so its deadline is not known here"))
       | not (null [ () | Lifecycle {} <- subExprs e' ]) ->
           pure (Left (what <> " is not a literal, so its deadline is not known here"))
       | not (null [ () | ReadCell {} <- subExprs e' ]) ->
           pure (Left (what <> " reads a ledger with RECALL, so it is worked out only in a run and its deadline is not known here"))
-      | (v : _) <- [ getOriginal r | x <- subExprs e', r <- refsOf x, Set.member (getUnique r) readsRun ] ->
+      | (v : _) <- [ getOriginal r | r <- namesIn e', Set.member (getUnique r) readsRun ] ->
           pure (Left (what <> " reads `" <> unqualifiedNameToText v <> "`, which reads a ledger, so it is worked out only in a run and its deadline is not known here"))
       | otherwise -> eval e' >>= pure . \ case
           Right v  -> Right v
           Left why -> Left ("working out " <> what <> " failed (" <> why <> "), so its deadline is not known here")
-  where
-    refsOf = \ case
-      Var _ r   -> [r]
-      App _ r _ -> [r]
-      _         -> []
+
+-- | 'openLocals' over every name in the expression ('namesIn'), not only its
+-- variables: a local applied as a function (@`f` 3@, @`f` WITH x IS 3@) is
+-- one too. The deadline's check uses this; an action's ('closedAction') keeps
+-- 'openLocals', whose refusals the list's consumers key on.
+openRefs :: Set Unique -> Environment -> Expr Resolved -> [Resolved]
+openRefs scope env e =
+  [ r
+  | r <- namesIn e
+  , let u = getUnique r
+  , Map.member u env
+  , u.sort /= 'b'
+  , not (Set.member u scope)
+  ]
 
 -- | A value that is not a number, for a reason line.
 notANumber :: Value NF -> Text
