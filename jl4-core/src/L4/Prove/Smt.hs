@@ -4,6 +4,8 @@
 -- particular solver: R-V6 asks for portable text, with no z3-specific options
 -- or tactics, so that cvc5 is a free second opinion on any @unsat@, and for an
 -- emitter narrow enough that an @sbv@ backend is a swap of one module (D3).
+-- @l4 prove@ asks cvc5 the same script where z3 gives no answer
+-- (smucclaw/l4-ide#1098), and this reader reads both solvers' replies.
 --
 -- __Identifiers.__ Every symbol that comes from an L4 name is a quoted symbol
 -- with a namespace prefix ('userSymbol'). Quoting alone is not enough: in
@@ -20,6 +22,7 @@ module L4.Prove.Smt
   , realLit
   , readRational
   , parseSExprs
+  , parseSExprsPrefix
   , CheckSat (..)
   , readCheckSat
   ) where
@@ -125,13 +128,23 @@ readRational = \case
 
 -- | Parse a solver's whole output into its top-level s-expressions.
 parseSExprs :: Text -> Either Text [SExpr]
-parseSExprs = go []
+parseSExprs t = case parseSExprsPrefix t of
+  (es, Nothing) -> Right es
+  (_, Just why) -> Left why
+
+-- | The top-level s-expressions of a solver's output up to the first one that
+-- cannot be parsed, and why parsing stopped there ('Nothing' when it reached
+-- the end). A solver's answer is its first expression, and what follows it
+-- (the error a solver prints for a @get-value@ after @unsat@, say) need not
+-- be understood for the answer to be read (smucclaw/l4-ide#1098).
+parseSExprsPrefix :: Text -> ([SExpr], Maybe Text)
+parseSExprsPrefix = go []
  where
   go acc s = case Text.uncons (skip s) of
-    Nothing -> Right (reverse acc)
-    Just _  -> do
-      (e, rest) <- one (skip s)
-      go (e : acc) rest
+    Nothing -> (reverse acc, Nothing)
+    Just _  -> case one (skip s) of
+      Left why -> (reverse acc, Just why)
+      Right (e, rest) -> go (e : acc) rest
 
   skip s =
     let s' = Text.dropWhile Char.isSpace s
