@@ -101,6 +101,11 @@ L4 lets you use a type before you declare it, but KIE does not load a model in w
 A record that refers to itself, or two records that refer to each other, is written in your order: KIE 8.44 and Camunda 8.7.6 both load and run such a model, measured on `jl4/examples/dmn/itemdef-order.l4`.
 No other engine has been checked.
 
+**Names.** Every element keeps your L4 name in its `label`, and its `name`, the one FEEL uses and the one an engine's input keys must match, is written in letters, digits and underscores.
+A name that FEEL reserves gets an underscore on the end: its keywords, such as `in`, `date` and `list`, and the functions the export calls, `floor`, `ceiling`, `decimal`, `sum`, `count`, `min`, `max`, `concatenate` and `modulo`.
+So an input `GIVEN floor IS A NUMBER` is the input `floor_`, and a case must supply `floor_`.
+The functions are reserved because FEEL looks a function's name up among the variables first: left as `floor`, the input hid the function, and KIE 8.44 failed each decision that called a function hidden this way (Camunda 8.7.6 did not), measured on `jl4/tests-cli/fixtures/export-shadowed-builtins.l4`.
+
 **Values from a file you import.** `l4 export dmn` writes one DMN file and no DMN `<import>`, so a decision can read only what is in that file.
 A constant defined in a module you `IMPORT` is copied into the model as a decision of its own when nothing can change its value: a `MEANS` with no `GIVEN` whose body uses only fixed values, L4's built-in operators, functions of the prelude and `daydate` libraries, and other such constants.
 Each copy carries an advisory `D-IMPORTED` note, because the model now holds the value rather than a link to it: if the imported file changes, export again.

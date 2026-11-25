@@ -2301,7 +2301,20 @@ nothing in readability.
 4. Collapse runs of `_`; strip leading and trailing `_`.
 5. Empty → `"_"`. Leading digit → prefix `"_"`.
 6. Reserved word → append `"_"` (list: `true false null and or not if then else for in return
-some every satisfies instance of between function external date time duration list context`).
+some every satisfies instance of between function external date time duration list context`,
+   **plus, since the review of smucclaw/l4-ide#1103, the built-in functions this exporter calls:
+   `floor ceiling decimal sum count min max concatenate modulo`**). Those are not keywords, but FEEL
+   resolves a call's name in the scope that holds the variables, so an `inputData` named `floor` made
+   `max(floor(x), floor)` a call of a number: KIE 8.44.0.Final failed all three decisions of a probe
+   with inputs named `floor`, `decimal` and `concatenate` (`Not an invocable: '1'`), while Camunda
+   8.7.6 answered them (measured 2026-11-26, `jl4/tests-cli/fixtures/export-shadowed-builtins.l4`).
+   `floor`, `ceiling`, `decimal`, `sum`, `count` and `concatenate` came with #1103's lowering; `min`
+   and `max` with it and with the select idiom before it, and `modulo` with `MODULO` before both, so
+   those three were exposed before #1103. The suffix
+   is this step's, so like a keyword's it carries no note (the `@label` keeps the L4 name), and it
+   reaches every name in the namespace, a record field or a type included; the corpus has none of
+   those, and 10 elements in it are renamed (5 decisions named `sum`, 2 named `count`, 3 inputs named
+   `floor`), decided by Claude 2026-11-26, pending Meng's review.
 
 **Stage 2 — `uniquifyIn : Scope -> [Text] -> [Text]`** over a stable source-order traversal:
 first claimant keeps the base, the nth gets `base_<n>` for the least free `n ≥ 2`. **Scopes, widened

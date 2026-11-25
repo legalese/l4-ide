@@ -508,11 +508,28 @@ feelTypeNameText = suffixReservedIn reservedFeelTypeNames . foldFeelName
 -- no engine objects to. (A name /part/ may be a keyword in any case, which is
 -- why the test is against the whole folded name and not against a part: after
 -- folding, @annual income@ is @annual_income@, not @in@.)
+--
+-- __Plus the FEEL built-in functions this exporter calls__ (the second
+-- group). They are not keywords, but FEEL resolves a call's name in the same
+-- scope as its variables, so a variable spelled like one hides it: an
+-- @inputData@ named @floor@ made @floor(x)@ a call of the number the input
+-- holds, which KIE 8.44.0.Final refuses at run time (@Not an invocable: '1'@,
+-- measured with parameters named @floor@, @decimal@ and @concatenate@;
+-- Camunda 8.7.6 answered those three correctly). @floor@, @ceiling@,
+-- @decimal@, @sum@, @count@ and @concatenate@ came with the rounding and
+-- aggregate lowering (smucclaw/l4-ide#1103); @min@ and @max@ with it and with
+-- the select idiom before it; @modulo@ with @MODULO@ before both. @not@ was
+-- already reserved above. The rename is stage 1's suffix (@floor_@), the same
+-- one a keyword gets, and like a keyword's it carries no note: the @label@
+-- keeps the L4 name. It reaches every name in this namespace, so a record
+-- field or a type spelled like one of these is renamed too.
 reservedFeelWords :: Set Text
 reservedFeelWords = Set.fromList
   [ "true", "false", "null", "and", "or", "not", "if", "then", "else", "for", "in", "return"
   , "some", "every", "satisfies", "instance", "of", "between", "function", "external"
   , "date", "time", "duration", "list", "context"
+  -- built-in functions this exporter calls
+  , "floor", "ceiling", "decimal", "sum", "count", "min", "max", "concatenate", "modulo"
   ]
 
 -- | 'reservedFeelWords' __plus FEEL's built-in type spellings__, which is the

@@ -1352,6 +1352,25 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       feelIdentText "not" `shouldBe` "not_"
       feelIdentText "not!" `shouldBe` "not_"
 
+    -- A variable spelled like a FEEL function this exporter calls hides the
+    -- function: KIE refused `max(floor(x), floor)` with an input named
+    -- `floor` ("Not an invocable"). So those names are reserved like keywords.
+    it "suffixes a name spelled like a FEEL function the export calls" $ do
+      forM_ ["floor", "ceiling", "decimal", "sum", "count", "min", "max", "concatenate", "modulo"] \w ->
+        feelIdentText w `shouldBe` (w <> "_")
+      -- the whole folded name only, as for a keyword
+      feelIdentText "max count" `shouldBe` "max_count"
+
+    it "renames an input spelled like a FEEL function, so the call still reaches the function" $ do
+      let src =
+            "GIVEN x IS A NUMBER\n\
+            \      floor IS A NUMBER\n\
+            \GIVETH A NUMBER\n\
+            \DECIDE `f` x floor IS FLOOR x PLUS floor\n"
+      case (decisionNamed "f" (drgOf src)).dcnLogic of
+        LogicLiteral x -> x.feText `shouldBe` "floor(x) + floor_"
+        _              -> expectationFailure "expected a boxed literal for `f`"
+
     it "gives type names their own function, with the same map and the same dot policy" $ do
       -- §5.1-2 and §5.3.6. A `.` in a typeRef QName is DMN's IMPORT PREFIX
       -- separator and this exporter emits no imports, so a dot passed through

@@ -1,0 +1,16 @@
+{
+  "cases": [
+    {
+      "name": "the three decisions",
+      "context": {
+        "x": 2.5,
+        "floor_": 1,
+        "y": 2.5,
+        "decimal_": 10,
+        "items": [1, 2],
+        "concatenate_": 10
+      },
+      "expect": { "f": 2, "g": 12, "h": 13 }
+    }
+  ]
+}

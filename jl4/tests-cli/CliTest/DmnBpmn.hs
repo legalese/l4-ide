@@ -164,6 +164,10 @@ exportImportedPartialFixture = fixtureDir </> "export-imported-partial.l4"
 -- A constant read from an imported module that does not type-check.
 exportImportedUncheckedFixture :: FilePath
 exportImportedUncheckedFixture = fixtureDir </> "export-imported-unchecked.l4"
+-- Inputs spelled like a FEEL function the export calls.
+exportShadowedBuiltinsFixture, exportShadowedBuiltinsCases :: FilePath
+exportShadowedBuiltinsFixture = fixtureDir </> "export-shadowed-builtins.l4"
+exportShadowedBuiltinsCases   = fixtureDir </> "export-shadowed-builtins.cases.json"
 -- EMPTY, the empty list, read by count, sum and an equality test.
 exportEmptyListFixture, exportEmptyListCases :: FilePath
 exportEmptyListFixture = fixtureDir </> "export-empty-list.l4"
@@ -660,6 +664,16 @@ spec bin = do
         sout `shouldSatisfy` (not . ("\"EMPTY\"" `isInfixOf`))
         sout `shouldSatisfy` ("h + count([])" `isInfixOf`)
         sout `shouldSatisfy` ("xs = []" `isInfixOf`)
+
+      -- An input spelled like a FEEL function the export calls hides that
+      -- function, so it is renamed as a keyword would be; its label keeps
+      -- the L4 name.
+      it "renames an input spelled like a FEEL function the export calls" $ do
+        Output code sout _ <- runL4 bin ["export", "dmn", exportShadowedBuiltinsFixture]
+        code `shouldBe` ExitSuccess
+        forM_ ["floor", "decimal", "concatenate"] \w ->
+          sout `shouldSatisfy` (("<inputData id=\"input_" <> w <> "\" name=\"" <> w <> "_\"") `isInfixOf`)
+        sout `shouldSatisfy` ("max(floor(x), floor_)" `isInfixOf`)
 
       -- `l4 check` refuses the importer of a module with errors, so a constant
       -- from one is no value L4 has: it is refused, not copied.
@@ -1308,6 +1322,33 @@ spec bin = do
         dmn [dmn, "--cases", exportImportedConstantCases] \out -> do
           out `shouldSatisfy` ("1 parsed, 0 error(s)" `isInfixOf`)
           out `shouldSatisfy` ("21/21 value(s) as expected" `isInfixOf`)
+
+  -- Before these names were reserved, KIE refused all three decisions
+  -- ("Not an invocable"); Camunda answered them.
+  describe "inputs spelled like FEEL functions (opt-in: L4_DMN_ENGINE_CHECK=1)" $ do
+    let exported = do
+          tmp <- getTemporaryDirectory
+          let outDir  = tmp </> "l4-export-shadowed-builtins"
+              outFile = outDir </> "export-shadowed-builtins.dmn"
+          removePathForcibly outDir
+          createDirectoryIfMissing True outDir
+          Output code _ serr <- runL4 bin ["export", "dmn", exportShadowedBuiltinsFixture, "-o", outFile]
+          unless (code == ExitSuccess) $
+            expectationFailure ("l4 export dmn failed:\n" ++ serr)
+          pure outFile
+    it "KIE calls the function, not the input spelled like it" $ do
+      dmn <- exported
+      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustPass
+        dmn [dmn, "--cases", exportShadowedBuiltinsCases] \out -> do
+          out `shouldSatisfy` ("1 case(s), 0 error(s), 0 warning(s)" `isInfixOf`)
+          out `shouldSatisfy` ("3/3 value(s) as expected" `isInfixOf`)
+
+    it "Camunda calls the function, not the input spelled like it" $ do
+      dmn <- exported
+      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustPass
+        dmn [dmn, "--cases", exportShadowedBuiltinsCases] \out -> do
+          out `shouldSatisfy` ("1 parsed, 0 error(s)" `isInfixOf`)
+          out `shouldSatisfy` ("3/3 value(s) as expected" `isInfixOf`)
 
   -- EMPTY, the empty list. Before it was FEEL's [], KIE answered 0 of these
   -- 10 values as expected (count("EMPTY") is 1, the prelude's sum of it fails, and
