@@ -52,7 +52,7 @@ fixtures =
   <> [ instants </> f | f <- ["clocks.l4", "window.l4", "half.l4", "adjacent.l4", "open.l4", "flip3.l4", "room.l4", "lapse.l4", "merged.l4", "lapse-fixed.l4", "cap-re.l4", "own-lapse.l4", "frac-re.l4", "fx-fork.l4", "fx-barrier.l4", "succ2.l4", "hidden.l4", "succ4.l4", "cap-shift.l4", "frac-start.l4", "frac-wait.l4", "frac-stamp.l4"] ]
   <> [ breached </> f | f <- ["sale.l4", "resell.l4", "continuation.l4"] ]
   <> [ sections </> f | f <- ["sectioned.l4", "two-sections.l4"] ]
-  <> [ deadlines </> f | f <- ["shapes.l4", "given.l4", "carried.l4", "armed.l4", "ledger.l4", "called.l4", "section-given.l4"] ]
+  <> [ deadlines </> f | f <- ["shapes.l4", "given.l4", "carried.l4", "armed.l4", "ledger.l4", "called.l4", "section-given.l4", "section-reader.l4"] ]
 
 -- | The acceptance run of the fixtures' README: the clock bounded at
 -- closing, the cells the properties read kept.
@@ -939,6 +939,20 @@ spec bin = describe "l4 explore" $ do
         lcode `shouldBe` ExitSuccess
         lout `shouldSatisfy` (why `isInfixOf`)
         lout `shouldSatisfy` ("Next deadline: not known here" `isInfixOf`)
+
+    -- review of #1107: worked out in the module, a rule that reads a section
+    -- GIVEN stopped with the evaluator's internal error
+    it "section-reader.l4: a WITHIN naming a rule that reads a section GIVEN is untried with a reason, not an internal error" $
+      forM_ ["supplied", "plain"] \ c -> do
+        let why = "the WITHIN reads `the window`, which reads `rate`, a section GIVEN, which a WITH can supply, so it is worked out only in a run and its deadline is not known here"
+        Output code out err <- explored c "section-reader.l4"
+        code `shouldBe` ExitFailure 2
+        out `shouldSatisfy` (("time runs out on pay, in 1 state: " <> why) `isInfixOf`)
+        (out <> err) `shouldNotSatisfy` ("Internal error" `isInfixOf`)
+        Output lcode lout lerr <- listed c "section-reader.l4"
+        lcode `shouldBe` ExitSuccess
+        lout `shouldSatisfy` (why `isInfixOf`)
+        (lout <> lerr) `shouldNotSatisfy` ("Internal error" `isInfixOf`)
   where
     liveness =
       [ "--eventually", "Alice has bought or stopped"
