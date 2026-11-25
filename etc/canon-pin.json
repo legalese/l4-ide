@@ -127,12 +127,23 @@
     "branch port-802-at-pin (e1b7780e1, 50d3655e6, 96b2b09a8), stacked on the",
     "previous pin b38cd5ab, so this bump moves those lines and nothing else.",
     "The same caveat as above applies: re-point at a main SHA when the mirror is",
-    "caught up to commons main."
+    "caught up to commons main.",
+    "",
+    "FOURTH BRANCH PIN, 2026-11-25 (smucclaw/l4-ide#1097, l4-core): `l4 check`",
+    "now warns on a LEST attached to a MUST, DO or MAY that has no deadline",
+    "(lint/lest-without-deadline), because nothing can ever reach it. That adds",
+    "18 warning blocks, 144 lines and nothing else, to ONE blessed golden:",
+    "us/regcf/cleanroom tests/regcf-denovo.golden. It was re-blessed in commons",
+    "on branch rebless-lest-1097-at-pin (20d325ff7), stacked on the previous pin",
+    "96b2b09a8, so this bump moves that one file and nothing else. Whether those",
+    "18 rules gain deadlines or lose their LESTs is an encoding question, left",
+    "to commons and NOT answered here. The same caveat applies: re-point at a",
+    "main SHA when the mirror is caught up to commons main."
   ],
   "repo": "legalese/commons",
-  "sha": "96b2b09a899b22302d4468259f8f408570dd0a2f",
-  "ref": "port-802-at-pin",
-  "pinned": "2026-11-01",
+  "sha": "20d325ff7938c388c46687bad5a988e802c0b5e8",
+  "ref": "rebless-lest-1097-at-pin",
+  "pinned": "2026-11-25",
   "blessed": [
     {
       "from": "subjects/sg/child-support/encodings/legalese",
