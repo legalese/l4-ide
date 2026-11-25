@@ -740,6 +740,21 @@ getImportPreamble st = do
          then ""
          else Text.unlines currentImports <> "\n"
 
+-- | A line of the REPL is not evaluated while the loaded file is not, because a
+-- module it imports has errors. The line's own check is not enough to say so:
+-- the line's file is written to the directory the REPL was started in, where
+-- the loaded file's IMPORTs may find no module, and an IMPORT that finds no
+-- module does not stop evaluation. A loaded file with errors of its own is
+-- left to the line's check, which reports them, since the line's file holds
+-- the loaded file's text.
+loadedFileRefusal :: ReplState -> FilePath -> IO (Maybe Text)
+loadedFileRefusal st contextFile = do
+  let contextUri = normalizedFilePathToUri (toNormalizedFilePath contextFile)
+  [mTc] <- shakeRunDatabase st.ideState.shakeDb [Shake.use Rules.SuccessfulTypeCheck contextUri]
+  case mTc of
+    Just tc | tc.success, not (Rules.evaluable tc) -> Just <$> fileImportsHaveErrors st contextUri
+    _ -> pure Nothing
+
 -- | Evaluate an expression in the context of a loaded file
 evalExpression :: ReplState -> FilePath -> Text -> IO Text
 evalExpression st contextFile exprText = do
@@ -780,7 +795,9 @@ evalExpression st contextFile exprText = do
 
   -- Type check and evaluate
   [mtc] <- shakeRunDatabase st.ideState.shakeDb [Shake.use Rules.SuccessfulTypeCheck replUri]
+  refusal <- loadedFileRefusal st contextFile
   case mtc of
+    _ | Just why <- refusal -> pure why
     Nothing -> pure "Failed to type check expression"
     Just tc | not tc.success -> do
       -- Extract error messages
@@ -883,7 +900,9 @@ evalWithTrace st contextFile exprText = do
   
   -- Type check and evaluate
   [mtc] <- shakeRunDatabase st.ideState.shakeDb [Shake.use Rules.SuccessfulTypeCheck replUri]
+  refusal <- loadedFileRefusal st contextFile
   case mtc of
+    _ | Just why <- refusal -> pure why
     Nothing -> pure "Failed to type check expression"
     Just tc | not tc.success -> do
       let errors = tc.infos
@@ -934,7 +953,9 @@ evalWithTraceAscii st contextFile exprText = do
 
   -- Type check and evaluate
   [mtc] <- shakeRunDatabase st.ideState.shakeDb [Shake.use Rules.SuccessfulTypeCheck replUri]
+  refusal <- loadedFileRefusal st contextFile
   case mtc of
+    _ | Just why <- refusal -> pure why
     Nothing -> pure "Failed to type check expression"
     Just tc | not tc.success -> do
       let errors = tc.infos

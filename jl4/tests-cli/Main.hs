@@ -4947,6 +4947,23 @@ spec bin = do
       both o `shouldNotSatisfy` isInfixOf "Evaluation["
       both o `shouldSatisfy` isInfixOf "import/cycle"
 
+    -- A line's file is written to the directory the REPL was started in,
+    -- where the loaded file's IMPORT finds no module, and an IMPORT that finds
+    -- no module does not stop evaluation; a line used to be evaluated there
+    -- while the load said nothing would be. A clean import, so started, still
+    -- lets a line that reads nothing from it be evaluated.
+    it "the REPL evaluates no line of it when started from another directory, and still evaluates one over a clean import" $ withRepl \repl -> do
+      let elsewhere dir = withSystemTempDirectory "l4-repl-imports" \work -> do
+            createDirectoryIfMissing True (work </> "sub")
+            forM_ ["lib.l4", "main.l4"] \f -> copyFile (dir </> f) (work </> "sub" </> f)
+            replSessionFor work repl (work </> "sub" </> "main.l4") ["1 PLUS 1", ":trace 1 PLUS 1", ":traceascii 1 PLUS 1"]
+      (loaded, rs) <- elsewhere errDir
+      loaded `shouldSatisfy` T.isSuffixOf ("Error loading file: " <> fileMessage)
+      rs `shouldBe` replicate 3 fileMessage
+      (loadedOk, rsOk) <- elsewhere okDir
+      loadedOk `shouldSatisfy` T.isSuffixOf "File loaded successfully."
+      take 1 rsOk `shouldBe` ["2"]
+
     -- The controls.
     it "still evaluates a file whose import is clean" $ do
       o <- runL4 bin ["run", okDir </> "main.l4"]
