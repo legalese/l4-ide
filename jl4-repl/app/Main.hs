@@ -4,11 +4,12 @@
 
 module Main where
 
-import Control.Monad (unless)
+import Control.Monad (forM, unless)
 import Control.Monad.IO.Class (liftIO)
 import qualified Data.ByteString.Char8 as BS8
 import Data.IORef
-import Data.List (nub, sortOn, isPrefixOf)
+import Data.List (nubBy, sortOn, isPrefixOf)
+import Data.Maybe (catMaybes)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text.Encoding
@@ -297,54 +298,72 @@ loadFile st fp = do
 -- 'Rules.evaluable'). It names the module, and says how to get past it: for a
 -- module the file imports, fixing it and starting the REPL again, since the
 -- REPL does not see a change to a file it has already checked, even on
--- @:reload@; for one that @:import@ added, @:reset@ (decided by Claude
--- 2026-11-25, pending Meng's review).
+-- @:reload@ or @:reset@; for one that @:import@ added, @:reset@, or starting
+-- the REPL again once it is fixed (decided by Claude 2026-11-25, pending
+-- Meng's review).
 fileImportsHaveErrors :: ReplState -> NormalizedUri -> IO Text
 fileImportsHaveErrors st uri = brokenImports st uri >>= \case
   [] -> pure importsHaveErrors
   broken -> pure $
-    "This file imports " <> describeBroken broken <> ", so nothing is evaluated; `l4 check` on the file shows the errors."
-      <> " If you have fixed that since, start the REPL again: it does not see a change to a file it has already checked, even on `:reload`."
+    "This file imports " <> describeBroken (map snd broken) <> ", so nothing is evaluated; `l4 check` on the file shows the errors."
+      <> restartToSeeAFix
 
--- | The same, for a line of the REPL: when the loaded file's own imports are
--- fine, the broken module came in through @:import@. What @:import@ added is
--- matched by name, as written after @IMPORT@ without the backticks a name such
--- as @`my-broken`@ needs.
+restartToSeeAFix :: Text
+restartToSeeAFix =
+  " If you have fixed that since, start the REPL again: it does not see a change to a file it has already checked, even on `:reload` or `:reset`."
+
+-- | The same, for a line of the REPL whose own imports have errors. When the
+-- loaded file is evaluable, a broken module came in through @:import@: the
+-- line's file begins with what @:import@ added, one IMPORT a line, so an
+-- import written on one of those lines is one that @:import@ added.
 lineImportsHaveErrors :: ReplState -> FilePath -> NormalizedUri -> IO Text
 lineImportsHaveErrors st contextFile lineUri = do
   let contextUri = normalizedFilePathToUri (toNormalizedFilePath contextFile)
   [mTc] <- shakeRunDatabase st.ideState.shakeDb [Shake.use Rules.SuccessfulTypeCheck contextUri]
   case mTc of
     Just tc | Rules.evaluable tc -> do
-      added <- map (Text.dropAround (== '`') . Text.strip . Text.drop (Text.length "IMPORT ")) <$> readIORef st.imports
+      added <- length <$> readIORef st.imports
       broken <- brokenImports st lineUri
-      pure $ case filter ((`elem` added) . fst) broken of
+      let fromImport imp = maybe False (\r -> r.start.line <= added) imp.importRange
+      pure $ case [b | (imp, b) <- broken, fromImport imp] of
         [] -> importsHaveErrors
-        fromImport ->
-          "`:import` added " <> describeBroken fromImport <> ", so nothing is evaluated;"
+        fromImports ->
+          "`:import` added " <> describeBroken fromImports <> ", so nothing is evaluated;"
             <> " `:imports` lists what `:import` added, and `:reset` removes it."
+            <> restartToSeeAFix
     _ -> fileImportsHaveErrors st contextUri
 
 -- | The modules a file imports directly that stop it being evaluated, each with
--- what is wrong with it, as the error on its IMPORT says.
-brokenImports :: ReplState -> NormalizedUri -> IO [(Text, Text)]
+-- its name and what is wrong with it, as the error on its IMPORT says.
+brokenImports :: ReplState -> NormalizedUri -> IO [(Rules.ImportResult, (Text, Text))]
 brokenImports st uri = do
-  [mDeps] <- shakeRunDatabase st.ideState.shakeDb [Shake.use Rules.GetTypeCheckDependencies uri]
-  pure $ nub
-    [ (rawNameToText (rawName imp.importName), why)
-    | (imp, mTc) <- maybe [] id mDeps
-    , Just why <- [problem mTc]
-    ]
+  [found] <- shakeRunDatabase st.ideState.shakeDb [problems]
+  pure (nubBy (\a b -> snd a == snd b) found)
   where
-    problem = \case
-      Nothing -> Just "could not be checked"
+    problems = do
+      deps <- maybe [] id <$> Shake.use Rules.GetTypeCheckDependencies uri
+      fmap catMaybes $ forM deps \(imp, mTc) ->
+        fmap (\why -> (imp, (rawNameToText (rawName imp.importName), why))) <$> problem imp mTc
+    problem imp = \case
+      Nothing -> Just . maybe "could not be checked" ringWords <$> Rules.firstImportCycleFrom imp.moduleUri
       Just tc
-        | not tc.success -> Just "has errors"
-        | not tc.importsOk -> Just "imports a module with errors"
-        | otherwise -> Nothing
+        | not tc.success -> pure (Just "has errors")
+        | not tc.importsOk -> pure (Just "imports a module with errors")
+        | otherwise -> pure Nothing
+    -- as the IMPORT's own error names a ring: by its files, the first repeated
+    -- at the end
+    ringWords ring = "is in a ring of imports: " <> Text.intercalate " -> " (map fileName ring)
+    fileName u = Text.takeWhileEnd (/= '/') (fromNormalizedUri u).getUri
 
+-- | The modules, each with what is wrong with it, as a list in words.
 describeBroken :: [(Text, Text)] -> Text
-describeBroken = Text.intercalate " and " . map (\(name, why) -> "`" <> name <> "`, which " <> why)
+describeBroken = inWords . map (\(name, why) -> "`" <> name <> "`, which " <> why)
+  where
+    inWords = \case
+      [] -> ""
+      [one] -> one
+      [one, two] -> one <> ", and " <> two
+      one : rest -> one <> ", " <> inWords rest
 
 -- | The words for when no module can be named.
 importsHaveErrors :: Text

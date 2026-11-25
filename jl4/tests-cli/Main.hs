@@ -4803,11 +4803,13 @@ spec bin = do
           replSessionFor work repl (work </> "main.l4") queries
         libAndMain dir = [(dir </> f, f) | f <- ["lib.l4", "main.l4"]]
         replQueries = ["`the answer`", "1 PLUS 1", ":trace `the answer`", ":traceascii `the answer`"]
-        -- What the REPL says, on loading main.l4 and for each line, while the
-        -- lib.l4 it imports has errors.
-        fileMessage :: T.Text
-        fileMessage = "This file imports `lib`, which has errors, so nothing is evaluated; `l4 check` on the file shows the errors."
-          <> " If you have fixed that since, start the REPL again: it does not see a change to a file it has already checked, even on `:reload`."
+        -- What the REPL says, on loading main.l4 and for each line, while a
+        -- module it imports has errors: which modules, and what is wrong with
+        -- each, then the same advice.
+        fileMessageFor :: T.Text -> T.Text
+        fileMessageFor modules = "This file imports " <> modules <> ", so nothing is evaluated; `l4 check` on the file shows the errors." <> restartAdvice
+        restartAdvice = " If you have fixed that since, start the REPL again: it does not see a change to a file it has already checked, even on `:reload` or `:reset`."
+        fileMessage = fileMessageFor "`lib`, which has errors"
         withLsp act = maybe (pendingWith "no jl4-lsp binary (set JL4_LSP_BIN, or run under cabal test)") act mLsp
         -- Draw the decision graph of `we agree` in ladder.l4 from its lens,
         -- then ask the language server to evaluate the call in it to a rule
@@ -4899,23 +4901,36 @@ spec bin = do
       loaded `shouldSatisfy` T.isSuffixOf ("Error loading file: " <> fileMessage)
       rs `shouldBe` replicate (length replQueries) fileMessage
 
+    it "the REPL names every module that stops it, and what is wrong with each, a ring of imports among them" $ withRepl \repl -> do
+      (two, _) <- session repl ([(errDir </> f, f) | f <- ["lib.l4", "mid.l4"]] <> [(errDir </> "two.l4", "main.l4")]) ["1 PLUS 1"]
+      two `shouldSatisfy` T.isSuffixOf ("Error loading file: " <> fileMessageFor "`lib`, which has errors, and `mid`, which imports a module with errors")
+      let cyc = fixtureDir </> "cycle-eval"
+      (ring, _) <- session repl [(cyc </> "ra.l4", "ra.l4"), (cyc </> "rb.l4", "rb.l4"), (cyc </> "outside.l4", "main.l4")] ["1 PLUS 1"]
+      ring `shouldSatisfy` T.isSuffixOf ("Error loading file: " <> fileMessageFor "`ra`, which is in a ring of imports: ra.l4 -> rb.l4 -> ra.l4")
+
     -- A module that :import added stops every line too, though the loaded
     -- file's own imports are clean, and `l4 check` on the file passes; so the
-    -- REPL says that :import added it, and :reset gets past it. A name that
-    -- needs backticks is named too.
+    -- REPL says that :import added it, and :reset gets past it. It is told
+    -- apart by where its IMPORT is, not by its spelling, so a name in
+    -- backticks and a comment after the name do not hide it.
     it "the REPL names a module that :import added and that has errors, and evaluates again after :reset" $ withRepl \repl -> do
       (_, rs) <- session repl (libAndMain okDir <> [(errDir </> "lib.l4", "broken.l4"), (errDir </> "lib.l4", "my-broken.l4")])
-        [":import broken", "1 PLUS 1", ":reset", "1 PLUS 1", ":import `my-broken`", "1 PLUS 1"]
-      let refusal name = "`:import` added `" <> name <> "`, which has errors, so nothing is evaluated; `:imports` lists what `:import` added, and `:reset` removes it."
+        [ ":import broken", "1 PLUS 1", ":reset", "1 PLUS 1"
+        , ":import `my-broken`", "1 PLUS 1", ":reset"
+        , ":import broken -- my lib", "1 PLUS 1"
+        ]
+      let refusal name = "`:import` added `" <> name <> "`, which has errors, so nothing is evaluated; `:imports` lists what `:import` added, and `:reset` removes it." <> restartAdvice
       case rs of
-        [added, refused, reset, again, addedQuoted, refusedQuoted] -> do
+        [added, refused, reset, again, addedQuoted, refusedQuoted, _, addedNoted, refusedNoted] -> do
           added `shouldBe` "Added: IMPORT broken"
           refused `shouldBe` refusal "broken"
           reset `shouldSatisfy` T.isPrefixOf "REPL reset."
           again `shouldBe` "2"
           addedQuoted `shouldBe` "Added: IMPORT `my-broken`"
           refusedQuoted `shouldBe` refusal "my-broken"
-        _ -> expectationFailure ("six replies were expected, not " <> show rs)
+          addedNoted `shouldBe` "Added: IMPORT broken -- my lib"
+          refusedNoted `shouldBe` refusal "broken"
+        _ -> expectationFailure ("nine replies were expected, not " <> show rs)
 
     -- A file that imports a ring of imports without being in it is checked
     -- without the ring, and was evaluated; it is not now. A file on the ring
