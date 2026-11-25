@@ -27,13 +27,15 @@ import Text.Printf (printf)
 import Development.IDE.Graph.Database (shakeRunDatabase)
 import Language.LSP.Protocol.Types (toNormalizedFilePath, normalizedFilePathToUri, fromNormalizedUri, NormalizedUri)
 import qualified Language.LSP.Protocol.Types as LSP
--- for 'syncStoreWithDisk', 'loadNamed' and 'loadedFileFromDisk'
+-- for 'syncStoreWithDisk', 'listedAsSpelled', 'loadNamed' and 'loadedFileFromDisk'
 import Control.Concurrent.STM (atomically, modifyTVar', readTVarIO)
 import Control.Exception (IOException, try)
 import Data.Int (Int32)
 import qualified Data.Text.Utf16.Rope.Mixed as Rope
 import Language.LSP.VFS (VFS (..), VirtualFile (..))
-import System.Directory (doesFileExist)
+import System.Directory (doesFileExist, listDirectory)
+import System.FilePath (takeFileName)
+import qualified L4.Import.ModuleNameCase as ModuleNameCase
 
 import LSP.Logger (makeDefaultStderrRecorder, cmapWithPrio, cfilter, pretty, Recorder, WithPriority(..), Priority(..))
 import L4.TypeCheck.Types (CheckError(..), CheckErrorWithContext(..))
@@ -338,6 +340,8 @@ loadedFileFromDisk fp = either (\ (_ :: IOException) -> "") id <$> try (Text.IO.
 -- * an entry whose file cannot be read is dropped, so that the rules look for
 --   the file again and report what they find. The REPL's own module for each
 --   line, which is not on disk, goes the same way, as nothing reads it again.
+--   So does a module whose folder no longer lists it under the capitals it was
+--   found by ('listedAsSpelled'), though it can still be read under them.
 syncStoreWithDisk :: ReplState -> LSP.NormalizedFilePath -> IO ()
 syncStoreWithDisk st loaded = do
   let var = st.ideState.shakeExtras.vfsVar
@@ -352,13 +356,32 @@ syncStoreWithDisk st loaded = do
     VFS (foldr (\(uri, entry) -> MapStrict.alter (const entry) uri) m [ c | Just c <- changes ])
   where
     readAgain (uri, nfp, old) = do
-      onDisk <- try (Text.IO.readFile (LSP.fromNormalizedFilePath nfp))
+      let path = LSP.fromNormalizedFilePath nfp
+      onDisk <- try (Text.IO.readFile path)
+      listed <- if uri == normalizedFilePathToUri loaded then pure True else listedAsSpelled path
       case (onDisk, old) of
         (Left (_ :: IOException), _) -> pure (Just (uri, Nothing))
+        _ | not listed -> pure (Just (uri, Nothing))
         (Right text, Just (VirtualFile _ _ rope)) | text == Rope.toText rope -> pure Nothing
         (Right text, _) -> do
           version <- atomicModifyIORef' st.storeVersion (\n -> (n + 1, n + 1))
           pure (Just (uri, Just (VirtualFile version 0 (Rope.fromText text))))
+
+-- | Whether the folder of @path@ lists its file under the capitals @path@ has.
+-- On a disk that ignores capitals, as macOS and Windows disks do by default, a
+-- file renamed from @lib.l4@ to @Lib.l4@ can still be read as @lib.l4@, but an
+-- @IMPORT lib@ no longer finds it: the import ladder asks the folder's listing
+-- too ('ModuleNameCase.classifyEntry', in "LSP.L4.Rules"), and this asks it
+-- the same way. A name the folder lists in another Unicode form, as HFS+ does,
+-- still counts as listed, and so does a folder that cannot be listed.
+listedAsSpelled :: FilePath -> IO Bool
+listedAsSpelled path = do
+  listing <- try (listDirectory (takeDirectory path))
+  pure $ case listing of
+    Left (_ :: IOException) -> True
+    Right entries -> case ModuleNameCase.classifyEntry entries (takeFileName path) of
+      ModuleNameCase.CaseVariantEntries _ -> False
+      _ -> True
 
 -- | Load a file and trigger type checking
 loadFile :: ReplState -> FilePath -> IO (Either Text ())

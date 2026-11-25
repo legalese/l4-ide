@@ -63,8 +63,8 @@ import System.Process
 import System.Timeout (timeout)
 import Test.Hspec
 import qualified Language.LSP.Protocol.Types as LSP
--- for 'replSession'
-import System.Directory (removeFile)
+-- for 'replSession' and the tests of the REPL after a file changes on disk
+import System.Directory (removeFile, renameFile)
 import System.IO (IOMode (..), withFile)
 import System.Process (withCreateProcess)
 
@@ -2692,6 +2692,26 @@ spec bin = do
           [line] -> saysNoFile "Error loading file: " "nosuch.l4" line
           _ -> False
         rs `shouldBe` ["2"]
+
+    -- On a disk that ignores capitals, lib.l4 renamed to Lib.l4 can still be
+    -- read as lib.l4, but `IMPORT lib` does not find it (smucclaw/l4-ide#1080).
+    -- On a disk that does not ignore them it cannot be read, and the test
+    -- checks the same answers. `the other` is imported under its own capitals
+    -- and never changed: the control, which checks that it still gives its
+    -- answer.
+    it "stops answering from a module renamed to other capitals, as a fresh REPL does" $ withRepl \repl ->
+      withSystemTempDirectory "l4-repl-edit" \work -> do
+        writeFile (work </> "lib.l4") "`the answer` MEANS 42\n"
+        writeFile (work </> "other.l4") "`the other` MEANS 7\n"
+        writeFile (work </> "main.l4") "IMPORT lib\nIMPORT other\n\nx MEANS 1\n"
+        rs <- replSession repl work ["main.l4"]
+          [ Send "`the answer`"
+          , OnDisk (renameFile (work </> "lib.l4") (work </> "Lib.l4")), Send ":reload", Send "`the answer`", Send "`the other`"
+          ]
+        freshReplies <- fresh repl work ["`the answer`", "`the other`"]
+        answers [0] rs `shouldBe` ["42"]
+        answers [2, 3] rs `shouldBe` freshReplies
+        freshReplies `shouldBe` ["Failed to type check expression", "7"]
 
   -- A rule that may refuse to answer gets no query plan, from the REPL or from
   -- the language server: each says why in the one sentence core gives, which
