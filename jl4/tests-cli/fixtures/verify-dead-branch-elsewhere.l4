@@ -1,0 +1,50 @@
+§ `VerifyDeadBranchElsewhereFixture`
+
+-- Under a NOT, a condition the context entails is, read the other way round,
+-- an alternative that cannot hold where it sits: the normal form's dead
+-- branch, which is reported alone (verify-written-guards.l4, (11) and (12)).
+-- Here a dead branch somewhere else in the rule means the same as such a
+-- condition, read the other way round, but is not it. Each condition is
+-- reported, as a redundant condition.
+
+GIVEN x IS A BOOLEAN, y IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `either` x y IF x OR y
+
+-- The requirement's `(a OR b)`, which `b` entails, is redundant. The scope's
+-- `NOT (either a b)` is a dead branch that means `NOT (a OR b)`, in the
+-- other part of the rule.
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN, c IS A BOOLEAN, p IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `the dead branch is in the scope` a b c p IF
+    (a AND (p OR NOT (`either` a b))) IMPLIES (c AND NOT (b AND (a OR b)))
+
+-- The control: the same requirement, and no dead branch in the scope.
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN, c IS A BOOLEAN, p IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `no dead branch in the scope` a b c p IF
+    (a AND p) IMPLIES (c AND NOT (b AND (a OR b)))
+
+-- The same with no seam. The dead branch is the call, where the NOT the
+-- condition stands under writes out `a OR b`.
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN, c IS A BOOLEAN, p IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `the dead branch is a call` a b c p IF
+    (c AND NOT (b AND (a OR b))) AND (q OR (a AND (p OR NOT (`either` a b))))
+  WHERE
+    q MEANS FALSE
+
+-- The scope's second `a`, which the first entails, is redundant. The
+-- requirement's second `a` is too, and it is the requirement's own dead
+-- branch, `NOT a`, read the other way round, so it is reported as that alone.
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN, c IS A BOOLEAN, d IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `the dead branch is in the requirement` a b c d IF
+    ((a AND NOT (a AND b)) OR c) IMPLIES (a AND NOT (a AND d))
+
+-- The control the other way: the call under the NOT, which `a` entails, is
+-- the dead branch, read the other way round, and is reported as that alone.
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN, c IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `the dead branch is the call under the NOT` a b c IF
+    a AND NOT ((`either` a b) AND c)

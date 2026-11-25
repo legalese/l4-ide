@@ -693,6 +693,11 @@ verifyDefinitionUsedTwiceFixture = fixtureDir </> "verify-definition-used-twice.
 verifyUnsatRequirementFixture :: FilePath
 verifyUnsatRequirementFixture = fixtureDir </> "verify-unsat-requirement.l4"
 
+-- Conditions under a NOT that a dead branch elsewhere in the rule means, read
+-- the other way round, and controls whose dead branch is the condition's own.
+verifyDeadBranchElsewhereFixture :: FilePath
+verifyDeadBranchElsewhereFixture = fixtureDir </> "verify-dead-branch-elsewhere.l4"
+
 -- Referential transparency (specs/todo/WHERE-INLINING-SPEC.md): a zero-arity
 -- WHERE/LET binding is inlined before analysis, so a rule means the same thing
 -- however its limbs are named. The recursive file is the termination control.
@@ -1056,6 +1061,7 @@ coreFixtures =
   , verifyClauseTableLargeFixture
   , verifyManufacturedClausesFixture, verifyWrittenGuardsFixture
   , verifyCoveredAlternativesFixture, verifyDefinitionUsedTwiceFixture, verifyUnsatRequirementFixture
+  , verifyDeadBranchElsewhereFixture
   , verifyVacuousGuardFixture, verifySeamFixture, verifyNestedFixture
   , verifyWhereTransparencyFixture, verifyWhereRecursiveFixture
   , verifyConstantsFixture, verifyConstantsReadThroughFixture
@@ -6899,6 +6905,40 @@ spec bin = do
       lookup "`a hurdle through an infix call`" found' `shouldBe` Just []
       filter ((`notElem` throughCalls) . fst) found'
         `shouldBe` filter ((`notElem` throughCalls) . fst) found
+
+    -- Under a NOT, a conjunct the context entails is left out where the
+    -- normal form reports its negation as a dead branch. That dead branch has
+    -- to be in the same part of the rule, the scope or the requirement, and
+    -- have no atom the NOT does not have. Matched by meaning anywhere in the
+    -- rule, as for a while during the fix of smucclaw/l4-ide#1093, the first,
+    -- third and fourth decisions lost their redundant condition; this test
+    -- failed on that build. unstable reports the first and the third, at the
+    -- normal form's clauses, and not the fourth. The first needs either
+    -- bound, the third the bound on atoms and the fourth the bound on the
+    -- part. The second and the last are the controls: the dead branch is the
+    -- condition's own, and is reported alone.
+    it "reports a condition under a NOT that a dead branch elsewhere in the rule means" $ do
+      env <- jsonEnvelope bin ["verify", verifyDeadBranchElsewhereFixture, "--format", "json"]
+      let found = findingSitesByDecision env
+          dead site = ("dead-branch", site)
+          guard site = ("vacuous-guard", site)
+      lookup "`the dead branch is in the scope`" found
+        `shouldBe` Just [dead "body.scope.and[1].or[1]", dead "body.requirement.and[1].or[1]", guard "body.requirement.and[1].not.and[1]"]
+      lookup "`no dead branch in the scope`" found
+        `shouldBe` Just [dead "body.requirement.and[1].or[1]", guard "body.requirement.and[1].not.and[1]"]
+      lookup "`the dead branch is a call`" found
+        `shouldBe` Just [dead "body.and[1].or[1]", dead "body.and[4].or[2]", guard "body.and[1].not.and[1]"]
+      lookup "`the dead branch is in the requirement`" found
+        `shouldBe` Just [dead "body.requirement.and[1].or[0]", guard "body.scope.or[0].and[1].not.and[0]"]
+      lookup "`the dead branch is the call under the NOT`" found
+        `shouldBe` Just [dead "body.and[1].or[0]"]
+      lookup "either" found `shouldBe` Just []
+      [ (round line, round col) :: (Int, Int)
+        | (_, f) <- findingObjectsByDecision env
+        , Just w <- [objField f "writtenAt"]
+        , Just (Number line) <- [objField w "line"]
+        , Just (Number col) <- [objField w "column"] ]
+        `shouldBe` [(20, 66), (26, 42), (33, 24), (43, 18)]
 
     -- A local definition used more than once. `both qualify` and `either
     -- qualifies` get a finding nothing in them deserves, at the `c` each use

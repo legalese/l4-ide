@@ -191,7 +191,11 @@ propositionalBound =
     , "  condition its siblings already entail, or an alternative the others"
     , "  already cover. It is looked for under a NOT too, at a site such as"
     , "  `body.not.or[0]'; there a condition the normal form has, negated, as"
-    , "  a dead branch is reported as that dead branch alone. Two"
+    , "  a dead branch is reported as that dead branch alone, if the dead"
+    , "  branch is in the same part of the rule (its scope or its"
+    , "  requirement, when the rule is an IMPLIES; otherwise the whole rule)"
+    , "  and names no atom outside the NOT. Within those bounds the match is"
+    , "  by meaning, not by place. Two"
     , "  conditions that entail each other, such as the two `x' of `x AND x',"
     , "  are both reported, and so are two alternatives that cover each other,"
     , "  although deleting either one alone leaves the rule as it was."
@@ -1172,12 +1176,12 @@ analyseBody labels order defs listed body written
              written
   where
     normal = walk Normalised sat labels Map.empty [] [] "body" body
-    -- The limbs the normal form reports as dead branches, for the walk over
-    -- the rule as written not to report the same condition again ('walk').
-    -- Both drawings' atoms are in one atom space, so a limb can be compared
-    -- with a written condition; the written walk's order is widened by the
-    -- analysis's to cover both.
-    deadLimbs = [e | (f, e) <- normal, f.findingKind == "dead-branch"]
+    -- The limbs the normal form reports as dead branches, with their sites,
+    -- for the walk over the rule as written not to report the same condition
+    -- again ('walk'). Both drawings' atoms are in one atom space, so a limb
+    -- can be compared with a written condition; the written walk's order is
+    -- widened by the analysis's to cover both.
+    deadLimbs = [(f.findingSite, e) | (f, e) <- normal, f.findingKind == "dead-branch"]
     sat = satisfiable order defs
     atomLabels labs e = [label labs u | u <- nubOrd (varsOf e)]
     label labs u = stripBackticks (Map.findWithDefault (Text.pack (show u)) u labs)
@@ -1259,12 +1263,12 @@ analyseBody labels order defs listed body written
       -> ([BDQ.BoolExpr Int] -> BDQ.BoolExpr Int -> Bool)
       -> Map Int Text
       -> Map Text SrcPos
-      -> [BDQ.BoolExpr Int]
+      -> [(Text, BDQ.BoolExpr Int)]
       -> [BDQ.BoolExpr Int]
       -> Text
       -> BDQ.BoolExpr Int
       -> [(Finding, BDQ.BoolExpr Int)]
-    walk pass sat' labs starts dead = go
+    walk pass sat' labs starts dead = go []
       where
         normalised = pass == Normalised
         -- The sign is the finding's: False for one that says something can
@@ -1301,18 +1305,39 @@ analyseBody labels order defs listed body written
         -- @a AND NOT (a AND b)@ is @a AND ((NOT a) OR (NOT b))@, whose @NOT a@
         -- is dead. So a conjunct under an odd number of NOTs whose negation is
         -- a limb the normal form reports dead ('deadLimbs') is not reported
-        -- again here. Any other entailed conjunct is: one entailed only with
-        -- its siblings' help is, read the other way round, an alternative the
-        -- others cover (@NOT (a AND (a OR b))@ is
+        -- again here, if that limb is in the same part of the rule (its scope,
+        -- its requirement, or the whole of a rule with no seam: 'seamPart';
+        -- an IMPLIES inside the rule is drawn as an OR, and is no seam)
+        -- and has no atom that the NOT the conjunct stands under does not
+        -- have. A limb that means the same but is in the other part, or
+        -- names other atoms (a call where the NOT writes out what it means),
+        -- is a different condition, and the conjunct is reported. Within those
+        -- bounds the match is still by meaning, not by place (decided by
+        -- Claude 2026-11-25, pending Meng's review). Any other entailed
+        -- conjunct is reported: one entailed only with its siblings' help is,
+        -- read the other way round, an alternative the others cover
+        -- (@NOT (a AND (a OR b))@ is
         -- @(NOT a) OR ((NOT a) AND (NOT b))@), and inside an OR the normal
         -- form distributes the NOT away and reports no dead branch for it.
         -- An alternative the others cover is looked for under a NOT as
         -- anywhere (decided by Claude 2026-11-25, pending Meng's review).
         underOddNot site = odd (Text.count ".not" site)
-        reportedDead ei = any (\d -> not (sat' [d] ei) && not (sat' [BDQ.BNot d] (BDQ.BNot ei))) dead
+        reportedDead nv site ei =
+          any
+            ( \(ds, d) ->
+                seamPart ds == seamPart site
+                  && all (`elem` nv) (varsOf d)
+                  && not (sat' [d] ei)
+                  && not (sat' [BDQ.BNot d] (BDQ.BNot ei))
+            )
+            dead
+        -- The steps of a site up to its first that is not a seam's.
+        seamPart = takeWhile (`elem` ["body", "scope", "requirement"]) . Text.splitOn "."
 
-        go :: [BDQ.BoolExpr Int] -> Text -> BDQ.BoolExpr Int -> [(Finding, BDQ.BoolExpr Int)]
-        go ctx site = \case
+        -- The first argument is the atoms of the NOT the subterm stands
+        -- under, the nearest one; none outside every NOT.
+        go :: [Int] -> [BDQ.BoolExpr Int] -> Text -> BDQ.BoolExpr Int -> [(Finding, BDQ.BoolExpr Int)]
+        go nv ctx site = \case
           e@(BDQ.BAnd es)
             | not (sat' ctx e) ->
                 -- Stop here. Everything below an unsatisfiable conjunction is
@@ -1323,7 +1348,7 @@ analyseBody labels order defs listed body written
                 ]
             | otherwise ->
                 concat
-                  [ entailed <> go ctx' arm ei
+                  [ entailed <> go nv ctx' arm ei
                   | (i, ei) <- zip [(0 :: Int) ..] es
                   , let arm = site <> ".and[" <> Text.pack (show i) <> "]"
                   , let ctx' = ctx <> [ej | (j, ej) <- zip [(0 :: Int) ..] es, j /= i]
@@ -1342,7 +1367,7 @@ analyseBody labels order defs listed body written
                             -- guard (decided by Claude 2026-11-25, pending
                             -- Meng's review).
                           , Map.member arm starts
-                          , not (underOddNot site && reportedDead ei)
+                          , not (underOddNot site && reportedDead nv site ei)
                           , interesting ei
                           , contingent ei
                           , not (sat' ctx' (BDQ.BNot ei))
@@ -1357,7 +1382,7 @@ analyseBody labels order defs listed body written
                         "this limb cannot hold in the context that reaches it; the rule reads identically with it deleted."
                     | normalised
                     ]
-                  else go ctx arm ei
+                  else go nv ctx arm ei
               | (i, ei) <- zip [(0 :: Int) ..] es
               , let arm = site <> ".or[" <> Text.pack (show i) <> "]"
               , let others = [ej | (j, ej) <- zip [(0 :: Int) ..] es, j /= i]
@@ -1404,8 +1429,8 @@ analyseBody labels order defs listed body written
                     , contingent req
                     , not (sat' (ctx <> [scope]) (BDQ.BNot req))
                     ]
-                  , go ctx (site <> ".scope") scope
-                  , go (ctx <> [scope]) (site <> ".requirement") req
+                  , go nv ctx (site <> ".scope") scope
+                  , go nv (ctx <> [scope]) (site <> ".requirement") req
                   ]
           -- Not descended into for the normal form's findings: under a negation
           -- the polarity flips, and "dead branch" would come to mean its own
@@ -1416,7 +1441,7 @@ analyseBody labels order defs listed body written
           -- unchanged too (decided by Claude 2026-11-25, pending Meng's review).
           BDQ.BNot e
             | normalised -> []
-            | otherwise -> go ctx (site <> ".not") e
+            | otherwise -> go (nubOrd (varsOf e)) ctx (site <> ".not") e
           BDQ.BVar _ -> []
           BDQ.BRefuse _ -> []
           BDQ.BTrue -> []

@@ -94,7 +94,8 @@ If OPA’s rule-completeness warnings are your reference point, this is the same
 To check a rule, the tool first rewrites it as one long list of “all of these must hold” clauses, and that rewriting creates clauses the drafter never wrote.
 So a vacuous guard is looked for only among the conditions the rule actually writes: `(a AND b) OR ((NOT a) AND e)` gets no finding, however the rewriting splits it up, while `x AND (x OR y)` is reported once, with the line and column of the first word of `(x OR y)`, its `x`.
 The same holds for an alternative the others already cover: `(a AND b) OR b` is reported at `a AND b`, which lets nothing through that `b` does not.
-Both are looked for under a `NOT` as well; there, a condition the rewritten rule has, negated, as a dead branch is reported as that dead branch alone.
+Both are looked for under a `NOT` as well; there, a condition the rewritten rule has, negated, as a dead branch is reported as that dead branch alone, if the dead branch is in the same part of the rule (its scope or its requirement, when the rule is an `IMPLIES`; otherwise the whole rule) and names no atom outside the `NOT`.
+Within those bounds the match is by meaning, not by place.
 Two conditions that entail each other, such as the two `x` of `x AND x`, are both reported, and so are two alternatives that cover each other, although deleting either one alone leaves the rule as it was.
 A condition written in a local definition (`WHERE` or `LET`) is placed where the definition writes it, at its opening bracket if its first word is one of the definition's parameters, which stands for whatever each use passes in.
 A bracketed group whose first word is a use of a local definition is placed at its bracket, not at that word.
