@@ -407,6 +407,18 @@ The lowering's input now includes the evaluator's residual term language (#526 �
 One lowering from that language to SMT-LIB2 serves both `l4 prove` and the query planner's arithmetic atoms, and the term language is kept close to SMT-LIB2 so that swapping z3 for cvc5 stays a change to this emitter.
 Nothing else in this ruling changes.
 
+**A second solver, 2026-11-25 (smucclaw/l4-ide#1098; decided by Claude 2026-11-25, pending Meng's review).**
+`l4 prove` gives cvc5 the same script where z3 gives no answer (a timeout, a failure to run, or z3's own `unknown`), when cvc5 is installed: `CVC5_EXE` first, where a set path that does not exist is a hard failure as `Z3_EXE`'s is, then `cvc5` on `PATH`.
+The two are asked one after the other, each with the whole `--timeout`, not raced: the two solvers give different models for the same script (on `hash-name.l4`'s, cvc5 gives `x = -1` and z3 `x = 0`), so a race would make the printed counterexample depend on which finished first.
+cvc5's answers pass through R-V5's two checks unchanged.
+Output from cvc5 that cannot be read is no answer, not an encoding defect, so unreadable output from it never turns an `unknown` into a defect; a cvc5 answer the evaluator disagrees with is still one, and z3's output is read as strictly as before.
+Strictness goes by the order asked, not by the solver: under `--solver`, whichever solver is asked first is read strictly, and only the one asked second leniently.
+Without cvc5, a run is z3's alone and its report is unchanged, except for one line counting the obligations z3 gave no answer to, printed only when there are any.
+`--solver` chooses the solvers and their order, and a solver it names is required.
+What drove it: the issue's claim about a rounded product, where z3 4.16.0 gives no answer in 30 s and cvc5 1.4.2 proves the same emitted script in 0.02 to 0.19 s (measured 2026-11-25); and, as the issue reports and not re-measured here, 10 of 5,146 scripts from a public L4 corpus where z3 gives no answer in 150 s and cvc5 says `unsat` in under 0.5 s, and 12 where cvc5 gives up and z3 answers. With z3 asked first and cvc5 after it, an obligation either solver answers within `--timeout` is answered, whichever of the two it is.
+This uses the ruling's "free second opinion" as a second chance: cvc5 is not asked to confirm z3's `unsat`.
+`l4 coverage` and `l4 export catala` still ask z3 alone.
+
 ### R-V7 — Encode rounding, modulo and dates exactly; reject transcendentals by name. ANSWERED 2026-09-07.
 
 `BOOLEAN` → `Bool`; `NUMBER` → `Real`, which is **faithful** rather than approximate because L4

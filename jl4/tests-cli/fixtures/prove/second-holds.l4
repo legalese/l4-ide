@@ -1,0 +1,6 @@
+-- For the stub-solver tests of `l4 prove`'s second solver (smucclaw/l4-ide#1098),
+-- which decide what each solver answers: one assertion that holds for every x.
+§ `A second solver`
+    GIVEN x IS A NUMBER
+
+#ASSERT x PLUS x EQUALS 2 TIMES x

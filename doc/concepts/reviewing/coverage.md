@@ -180,6 +180,6 @@ These are stated here, and printed in `l4 coverage --help`, because you would ot
 ## Related
 
 - [`l4 prove`](proving-assertions.md) answers a different question: whether an assertion you wrote holds for every input.
-  The two share a solver.
+  The two share z3; `l4 prove` also asks cvc5, where it is installed, about an assertion z3 gave no answer to, and `l4 coverage` does not.
 - [`l4 export catala`](../../exports/catala.md) uses the same buckets to decide which inputs to test its output at, and to check the Catala it writes against L4.
 - The same exit-status and closing-line conventions as [`l4 explore`](../../reference/regulative/explore.md) apply: the last line says what was not done.
