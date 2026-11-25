@@ -81,14 +81,14 @@ import L4.Bpmn.Lower (stateGraphToBpmn)
 import L4.Bpmn.Wiring (wiringFromDrg)
 import L4.Dmn.Emit (emitDrg)
 import L4.Dmn.IR (Drg (..), DmnFlavor (..), DropReason (..), defaultDmnFlavor, dmnReport, drgDecisions)
-import L4.Dmn.Lower (DmnLowerOptions (..), lowerModule, moduleTitle, resolveMaybePredicates)
+import L4.Dmn.Lower
+  ( DmnLowerOptions (..), ImportedModule (..), checkerClauseMatrixRanges
+  , checkerMissingMatchRanges, lowerModule, moduleTitle, resolveMaybePredicates )
 import L4.Dmn.Markdown (emitMarkdown, markdownReport)
-import L4.Annotation (rangeOf)
 import L4.Interchange.Fidelity
   (FidelityNote (..), FidelityReport (..), FidelitySeverity (..), renderReport)
 import L4.StateGraph (StateGraph (..), extractStateGraphs)
 import L4.Syntax
-import qualified L4.TypeCheck as TC
 
 import L4.Cli.Common
 
@@ -456,27 +456,23 @@ dmnDrgFor opts tcRes = do
             , dloIncludeTests = opts.exportIncludeTests
             -- DMN-SAFE's L1: the checker's own exhaustiveness warnings, from
             -- the same check result the module came from (the golden harness
-            -- extracts them identically, so the two cannot drift).
-            , dloMissingMatchRanges =
-                [ r
-                | e@(TC.MkCheckErrorWithContext (TC.CheckWarning (TC.PatternMatchesMissing _ _)) _) <- tcRes.infos
-                , Just r <- [rangeOf e]
-                ]
+            -- extracts them with the same function, so the two cannot drift).
+            , dloMissingMatchRanges = checkerMissingMatchRanges tcRes.infos
             -- L1's Decide-level channel: the clause-matrix warnings for
-            -- multi-clause pattern-matching groups, extracted by the same
-            -- comprehension as above (the golden harness matches this
-            -- exactly, so the two cannot drift).
-            , dloClauseMatrixRanges =
-                [ r
-                | e@(TC.MkCheckErrorWithContext (TC.CheckWarning (TC.PatternClausesMissing {})) _) <- tcRes.infos
-                , Just r <- [rangeOf e]
-                ]
+            -- multi-clause pattern-matching groups.
+            , dloClauseMatrixRanges = checkerClauseMatrixRanges tcRes.infos
             , dloExternalRefNames = externalRefs
             -- #1102: every module this one imports, transitively and once
             -- each (the same walk `l4 export catala` takes), so a closed
-            -- imported constant can be carried into the model as a decision.
+            -- imported constant can be carried into the model as a decision,
+            -- and certified with the checker's facts about its own module.
             , dloImportedModules =
-                [ (dep.module', dep.substitution)
+                [ MkImportedModule
+                    { imModule             = dep.module'
+                    , imSubstitution       = dep.substitution
+                    , imMissingMatchRanges = checkerMissingMatchRanges dep.infos
+                    , imClauseMatrixRanges = checkerClauseMatrixRanges dep.infos
+                    }
                 | dep <- Rules.transitiveDependencies tcRes
                 ]
             }

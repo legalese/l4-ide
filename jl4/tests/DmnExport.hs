@@ -32,10 +32,11 @@ import qualified Base.Text as Text
 
 import L4.API.VirtualFS (TypeCheckWithDepsResult (..), VFS, checkWithImports, emptyVFS, vfsFromList)
 import qualified Base.Set as Set
-import L4.Annotation (rangeOf)
 import L4.Dmn.Emit (emitDrg, escapeXmlAttr, escapeXmlText)
 import L4.Dmn.IR
-import L4.Dmn.Lower (DmnLowerOptions (..), lowerModule, moduleTitle, resolveMaybePredicates)
+import L4.Dmn.Lower
+  ( DmnLowerOptions (..), ImportedModule (..), checkerClauseMatrixRanges
+  , checkerMissingMatchRanges, lowerModule, moduleTitle, resolveMaybePredicates )
 import L4.Dmn.Markdown (emitMarkdown, markdownReport)
 import L4.EvaluateLazy.Exceptions (UserEvalException (..))
 import L4.Import.Resolution (ResolvedImport (..))
@@ -3996,6 +3997,34 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       [d.dcnName | d <- drgDecisions broken] `shouldBe` ["within allowance"]
       (literalOf "within allowance" broken).feFragment `shouldBe` L4Verbatim
 
+    -- A copy is certified exactly as a local constant is. The checker's
+    -- warning that this CONSIDER is not exhaustive is in the IMPORTED
+    -- module's diagnostics, so a copy certified from the importer's alone was
+    -- certified total, and its reader with it, where the same text written
+    -- locally is Blocking twice.
+    it "certifies a copied constant with its own module's checker facts, exactly as a local one" $ do
+      let partialLib =
+            "IMPORT prelude\n\
+            \GIVETH A NUMBER\n\
+            \`first of nothing` MEANS\n\
+            \  CONSIDER (LIST 5, 6)\n\
+            \  WHEN EMPTY THEN 0\n"
+          readerSrc =
+            "GIVEN h IS A NUMBER\n\
+            \GIVETH A NUMBER\n\
+            \DECIDE `g2` h IS h PLUS `first of nothing`\n"
+          copied = drgGeneral (vfsFromList [("partial", partialLib)]) id defaultDmnFlavor (const "Test")
+                     ("IMPORT prelude\nIMPORT partial\n" <> readerSrc)
+          written = drgAdjusted id (partialLib <> readerSrc)
+          verdicts nm drg =
+            [ (n.code, n.severity)
+            | n <- (dmnReport drg).notes, n.element == idOf nm drg, n.code /= "D-IMPORTED"
+            ]
+      verdicts "first of nothing" copied `shouldMatchList` verdicts "first of nothing" written
+      verdicts "g2" copied `shouldMatchList` verdicts "g2" written
+      verdicts "first of nothing" copied `shouldSatisfy` elem ("D-PARTIAL", Blocking)
+      verdicts "g2" copied `shouldSatisfy` elem ("D-PARTIAL", Blocking)
+
     it "passes a copied constant into a BKM that reads it" $ do
       let drg = drgImp $ importing
             "GIVEN y IS A NUMBER\n\
@@ -4691,25 +4720,20 @@ drgGeneral vfs adjust flavor mkName src = case checkWithImports vfs src of
                 , dloMaybePredicates =
                     resolveMaybePredicates tc.tcdModule tc.tcdEnvironment tc.tcdEntityInfo
                 , dloIncludeTests = False
-                , dloMissingMatchRanges =
-                    [ r
-                    | e@(TC.MkCheckErrorWithContext (TC.CheckWarning (TC.PatternMatchesMissing _ _)) _) <-
-                        tc.tcdErrors
-                    , Just r <- [rangeOf e]
-                    ]
+                , dloMissingMatchRanges = checkerMissingMatchRanges tc.tcdErrors
                 -- L1's Decide-level channel (clause matrices), extracted by
-                -- the same comprehension as the CLI (jl4/app/L4/Cli/Export.hs)
-                , dloClauseMatrixRanges =
-                    [ r
-                    | e@(TC.MkCheckErrorWithContext (TC.CheckWarning (TC.PatternClausesMissing {})) _) <-
-                        tc.tcdErrors
-                    , Just r <- [rangeOf e]
-                    ]
+                -- the same function as the CLI (jl4/app/L4/Cli/Export.hs)
+                , dloClauseMatrixRanges = checkerClauseMatrixRanges tc.tcdErrors
                 , dloExternalRefNames = Just Set.empty
                 -- #1102: the same transitive import closure the CLI passes
-                -- (jl4/app/L4/Cli/Export.hs), from the same check result.
+                -- (jl4/app/L4/Cli/Export.hs), from the same check results.
                 , dloImportedModules =
-                    [ (ri.riTypeChecked.program, ri.riTypeChecked.substitution)
+                    [ MkImportedModule
+                        { imModule             = ri.riTypeChecked.program
+                        , imSubstitution       = ri.riTypeChecked.substitution
+                        , imMissingMatchRanges = checkerMissingMatchRanges ri.riTypeChecked.errors
+                        , imClauseMatrixRanges = checkerClauseMatrixRanges ri.riTypeChecked.errors
+                        }
                     | ri <- tc.tcdResolvedImports
                     ]
                 }

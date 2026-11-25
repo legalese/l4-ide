@@ -84,6 +84,9 @@ module L4.Dmn.Lower
   , moduleTitle
   , DmnLowerOptions (..)
   , defaultDmnLowerOptions
+  , ImportedModule (..)
+  , checkerMissingMatchRanges
+  , checkerClauseMatrixRanges
   , MaybePredicates (..)
   , resolveMaybePredicates
     -- * Reusable pieces
@@ -116,7 +119,7 @@ import Data.Ratio (denominator, numerator)
 import Data.Time.Calendar (Day, fromGregorianValid, showGregorian, toModifiedJulianDay)
 import Optics
 
-import L4.Annotation (Anno_ (..), emptyAnno, getAnno)
+import L4.Annotation (Anno_ (..), emptyAnno, getAnno, rangeOf)
 import L4.Desugar (carameliseExpr)
 import L4.Parser.SrcSpan (SrcRange, prettySrcRange)
 import L4.Print (prettyLayout)
@@ -512,17 +515,52 @@ data DmnLowerOptions = MkDmnLowerOptions
     -- filter then FAILS SAFE (drops nothing, reports what it would have
     -- dropped). The CLI supplies a sibling-directory scan; the golden harness
     -- supplies its VFS's contents.
-  , dloImportedModules :: ![(Module Resolved, TC.Substitution)]
+  , dloImportedModules :: ![ImportedModule]
     -- ^ every module this one reaches through @IMPORT@, transitively, each
-    -- with the substitution ITS OWN check produced (smucclaw/l4-ide#1102): an
-    -- importer starts from an empty substitution, so an imported body's
-    -- inference variables resolve only against its own module's. Read for one
+    -- with what ITS OWN check produced (smucclaw/l4-ide#1102). Read for one
     -- thing only: a CLOSED constant defined in one of them (see
     -- 'importedClosedSet') that a decision of this module reads is emitted as
     -- a decision of this model, with a @D-IMPORTED@ note, because this
     -- exporter emits no DMN @import@ (spec §18). Empty: no constant is copied,
     -- and every reference to an imported value refuses (see 'neHomeUri').
   }
+
+-- | One module the exported module imports, with what its own check produced
+-- (smucclaw/l4-ide#1102). A constant copied out of it is certified exactly as
+-- a local constant is, so the copy needs the same checker facts a local
+-- constant gets from 'dloMissingMatchRanges' and 'dloClauseMatrixRanges', and
+-- those are in the imported module's diagnostics, not the importer's.
+data ImportedModule = MkImportedModule
+  { imModule             :: !(Module Resolved)
+  , imSubstitution       :: !TC.Substitution
+    -- ^ an importer starts from an empty substitution, so an imported body's
+    -- inference variables resolve only against its own module's
+  , imMissingMatchRanges :: ![SrcRange]
+    -- ^ 'checkerMissingMatchRanges' of the imported module's own check
+  , imClauseMatrixRanges :: ![SrcRange]
+    -- ^ 'checkerClauseMatrixRanges' of the imported module's own check
+  }
+
+-- | The source ranges of the checker's @PatternMatchesMissing@ warnings, for
+-- @DMN-SAFE@'s L1. One definition, used by every caller for the exported
+-- module and for each module it imports, so that what "the checker warned"
+-- means cannot drift between them.
+checkerMissingMatchRanges :: [TC.CheckErrorWithContext] -> [SrcRange]
+checkerMissingMatchRanges diags =
+  [ r
+  | e@(TC.MkCheckErrorWithContext (TC.CheckWarning (TC.PatternMatchesMissing _ _)) _) <- diags
+  , Just r <- [rangeOf e]
+  ]
+
+-- | The source ranges (clause-head hulls) of the checker's
+-- @PatternClausesMissing@ warnings: L1's Decide-level channel. See
+-- 'checkerMissingMatchRanges'.
+checkerClauseMatrixRanges :: [TC.CheckErrorWithContext] -> [SrcRange]
+checkerClauseMatrixRanges diags =
+  [ r
+  | e@(TC.MkCheckErrorWithContext (TC.CheckWarning (TC.PatternClausesMissing {})) _) <- diags
+  , Just r <- [rangeOf e]
+  ]
 
 defaultDmnLowerOptions :: DmnLowerOptions
 defaultDmnLowerOptions = MkDmnLowerOptions
@@ -3893,7 +3931,7 @@ lowerModule opts modul@(MkModule _ uri _) =
   importedConstantPool =
     nubOrdOn fst
       [ (getUnique (decideResolved d), (ann, over decideBody (TC.applyFinalSubstitution subst mUri) d))
-      | (m@(MkModule _ mUri _), subst) <- opts.dloImportedModules
+      | MkImportedModule { imModule = m@(MkModule _ mUri _), imSubstitution = subst } <- opts.dloImportedModules
       , mUri /= uri
       , Decide ann d <- topDecls m
       , null (A.decideParams d)
@@ -3982,7 +4020,19 @@ lowerModule opts modul@(MkModule _ uri _) =
   -- The imported constants (#1102) are in the call graph and the safety
   -- analysis, so a local caller sees its callee and a clock-reading or
   -- partial constant is certified like a local one; they are not in the
-  -- population filter (see 'importedClosedConstants').
+  -- population filter (see 'importedClosedConstants'). "Like a local one"
+  -- needs the checker's facts about the copy as well as its body: those are in
+  -- the imported module's own diagnostics, which 'ImportedModule' carries, so
+  -- L1's two channels and L2's decorator read the copies' modules too.
+  --
+  -- The rest of 'A.SafetyInput' is the importer's and needs nothing from the
+  -- imported module. 'A.siEnumFields' and 'A.siComponentTypes' describe this
+  -- module's declared types, and a copy can hold no value of a type its own
+  -- module declares, because 'importedClosedSet' refuses that module's
+  -- constructors and selectors; for the library's types a copy sees exactly
+  -- what a local constant sees. 'A.siSubst' changes nothing in a copy, whose
+  -- body 'importedConstantPool' has already resolved against its own module's
+  -- substitution.
   callGraph :: A.CallGraph
   callGraph =
     A.buildCallGraph (allDecides <> map snd importedClosedConstants)
@@ -3999,9 +4049,12 @@ lowerModule opts modul@(MkModule _ uri _) =
   safetyIssues =
     A.analyzeSafety
       A.MkSafetyInput
-        { A.siMissingRanges  = opts.dloMissingMatchRanges
-        , A.siClauseMatrixRanges = opts.dloClauseMatrixRanges
-        , A.siNonexhaustive  = A.nonexhaustiveDecides allDecides
+        { A.siMissingRanges  =
+            opts.dloMissingMatchRanges <> concatMap (.imMissingMatchRanges) opts.dloImportedModules
+        , A.siClauseMatrixRanges =
+            opts.dloClauseMatrixRanges <> concatMap (.imClauseMatrixRanges) opts.dloImportedModules
+        , A.siNonexhaustive  =
+            A.nonexhaustiveDecides (allDecides <> map snd importedClosedConstants)
         , A.siEnumFields     =
             Map.fromList
               [ ( getUnique tn

@@ -157,6 +157,10 @@ exportImportedConstantFixture = fixtureDir </> "export-imported-constant.l4"
 exportImportedOpenFixture     = fixtureDir </> "export-imported-open.l4"
 exportImportedLimitsFixture   = fixtureDir </> "export-imported-limits.l4"
 exportImportedConstantCases   = fixtureDir </> "export-imported-constant.cases.json"
+-- A copied constant whose own module's checker reports its CONSIDER
+-- non-exhaustive: it must be reported exactly as it would be written locally.
+exportImportedPartialFixture :: FilePath
+exportImportedPartialFixture = fixtureDir </> "export-imported-partial.l4"
 exportAdvisoryOnlyFixture = fixtureDir </> "export-advisory-only.l4"
 
 -- The FIXTURE(d) backticked-import pair: a HYPHENATED module beside a sibling
@@ -627,6 +631,18 @@ spec bin = do
         -- the name with nothing behind it that the export used to write
         sout `shouldSatisfy` (not . ("default_colour = " `isInfixOf`))
         sout `shouldSatisfy` (not . ("id=\"decision_default_colour\"" `isInfixOf`))
+
+      -- A copy is certified with its own module's checker warnings, so a
+      -- constant whose CONSIDER the checker reports non-exhaustive is Blocking
+      -- here exactly as it is when written in the importing file, and so is
+      -- the decision that reads it.
+      it "reports a copied constant that is not total as Blocking, as it would a local one" $ do
+        Output code _ serr <- runL4 bin ["export", "dmn", "--fidelity-report", exportImportedPartialFixture]
+        code `shouldBe` ExitSuccess
+        serr `shouldSatisfy` ("2 blocking" `isInfixOf`)
+        serr `shouldSatisfy` ("[D-PARTIAL] blocking — decision_first_of_nothing" `isInfixOf`)
+        serr `shouldSatisfy` ("[D-PARTIAL] blocking — decision_g2" `isInfixOf`)
+        serr `shouldSatisfy` ("the checker reports this CONSIDER non-exhaustive" `isInfixOf`)
 
     -- FIXTURE(d)'s importer view must see a BACKTICKED import. A hyphenated
     -- module name can only be imported as IMPORT `interp-common`, and the
