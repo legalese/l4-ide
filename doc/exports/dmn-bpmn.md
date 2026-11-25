@@ -132,6 +132,8 @@ means the export ran, not that everything made it across.
 
 **One kind of Blocking note costs more than the rest.** When a DMN expression has no FEEL form, the export writes the L4 text in its place and reports `D-LITERALEXPR` (or `D-NONFEELINPUT` in a table's input).
 FEEL cannot parse L4, so KIE 8.44 and Camunda 8.7.6 both refuse the whole file, not only that one decision: every other decision in it is lost too.
+The note says so.
+The one exception is raw L4 that happens to read as a FEEL name, such as a bare `TBD`: Camunda parses it, answers null for that decision and runs the rest, while KIE still refuses the file.
 Measured on `jl4/examples/dmn/rounding.l4` before its functions were lowered: eight such notes, and neither engine ran a single case.
 `--fail-on blocking` catches it before an engine does.
 

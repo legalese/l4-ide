@@ -167,6 +167,10 @@ exportImportedPartialFixture = fixtureDir </> "export-imported-partial.l4"
 exportImportedUncheckedFixture :: FilePath
 exportImportedUncheckedFixture = fixtureDir </> "export-imported-unchecked.l4"
 -- Inputs spelled like a FEEL function the export calls.
+-- Raw L4 in a boxed literal and in an input column, beside plain FEEL.
+exportRawL4Fixture, exportRawL4Cases :: FilePath
+exportRawL4Fixture = fixtureDir </> "export-raw-l4.l4"
+exportRawL4Cases   = fixtureDir </> "export-raw-l4.cases.json"
 -- A rule with the name of a computed field (smucclaw/l4-ide#1038), alone and
 -- beside scaffolding, and a computed field with no rule.
 exportTakenForFieldFixture, exportTakenForFieldMixFixture, exportComputedFieldOnlyFixture :: FilePath
@@ -648,6 +652,17 @@ spec bin = do
         let flagLines = [l | l <- lines serr, "--include-tests" `isInfixOf` l]
         flagLines `shouldSatisfy` all ("`sample amounts`" `isInfixOf`)
         length flagLines `shouldBe` 1
+
+      -- A raw-L4 note says what it costs: the whole file, on both engines.
+      it "says in each raw-L4 note that both engines refuse the whole file" $ do
+        Output code _ serr <- runL4 bin ["export", "dmn", exportRawL4Fixture, "--fidelity-report"]
+        code `shouldBe` ExitSuccess
+        serr `shouldSatisfy` ("[D-LITERALEXPR] blocking — decision_as_text" `isInfixOf`)
+        serr `shouldSatisfy` ("[D-NONFEELINPUT] blocking — decision_banded" `isInfixOf`)
+        let says = [l | l <- lines serr, "the whole file goes with it: KIE 8.44 refuses to load the file" `isInfixOf` l]
+        length says `shouldBe` 2
+        serr `shouldSatisfy` ("execution of every decision in the file" `isInfixOf`)
+        serr `shouldSatisfy` (not . ("silently treated as non-matching" `isInfixOf`))
 
       -- smucclaw/l4-ide#1038: the checker takes a rule with a computed
       -- field's name for that field, and the export leaves the rule out.
@@ -1408,6 +1423,32 @@ spec bin = do
         dmn [dmn, "--cases", exportImportedConstantCases] \out -> do
           out `shouldSatisfy` ("1 parsed, 0 error(s)" `isInfixOf`)
           out `shouldSatisfy` ("21/21 value(s) as expected" `isInfixOf`)
+
+  -- What the raw-L4 notes claim: neither engine runs any decision of the
+  -- file, the plain-FEEL `pay` included.
+  describe "raw L4 costs the whole file (opt-in: L4_DMN_ENGINE_CHECK=1)" $ do
+    let exported = do
+          tmp <- getTemporaryDirectory
+          let outDir  = tmp </> "l4-export-raw-l4"
+              outFile = outDir </> "export-raw-l4.dmn"
+          removePathForcibly outDir
+          createDirectoryIfMissing True outDir
+          Output code _ serr <- runL4 bin ["export", "dmn", exportRawL4Fixture, "-o", outFile]
+          unless (code == ExitSuccess) $
+            expectationFailure ("l4 export dmn failed:\n" ++ serr)
+          pure outFile
+    it "KIE refuses to load the file" $ do
+      dmn <- exported
+      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustFail
+        dmn [dmn, "--cases", exportRawL4Cases] \out -> do
+          out `shouldSatisfy` ("0 case(s)" `isInfixOf`)
+          out `shouldSatisfy` ("ERR_COMPILING_FEEL" `isInfixOf`)
+
+    it "Camunda refuses to parse the file" $ do
+      dmn <- exported
+      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustFail
+        dmn [dmn, "--cases", exportRawL4Cases] \out ->
+          out `shouldSatisfy` ("0 parsed" `isInfixOf`)
 
   -- Before these names were reserved, KIE refused all three decisions
   -- ("Not an invocable"); Camunda answered them.

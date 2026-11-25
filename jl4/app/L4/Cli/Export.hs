@@ -298,8 +298,9 @@ failOnOption = option fidelityGateReader
  <> showDefaultWith (const "none")
  <> help
       "Exit non-zero when the fidelity report holds a note this severe or worse: \
-      \none|blocking|lossy|advisory. Default none, because Blocking describes the \
-      \target notation's limits and fires on every realistic export."
+      \none|blocking|lossy|advisory. Default none, because Blocking usually describes \
+      \the target notation's limits rather than a defect in your file, and fires on \
+      \most realistic exports."
   )
 
 includeTestsSwitch :: Parser Bool

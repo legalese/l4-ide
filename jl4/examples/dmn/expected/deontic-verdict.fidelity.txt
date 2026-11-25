@@ -3,14 +3,14 @@ fidelity report — DMN 1.3 (XML), camunda flavor
       `reporting duty` has a deontic body; it is lowered to a VERDICT decision table over its guards, each rule's output a string naming the arm. The obligation semantics (PARTY/MUST/WITHIN/HENCE/LEST) are the BPMN exporter's job (`l4 export bpmn`): WITHIN deadlines are the exported deadline decisions, the HENCE loop is the BPMN loop-back edge, and a BPMN gateway consumes this verdict to choose the process path
       lost: the obligation as a state: PARTY/WITHIN/HENCE/LEST do not survive into this artifact; the verdict names the arm, the BPMN projection carries the lifecycle
   [D-LITERALEXPR] blocking — decision_joint_duty  (main.l4:70:5-73:19)
-      `joint duty` is a deontic (regulative) body: DMN has no notion of time or obligation, so it is emitted as a boxed literal expression rather than a decision table. Its body could not be rendered as FEEL, so the emitted text is raw L4 that NO engine can evaluate
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
+      `joint duty` is a deontic (regulative) body: DMN has no notion of time or obligation, so it is emitted as a boxed literal expression rather than a decision table. Its body could not be rendered as FEEL, so the emitted text is raw L4 that NO engine can evaluate, and the whole file goes with it: KIE 8.44 refuses to load the file, and Camunda 8.7.6 refuses to parse it unless the text happens to read as a FEEL name, when it answers null for this decision
+      lost: execution of every decision in the file, not only this one, and every decision-table analysis: gap, overlap, consistency and manual review
   [D-LITERALEXPR] advisory — decision_invoked_joint_duty  (main.l4:77:36-56)
       `invoked joint duty` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
   [D-LITERALEXPR] blocking — decision_bare_duty  (main.l4:81:19-65)
-      `bare duty` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table. Its body could not be rendered as FEEL, so the emitted text is raw L4 that NO engine can evaluate
-      lost: every decision-table analysis: gap, overlap, consistency and manual review
+      `bare duty` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table. Its body could not be rendered as FEEL, so the emitted text is raw L4 that NO engine can evaluate, and the whole file goes with it: KIE 8.44 refuses to load the file, and Camunda 8.7.6 refuses to parse it unless the text happens to read as a FEEL name, when it answers null for this decision
+      lost: execution of every decision in the file, not only this one, and every decision-table analysis: gap, overlap, consistency and manual review
   [D-LITERALEXPR] advisory — decision_invoked_bare_duty  (main.l4:84:27-38)
       `invoked bare duty` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
       lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach

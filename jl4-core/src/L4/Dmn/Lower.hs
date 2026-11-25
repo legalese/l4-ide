@@ -3642,13 +3642,21 @@ tableNotes ctx decomposed columnCells columns policy rows inlined cappedBodies =
   -- verified corpus shapes reached the shipped DMN through that gap — one with
   -- only D-UNDECOMPOSABLE, and two (a `Proj` of a verbatim object; a select
   -- idiom over an unrenderable operand) with no note at all.
+  --
+  -- What it costs, measured 2026-11-26 on KIE 8.44.0.Final and Camunda 8.7.6
+  -- (spec §7, the D-NONFEELINPUT row): both refuse the whole file. The
+  -- consequence this note used to give, that every rule testing the column is
+  -- silently treated as non-matching, was not what either engine does.
   nonFeelInputNotes =
     [ dmnNote "D-NONFEELINPUT" Blocking here (bestRange c.cellSubject)
         ("the input expression `" <> col.icExpr.feText
            <> "` is L4 source, not FEEL: this backend has no FEEL rendering for it, so the \
-              \text was emitted verbatim and NO DMN engine can evaluate this column")
-        "execution: the table is well-formed DMN but the engine fails to compile the column, \
-        \and every rule that tests it is silently treated as non-matching"
+              \text was emitted verbatim and NO DMN engine can evaluate this column, and the \
+              \whole file goes with it: KIE 8.44 refuses to load the file, and Camunda 8.7.6 \
+              \refuses to parse it unless the text happens to read as a FEEL name")
+        "execution of every decision in the file: the table is well-formed DMN, but neither \
+        \engine will compile the column, and each refuses the file over it (Camunda not when \
+        \the text reads as a FEEL name)"
     | (col, c) <- zip columns columnCells
     , col.icExpr.feFragment == L4Verbatim
     ]
@@ -7054,7 +7062,10 @@ lowerModule opts modul@(MkModule _ uri _) =
                 ("`" <> decideName d <> "` is " <> renderFidelityLoss loss
                    <> ", so it is emitted as a boxed literal expression rather than a \
                       \decision table" <> verbatimTail)
-                "every decision-table analysis: gap, overlap, consistency and manual review"
+                (if rendered.feFragment == L4Verbatim
+                   then "execution of every decision in the file, not only this one, and \
+                        \every decision-table analysis: gap, overlap, consistency and manual review"
+                   else "every decision-table analysis: gap, overlap, consistency and manual review")
             else
               dmnNote code Advisory did (bestRange body)
                 ("`" <> decideName d <> "` is " <> renderFidelityLoss loss
@@ -7068,10 +7079,16 @@ lowerModule opts modul@(MkModule _ uri _) =
       rendered = renderFeelIn nameEnv constructors (oracleOf tctx) body
       code     = fidelityLossCode loss
       blocking = code == "D-SUMTYPE" || rendered.feFragment == L4Verbatim
+      -- What the raw L4 costs, measured 2026-11-26 on KIE 8.44.0.Final and
+      -- Camunda 8.7.6 (spec §7, the D-LITERALEXPR row): neither engine runs any
+      -- decision of a file holding such text, unless the text happens to read
+      -- as a FEEL name (`TBD`), which Camunda parses and answers null for.
       verbatimTail
         | rendered.feFragment == L4Verbatim =
             ". Its body could not be rendered as FEEL, so the emitted text is raw L4 \
-            \that NO engine can evaluate"
+            \that NO engine can evaluate, and the whole file goes with it: KIE 8.44 \
+            \refuses to load the file, and Camunda 8.7.6 refuses to parse it unless the \
+            \text happens to read as a FEEL name, when it answers null for this decision"
         | otherwise = ""
 
     -- D1: the author's reasons, kept IN THE ARTIFACT rather than only in a

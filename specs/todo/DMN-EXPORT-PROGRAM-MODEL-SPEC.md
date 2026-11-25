@@ -3448,6 +3448,14 @@ the census showed 0 cyclic files. The census is blind to suppressed self-edges b
 > Listing them, rather than rewording the header, is decided by Claude 2026-11-26, pending Meng's review, because the reader can act on a name and cannot act on a vaguer sentence.
 > Beside other decisions such a rule still leaves the model with no note (measured 2026-11-26: `jl4/tests-cli/fixtures/export-taken-for-field.l4` plus a second rule exports only the second); that is #1038's to fix, and this change does not touch it.
 
+> **What a raw-L4 note costs the rest of the file, said in the note since the review of #1103.**
+> A Blocking `D-LITERALEXPR` (the raw-L4 kind; its FEEL kind is Advisory) and a `D-NONFEELINPUT` used to say only that no engine can evaluate the one decision or column.
+> Measured 2026-11-26 on KIE 8.44.0.Final and Camunda 8.7.6, each with one such decision beside a FEEL decision `pay` that both engines otherwise answer: a raw-L4 boxed literal (`count OF xs`, seven of them in `jl4/tests-cli/fixtures/export-shadow-prelude/uses-shadow.l4`) and a raw-L4 input column (`x AS STRING`) each made KIE refuse to load the file (`0 case(s)`, `ERR_COMPILING_FEEL`) and Camunda refuse to parse it (`0 parsed`), so `pay` ran on neither.
+> The exception is raw L4 that reads as a FEEL name: a bare `TBD` made KIE refuse the file (`Unknown variable 'TBD'`), while Camunda parsed it, answered null for that decision and 2 for `pay`.
+> Of the 1,164 Blocking `D-LITERALEXPR` notes in the review's tip-build corpus exports (310 files), 1,081 name a `<decision>` whose text was read back, and 2 of those texts are a single name (`TBD`, `CONCAT`); both files also hold texts no engine parses, and both engines refused each of them whole.
+> Both notes now say this, and `D-NONFEELINPUT`'s consequence no longer claims that every rule testing the column is silently treated as non-matching, which neither engine does; the wording is decided by Claude 2026-11-26, pending Meng's review.
+> `--fail-on`'s help said Blocking "fires on every realistic export"; in the same corpus exports 441 of the 764 that exited 0 carry a Blocking note and 323 carry none, so it now says "most", as `doc/exports/README.md` does (DMN measured; BPMN not).
+
 ---
 
 ## 8. The markdown carrier
