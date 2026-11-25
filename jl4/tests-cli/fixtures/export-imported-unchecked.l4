@@ -1,0 +1,9 @@
+-- smucclaw/l4-ide#1102: a constant from an imported module that does not
+-- type-check is not closed, so it is refused (Blocking) rather than copied.
+-- Before, it was copied as `typeRef="number"` with the text "three", and the
+-- export reported nothing worse than Advisory.
+IMPORT `export-imported-unchecked-lib`
+
+GIVEN h IS A NUMBER
+GIVETH A NUMBER
+DECIDE `pay` h IS h TIMES `the rate`

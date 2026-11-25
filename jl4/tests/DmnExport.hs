@@ -4025,6 +4025,22 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       verdicts "first of nothing" copied `shouldSatisfy` elem ("D-PARTIAL", Blocking)
       verdicts "g2" copied `shouldSatisfy` elem ("D-PARTIAL", Blocking)
 
+    -- A module with errors: `l4 check` refuses its importer, and the
+    -- importer's own check result does not carry them. `the rate` is typed
+    -- NUMBER and defined as a STRING, so copying it would carry "three".
+    it "does not copy a constant from an imported module that does not type-check" $ do
+      let unchecked = drgGeneral
+                        (vfsFromList [("rates", "GIVETH A NUMBER\n`the rate` MEANS \"three\"\n")])
+                        id defaultDmnFlavor (const "Test")
+                        "IMPORT rates\n\
+                        \GIVEN h IS A NUMBER\n\
+                        \GIVETH A NUMBER\n\
+                        \DECIDE `pay` h IS h TIMES `the rate`\n"
+      [d.dcnName | d <- drgDecisions unchecked] `shouldBe` ["pay"]
+      (literalOf "pay" unchecked).feFragment `shouldBe` L4Verbatim
+      notesCoded "D-IMPORTED" unchecked `shouldBe` []
+      blockingOf unchecked `shouldSatisfy` (not . null)
+
     it "passes a copied constant into a BKM that reads it" $ do
       let drg = drgImp $ importing
             "GIVEN y IS A NUMBER\n\
@@ -4733,6 +4749,8 @@ drgGeneral vfs adjust flavor mkName src = case checkWithImports vfs src of
                         , imSubstitution       = ri.riTypeChecked.substitution
                         , imMissingMatchRanges = checkerMissingMatchRanges ri.riTypeChecked.errors
                         , imClauseMatrixRanges = checkerClauseMatrixRanges ri.riTypeChecked.errors
+                        , imChecks             =
+                            not (any ((== SError) . TC.severity) ri.riTypeChecked.errors)
                         }
                     | ri <- tc.tcdResolvedImports
                     ]

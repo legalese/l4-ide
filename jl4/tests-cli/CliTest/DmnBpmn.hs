@@ -161,6 +161,9 @@ exportImportedConstantCases   = fixtureDir </> "export-imported-constant.cases.j
 -- non-exhaustive: it must be reported exactly as it would be written locally.
 exportImportedPartialFixture :: FilePath
 exportImportedPartialFixture = fixtureDir </> "export-imported-partial.l4"
+-- A constant read from an imported module that does not type-check.
+exportImportedUncheckedFixture :: FilePath
+exportImportedUncheckedFixture = fixtureDir </> "export-imported-unchecked.l4"
 exportAdvisoryOnlyFixture = fixtureDir </> "export-advisory-only.l4"
 
 -- The FIXTURE(d) backticked-import pair: a HYPHENATED module beside a sibling
@@ -643,6 +646,15 @@ spec bin = do
         serr `shouldSatisfy` ("[D-PARTIAL] blocking — decision_first_of_nothing" `isInfixOf`)
         serr `shouldSatisfy` ("[D-PARTIAL] blocking — decision_g2" `isInfixOf`)
         serr `shouldSatisfy` ("the checker reports this CONSIDER non-exhaustive" `isInfixOf`)
+
+      -- `l4 check` refuses the importer of a module with errors, so a constant
+      -- from one is no value L4 has: it is refused, not copied.
+      it "refuses a constant from an imported module that does not type-check, rather than copying it" $ do
+        Output code sout serr <- runL4 bin ["export", "dmn", exportImportedUncheckedFixture]
+        code `shouldBe` ExitSuccess
+        serr `shouldSatisfy` ("1 blocking" `isInfixOf`)
+        sout `shouldSatisfy` (not . ("id=\"decision_the_rate\"" `isInfixOf`))
+        sout `shouldSatisfy` (not . ("\"three\"" `isInfixOf`))
 
     -- FIXTURE(d)'s importer view must see a BACKTICKED import. A hyphenated
     -- module name can only be imported as IMPORT `interp-common`, and the

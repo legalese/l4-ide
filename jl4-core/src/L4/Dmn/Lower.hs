@@ -539,6 +539,11 @@ data ImportedModule = MkImportedModule
     -- ^ 'checkerMissingMatchRanges' of the imported module's own check
   , imClauseMatrixRanges :: ![SrcRange]
     -- ^ 'checkerClauseMatrixRanges' of the imported module's own check
+  , imChecks             :: !Bool
+    -- ^ the imported module's own check reported no error. Its errors are not
+    -- the importer's (the importer is told only that the import has errors),
+    -- so a constant there can be typed one way and defined another; such a
+    -- module's constants are never closed (see 'importedConstantPool').
   }
 
 -- | The source ranges of the checker's @PatternMatchesMissing@ warnings, for
@@ -3923,15 +3928,22 @@ lowerModule opts modul@(MkModule _ uri _) =
   -- a reference to one without depending on the verdict it feeds; only those
   -- a KEPT decide (or a computed field) reaches are emitted.
   --
+  -- Only a module whose own check reported no error contributes: `l4 check`
+  -- refuses the importer of such a module (import/module-has-errors), so a
+  -- constant from it is no value L4 has, and copying `the rate` defined as a
+  -- STRING under a NUMBER signature would carry the string into the model.
+  --
   -- Anything else read from another module (a constant that reads an ASSUME,
-  -- law time or an imported constructor; an ASSUME itself; a function used as
-  -- a value) is not copied; the renderer refuses it instead ('neHomeUri'). Both choices are
-  -- decided by Claude 2026-11-25, pending Meng's review.
+  -- law time or an imported constructor, or that comes from a module with
+  -- errors; an ASSUME itself; a function used as a value) is not copied; the
+  -- renderer refuses it instead ('neHomeUri'). Both choices are decided by
+  -- Claude 2026-11-25, pending Meng's review.
   importedConstantPool :: [(Unique, (Anno, Decide Resolved))]
   importedConstantPool =
     nubOrdOn fst
       [ (getUnique (decideResolved d), (ann, over decideBody (TC.applyFinalSubstitution subst mUri) d))
-      | MkImportedModule { imModule = m@(MkModule _ mUri _), imSubstitution = subst } <- opts.dloImportedModules
+      | MkImportedModule { imModule = m@(MkModule _ mUri _), imSubstitution = subst, imChecks = True }
+          <- opts.dloImportedModules
       , mUri /= uri
       , Decide ann d <- topDecls m
       , null (A.decideParams d)

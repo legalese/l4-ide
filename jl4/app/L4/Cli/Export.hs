@@ -472,6 +472,7 @@ dmnDrgFor opts tcRes = do
                     , imSubstitution       = dep.substitution
                     , imMissingMatchRanges = checkerMissingMatchRanges dep.infos
                     , imClauseMatrixRanges = checkerClauseMatrixRanges dep.infos
+                    , imChecks             = dep.success
                     }
                 | dep <- Rules.transitiveDependencies tcRes
                 ]

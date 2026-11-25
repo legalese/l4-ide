@@ -1,0 +1,5 @@
+-- smucclaw/l4-ide#1102: the module `export-imported-unchecked.l4` imports.
+-- It does not type-check: `the rate` is declared a NUMBER and defined as a
+-- STRING. `l4 check` on the importer reports import/module-has-errors.
+GIVETH A NUMBER
+`the rate` MEANS "three"
