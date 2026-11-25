@@ -26,7 +26,6 @@ module L4.Viz.GuardedRows
   ( GuardedRows(..)
   , normaliseGuarded
   , guardedToLadder
-  , guardedToLadderWith
   , hasEffectfulNode
   , literalBool
   ) where
@@ -246,20 +245,7 @@ guardedToLadder
   -> (Expr Resolved -> m IRExpr)      -- ^ the caller's expression translator
   -> GuardedRows
   -> m IRExpr
-guardedToLadder fresh = guardedToLadderWith fresh (const fresh)
-
--- | 'guardedToLadder', with the id each node of a guard's copy gets ('copyOf')
--- taken from the id of the node it copies. A caller that keeps something per
--- node, such as where in the source it was drawn from, can carry it over to
--- the copy.
-guardedToLadderWith
-  :: forall m. Monad m
-  => m ID                             -- ^ fresh id supply
-  -> (ID -> m ID)                     -- ^ the id of a copy of the node with this id
-  -> (Expr Resolved -> m IRExpr)      -- ^ the caller's expression translator
-  -> GuardedRows
-  -> m IRExpr
-guardedToLadderWith fresh copyId go rows = do
+guardedToLadder fresh go rows = do
   -- Translate each guard EXACTLY ONCE and copy the result at every later occurrence.
   --
   -- This is not an optimisation, it is a correctness requirement. A guard appears once
@@ -335,15 +321,15 @@ guardedToLadderWith fresh copyId go rows = do
     -- Fresh node IDs, identical atom identity.
     copyOf :: IRExpr -> m IRExpr
     copyOf = \case
-      V.And i xs                -> V.And <$> copyId i <*> traverse copyOf xs
-      V.Or i xs                 -> V.Or <$> copyId i <*> traverse copyOf xs
-      V.Not i x                 -> V.Not <$> copyId i <*> copyOf x
-      V.Implies i p q seam      -> (\i' p' q' -> V.Implies i' p' q' seam) <$> copyId i <*> copyOf p <*> copyOf q
-      V.UBoolVar i nm v ci a ty x -> (\i' x' -> V.UBoolVar i' nm v ci a ty x') <$> copyId i <*> traverse copyOf x
-      V.App i nm xs a x           -> (\i' xs' x' -> V.App i' nm xs' a x') <$> copyId i <*> traverse copyOf xs <*> traverse copyOf x
-      V.TrueE i nm              -> (`V.TrueE` nm) <$> copyId i
-      V.FalseE i nm             -> (`V.FalseE` nm) <$> copyId i
-      V.InertE i t c            -> (\i' -> V.InertE i' t c) <$> copyId i
+      V.And _ xs                -> V.And <$> fresh <*> traverse copyOf xs
+      V.Or _ xs                 -> V.Or <$> fresh <*> traverse copyOf xs
+      V.Not _ x                 -> V.Not <$> fresh <*> copyOf x
+      V.Implies _ p q seam      -> (\i p' q' -> V.Implies i p' q' seam) <$> fresh <*> copyOf p <*> copyOf q
+      V.UBoolVar _ nm v ci a ty x -> (\i x' -> V.UBoolVar i nm v ci a ty x') <$> fresh <*> traverse copyOf x
+      V.App _ nm xs a x           -> (\i xs' x' -> V.App i nm xs' a x') <$> fresh <*> traverse copyOf xs <*> traverse copyOf x
+      V.TrueE _ nm              -> (`V.TrueE` nm) <$> fresh
+      V.FalseE _ nm             -> (`V.FalseE` nm) <$> fresh
+      V.InertE _ t c            -> (\i -> V.InertE i t c) <$> fresh
 
     conj :: [IRExpr] -> m IRExpr
     conj []  = mkLit True

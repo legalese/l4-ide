@@ -267,10 +267,10 @@ data VizState = MkVizState
   -- ^ Node id -> the source range of the expression 'translateGo' drew that node
   -- from, where that expression has one ('getNodeRanges'). A node the
   -- normal form made ('Transform.simplify' builds every node it makes with no
-  -- annotation) has none; a guard's copy has the range of what it copies.
+  -- annotation) or a guarded chain copied has none.
   , nodeStarts :: IntMap SrcPos
   -- ^ Node id -> where the text of that expression starts ('writtenStart',
-  -- 'getNodeStarts'), for the nodes of 'nodeRanges' that are not copies.
+  -- 'getNodeStarts'), for the same nodes as 'nodeRanges'.
   , expansionNodes :: !Int
   -- ^ IR nodes the expansions so far have added (see 'expansionNodeBudget').
   , expansionOverBudget :: !Bool
@@ -449,16 +449,15 @@ getFreshLeaves vs = vs.freshLeafIds
 -- | The source range each node was drawn from, by node id, where it has one
 -- ('nodeRanges'). In a diagram drawn without the normal form
 -- ('withSimplification' False) every @AND@ operand, @OR@ limb and leaf the
--- drafter wrote has its range here. The guards of a guarded chain (IF, BRANCH,
--- CONSIDER) are drawn as copies ("L4.Viz.GuardedRows"), and each copy has the
--- range of the node it copies.
+-- drafter wrote has its range here, except in the guards of a guarded chain
+-- (IF, BRANCH, CONSIDER), which are drawn as copies ("L4.Viz.GuardedRows") and
+-- have none.
 getNodeRanges :: VizState -> IntMap SrcRange
 getNodeRanges vs = vs.nodeRanges
 
 -- | Where the text of each node starts, by node id, for the nodes
--- 'getNodeRanges' has that are not a guard's copy ('writtenStart'). @l4 verify@
--- uses it to say where a condition it reports is written, and reports one only
--- where this has it.
+-- 'getNodeRanges' has ('writtenStart'). @l4 verify@ uses it to say where a
+-- condition it reports is written.
 getNodeStarts :: VizState -> IntMap SrcPos
 getNodeStarts vs = vs.nodeStarts
 
@@ -846,20 +845,8 @@ translateGo = go
             Just rows
               | isBool
               , not (any (GR.hasEffectfulNode . fst) rows.grRows) ->
-                  GR.guardedToLadderWith getFresh copyId (go CtxNone) rows
+                  GR.guardedToLadder getFresh (go CtxNone) rows
             _ -> leafFromExpr e
-
-    -- The id of a guard's copy ('GR.guardedToLadderWith'). The copy keeps the
-    -- range of the node it copies, so that a consumer can tell it is the same
-    -- condition (@l4 verify@ forgets the other copies of a condition it judges),
-    -- but not its start ('getNodeStarts'): nobody wrote a copy, and the negations
-    -- of the earlier guards that each row carries are copies.
-    copyId :: V.ID -> Viz V.ID
-    copyId old = do
-      new <- getFresh
-      ranges <- use #nodeRanges
-      for_ (Map.lookup old.id ranges) \r -> #nodeRanges %= Map.insert new.id r
-      pure new
 
     -- A call @e@, whose arguments in the order they are drawn are @args@: a box
     -- over its arguments when the call and every argument are BOOLEAN, with the

@@ -85,12 +85,12 @@ import qualified L4.Decision.QueryPlan as QP
 import qualified L4.Transform as Transform
 import qualified L4.TypeCheck as TC
 import qualified L4.Viz.GuardedRows as GR
-import L4.Annotation (Anno_ (..), getAnno, rangeOf)
+import L4.Annotation (Anno_ (..), getAnno)
 import qualified LSP.L4.Viz.Ladder as LadderViz
 import qualified LSP.L4.Viz.QueryPlan as VizQP
 import qualified LSP.L4.Viz.VizExpr as VizExpr
 
-import L4.Parser.SrcSpan (SrcPos (..), SrcRange, prettySrcPos)
+import L4.Parser.SrcSpan (SrcPos (..), prettySrcPos)
 import L4.Print (prettyLayout)
 import L4.Syntax
 
@@ -580,7 +580,7 @@ analyseDecide opts callees cfg decide0 =
                     | opts.verifyCoalesce = callMeanings opts callees cfg decide fnName atomIds labels' vizState order'
                     | otherwise = noMeanings
                   analysisOrder = if null meanings.cmOrder then order' else meanings.cmOrder
-                  written = writtenForm opts cfg decide (usedBodies (decideBodyOf decide0)) fnName atomIds order labels' analysisOrder
+                  written = writtenForm opts cfg decide fnName atomIds order labels' analysisOrder
                in DecisionReport
                     { drName = fnName
                     , drResult =
@@ -602,7 +602,6 @@ analyseDecide opts callees cfg decide0 =
     -- ladder refuses it ('LadderViz.ClauseGroupTooLong'); a call to one is
     -- left as a box ('callMeanings').
     constant = literalBody decide0
-    decideBodyOf (MkDecide _ _ _ body) = body
     decide = case decide0 of
       MkDecide ann sig af body -> MkDecide ann sig af (fromMaybe body (Transform.inlineLocalBindingsForDrawing body))
     notBrokenDown =
@@ -911,10 +910,9 @@ ladderNodeCount budget root = go 0 [root]
 -- it simplifies or not ("L4.Viz.GuardedRows"): each row of a guarded chain
 -- (IF, BRANCH, CONSIDER) carries the negations of the guards before it, which
 -- nobody wrote. Every occurrence of a guard, negated or not, is drawn as a copy
--- with no start in the source, so 'wStarts' has no entry for it, and the walk
--- reports a redundant condition only where 'wStarts' has one: a row's THEN and
--- the OTHERWISE are checked, the guards are not. A copy keeps the range of what
--- it copies, which is how 'withCopies' tells that it is the same condition.
+-- with no source range, so 'wStarts' has no entry for it, and the walk reports
+-- a redundant condition only where 'wStarts' has one: a row's THEN and the
+-- OTHERWISE are checked, the guards are not.
 --
 -- Reading this one finding off a second drawing, rather than mapping the normal
 -- form's clauses back to the source, was decided by Claude 2026-11-25, pending
@@ -929,10 +927,6 @@ data Written = Written
   -- ^ Every variable of 'wBody' and of the call meanings.
   , wStarts :: Map Text SrcPos
   -- ^ Site -> where the condition at that site starts in the source ('siteStarts').
-  , wCopies :: Map Text ([BDQ.BoolExpr Int], [BDQ.BoolExpr Int])
-  -- ^ Site -> the context of the condition there, and its siblings, with the
-  -- other copies of it forgotten ('withCopies'), for a condition a local
-  -- definition read through has put in more than one place.
   }
 
 -- | Draw the rule as written and put its atoms in the analysis's atom space.
@@ -955,8 +949,6 @@ writtenForm
   :: VerifyOptions
   -> LadderViz.VizConfig
   -> Decide Resolved
-  -> Set SrcRange
-  -- ^ The bodies of the local definitions the rule uses only itself ('usedBodies').
   -> Text
   -> Map Int Text
   -- ^ The analysed drawing's atomIds, by leaf unique.
@@ -967,16 +959,15 @@ writtenForm
   -> [Int]
   -- ^ The analysis's variable order.
   -> Maybe Written
-writtenForm opts cfg decide uses fnName atomIds order labels analysisOrder =
+writtenForm opts cfg decide fnName atomIds order labels analysisOrder =
   case LadderViz.doVisualize decide (LadderViz.withSimplification False cfg) of
     Left _ -> Nothing
     Right (li, vs) ->
       let (bx, labelsW, orderW) = VizQP.vizExprToBoolExpr li.funDecl.body
           starts = siteStarts (LadderViz.getNodeStarts vs) li.funDecl.body
-          spans = siteSpans (LadderViz.getNodeRanges vs) li.funDecl.body
-       in Just . withCopies uses spans $
+       in Just $
             if not opts.verifyCoalesce
-              then Written bx labelsW orderW starts Map.empty
+              then Written bx labelsW orderW starts
               else joined li vs bx labelsW orderW starts
   where
     joined li vs bx labelsW orderW starts =
@@ -985,7 +976,6 @@ writtenForm opts cfg decide uses fnName atomIds order labels analysisOrder =
         , wLabels = labels <> Map.fromList [(target w, l) | (w, l) <- Map.toList labelsW, not (isJoined (keyOf w))]
         , wOrder = analysisOrder <> [v | k <- newKeys, Just v <- [Map.lookup k newVar]]
         , wStarts = starts
-        , wCopies = Map.empty
         }
       where
         aidsW = atomIdsOf fnName li vs
@@ -1012,158 +1002,17 @@ writtenForm opts cfg decide uses fnName atomIds order labels analysisOrder =
 -- 'VizQP.vizExprToBoolExpr' keeps the drawing's shape node for node, so a site
 -- of the formula is the same site of the drawing.
 siteStarts :: IntMap.IntMap SrcPos -> VizExpr.IRExpr -> Map Text SrcPos
-siteStarts = bySite
-
--- | The source range of the node at each site ('LadderViz.getNodeRanges').
-siteSpans :: IntMap.IntMap SrcRange -> VizExpr.IRExpr -> Map Text SrcRange
-siteSpans = bySite
-
-bySite :: IntMap.IntMap a -> VizExpr.IRExpr -> Map Text a
-bySite byNode = go "body"
+siteStarts starts = go "body"
   where
     go site e =
-      maybe Map.empty (Map.singleton site) (IntMap.lookup (LadderViz.irNodeId e).id byNode)
+      maybe Map.empty (Map.singleton site) (IntMap.lookup (LadderViz.irNodeId e).id starts)
         <> children site e
     children site = \case
-      VizExpr.And _ xs -> Map.unions [go (andSite site i) x | (i, x) <- zip [0 ..] xs]
-      VizExpr.Or _ xs -> Map.unions [go (orSite site i) x | (i, x) <- zip [0 ..] xs]
+      VizExpr.And _ xs -> Map.unions [go (site <> ".and[" <> Text.pack (show i) <> "]") x | (i, x) <- zip [(0 :: Int) ..] xs]
+      VizExpr.Or _ xs -> Map.unions [go (site <> ".or[" <> Text.pack (show i) <> "]") x | (i, x) <- zip [(0 :: Int) ..] xs]
       VizExpr.Implies _ s r _ -> go (site <> ".scope") s <> go (site <> ".requirement") r
       VizExpr.Not _ x -> go (site <> ".not") x
       _ -> Map.empty
-
-andSite, orSite :: Text -> Int -> Text
-andSite site i = site <> ".and[" <> Text.pack (show i) <> "]"
-orSite site i = site <> ".or[" <> Text.pack (show i) <> "]"
-
--- | One condition in several places: the copies a local definition read
--- through leaves ('Transform.inlineLocalBindingsForDrawing'). The definition's
--- body is put in place of each use, with the arguments in place of its
--- parameters, so every condition of the body the parameters do not reach
--- appears once per use. In
---
--- > `qualifies` a AND `qualifies` b WHERE `qualifies` x MEANS x AND c
---
--- the rule as drawn is @a AND c AND b AND c@, and each @c@ is entailed by the
--- other, although the drafter wrote @c@ once and cannot delete it. The same rule
--- with @qualifies@ defined at the top is a conjunction of two calls, and clean.
---
--- So when the walk asks whether a condition is redundant, the other copies of
--- it are forgotten: each is replaced by a fresh variable of its own, which says
--- nothing about it. A copy is a node drawn from exactly the same source range; its
--- arguments come from each use, so they are not copies, and two conditions
--- written alike in different places have different ranges and are not copies
--- either. A context with some parts replaced by variables of their own entails
--- a condition only if it does for every value of them, the parts' own values
--- among those, so forgetting can hide a finding but cannot invent one. The walk
--- still decides whether to ask (a dead alternative, a context that entails the
--- whole disjunction) in the context as drawn.
---
--- The whole body of a definition the rule uses only in its own text, and not in
--- another definition, stands for a use the drafter wrote, so its copies are not
--- forgotten: @e AND e WHERE e MEANS m@ still reports its second @e@ (at the
--- definition, where @m@ is written). A body that is a conjunction is spread
--- into the conjunction around it when it is drawn, and then has no node of its
--- own; its conditions are copies like any others, and such a repeated use goes
--- unreported. So does a repeated use of a definition another definition calls.
---
--- Decided by Claude 2026-11-25, pending Meng's review.
-withCopies :: Set SrcRange -> Map Text SrcRange -> Written -> Written
-withCopies uses spans w
-  | Map.null copied = w
-  | otherwise = w {wOrder = w.wOrder <> Map.elems freshFor, wCopies = copied}
-  where
-    bySpan = Map.fromListWith (<>) [(r, [site]) | (site, r) <- Map.toList spans, not (Set.member r uses)]
-    copiesOf site r =
-      [ other
-      | other <- Map.findWithDefault [] r bySpan
-      , other /= site
-      , not (site `within` other)
-      , not (other `within` site)
-      ]
-    within inner outer = (outer <> ".") `Text.isPrefixOf` inner
-    -- A fresh variable for every copy, its own: copies with a parameter in them
-    -- differ from use to use (@a OR d@, @b OR d@), so one variable for all of
-    -- them would say they are equal, and two of opposite sign in one context
-    -- would make it unsatisfiable, and everything entailed.
-    freshFor =
-      Map.fromList
-        (zip [site | sites@(_ : _ : _) <- Map.elems bySpan, site <- sites]
-             [1 + maximum (0 : w.wOrder) ..])
-    -- Only a site with a start is ever judged ('analyseBody').
-    copied =
-      Map.fromList
-        [ (site, ctx)
-        | (site, r) <- Map.toList spans
-        , Map.member site w.wStarts
-        , let others = copiesOf site r
-        , not (null others)
-        , Just ctx <- [contextAt site (forget (Set.fromList others) w.wBody)]
-        ]
-    forget sites = go "body"
-      where
-        go site e
-          | Set.member site sites, Just v <- Map.lookup site freshFor = BDQ.BVar v
-          | otherwise = case e of
-              BDQ.BAnd es -> BDQ.BAnd [go (andSite site i) x | (i, x) <- zip [0 ..] es]
-              BDQ.BOr es -> BDQ.BOr [go (orSite site i) x | (i, x) <- zip [0 ..] es]
-              BDQ.BImplies sc rq -> BDQ.BImplies (go (site <> ".scope") sc) (go (site <> ".requirement") rq)
-              BDQ.BNot x -> BDQ.BNot (go (site <> ".not") x)
-              other -> other
-
--- | The context the as-written walk ('analyseBody') reaches a site with, and the
--- node's siblings there.
-contextAt :: Text -> BDQ.BoolExpr Int -> Maybe ([BDQ.BoolExpr Int], [BDQ.BoolExpr Int])
-contextAt target = go [] "body"
-  where
-    toward site = site == target || (site <> ".") `Text.isPrefixOf` target
-    arrive site here further = if site == target then Just here else further
-    go ctx site = \case
-      BDQ.BAnd es ->
-        asum
-          [ arrive arm (ctx, others) (go (ctx <> others) arm x)
-          | (i, x) <- zip [0 ..] es
-          , let arm = andSite site i
-          , toward arm
-          , let others = [y | (j, y) <- zip [0 ..] es, j /= i]
-          ]
-      BDQ.BOr es ->
-        asum
-          [ arrive arm (ctx, others) (go ctx arm x)
-          | (i, x) <- zip [0 ..] es
-          , let arm = orSite site i
-          , toward arm
-          , let others = [y | (j, y) <- zip [0 ..] es, j /= i]
-          ]
-      BDQ.BImplies sc rq ->
-        asum
-          [ arrive (site <> ".scope") (ctx, []) (go ctx (site <> ".scope") sc)
-          | toward (site <> ".scope")
-          ]
-          <|> asum
-            [ arrive (site <> ".requirement") (ctx <> [sc], []) (go (ctx <> [sc]) (site <> ".requirement") rq)
-            | toward (site <> ".requirement")
-            ]
-      BDQ.BNot x -> asum [arrive (site <> ".not") (ctx, []) (go ctx (site <> ".not") x) | toward (site <> ".not")]
-      _ -> Nothing
-
--- | The bodies of the local definitions a rule uses in its own text and in no
--- other definition ('withCopies'), by source range.
-usedBodies :: Expr Resolved -> Set SrcRange
-usedBodies body =
-  Set.fromList
-    [ r
-    | (u, b) <- locals
-    , not (Set.member u calledByLocals)
-    , Just r <- [rangeOf b]
-    ]
-  where
-    locals = go body
-    go = \case
-      Where _ e ds -> definitions ds <> go e
-      LetIn _ ds e -> definitions ds <> go e
-      _ -> []
-    definitions ds = [(getUnique n, b) | LocalDecide _ (MkDecide _ _ (MkAppForm _ n _ _) b) <- ds]
-    calledByLocals = foldMap (Transform.callees . snd) locals
 
 ----------------------------------------------------------------------------
 -- Atom coalescing
@@ -1301,8 +1150,8 @@ analyseBody labels order defs listed body written
       ]
   | otherwise =
       topTautology
-        <> walk Normalised sat labels Map.empty Map.empty [] "body" body
-        <> foldMap (\w -> walk AsWritten (satisfiable w.wOrder defs) w.wLabels w.wStarts w.wCopies [] "body" w.wBody) written
+        <> walk Normalised sat labels Map.empty [] "body" body
+        <> foldMap (\w -> walk AsWritten (satisfiable w.wOrder defs) w.wLabels w.wStarts [] "body" w.wBody) written
   where
     sat = satisfiable order defs
     atomLabels labs e = [label labs u | u <- nubOrd (varsOf e)]
@@ -1365,12 +1214,11 @@ analyseBody labels order defs listed body written
       -> ([BDQ.BoolExpr Int] -> BDQ.BoolExpr Int -> Bool)
       -> Map Int Text
       -> Map Text SrcPos
-      -> Map Text ([BDQ.BoolExpr Int], [BDQ.BoolExpr Int])
       -> [BDQ.BoolExpr Int]
       -> Text
       -> BDQ.BoolExpr Int
       -> [Finding]
-    walk pass sat' labs starts copies = go
+    walk pass sat' labs starts = go
       where
         normalised = pass == Normalised
         -- The sign is the finding's: False for one that says something can
@@ -1411,13 +1259,8 @@ analyseBody labels order defs listed body written
                 concat
                   [ entailed <> go ctx' arm ei
                   | (i, ei) <- zip [(0 :: Int) ..] es
-                  , let arm = andSite site i
-                  , let others = [ej | (j, ej) <- zip [(0 :: Int) ..] es, j /= i]
-                  , let ctx' = ctx <> others
-                    -- The context to judge it in: with the other copies of it
-                    -- forgotten, if a definition read through put it in more
-                    -- than one place ('withCopies').
-                  , let judged = maybe ctx' (uncurry (<>)) (Map.lookup arm copies)
+                  , let arm = site <> ".and[" <> Text.pack (show i) <> "]"
+                  , let ctx' = ctx <> [ej | (j, ej) <- zip [(0 :: Int) ..] es, j /= i]
                   , let entailed =
                           [ finding "vacuous-guard" True arm ei
                               "this condition is already entailed by the ones it is conjoined with, so it excludes nothing."
@@ -1435,7 +1278,7 @@ analyseBody labels order defs listed body written
                           , Map.member arm starts
                           , interesting ei
                           , contingent ei
-                          , not (sat' judged (BDQ.BNot ei))
+                          , not (sat' ctx' (BDQ.BNot ei))
                           ]
                   ]
           BDQ.BOr es ->
@@ -1449,9 +1292,8 @@ analyseBody labels order defs listed body written
                     ]
                   else go ctx arm ei
               | (i, ei) <- zip [(0 :: Int) ..] es
-              , let arm = orSite site i
-              , let others0 = [ej | (j, ej) <- zip [(0 :: Int) ..] es, j /= i]
-              , let (cx, others) = Map.findWithDefault (ctx, others0) arm copies
+              , let arm = site <> ".or[" <> Text.pack (show i) <> "]"
+              , let others = [ej | (j, ej) <- zip [(0 :: Int) ..] es, j /= i]
                 -- The dual of a redundant condition: an alternative every case
                 -- of which the others already let through, so the rule reads
                 -- the same with it deleted. It is reported as a vacuous guard,
@@ -1471,7 +1313,7 @@ analyseBody labels order defs listed body written
                       , not (null others)
                       , sat' ctx ei
                       , sat' ctx (BDQ.BNot (BDQ.BOr es))
-                      , not (sat' (cx <> [ei]) (BDQ.BNot (BDQ.BOr others)))
+                      , not (sat' (ctx <> [ei]) (BDQ.BNot (BDQ.BOr others)))
                       ]
               ]
           BDQ.BImplies scope req

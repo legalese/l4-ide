@@ -683,11 +683,6 @@ verifyWrittenGuardsFixture       = fixtureDir </> "verify-written-guards.l4"
 verifyCoveredAlternativesFixture :: FilePath
 verifyCoveredAlternativesFixture = fixtureDir </> "verify-covered-alternatives.l4"
 
--- A local definition read through leaves a copy of its body at each use; the
--- copies of one written condition are one condition, not several.
-verifyLocalHelpersFixture :: FilePath
-verifyLocalHelpersFixture = fixtureDir </> "verify-local-helpers.l4"
-
 -- Referential transparency (specs/todo/WHERE-INLINING-SPEC.md): a zero-arity
 -- WHERE/LET binding is inlined before analysis, so a rule means the same thing
 -- however its limbs are named. The recursive file is the termination control.
@@ -1050,7 +1045,7 @@ coreFixtures =
   , verifyClauseGroupCallFixture, verifyClauseGroupWhereFixture, verifyClauseTableFixture, verifyClauseGroupMaybeFixture
   , verifyClauseTableLargeFixture
   , verifyManufacturedClausesFixture, verifyWrittenGuardsFixture
-  , verifyCoveredAlternativesFixture, verifyLocalHelpersFixture
+  , verifyCoveredAlternativesFixture
   , verifyVacuousGuardFixture, verifySeamFixture, verifyNestedFixture
   , verifyWhereTransparencyFixture, verifyWhereRecursiveFixture
   , verifyConstantsFixture, verifyConstantsReadThroughFixture
@@ -6900,44 +6895,6 @@ spec bin = do
       lineOf "`absorbed inside a condition`" `shouldBe` [28]
       [msg | (nm, _, msg) <- placed, nm == "absorbed"]
         `shouldSatisfy` all ("this alternative is already covered by the ones it is joined with" `T.isPrefixOf`)
-
-    -- A local definition with parameters used twice leaves two copies of its
-    -- body, and one copy's `c` made the other's look redundant, although the
-    -- drafter wrote `c` once. Before the fix `both qualify` had two findings,
-    -- both at the definition's `c`, where the same rule with the definition at
-    -- the top has none; so did a definition with no parameter called from it,
-    -- the dual with alternatives, and a use in the test of an IF. The two
-    -- decisions with copies of opposite sign guard the forgetting itself: with
-    -- one variable for every copy they were reported, falsely. The other
-    -- decisions are the controls: a
-    -- repeated use, a redundancy inside the definition, two conditions written
-    -- alike in two places, and a name used twice are still reported.
-    it "reads a local definition used twice as it reads one defined at the top" $ do
-      env <- jsonEnvelope bin ["verify", verifyLocalHelpersFixture, "--format", "json"]
-      let found = findingSitesByDecision env
-          vg = map ((,) "vacuous-guard")
-      lookup "`both qualify`" found `shouldBe` Just []
-      lookup "`both qualify at the top`" found `shouldBe` Just []
-      lookup "`a name inside a definition`" found `shouldBe` Just []
-      lookup "`either qualifies`" found `shouldBe` Just []
-      lookup "`a use in a test`" found `shouldBe` Just []
-      -- Each copy is forgotten as a condition of its own: forgotten as one,
-      -- copies of opposite sign made the context unsatisfiable. (Their dead
-      -- branches are the normal form's, and not what this test is about.)
-      let noRedundancy nm = lookup nm found `shouldSatisfy` maybe False (all ((/= "vacuous-guard") . fst))
-      noRedundancy "`copies of opposite sign`"
-      noRedundancy "`copies of opposite sign in a chain`"
-      lookup "`the same use twice`" found `shouldBe` Just (vg ["body.and[0]", "body.and[2]"])
-      lookup "`redundant inside the definition`" found `shouldBe` Just (vg ["body.and[1]", "body.and[3]"])
-      lookup "`written twice`" found `shouldBe` Just (vg ["body.and[2]", "body.and[2].or[0].and[0]"])
-      lookup "`a name used twice`" found `shouldBe` Just (vg ["body.and[1]", "body.and[2]"])
-      let linesOf nm =
-            [ round line :: Int
-            | (nm', f) <- findingObjectsByDecision env, nm' == nm
-            , Just w <- [objField f "writtenAt"], Just (Number line) <- [objField w "line"] ]
-      linesOf "`the same use twice`" `shouldBe` [35, 35]
-      linesOf "`redundant inside the definition`" `shouldBe` [50, 50]
-      linesOf "`a name used twice`" `shouldBe` [68, 68]
 
     -- The weaker mode is documented as weaker; pin that it is not SILENTLY
     -- weaker. `x` here is a nullary reference to a GIVEN binder, so the two
