@@ -632,8 +632,9 @@ data Explorer = MkExplorer
     -- own @#TRACE@ back ('rigFor')
   , exStart      :: !Start
   , exActionType :: !(Either Text (Type' Resolved))
-  , exAnchors    :: !(IORef (Map Text (Maybe Rational)))
-    -- ^ closed anchors already evaluated ('resolveAnchor')
+  , exClosed     :: !Closed
+    -- ^ how a deadline written as a name or an expression is worked out
+    -- ('exploreClosed'): WhatIf's reader, cached for the exploration
   , exHint       :: !(Map Text (Set Rational, Set Rational))
     -- ^ per act (as its edge is labelled), what the acts that can FOLLOW it
     -- were found to do in an earlier pass over the same contract: the sums of
@@ -670,16 +671,6 @@ rigFor ex events =
       m' = MkModule a uri (MkSection sa sn saka sg (decls <> [Directive emptyAnno directive]))
   in ( ex.exRig {rigModule = m'}
      , MkTrace {trDirective = directive, trContract = ex.exStart.stContract, trStart = startExpr ex.exStart, trEvents = events} )
-
--- | A module with no directives: the explorer adds the one it replays.
-withoutDirectives :: Module Resolved -> Module Resolved
-withoutDirectives (MkModule a uri section) = MkModule a uri (go section)
-  where
-    go (MkSection sa sn saka sg decls) = MkSection sa sn saka sg (mapMaybe keep decls)
-    keep = \ case
-      Directive _ _ -> Nothing
-      Section sa s  -> Just (Section sa (go s))
-      other         -> Just other
 
 stateKey :: Explorer -> Position -> IO (StateKey, KeyNotes)
 stateKey ex pos = do
@@ -935,73 +926,45 @@ projectLedger sites store = do
 
 -- | Each obligation in force, with its absolute deadline: 'Nothing' when it
 -- has none, 'Left' with the reason when it has one that is not known here.
--- WhatIf's 'deadlineOf' first; an anchor the residual holds unforced is then
--- evaluated, when it is closed in the module ('resolveAnchor').
+-- Read by WhatIf's 'deadlineOf', through the exploration's 'Closed' reader,
+-- which is the one 'candidatesWith' is given too, so a deadline known here is
+-- one a tick is offered for, and the other way round.
 liveDeadlines :: Explorer -> Position -> IO [(RawObligation NF, Maybe (Either Text Rational))]
 liveDeadlines ex pos = for (obligationsOf pos) \ raw -> case raw.roDue of
   Left Nothing -> pure (raw, Nothing)
-  _ -> do
-    d <- deadlineOf pos.posClock raw
-    case d of
-      Right x  -> pure (raw, Just (Right x))
-      Left why -> do
-        resolved <- resolveAnchor ex pos raw
-        pure (raw, Just (maybe (Left why) Right resolved))
+  _ -> (raw,) . Just <$> deadlineOf ex.exClosed pos raw
 
--- | An anchored deadline whose anchor the residual holds UNFORCED — the
--- @WITHIN 0 OF closing@ of an obligation that has met no event yet — is
--- not known to the what-if ('deadlineOf'), which reads only what the
--- machine forced. When the anchor and the duration are closed in the
--- module (they name only top-level rules and builtins), they mean the same
--- in every run, and the evaluator is asked for them: one @#EVAL@ of each,
--- in the module, cached. The tick this offers is then held to
--- 'confirmTick' like any other, so a deadline the machine does not bear
--- out is still reported untried. Only the plain form is read: a window
--- with an opening edge, or a lifecycle anchor, stays unknown.
-resolveAnchor :: Explorer -> Position -> RawObligation NF -> IO (Maybe Rational)
-resolveAnchor ex pos raw = case (raw.roDue, raw.roOpens) of
-  (Left (Just (MkDeadline _ duration (Just (AnchorAt _ anchor)))), opens)
-    | noOpening opens -> do
-        a <- closedNumber anchor
-        d <- closedNumber duration
-        pure ((+) <$> a <*> d)
-  _ -> pure Nothing
+-- | WhatIf's 'Closed' reader for one exploration: a deadline written as a name
+-- or an expression, and closed (@WITHIN `ten days`@, @WITHIN 5 PLUS 5@, an
+-- @OF@ anchor the residual has not forced), is worked out by one @#EVAL@ in
+-- the module ('evalInModule'), and the answer is kept for the rest of the
+-- exploration under the expression's printed form and the names it refers
+-- to. An evaluation stopped at a limit raises 'LimitStopped' rather than
+-- answer: a deadline read as unknown would leave its tick out, and the graph
+-- would be missing positions with nothing to say so. Any other failure (a
+-- division by zero) is the reason the deadline is not known, and the tick is
+-- listed as untried with it.
+exploreClosed :: Rig -> IORef (Map (Text, [Unique]) (Either Text (Value NF))) -> Closed
+exploreClosed rig cache = (closedIn rig) {clEval = Just evalCached}
   where
-    noOpening = \ case
-      Left Nothing  -> True
-      Right Nothing -> True
-      _             -> False
-    closedNumber e = do
-      e' <- reifyExpr raw.roEnv e
-      case e' of
-        Lit _ (NumericLit _ r) -> pure (Just r)
-        _ | null (openLocals pos.posReplayScope raw.roEnv e') -> evaluated e'
-          | otherwise -> pure Nothing
-    evaluated e = do
-      let key = prettyLayout e
-      cache <- readIORef ex.exAnchors
-      case Map.lookup key cache of
-        Just r  -> pure r
+    evalCached e = do
+      let key = (prettyLayout e, [ getUnique r | x <- subExprsOf e, r <- refsOf x ])
+      known <- Map.lookup key <$> readIORef cache
+      case known of
+        Just v -> pure v
         Nothing -> do
-          r <- evalNumber ex e
-          modifyIORef' ex.exAnchors (Map.insert key r)
-          pure r
-
--- | One @#EVAL@ of a closed expression in the module. An evaluation
--- stopped at a limit raises 'LimitStopped' rather than answer 'Nothing':
--- an anchor read as unknown would leave a deadline out of the instants
--- tried, and the graph would be missing positions with nothing to say so.
-evalNumber :: Explorer -> Expr Resolved -> IO (Maybe Rational)
-evalNumber ex e = do
-  let MkModule a uri (MkSection sa sn saka sg decls) = ex.exRig.rigModule
-      m' = MkModule a uri (MkSection sa sn saka sg (decls <> [Directive emptyAnno (LazyEval emptyAnno e)]))
-  (_, results) <- execEvalModuleWithDeonticLog ex.exRig.rigConfig ex.exRig.rigEntityInfo ex.exRig.rigEnv m'
-  case results of
-    ((res, _) : _)
-      | Reduction (Reduced (MkNF (ValNumber r))) <- res.result -> pure (Just r)
-      | Reduction (ReducedErrored exc) <- res.result, isLimitStop exc ->
-          throwIO (LimitStopped ("working out a deadline's anchor: " <> Text.unwords (prettyEvalException exc)))
-    _ -> pure Nothing
+          r <- evalInModule rig e
+          case r of
+            Just (ReducedErrored exc) | isLimitStop exc ->
+              throwIO (LimitStopped ("working out a deadline: " <> Text.unwords (prettyEvalException exc)))
+            _ -> do
+              let v = outcomeValue r
+              modifyIORef' cache (Map.insert key v)
+              pure v
+    refsOf = \ case
+      Var _ r   -> [r]
+      App _ r _ -> [r]
+      _         -> []
 
 -- | One @#EVAL@ of a closed expression in the module, read as an instant: a
 -- NUMBER as it is, a DATE by its serial (as the machine lowers an anchor).
@@ -1414,15 +1377,16 @@ newExplorer opts sites rig0 start = newExplorerWith Map.empty opts sites rig0 st
 
 newExplorerWith :: Map Text (Set Rational, Set Rational) -> ExploreOptions -> ReadSites -> Rig -> Start -> IO Explorer
 newExplorerWith hint opts sites rig0 start = do
-  anchors <- newIORef Map.empty
+  cache <- newIORef Map.empty
   records <- newIORef []
+  let rig = rig0 {rigModule = withoutDirectives rig0.rigModule}
   pure MkExplorer
     { exOptions = opts
     , exSites = sites
-    , exRig = rig0 {rigModule = withoutDirectives rig0.rigModule}
+    , exRig = rig
     , exStart = start
     , exActionType = contractActionType rig0.rigEntityInfo start.stContract
-    , exAnchors = anchors
+    , exClosed = exploreClosed rig cache
     , exHint = hint
     , exRecords = records
     }
@@ -1630,7 +1594,7 @@ positionAlong ex events = do
           (rig, tr) = rigFor ex done'
       position rig tr >>= \ case
         Nothing    -> pure Nothing
-        Just child -> carryBreach parent child >>= go done' es . Just
+        Just child -> carryBreach ex.exClosed parent child >>= go done' es . Just
 
 loop :: Explorer -> Accum -> IO Accum
 loop ex acc = case acc.acQueue of
@@ -1641,7 +1605,7 @@ loop ex acc = case acc.acQueue of
         -- has nothing the bound kept from it: it is terminal, not cut.
         -- Listing the candidates replays nothing, so asking costs nothing.
         let (rig, tr) = rigFor ex node.ndEvents
-        cands <- candidatesOf rig tr node.ndPos
+        cands <- candidatesWith ex.exClosed rig tr node.ndPos
         loop ex if null cands && null node.ndPos.posUnread
           then terminal node acc {acQueue = rest}
           else acc {acQueue = rest, acDepthCutIds = Set.insert node.ndId acc.acDepthCutIds}
@@ -1820,14 +1784,13 @@ expand :: Explorer -> Node -> IO [Tried]
 expand ex node = do
   let (rig, tr) = rigFor ex node.ndEvents
       pos = node.ndPos
-  cands <- candidatesOf rig tr pos
+  cands <- candidatesWith ex.exClosed rig tr pos
   deadlines <- liveDeadlines ex pos
   -- each candidate's obligation, found again by the 'LiveNorm' the what-if
-  -- rendered it to from the very same residual ('candidatesOf')
+  -- rendered it to from the very same residual ('candidatesWith')
   let lives :: [(LiveNorm, (RawObligation NF, Maybe (Either Text Rational)))]
       lives = [ (renderLive pos.posContext raw, (raw, due)) | (raw, due) <- deadlines ]
       known = nubOrd [ d | (_, Just (Right d)) <- deadlines ]
-      offeredTicks = [ d | MkCandidate {cdKind = TickPast d _} <- cands ]
       -- the stamp that reveals deadline d: one unit past it, or, on a grid,
       -- the next point of the grid past it
       -- (never earlier than the clock: a deadline the clock has already passed
@@ -1845,7 +1808,7 @@ expand ex node = do
           _ -> case (cand.cdHypothetical, mpos) of
             -- what a breach leaves standing is carried to the position it leads to
             (Right hyp, Just pos') | isJust pos'.posResidual -> do
-              carried <- carryBreach pos pos'
+              carried <- carryBreach ex.exClosed pos pos'
               pure (TriedEdge label kind (hypotheticalExpr hyp) carried)
             _ -> pure (TriedUntried label "the replay produced no position")
       -- a tick, and the instants a lapse it reveals arms (see 'tickRecord')
@@ -1890,13 +1853,12 @@ expand ex node = do
         pure [ h.heldAt | h <- new ]
       tickMove cand = case cand.cdKind of
         TickPast d _ -> let cand' = retimed d cand in tick (tickLabel cand' d) d cand'
-        NoTick live -> case snd <$> lookup live lives of
-          Just (Just (Right d))
-            | d `notElem` offeredTicks ->
-                let cand' = cand {cdKind = TickPast d [live], cdHypothetical = Right (Tick (tickTime d))}
-                in tick (tickLabel cand' d) d cand'
-            | otherwise -> pure ([], [])
-          _ -> pure ([TriedUntried ("time runs out on " <> live.lnAction) (either id (const "") cand.cdHypothetical)], [])
+        -- the what-if read the deadline with the exploration's own reader
+        -- ('candidatesWith', 'liveDeadlines'), so one it could not read is not
+        -- known here either; until 2026-11-25 the two read differently, and a
+        -- NoTick whose anchor this module could work out was turned into a
+        -- tick here
+        NoTick live -> pure ([TriedUntried ("time runs out on " <> live.lnAction) (either id (const "") cand.cdHypothetical)], [])
         ActBy _ -> pure ([], [])
   -- the ticks first, and each in its own place in the result: what a lapse
   -- arms is a fact about this state that the acts tried in it are tied with

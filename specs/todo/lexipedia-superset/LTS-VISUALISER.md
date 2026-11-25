@@ -685,7 +685,16 @@ step log, the marking, the enabled set **and the rank/lane assignment** (§4.7) 
 deadline` and a tick AT the deadline reveals nothing); and a listed refusal, when the shape
   cannot be instantiated — a `WITHIN` that was never evaluated and is not a
   literal (`deadlineOf`, `:264`). Refusals are listed, not dropped: an enabled set that omitted
-  them would say "nothing else can happen". **Amended 2026-09-19 (every-each round 2, O2; the
+  them would say "nothing else can happen".
+  **Amended 2026-11-25 (smucclaw/l4-ide#1107):** a `WITHIN` that is a name or an expression (`` WITHIN `ten days` ``, `WITHIN 5 PLUS 5`) is no longer refused on sight.
+  `deadlineOf` asks the evaluator for it, one `#EVAL` in the module with its directives taken out (`evalInModule`), when it is CLOSED, and refuses it only otherwise, saying why.
+  Closed means that, once `reifyExpr` has read back what the residual forced, it names no local the replay cannot resolve (`openLocals`: a rule `GIVEN`, a `WHERE` local, a value an event bound), no lifecycle value, no `RECALL` of its own (a guard added in review the same day: without it, ``WITHIN fromMaybe 10 (RECALL `period`)`` was worked out as 10 against an empty ledger), and no rule of the module that reads a ledger directly or through another (`runStateRules`); an `OF e` anchor the residual has not forced is read the same way (decided by Claude 2026-11-25, pending Meng's review).
+  A closed expression means the same in every run, so the `#EVAL` is the evaluator's own answer and nothing is re-derived (§2.4); the tick it leads to is still held to `confirmTick`.
+  Not covered: an unforced `AFTER` offset that is a name (still refused, as outside #1107), and a ledger-reading rule of an IMPORTED module, which the rig holds as a heap and not as source, so a deadline naming one is worked out against an empty ledger (measured: such a `WITHIN` explores as its fallback).
+  A working out that fails is the refusal's reason (`working out the WITHIN failed (…)`); one stopped at a limit refuses the whole exploration in `l4 explore`, as the 2026-11-21 budget ruling already had it for an anchor, and is a refusal with the evaluator's message in `l4 lts`.
+  `l4 lts` and `l4 explore` read deadlines through one reader (`Closed`; explore's caches its answers), so explore's own `resolveAnchor`, which had worked out a closed `OF` anchor for the explorer alone, is gone, and with it the place where the two tools could disagree about whether a deadline is known.
+  The durable ledger (`L4.Ledger.Replay`, the stateful service's due ticks) is left as it was: `candidatesOf` and `enabledSet` read with `literalOnly`, which works nothing out, and only `l4 lts` (`enabledSetWith`) and `l4 explore` (`candidatesWith`) opt in, because a ledger that started appending ticks for named deadlines is a change to what a deployed contract records (measured: with the closed reader, `LedgerSpec`'s fresh-instance case appends a tick it pins as absent).
+  **Amended 2026-09-19 (every-each round 2, O2; the
   proxy's one actionable finding, §7.7):** an action that NAMES a local the residual holds
   unforced — a member's pattern-bound `amount` read through a fork's `HENCE`
   (`ok/every/run-fork.l4`); a rule `GIVEN` no event has compared yet — is the same refusal,

@@ -1,0 +1,39 @@
+-- smucclaw/l4-ide#1107: named deadlines in three other places. A duty armed
+-- by HENCE, a WITHIN beside an AFTER, and a WITHIN counted OF a named instant
+-- are each worked out as their literal twin is. A named AFTER is not: its
+-- window's deadline stays unknown (a limit, stated on the explore page).
+
+DECLARE Actor IS ONE OF Alice, Bob
+DECLARE Act IS ONE OF pay, ship
+
+`ten days` MEANS 10
+`five days` MEANS 5
+`the start` MEANS 3
+
+GIVETH A DEONTIC Actor Act
+`then literal` MEANS
+  PARTY Alice MUST pay WITHIN 3
+  HENCE PARTY Bob MUST ship WITHIN 10 LEST BREACH BY Bob BECAUSE "late"
+
+GIVETH A DEONTIC Actor Act
+`then named` MEANS
+  PARTY Alice MUST pay WITHIN 3
+  HENCE PARTY Bob MUST ship WITHIN `ten days` LEST BREACH BY Bob BECAUSE "late"
+
+GIVETH A DEONTIC Actor Act
+`after literal` MEANS PARTY Alice MUST ship AFTER 5 WITHIN 10 LEST BREACH BY Alice BECAUSE "late"
+
+GIVETH A DEONTIC Actor Act
+`after named` MEANS PARTY Alice MUST ship AFTER 5 WITHIN `ten days` LEST BREACH BY Alice BECAUSE "late"
+
+GIVETH A DEONTIC Actor Act
+`of literal` MEANS PARTY Alice MUST ship WITHIN 5 OF 3 LEST BREACH BY Alice BECAUSE "late"
+
+GIVETH A DEONTIC Actor Act
+`of named` MEANS PARTY Alice MUST ship WITHIN `five days` OF `the start` LEST BREACH BY Alice BECAUSE "late"
+
+GIVETH A DEONTIC Actor Act
+`named after` MEANS PARTY Alice MUST ship AFTER `five days` WITHIN 10 LEST BREACH BY Alice BECAUSE "late"
+
+#TRACE `then named` AT 0 WITH
+  PARTY Alice DOES pay AT 2

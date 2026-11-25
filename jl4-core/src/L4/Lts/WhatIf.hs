@@ -64,6 +64,7 @@ module L4.Lts.WhatIf
   , tracesOf
   , decidesOf
   , ruleNamed
+  , withoutDirectives
     -- * The position: the trace as written, replayed
   , Position (..)
   , Pending (..)
@@ -78,9 +79,17 @@ module L4.Lts.WhatIf
   , BoundAct (..)
   , BoundScope (..)
   , candidatesOf
+  , candidatesWith
   , tickPast
   , deadlineOf
   , openingOf
+    -- * A deadline written as a name or an expression
+  , Closed (..)
+  , closedIn
+  , literalOnly
+  , evalInModule
+  , outcomeValue
+  , runStateRules
     -- * The replay
   , whatIf
   , tryCandidate
@@ -96,6 +105,7 @@ module L4.Lts.WhatIf
   , Outcome (..)
   , EnabledSet (..)
   , enabledSet
+  , enabledSetWith
   , discharging
   , breaching
   , advancing
@@ -204,6 +214,17 @@ ruleNamed (MkModule _ _ section) wanted =
     [] -> Left ("no rule named `" <> wanted <> "` that takes no inputs")
     ((u, n) : _) -> Right (Var emptyAnno (Ref n u n))
 
+-- | A module with no directives: whoever runs it adds the one it wants
+-- answered ("L4.Lts.Explore"'s replays, 'evalInModule').
+withoutDirectives :: Module Resolved -> Module Resolved
+withoutDirectives (MkModule a uri section) = MkModule a uri (go section)
+  where
+    go (MkSection sa sn saka sg decls) = MkSection sa sn saka sg (mapMaybe keep decls)
+    keep = \ case
+      Directive _ _ -> Nothing
+      Section sa s  -> Just (Section sa (go s))
+      other         -> Just other
+
 -- | The trace as written, replayed: the residual and its marking, the steps
 -- the run logged, and the contract clock the residual is relative to.
 data Position = MkPosition
@@ -274,12 +295,15 @@ obligationsOf pos = maybe [] liveObligations pos.posResidual <> map (.pdRaw) pos
 -- The carried obligation's countdown is moved to the child's clock from its
 -- absolute deadline and opening, read at the clock they were counted from. A
 -- deadline that cannot be read is carried as it was and reported by whoever
--- offers its tick.
-carryBreach :: Position -> Position -> IO Position
-carryBreach parent child = case child.posResidual of
+-- offers its tick. A deadline written as a name or an expression is read
+-- through the 'Closed' reader, as 'deadlineOf' reads it anywhere else: carried
+-- unread, its expression would be counted afresh from the child's clock, and
+-- the deadline would land late by the gap.
+carryBreach :: Closed -> Position -> Position -> IO Position
+carryBreach closed parent child = case child.posResidual of
   Just (ValBreached _) -> do
     carried <- for (known parent) \ (raw, key) -> do
-      moved <- retime parent.posClock child.posClock raw
+      moved <- retime closed parent child.posClock raw
       pure (MkPending {pdRaw = moved, pdKey = key})
     let waiting = [ k | s <- child.posSteps, Waiting <- [s.dsOutcome], Just k <- [s.dsNorm] ]
         still = [ p | p <- carried, any (sameKey p.pdKey) waiting ]
@@ -310,12 +334,13 @@ carryBreach parent child = case child.posResidual of
 -- | An obligation, with the countdowns it counted from one clock moved to
 -- count from another: the deadline and the opening are read as instants at the
 -- first ('deadlineOf', 'openingOf') and written back as remaining at the
--- second. One whose deadline is not known is left as it was.
-retime :: Rational -> Rational -> RawObligation NF -> IO (RawObligation NF)
-retime origin dest raw
+-- second. One whose deadline is not known is left as it was. The first clock
+-- is the position's the obligation was read in.
+retime :: Closed -> Position -> Rational -> RawObligation NF -> IO (RawObligation NF)
+retime closed from dest raw
   | origin == dest = pure raw
   | otherwise = do
-      due <- deadlineOf origin raw
+      due <- deadlineOf closed from raw
       open <- openingOf origin raw
       let opensLater = case open of
             Just (Right o) | o > dest -> Just o
@@ -327,6 +352,8 @@ retime origin dest raw
             Right d -> Right (ValNumber (d - fromMaybe dest opensLater))
             Left _  -> raw.roDue
       pure raw {roOpens = opens', roDue = due'}
+  where
+    origin = from.posClock
 
 -- | Replay the trace as written.
 position :: Rig -> Trace -> IO (Maybe Position)
@@ -401,9 +428,9 @@ data CandidateKind
     -- ^ a tick past this deadline (absolute, on the contract clock), and the
     -- obligations whose countdown ends there
   | NoTick !LiveNorm
-    -- ^ this obligation's deadline could not be read — its @WITHIN@ was
-    -- never evaluated and is not a literal — so no tick is offered for it;
-    -- listed rather than dropped
+    -- ^ this obligation's deadline could not be read ('deadlineOf' says
+    -- why: its @WITHIN@ reads something only a run works out, or working it
+    -- out failed), so no tick is offered for it; listed rather than dropped
   deriving stock (Eq, Show)
 
 data Candidate = MkCandidate
@@ -485,8 +512,18 @@ data BoundScope
 -- Each candidate's 'LiveNorm' is rendered ('renderLive') from the very
 -- 'RawObligation' its act is built from, so the label and the act cannot
 -- come apart; the position's 'posMarking' is not consulted here.
+--
+-- A deadline is read as the reader given to 'candidatesWith' reads it.
+-- 'candidatesOf' gives 'literalOnly', which works nothing out, so its
+-- callers read deadlines as they did before smucclaw/l4-ide#1107: the durable
+-- ledger ("L4.Ledger.Replay"), whose due ticks would otherwise change, opted
+-- in to nothing. @l4 lts@ gives 'closedIn' ('enabledSetWith'), and @l4
+-- explore@ its own cached one.
 candidatesOf :: Rig -> Trace -> Position -> IO [Candidate]
-candidatesOf rig tr pos = case pos.posResidual of
+candidatesOf = candidatesWith literalOnly
+
+candidatesWith :: Closed -> Rig -> Trace -> Position -> IO [Candidate]
+candidatesWith closed rig tr pos = case pos.posResidual of
   Nothing -> pure []
   Just _ -> do
     let raws   = obligationsOf pos
@@ -510,7 +547,7 @@ candidatesOf rig tr pos = case pos.posResidual of
         , cdHypothetical = hyp
         , cdShape = either (const Nothing) Just shape
         , cdBound = bound }
-    dues <- for paired \ (raw, live) -> (live,) <$> deadlineOf pos.posClock raw
+    dues <- for paired \ (raw, live) -> (live,) <$> deadlineOf closed pos raw
     let deadlines =
           Map.fromListWith (<>) [ (d, [live]) | (live, Right d) <- dues ]
         ticks =
@@ -540,9 +577,12 @@ candidatesOf rig tr pos = case pos.posResidual of
 -- armed by the last event), not a proof. If it is wrong the tick lands
 -- short of the real deadline by the gap and reveals nothing — which
 -- 'confirmTick' turns into an 'Untried' naming this function, so the
--- failure is loud. The expression is read after 'reifyExpr'; if it is
--- still not a literal, the deadline is not known here and the reason says
--- so.
+-- failure is loud. The expression is read after 'reifyExpr'; if it is still
+-- not a literal — a name (@WITHIN `ten days`@) or arithmetic (@WITHIN 5
+-- PLUS 5@) — it is worked out by the evaluator when it is CLOSED, and is
+-- otherwise not known here, the reason saying why ('closedDeadline'; since
+-- 2026-11-25, smucclaw/l4-ide#1107: until then any such @WITHIN@ was "never
+-- evaluated and is not a literal", and its breach was never explored).
 --
 -- An ANCHORED unforced @WITHIN d OF …@ (R-Q7B\/C) is absolute: the anchor's
 -- instant plus @d@, not the clock plus @d@. The anchor is read the way the
@@ -551,9 +591,10 @@ candidatesOf rig tr pos = case pos.posResidual of
 -- in this environment ('lifecycleOf', from the machine), THE ARMING with no
 -- enclosing obligation being this obligation's own arming — the clock, by
 -- the reasoning above; an @OF e@ is the value @e@ names; and either is
--- lowered by the machine's own 'anchorInstant'. An anchor that is not yet
--- forced, or a lifecycle position this hand-off does not have, leaves the
--- deadline unknown, and the reason says which.
+-- lowered by the machine's own 'anchorInstant'. An @OF e@ that is not yet
+-- forced is worked out as the @WITHIN@'s duration is, when it is closed; a
+-- lifecycle position this hand-off does not have, or an @OF e@ that is not
+-- closed, leaves the deadline unknown, and the reason says which.
 --
 -- The window's OPENING edge (@AFTER@, EVERY-EACH-QUANTIFIER-SPEC §5.1.2,
 -- read here since 2026-09-17) moves the origin in two ways, both the
@@ -564,11 +605,12 @@ candidatesOf rig tr pos = case pos.posResidual of
 -- first, exactly as @Contract4@ does at the next scrutiny; and a bare
 -- unforced @WITHIN@ beside an @AFTER@ re-anchors on the opening (§5.1.2.2,
 -- R-X5 as amended), so its origin is the opening's instant — the
--- @AFTER@'s anchor (or the clock) plus its offset, read the same way the
--- closing edge's anchor is. An @AFTER@ whose offset is not a literal (a
--- date) leaves the deadline unknown, as an unforced @BEFORE@ does.
-deadlineOf :: Rational -> RawObligation NF -> IO (Either Text Rational)
-deadlineOf clock raw = case raw.roDue of
+-- @AFTER@'s anchor (or the clock) plus its offset, read as 'openingOf'
+-- reads them: from what the residual forced, and never worked out by the
+-- evaluator. An @AFTER@ whose offset is not a literal (a date, a name)
+-- leaves the deadline unknown, as an unforced @BEFORE@ does.
+deadlineOf :: Closed -> Position -> RawObligation NF -> IO (Either Text Rational)
+deadlineOf closed pos raw = case raw.roDue of
   Right (ValNumber r) -> pure $ case raw.roOpens of
     Right (Just (ValNumber untilOpen)) -> Right (clock + untilOpen + r)
     Right (Just other) -> Left ("the residual opening is not a number: " <> Text.pack (show other))
@@ -576,12 +618,17 @@ deadlineOf clock raw = case raw.roDue of
   Right other         -> pure (Left ("the residual deadline is not a number: " <> Text.pack (show other)))
   Left Nothing        -> pure (Left "no WITHIN: the obligation has no deadline to tick past")
   Left (Just (MkDeadline _ e anchor)) -> do
-    duration <- reifyExpr raw.roEnv e >>= pure . \ case
-      Lit _ (NumericLit _ r) -> Right r
-      _ -> Left "the WITHIN was never evaluated and is not a literal, so its deadline is not known here"
+    duration <- case closed.clEval of
+      Nothing -> reifyExpr raw.roEnv e >>= pure . \ case
+        Lit _ (NumericLit _ r) -> Right r
+        _ -> Left "the WITHIN was never evaluated and is not a literal, so its deadline is not known here"
+      Just ev -> closedDeadline ev closed.clRunState pos raw "the WITHIN" e >>= pure . \ case
+        Right (ValNumber r) -> Right r
+        Right other -> Left ("the WITHIN is " <> notANumber other <> ", so its deadline is not known here")
+        Left why -> Left why
     origin <- case anchor of
       Nothing -> openingInstant
-      Just a  -> anchorOf a
+      Just a  -> anchorInstantOf clock raw (closedAnchor <$> closed.clEval) a
     pure ((+) <$> origin <*> duration)
   -- a BEFORE date (EVERY-EACH-QUANTIFIER-SPEC §5.1.2, R-X5) is lowered by
   -- the machine at Contract5, from an application (@YMD …@), not a literal;
@@ -589,7 +636,17 @@ deadlineOf clock raw = case raw.roDue of
   Left (Just (MkBefore _ _)) ->
     pure (Left "the BEFORE date was never evaluated, so its deadline is not known here")
   where
-    anchorOf = anchorInstantOf clock raw
+    clock = pos.posClock
+    -- the AFTER's anchor is read as 'openingOf' reads it, so that the two
+    -- never disagree about where a window opens
+    anchorOf = anchorInstantOf clock raw Nothing
+    -- an OF e the residual did not force, worked out as the duration is; an
+    -- instant is a NUMBER or a DATE, as the machine lowers an anchor
+    closedAnchor ev e = closedDeadline ev closed.clRunState pos raw "the anchor of the WITHIN" e >>= pure . \ case
+      Right (ValNumber r) -> Right r
+      Right (ValDate d)   -> anchorInstant (ValDate d)
+      Right other -> Left ("the anchor of the WITHIN is " <> notANumber other <> ", so its deadline is not known here")
+      Left why -> Left why
     -- what a bare WITHIN counts from: the window's opening when the act
     -- has one that is still to open, the clock otherwise
     openingInstant = case raw.roOpens of
@@ -608,9 +665,14 @@ deadlineOf clock raw = case raw.roDue of
 -- @Contract4@ (§2.4: not re-derived): a lifecycle anchor is the binding the
 -- enclosing obligation's hand-off left in the obligation's environment, THE
 -- ARMING with no enclosing obligation being the obligation's own arming (the
--- clock), an @OF e@ is the value @e@ names.
-anchorInstantOf :: Rational -> RawObligation NF -> Anchor Resolved -> IO (Either Text Rational)
-anchorInstantOf clock raw = \ case
+-- clock), an @OF e@ is the value @e@ names. An @OF e@ that the residual has
+-- not forced is handed to the reader given, when there is one ('deadlineOf'
+-- passes the 'Closed' one for the closing edge); without one, only a literal
+-- is read.
+anchorInstantOf
+  :: Rational -> RawObligation NF -> Maybe (Expr Resolved -> IO (Either Text Rational))
+  -> Anchor Resolved -> IO (Either Text Rational)
+anchorInstantOf clock raw unforced = \ case
   AnchorJoin _     -> lifecyclePosition "THE JOIN" (lifecycle >>= (.join))
   AnchorDeadline _ -> lifecyclePosition "THE DEADLINE" (lifecycle >>= (.deadline))
   AnchorArming _   -> maybe (pure (Right clock)) (lifecyclePosition "THE ARMING" . Just) ((.armed) <$> lifecycle)
@@ -620,10 +682,17 @@ anchorInstantOf clock raw = \ case
     Lifecycle _ LifecycleJoin     -> lifecyclePosition "THE JOIN" (lifecycle >>= (.join))
     Lifecycle _ LifecycleDeadline -> lifecyclePosition "THE DEADLINE" (lifecycle >>= (.deadline))
     Lifecycle _ LifecycleArming   -> maybe (pure (Right clock)) (lifecyclePosition "THE ARMING" . Just) ((.armed) <$> lifecycle)
-    Var _ r | Just rf <- Map.lookup (getUnique r) raw.roEnv -> instantOf "the anchor" rf
-    _ -> reifyExpr raw.roEnv e >>= pure . \ case
-      Lit _ (NumericLit _ r) -> Right r
-      _ -> Left "the anchor of the WITHIN is not a literal, so its deadline is not known here"
+    Var _ r | Just rf <- Map.lookup (getUnique r) raw.roEnv -> readIORef rf.pointer >>= \ case
+      WHNF v           -> pure (anchorInstant v)
+      WHNFWhen _ v _ _ -> pure (anchorInstant v)
+      Unevaluated{}    -> case unforced of
+        Just readIt -> readIt e
+        Nothing     -> pure (Left "the anchor was never forced, so the deadline is not known here")
+    _ -> case unforced of
+      Just readIt -> readIt e
+      Nothing -> reifyExpr raw.roEnv e >>= pure . \ case
+        Lit _ (NumericLit _ r) -> Right r
+        _ -> Left "the anchor of the WITHIN is not a literal, so its deadline is not known here"
   where
     lifecycle = lifecycleOf raw.roEnv
     lifecyclePosition name = \ case
@@ -638,7 +707,11 @@ anchorInstantOf clock raw = \ case
 -- 'Nothing' when it has no opening edge, 'Left' with the reason when it has
 -- one whose instant is not known here. Read as 'deadlineOf' reads the same
 -- edge: a residual opening is the time still to run, counted from the clock;
--- an unforced one is an offset from its anchor, or from the clock.
+-- an unforced one is an offset from its anchor, or from the clock. Unlike the
+-- @WITHIN@ ('deadlineOf'), an unforced @AFTER@ written as a name or an
+-- expression is not worked out by the evaluator: it is not known here
+-- (decided by Claude 2026-11-25, pending Meng's review, as outside
+-- smucclaw/l4-ide#1107, which is about the closing edge).
 openingOf :: Rational -> RawObligation NF -> IO (Maybe (Either Text Rational))
 openingOf clock raw = case raw.roOpens of
   Left Nothing  -> pure Nothing
@@ -649,8 +722,138 @@ openingOf clock raw = case raw.roOpens of
     off <- reifyExpr raw.roEnv offset >>= pure . \ case
       Lit _ (NumericLit _ r) -> Right r
       _ -> Left "the AFTER was never evaluated and is not a literal (a date, or a computed offset), so its opening is not known here"
-    base <- maybe (pure (Right clock)) (anchorInstantOf clock raw) mAnchor
+    base <- maybe (pure (Right clock)) (anchorInstantOf clock raw Nothing) mAnchor
     pure ((+) <$> base <*> off)
+
+----------------------------------------------------------------------------
+-- A deadline written as a name or an expression
+----------------------------------------------------------------------------
+
+-- | How a deadline that the residual still holds as an expression is worked
+-- out: a @WITHIN `ten days`@, a @WITHIN 5 PLUS 5@, an @OF `the start of
+-- term`@ (smucclaw/l4-ide#1107). The machine itself works such a @WITHIN@
+-- out at the first event the obligation looks at (@Contract4@); before that
+-- the residual holds the expression, and the what-if needs the number to
+-- offer the tick that would breach it.
+--
+-- The rule, decided by Claude 2026-11-25, pending Meng's review: the
+-- expression, with what the residual has forced read back into it
+-- ('reifyExpr'), is worked out ONLY when it is CLOSED, meaning it names no
+-- local the replay cannot resolve ('openLocals': a @GIVEN@, a @WHERE@ local,
+-- a pattern-bound value the residual holds unforced), no lifecycle value
+-- (@THE JOIN@, @THE DEADLINE@, @THE ARMING@), no @RECALL@ of its own, and no
+-- rule of the module that reads a ledger ('runStateRules'). (Until review on
+-- 2026-11-25 a @RECALL@ written in the @WITHIN@ itself was missed and worked
+-- out against an empty ledger.) A closed expression means the same in
+-- every run, so one @#EVAL@ of it in the module ('evalInModule') is the
+-- evaluator's own answer for it, which §2.4 asks for: nothing here re-derives
+-- arithmetic. Anything not closed is not known here, and the reason says
+-- what it reads. The tick the answer leads to is still held to 'confirmTick'.
+--
+-- Not covered: a rule of an IMPORTED module that reads a ledger. The rig
+-- holds the imports' heaps, not their source, so such a rule is not in
+-- 'clRunState', and an expression naming it is worked out against an empty
+-- ledger (measured 2026-11-25: @fromMaybe 10 (RECALL `period`)@ in an
+-- imported file, named by a @WITHIN@, explores and lists as @WITHIN 10@).
+-- That is the run's deadline only while nothing has recorded the cell; the
+-- explore page lists it among the silent failures.
+data Closed = MkClosed
+  { clEval     :: Maybe (Expr Resolved -> IO (Either Text (Value NF)))
+    -- ^ the evaluator's answer for a closed expression, or what stopped it;
+    -- 'Nothing' to work nothing out ('literalOnly')
+  , clRunState :: Set Unique
+    -- ^ the module's rules whose answer depends on the run: 'runStateRules'
+  }
+
+-- | The reader for one rig, with no cache: one @#EVAL@ for each deadline read.
+closedIn :: Rig -> Closed
+closedIn rig = MkClosed
+  { clEval = Just (fmap outcomeValue . evalInModule rig)
+  , clRunState = runStateRules rig.rigModule
+  }
+
+-- | The reader that works nothing out: a deadline the residual holds as an
+-- expression is known only when it is a literal, word for word as before
+-- smucclaw/l4-ide#1107 ('candidatesOf', 'enabledSet').
+literalOnly :: Closed
+literalOnly = MkClosed {clEval = Nothing, clRunState = Set.empty}
+
+-- | One @#EVAL@ of an expression in the module, after every directive the
+-- module carries is taken out ('withoutDirectives'), so that the one result
+-- is this expression's. Run on the rig's own configuration, so its limits
+-- apply, and a stop at one is recorded as any other run's is.
+evalInModule :: Rig -> Expr Resolved -> IO (Maybe ReductionOutcome)
+evalInModule rig e = do
+  let MkModule a uri (MkSection sa sn saka sg decls) = withoutDirectives rig.rigModule
+      m' = MkModule a uri (MkSection sa sn saka sg (decls <> [Directive emptyAnno (LazyEval emptyAnno e)]))
+  (_, results) <- execEvalModuleWithDeonticLog rig.rigConfig rig.rigEntityInfo rig.rigEnv m'
+  pure case results of
+    ((res, _) : _) | Reduction o <- res.result -> Just o
+    _ -> Nothing
+
+-- | What an 'evalInModule' came to: the value, or the evaluator's own words
+-- for why there is none, on one line, since they end up inside a reason.
+outcomeValue :: Maybe ReductionOutcome -> Either Text (Value NF)
+outcomeValue = \ case
+  Just (Reduced (MkNF v))      -> Right v
+  Just (Reduced Omitted)       -> Left "the evaluator omitted it"
+  Just (ReducedRefused ref)    -> Left (oneLine (prettyRefusal ref))
+  Just (ReducedErrored exc)    -> Left (oneLine (prettyEvalException exc))
+  Just o@(ReducedUndetermined _) -> Left (oneLine [prettyReductionOutcome o])
+  Nothing                      -> Left "the evaluator gave no answer"
+  where
+    oneLine = Text.unwords . concatMap Text.words
+
+-- | The module's rules whose answer depends on the run they are forced in,
+-- not on the module alone: those that read a ledger (@RECALL@), directly or
+-- by naming one that does. An @#EVAL@ outside a run sees an empty ledger, so
+-- a deadline that names one of them is not worked out ('Closed').
+runStateRules :: Module Resolved -> Set Unique
+runStateRules (MkModule _ _ section) = grow direct
+  where
+    rules = [ (getUnique name, body) | MkDecide _ _ (MkAppForm _ name _ _) body <- decidesOf section ]
+    direct = Set.fromList [ u | (u, body) <- rules, not (null [ () | ReadCell {} <- subExprs body ]) ]
+    grow s =
+      let s' = s <> Set.fromList [ u | (u, body) <- rules, any (`Set.member` s) (namesIn body) ]
+      in if s' == s then s else grow s'
+
+-- | Every name an expression refers to, as a variable or as the head of an
+-- application.
+namesIn :: Expr Resolved -> [Unique]
+namesIn e = [ getUnique r | x <- subExprs e, r <- case x of { Var _ r -> [r]; App _ r _ -> [r]; _ -> [] } ]
+
+-- | The expression of a deadline the residual has not forced, worked out when
+-- it is closed ('Closed'): its value, or why it is not known here. @what@
+-- names the expression for the reason ("the WITHIN", "the anchor of the
+-- WITHIN"). A literal, after what the residual forced is read back, is its own
+-- value and is not evaluated.
+closedDeadline
+  :: (Expr Resolved -> IO (Either Text (Value NF))) -> Set Unique
+  -> Position -> RawObligation NF -> Text -> Expr Resolved -> IO (Either Text (Value NF))
+closedDeadline eval readsRun pos raw what e = do
+  e' <- reifyExpr raw.roEnv e
+  case e' of
+    Lit _ (NumericLit _ r) -> pure (Right (ValNumber r))
+    _ | (v : _) <- openLocals pos.posReplayScope raw.roEnv e' ->
+          pure (Left (what <> " reads `" <> unqualifiedNameToText v <> "`, which the contract has not worked out yet (an input of the rule, or a name local to it), so its deadline is not known here"))
+      | not (null [ () | Lifecycle {} <- subExprs e' ]) ->
+          pure (Left (what <> " is not a literal, so its deadline is not known here"))
+      | not (null [ () | ReadCell {} <- subExprs e' ]) ->
+          pure (Left (what <> " reads a ledger with RECALL, so it is worked out only in a run and its deadline is not known here"))
+      | (v : _) <- [ getOriginal r | x <- subExprs e', r <- refsOf x, Set.member (getUnique r) readsRun ] ->
+          pure (Left (what <> " reads `" <> unqualifiedNameToText v <> "`, which reads a ledger, so it is worked out only in a run and its deadline is not known here"))
+      | otherwise -> eval e' >>= pure . \ case
+          Right v  -> Right v
+          Left why -> Left ("working out " <> what <> " failed (" <> why <> "), so its deadline is not known here")
+  where
+    refsOf = \ case
+      Var _ r   -> [r]
+      App _ r _ -> [r]
+      _         -> []
+
+-- | A value that is not a number, for a reason line.
+notANumber :: Value NF -> Text
+notANumber v = "not a number but " <> Text.unwords (Text.words (prettyLayout (MkNF v)))
 
 -- | The stamp that reveals the expiry of deadline @d@ and of no later one:
 -- the machine expires on @stamp > deadline@, so a tick AT @d@ shows
@@ -997,10 +1200,14 @@ data EnabledSet = MkEnabledSet
   }
 
 enabledSet :: Rig -> Trace -> IO (Maybe EnabledSet)
-enabledSet rig tr = position rig tr >>= \ case
+enabledSet = enabledSetWith literalOnly
+
+-- | 'enabledSet', with deadlines read by the reader given ('candidatesWith').
+enabledSetWith :: Closed -> Rig -> Trace -> IO (Maybe EnabledSet)
+enabledSetWith closed rig tr = position rig tr >>= \ case
   Nothing -> pure Nothing
   Just pos -> do
-    cands <- candidatesOf rig tr pos
+    cands <- candidatesWith closed rig tr pos
     outcomes <- for cands (tryCandidate rig tr pos)
     pure (Just MkEnabledSet {esPosition = pos, esOutcomes = outcomes})
 

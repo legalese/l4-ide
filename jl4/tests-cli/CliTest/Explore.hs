@@ -12,6 +12,7 @@
 module CliTest.Explore (spec, fixtures) where
 
 import Control.Monad (forM_)
+import Data.Char (isDigit)
 import Data.List (isInfixOf, isPrefixOf, isSuffixOf, sort, tails)
 import System.Directory (copyFile, listDirectory)
 import System.Exit (ExitCode (..))
@@ -40,12 +41,18 @@ startFixtures = "tests-cli" </> "fixtures" </> "explore-start"
 sections :: FilePath
 sections = "tests-cli" </> "fixtures" </> "lts-sections"
 
+-- | The fixtures of smucclaw/l4-ide#1107, a deadline written as a name or an
+-- expression.
+deadlines :: FilePath
+deadlines = "tests-cli" </> "fixtures" </> "explore-deadlines"
+
 fixtures :: [FilePath]
 fixtures =
   [ brief </> f | f <- ["d1-naive.l4", "d2-reread.l4", "d3-atomic.l4", "refused-number.l4", "properties.l4"] ]
   <> [ instants </> f | f <- ["clocks.l4", "window.l4", "half.l4", "adjacent.l4", "open.l4", "flip3.l4", "room.l4", "lapse.l4", "merged.l4", "lapse-fixed.l4", "cap-re.l4", "own-lapse.l4", "frac-re.l4", "fx-fork.l4", "fx-barrier.l4", "succ2.l4", "hidden.l4", "succ4.l4", "cap-shift.l4", "frac-start.l4", "frac-wait.l4", "frac-stamp.l4"] ]
   <> [ breached </> f | f <- ["sale.l4", "resell.l4", "continuation.l4"] ]
   <> [ sections </> f | f <- ["sectioned.l4", "two-sections.l4"] ]
+  <> [ deadlines </> f | f <- ["shapes.l4", "given.l4", "carried.l4", "armed.l4", "ledger.l4"] ]
 
 -- | The acceptance run of the fixtures' README: the clock bounded at
 -- closing, the cells the properties read kept.
@@ -816,8 +823,119 @@ spec bin = describe "l4 explore" $ do
       Output ecode _ eserr <- runL4 bin ["explore", sections </> "two-sections.l4", "--contract", "no such duty"]
       ecode `shouldBe` ExitFailure 1
       eserr `shouldSatisfy` ("--contract: no rule named `no such duty` that takes no inputs" `isInfixOf`)
+
+  -- smucclaw/l4-ide#1107: a WITHIN written as a name or an expression was
+  -- never worked out, so its breach was never explored and the list could not
+  -- name its deadline. Each spelling is held to its literal twin: the same
+  -- text, but for the contract's name and the WITHIN as written.
+  describe "a deadline written as a name or an expression (#1107)" $ do
+    let explored c f = runL4 bin ["explore", deadlines </> f, "--contract", c]
+        listed c f = runL4 bin ["lts", deadlines </> f, "--contract", c]
+        twins f lit c = do
+          Output lcode lout _ <- explored lit f
+          Output code out _ <- explored c f
+          lcode `shouldBe` ExitSuccess
+          code `shouldBe` ExitSuccess
+          exploreTwin out `shouldBe` exploreTwin lout
+          Output llcode llout _ <- listed lit f
+          Output lscode lsout _ <- listed c f
+          llcode `shouldBe` ExitSuccess
+          lscode `shouldBe` ExitSuccess
+          ltsTwin lsout `shouldBe` ltsTwin llout
+          pure (out, lsout)
+    it "shapes.l4: a named constant, arithmetic on literals, and a name for arithmetic explore and list as the literal does" $
+      forM_ ["named", "sum", "named sum"] \ c -> do
+        (out, lsout) <- twins "shapes.l4" "literal" c
+        out `shouldSatisfy` ("3 states, 4 transitions" `isInfixOf`)
+        out `shouldSatisfy` ("time passes the deadline 10 (WAITUNTIL 11)" `isInfixOf`)
+        lsout `shouldSatisfy` ("Alice MUST pay \8212 due by 10 (" `isInfixOf`)
+        lsout `shouldSatisfy` ("Next deadline: 10 (Alice: pay)" `isInfixOf`)
+
+    it "shapes.l4: a deadline whose working out divides by zero is not known, and neither tool crashes" $ do
+      let why = "working out the WITHIN failed (Division by zero in the operation: DIVIDED BY), so its deadline is not known here"
+      Output code out _ <- explored "raises" "shapes.l4"
+      code `shouldBe` ExitFailure 2
+      out `shouldSatisfy` (("time runs out on pay, in 1 state: " <> why) `isInfixOf`)
+      Output lcode lout _ <- listed "raises" "shapes.l4"
+      lcode `shouldBe` ExitSuccess
+      lout `shouldSatisfy` (("time runs out on Alice MUST pay \8212 " <> why) `isInfixOf`)
+      lout `shouldSatisfy` ("Next deadline: not known here" `isInfixOf`)
+
+    it "given.l4: a WITHIN that reads the rule's own input is not worked out" $ do
+      let why = "the WITHIN reads `period`, which the contract has not worked out yet (an input of the rule, or a name local to it), so its deadline is not known here"
+      Output code out _ <- runL4 bin ["explore", deadlines </> "given.l4"]
+      code `shouldBe` ExitFailure 2
+      out `shouldSatisfy` (why `isInfixOf`)
+      Output lcode lout _ <- runL4 bin ["lts", deadlines </> "given.l4"]
+      lcode `shouldBe` ExitSuccess
+      lout `shouldSatisfy` (why `isInfixOf`)
+
+    it "carried.l4: a named deadline carried past a breach explores as the literal does" $ do
+      Output lcode lout _ <- explored "sale literal" "carried.l4"
+      Output code out _ <- explored "sale named" "carried.l4"
+      lcode `shouldBe` ExitSuccess
+      code `shouldBe` ExitSuccess
+      exploreTwin out `shouldBe` exploreTwin lout
+      out `shouldSatisfy` ("12 states, 26 transitions" `isInfixOf`)
+      out `shouldSatisfy` ("[still waiting on: Seller MUST deliver WITHIN 2]" `isInfixOf`)
+
+    it "armed.l4: armed by HENCE, beside an AFTER, and counted OF a named instant, each as its literal twin" $ do
+      _ <- twins "armed.l4" "then literal" "then named"
+      (_, opened) <- twins "armed.l4" "after literal" "after named"
+      opened `shouldSatisfy` ("Next deadline: 15 (Alice: ship)" `isInfixOf`)
+      (_, anchored) <- twins "armed.l4" "of literal" "of named"
+      anchored `shouldSatisfy` ("Next deadline: 8 (Alice: ship)" `isInfixOf`)
+      Output code out _ <- runL4 bin ["lts", deadlines </> "armed.l4"]
+      code `shouldBe` ExitSuccess
+      out `shouldSatisfy` ("Bob MUST ship \8212 due by 12 (`ten days` from now)" `isInfixOf`)
+      out `shouldSatisfy` ("Next deadline: 12 (Bob: ship)" `isInfixOf`)
+
+    it "armed.l4 and ledger.l4: a named AFTER, and a name that reads a ledger, are not worked out" $ do
+      Output code out _ <- explored "named after" "armed.l4"
+      code `shouldBe` ExitFailure 2
+      out `shouldSatisfy` ("time runs out on ship, in 1 state: the AFTER was never evaluated and is not a literal" `isInfixOf`)
+      Output lcode lout _ <- explored "ledger read" "ledger.l4"
+      lcode `shouldBe` ExitFailure 2
+      lout `shouldSatisfy` ("the WITHIN reads `recorded period`, which reads a ledger, so it is worked out only in a run and its deadline is not known here" `isInfixOf`)
+
+    it "ledger.l4: a RECALL written in the WITHIN, or in its OF anchor, is not worked out either" $ do
+      forM_ [("direct read", "the WITHIN"), ("direct anchor", "the anchor of the WITHIN")] \ (c, what) -> do
+        let why = what <> " reads a ledger with RECALL, so it is worked out only in a run and its deadline is not known here"
+        Output code out _ <- explored c "ledger.l4"
+        code `shouldBe` ExitFailure 2
+        out `shouldSatisfy` (why `isInfixOf`)
+        Output lcode lout _ <- listed c "ledger.l4"
+        lcode `shouldBe` ExitSuccess
+        lout `shouldSatisfy` (why `isInfixOf`)
+        lout `shouldSatisfy` ("Next deadline: not known here" `isInfixOf`)
   where
     liveness =
       [ "--eventually", "Alice has bought or stopped"
       , "--eventually", "one dinner is bought", "--if-always", "the ledger is open"
       , "--eventually", "Bob has bought" ]
+
+-- | An exploration's text with what spells the deadline left out: the
+-- contract's name on the first line, and the residuals, which print the
+-- WITHIN as written.
+exploreTwin :: String -> [String]
+exploreTwin out = case lines out of
+  (h : rest) -> dropWhile (/= ',') h : filter (not . residualLine) rest
+  []         -> []
+  where
+    residualLine = \ case
+      ' ' : ' ' : 'r' : d : _ -> isDigit d
+      _                       -> False
+
+-- | A list's text with what spells the deadline left out: the header, which
+-- names the contract, and what follows the due date on an owed line.
+ltsTwin :: String -> [String]
+ltsTwin out = map dueLine (drop 1 (lines out))
+  where
+    dueLine l = case breakOn "\8212 due by " l of
+      Just (pre, post) -> pre <> "\8212 due by " <> takeWhile (/= ' ') post
+      Nothing -> case breakOn "\8212 due " l of
+        Just (pre, _) -> pre <> "\8212 due"
+        Nothing       -> l
+    breakOn pat s = case [ (take i s, drop (i + length pat) s) | (i, t) <- zip [0 :: Int ..] (tails s), pat `isPrefixOf` t ] of
+      (x : _) -> Just x
+      []      -> Nothing

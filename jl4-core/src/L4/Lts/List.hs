@@ -136,9 +136,11 @@ data Standing
   | NotEvaluated !Text   -- ^ the directive errored or refused; the text says why
   deriving stock (Eq, Show)
 
--- | Replay the trace, try every candidate, and gather the answers.
+-- | Replay the trace, try every candidate, and gather the answers. A
+-- deadline written as a name or an expression is worked out when it is
+-- closed ('closedIn', smucclaw/l4-ide#1107), as @l4 explore@ works it out.
 reportOf :: Rig -> Trace -> IO (Maybe TraceReport)
-reportOf rig tr = fmap (reportFrom tr) <$> enabledSet rig tr
+reportOf rig tr = fmap (reportFrom tr) <$> enabledSetWith (closedIn rig) rig tr
 
 -- | The answers, read off an enabled set already tried. Pure, so that a
 -- test can hand it an outcome the replay would not produce on its own.

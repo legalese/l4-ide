@@ -1,0 +1,11 @@
+-- smucclaw/l4-ide#1107: a WITHIN that reads the rule's own input is not
+-- worked out, so its deadline stays unknown and its tick untried.
+
+DECLARE Actor IS ONE OF Alice
+DECLARE Act IS ONE OF pay
+
+GIVEN period IS A NUMBER
+GIVETH A DEONTIC Actor Act
+`given` period MEANS PARTY Alice MUST pay WITHIN period LEST BREACH BY Alice BECAUSE "late"
+
+#TRACE `given` 10 AT 0 WITH

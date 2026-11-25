@@ -279,6 +279,39 @@ Exploration is breadth first and every move is a full re-run of the contract, so
 `--until T` bounds the clock: no event later than T, and a tick past T is not taken.
 `--max-depth N` (default 100) stops expanding states reached by more than N events, and `--max-states N` (default 10000) stops adding states.
 
+### A deadline written as a name
+
+A `WITHIN` written as a name or as arithmetic is worked out by the evaluator, as a run of the contract would work it out, whenever it is _closed_: when it reads nothing that only a run decides, which is no input of the rule, no name local to it, no value an event carried, no anchor word such as `THE JOIN`, and no ledger.
+Numbers, and rules of the file or its imports applied to numbers, are closed.
+A statutory period written once and named is the usual case:
+
+```
+DECLARE Person IS ONE OF Buyer, Seller
+DECLARE Action IS ONE OF refund
+
+`the refund period` MEANS 14
+
+GIVETH A DEONTIC Person Action
+`the refund duty` MEANS
+  PARTY Seller MUST refund WITHIN `the refund period`
+  HENCE FULFILLED
+  LEST BREACH BY Seller BECAUSE "refund late"
+```
+
+`l4 explore --contract "the refund duty"` explores it as it explores `WITHIN 14`: 3 states and 4 transitions, among them `time passes the deadline 14 (WAITUNTIL 15)`, and exit 0 (measured 2026-11-25).
+The same holds for `WITHIN 5 PLUS 5`, for a name for `5 PLUS 5`, for a constant an imported file defines, for an `OF` anchor that is a name, for a deadline beside a literal `AFTER`, and for one armed by a `HENCE` or carried past a breach: each explores to the graph of its literal twin (`jl4/tests-cli/fixtures/explore-deadlines/`).
+Before 2026-11-25 the explorer worked out a `WITHIN` only when it was a literal number (it already worked out a closed `OF` anchor with no `AFTER` beside it), so this contract explored to 2 states, its breach was never reached, and the line said `UNTRIED 1: time runs out on refund (the WITHIN was never evaluated and is not a literal, so its deadline is not known here)`.
+
+What is still not worked out is listed as untried (exit 2), and the reason in brackets says which it is:
+
+- a `WITHIN` that reads an input of the rule (`GIVEN period … WITHIN period`) or a `WHERE` name: ``the WITHIN reads `period`, which the contract has not worked out yet (an input of the rule, or a name local to it), so its deadline is not known here``;
+- one that reads a ledger with `RECALL`, written in the `WITHIN` itself (`the WITHIN reads a ledger with RECALL, so it is worked out only in a run and its deadline is not known here`) or in a rule of the file it names, directly or through another rule (``the WITHIN reads `recorded period`, which reads a ledger, …``), because outside a run the ledger is empty (a rule of an imported file is not checked: see [the silent failures](#silent-not-on-the-coverage-line-either));
+- one whose working out fails, such as a name for `10 DIVIDED BY 0`: `working out the WITHIN failed (Division by zero in the operation: DIVIDED BY), so its deadline is not known here`, and the exploration carries on;
+- one that reads a section's `GIVEN`, which is assumed and has no value: `working out the WITHIN failed (I could not continue evaluating, because I needed to know the value of period but it is an assumed term.)`;
+- an `AFTER` written as a name (``AFTER `five days` WITHIN 10``): the window's opening is not worked out, and so neither is its deadline (`the AFTER was never evaluated and is not a literal (a date, or a computed offset), so its deadline is not known here`).
+
+A deadline whose working out is stopped at a limit is not listed as untried: the explorer refuses the contract and exits 1 (`the evaluator stopped at a limit working out a deadline: I stopped evaluating: it took more than 20000 steps, …` under `--max-steps 20000`, measured 2026-11-25), because a graph without that deadline's tick would be missing positions.
+
 ## The coverage line
 
 Every run ends with one line that says how much of the contract the graph covers.
@@ -310,14 +343,14 @@ It is true with ticks cut by `--until`, and true when write-only cells merged st
 
 The exit status is for scripts, so that a CI job cannot read a partial run as a green one.
 
-| status | means                                                                                                                                                                                                                                                                                                                                    |
-| ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0      | the frontier was exhausted with nothing refused and nothing untried, and every property named holds                                                                                                                                                                                                                                      |
-| 1      | the file does not type-check; an option names nothing (a property, a `--contract`, a `--fair`); a property input named for a cell nothing writes; an `--until` before the outset; a property, `--emit` or `--fair` asked of a file with nothing to explore; a contract cannot be run at its outset; an emitted file could not be written |
-| 2      | an act was refused, or a move could not be tried, or an act could not be tried at an instant the scheme chose (including a tie through a chain of acts, below)                                                                                                                                                                           |
-| 3      | nothing refused or untried, but `--max-depth` or `--max-states` stopped the exploration                                                                                                                                                                                                                                                  |
-| 4      | a property is violated (its counterexample is printed, and is real whatever else the run did)                                                                                                                                                                                                                                            |
-| 5      | the exploration was complete but a property's verdict is unknown (every liveness property)                                                                                                                                                                                                                                               |
+| status | means                                                                                                                                                                                                                                                                                                                                                                                   |
+| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0      | the frontier was exhausted with nothing refused and nothing untried, and every property named holds                                                                                                                                                                                                                                                                                     |
+| 1      | the file does not type-check; an option names nothing (a property, a `--contract`, a `--fair`); a property input named for a cell nothing writes; an `--until` before the outset; a property, `--emit` or `--fair` asked of a file with nothing to explore; a contract cannot be run at its outset; working out a deadline was stopped at a limit; an emitted file could not be written |
+| 2      | an act was refused, or a move could not be tried, or an act could not be tried at an instant the scheme chose (including a tie through a chain of acts, below)                                                                                                                                                                                                                          |
+| 3      | nothing refused or untried, but `--max-depth` or `--max-states` stopped the exploration                                                                                                                                                                                                                                                                                                 |
+| 4      | a property is violated (its counterexample is printed, and is real whatever else the run did)                                                                                                                                                                                                                                                                                           |
+| 5      | the exploration was complete but a property's verdict is unknown (every liveness property)                                                                                                                                                                                                                                                                                              |
 
 When a run has more than one of these, the order of the table is not the order of precedence: 1 wins, then 4, then 2, then 3, then 5.
 A tick past `--until` is the exploration you asked for, not a failure of it, and does not change the status.
@@ -421,6 +454,8 @@ These are sorted by which signal carries them.
   A move whose run stopped because the two sides of a compound read each other's records in an order L4 cannot settle is untried too, and the reason in brackets is that error, naming the record and both sides ([Deadlines and consequences](consequences.md)).
   On `jl4/tests-cli/fixtures/sibling-reads/one-event.l4`, a `RAND` whose two sides take one event, one side making a record and the other reading it at the same instant, `--until 20` gave 2 states, `UNTRIED 3` (three `PARTY P DOES go` moves) and exited 2 (measured 2026-11-13).
   The two sides of a `RAND` that read each other's records at different events are run in step and explored like any other contract: on `jl4/tests-cli/fixtures/sibling-reads/dinner-ab.l4`, Alice and Bob as the two sides of a `RAND`, `--until 100 --always "every dinner was accepted while open"` gave 18 states, `violated after 3 events` with Alice checking, Bob buying and Alice buying, and exited 4 (measured 2026-11-13).
+- **A deadline it cannot work out (exit 2).** A `WITHIN` that reads an input of the rule, a local name or a ledger, or whose working out fails, has no tick: the line has `UNTRIED` and `time runs out on …`, with the reason in brackets ([A deadline written as a name](#a-deadline-written-as-a-name), above).
+  One whose working out is stopped at a limit refuses the contract instead (exit 1).
 - **A norm armed behind a breach (exit 2).** The coverage line has `UNTRIED` and `(unread)`, as above: a part of the contract that the evaluator is still waiting on after a breach, and that the explorer holds no obligation for.
   Nothing was explored from it, and the state is not called terminal.
 - **A bound stopped it (exit 3).** `frontier NOT exhausted`, with the number of states left.
@@ -501,6 +536,11 @@ These are all in the output, on the coverage line or the property's own line, an
   Under `l4 run`, a trace in which Bob's purchase is recorded while the payment is pending never records it (`taken` is absent from the official record), and one in which it is recorded after the payment does.
   So the graph of such a contract is the graph of a world in which Bob cannot buy while Alice owes the restaurant, and a property checked on it is checked on that world.
   Keep the recurring permission a `MAY` throughout, as the files on this page do.
+- **A deadline that names an imported rule reading a ledger.** Only the rules of the file itself are checked for a `RECALL` before a deadline is worked out.
+  A deadline that names a rule of an imported file that reads a ledger is worked out as if the ledger were empty: with `` `recorded period` MEANS fromMaybe 10 (RECALL `period`) `` in an imported file, `` WITHIN `recorded period` `` explores as `WITHIN 10`, 3 states, exit 0 (measured 2026-11-25).
+  That is the right deadline only while nothing has recorded `period` by the time the deadline is read.
+  When a deadline worked out this way is later than the one the run would use, the tick past it shows the breach and is labelled with the wrong deadline, and nothing says so (read from the code, not measured); when it is earlier, the tick shows nothing and is listed as untried.
+  Define such a rule in the file that uses it, where it is caught.
 - **Two rules of one name.** When two sections each define a rule called `NAME`, `--contract NAME` explores the first in the file and says nothing about the other; `l4 lts --contract` lists the same one.
   Give one of them another name to explore it.
 - **No `#TRACE` and no `--contract`.** `Nothing to explore: the file has no #TRACE directive.` is printed on standard output and the exit status is 0, so a script that reads only the status sees a green run in which nothing ran.
