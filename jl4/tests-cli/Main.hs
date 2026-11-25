@@ -6948,7 +6948,10 @@ spec bin = do
     -- at the argument the use passes in. Judging a definition's copies as
     -- one, tried while smucclaw/l4-ide#1093 was fixed, removed the first two
     -- and hid every other; this test failed on that build, with no finding on
-    -- any of the seven.
+    -- any of the seven. The last decision, added since, has both: its
+    -- `p OR c` is redundant and is reported where it is written, at line 87,
+    -- while the definition's `a` and `b`, at line 89, are reported only
+    -- because the other use repeats them, which is the same limit.
     it "reports a condition in a local definition used twice, once for each use" $ do
       env <- jsonEnvelope bin ["verify", verifyDefinitionUsedTwiceFixture, "--format", "json"]
       let found = findingSitesByDecision env
@@ -6966,10 +6969,13 @@ spec bin = do
       lookup "`a name twice`" found `shouldBe` guards (map at [1 .. 4])
       lookup "`a LET name twice`" found `shouldBe` guards (map at [1 .. 4])
       lookup "`a name twice in an OR`" found `shouldBe` guards (map alt [0 .. 3])
+      lookup "`a definition with no parameters twice`" found
+        `shouldBe` guards ["body.and[2]", "body.and[2].or[0].and[0]", "body.and[2].or[0].and[1]"]
       map linesOf
           [ "`both qualify`", "`either qualifies`", "`a parameter twice`", "`the same call twice`"
-          , "`a name twice`", "`a LET name twice`", "`a name twice in an OR`" ]
-        `shouldBe` [[18, 18], [30, 30], [38, 38], [52, 52, 52, 52], [60, 60, 60, 60], [65, 65, 65, 65], [76, 76, 76, 76]]
+          , "`a name twice`", "`a LET name twice`", "`a name twice in an OR`"
+          , "`a definition with no parameters twice`" ]
+        `shouldBe` [[18, 18], [30, 30], [38, 38], [52, 52, 52, 52], [60, 60, 60, 60], [65, 65, 65, 65], [76, 76, 76, 76], [87, 89, 89]]
 
     -- An alternative the others already cover adds nothing, and is reported
     -- where it is written, under a NOT too. Looking in the normal form, as

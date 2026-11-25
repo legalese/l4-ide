@@ -134,7 +134,10 @@ propositionalBound =
     , "  visible to this command. Neither is anything about the world."
     , ""
     , "  Findings are SOUND, not COMPLETE. A reported finding is a real"
-    , "  property of the boolean skeleton. Silence is not a consistency proof:"
+    , "  property of the boolean skeleton, with one exception: a condition in a"
+    , "  local definition used more than once can be reported because another"
+    , "  use repeats it, although nothing is redundant (a limit, stated below)."
+    , "  Silence is not a consistency proof:"
     , "  it means nothing was found at this level of abstraction, which is a"
     , "  much weaker claim and must be reported as the weaker one."
     , ""
@@ -1527,7 +1530,8 @@ jsonEnvelope opts reports total nested =
 boundOneLine :: Text
 boundOneLine =
   "propositional only: every leaf is an opaque atom, so no numeric, interval, date or \
-  \string contradiction is visible. Findings are sound; silence is not a consistency proof."
+  \string contradiction is visible. Findings are sound, except for a condition in a local \
+  \definition used more than once; silence is not a consistency proof."
 
 textReport :: VerifyOptions -> [DecisionReport] -> Int -> Int -> Text
 textReport opts reports total nested =

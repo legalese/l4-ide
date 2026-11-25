@@ -74,3 +74,16 @@ DECIDE `a name twice in an OR` a m n IF
     a AND (e OR e)
   WHERE
     e MEANS m OR n
+
+-- A definition with no parameters, used twice. `p OR c` is redundant, since
+-- `p` is asked for beside it, and is reported where it is written. The
+-- definition's `a` and `b` are reported too, in the copy of it that `p OR c`
+-- holds, because the other use repeats them, although deleting either one
+-- changes the rule: two false findings beside a true one, the same limit as
+-- the first two decisions.
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN, c IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `a definition with no parameters twice` a b c IF
+    p AND (p OR c)
+  WHERE
+    p MEANS a AND b
