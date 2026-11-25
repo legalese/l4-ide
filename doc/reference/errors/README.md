@@ -739,9 +739,11 @@ The error is on an `IMPORT` line, and it points at an error in the module that l
 **While a module a file imports has errors, nothing in the file is evaluated.** Its `#EVAL`, `#ASSERT` and `#TRACE` lines do not run, as they do not run in a file with an error of its own. That holds for a line that uses nothing from the broken module, such as `#EVAL 1 PLUS 1`, and for every file that imports this one, directly or not.
 
 - `l4 run` prints the errors and no results, and exits with status 1. `l4 check` fails as before.
-- The editor shows the errors and no results for the file. A decision graph of a rule in the file can still be drawn. Where the rule calls another rule, answering the graph's questions makes it say that evaluation failed: `A module this file imports has errors, so nothing is evaluated; the error on its IMPORT names it.`
+- The editor shows the errors and no new results for the file; a results panel that was open keeps the last results it had, as it does while a file has an error of its own. A decision graph of a rule in the file can still be drawn. Where the rule calls another rule, answering the graph's questions makes it say that evaluation failed: `A module this file imports has errors, so nothing is evaluated; the error on its IMPORT names it.`
 - `l4 trace` says that evaluation failed. `l4 lts`, `l4 explore`, `l4 prove`, `l4 coverage` and `l4 batch` refuse the file, as they refuse a file that does not type-check, and print the errors.
 - The REPL says ``A module this file imports has errors, so nothing is evaluated; `l4 check` on the file shows them.`` when it loads the file, and again for each line you ask it to evaluate.
+
+A function deployed to the L4 service is the exception. When the only errors in a module its file imports are names that module reads and never declares, which the service takes as inputs, the deploy succeeds and the function is evaluated as before: a call that reads a name from that module answers `Internal error: ... is not in scope.`
 
 Older versions of L4 evaluated the file without the broken module, and every line that used a name from it answered `Internal error: ... is not in scope. Please report this as a bug.` If you see that beside this error, it is not a bug in your file: the error to read is the one in the imported module.
 
