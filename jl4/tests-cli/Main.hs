@@ -2536,18 +2536,17 @@ spec bin = do
   -- The REPL reads a file again from disk at :reload, :load and :reset: the
   -- file it has loaded, every module that file imports, directly or not, and
   -- a module added with :import (smucclaw/l4-ide#1099). Each session stays
-  -- open across the change, which is made between two of its lines, and each
-  -- answer is the one a fresh REPL gives on the files as they are then.
-  -- A file nobody changes keeps its answer.
+  -- open across the changes, which are made between two of its lines, and the
+  -- tests check the answers it gives after them. Where a test also starts a
+  -- fresh REPL on the files as they are at the end, it checks that the two
+  -- agree.
   describe "the REPL after a file changes on disk" $ do
     mRepl <- runIO locateReplBinary
     let withRepl act = maybe (pendingWith "jl4-repl was not found: set L4_REPL_BIN, or build it with `cabal build jl4-repl`") act mRepl
         inDir work name text = OnDisk (writeFile (work </> name) text)
         -- the replies to the lines, numbered from 0, that ask for an answer
         answers ixs rs = [ r | (i, r) <- zip [0 :: Int ..] rs, i `elem` ixs ]
-        -- A fresh REPL on main.l4, started in its folder, as the session is:
-        -- one started elsewhere does not find what main.l4 imports when it
-        -- evaluates a line.
+        -- A fresh REPL on main.l4, started in its folder, as the session is
         fresh repl work queries = replRepliesFor work repl (work </> "main.l4") queries
 
     it "reads the loaded file again at :reload, at :load and at :reset" $ withRepl \repl ->
@@ -2572,8 +2571,9 @@ spec bin = do
           ]
         answers [0, 2, 3] rs `shouldBe` ["1", "5", "1"]
 
-    -- `the other` is imported and never changed: the control.
-    it "reads again a module the loaded file imports, directly or not, and keeps one nobody changed" $ withRepl \repl ->
+    -- `the other` is imported and never changed: the control, which checks
+    -- that it still gives its answer.
+    it "reads again a module the loaded file imports, directly or not, and still answers from one nobody changed" $ withRepl \repl ->
       withSystemTempDirectory "l4-repl-edit" \work -> do
         writeFile (work </> "leaf.l4") "`the leaf` MEANS 10\n"
         writeFile (work </> "mid.l4") "IMPORT leaf\n\n`the mid` MEANS `the leaf` PLUS 1\n"
@@ -2712,6 +2712,20 @@ spec bin = do
         answers [0] rs `shouldBe` ["42"]
         answers [2, 3] rs `shouldBe` freshReplies
         freshReplies `shouldBe` ["Failed to type check expression", "7"]
+
+    -- A line reads no file again: it answers from the files as the last
+    -- :load, :reload or :reset read them (decided by Claude 2026-11-25,
+    -- pending Meng's review), and :reload then sees both changes.
+    it "answers a line from the files as they were read, until :reload" $ withRepl \repl ->
+      withSystemTempDirectory "l4-repl-edit" \work -> do
+        writeFile (work </> "lib.l4") "`the answer` MEANS 42\n"
+        writeFile (work </> "main.l4") "IMPORT lib\n\nx MEANS 1\n"
+        rs <- replSession repl work ["main.l4"]
+          [ Send "x", Send "`the answer`"
+          , inDir work "main.l4" "IMPORT lib\n\nx MEANS 2\n", inDir work "lib.l4" "`the answer` MEANS 43\n"
+          , Send "x", Send "`the answer`", Send ":reload", Send "x", Send "`the answer`"
+          ]
+        answers [0, 1, 2, 3, 5, 6] rs `shouldBe` ["1", "42", "1", "42", "2", "43"]
 
   -- A rule that may refuse to answer gets no query plan, from the REPL or from
   -- the language server: each says why in the one sentence core gives, which
