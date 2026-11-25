@@ -123,6 +123,19 @@ coverageBound =
     , "  A condition inside the result of an arm, or a condition that raises at"
     , "  an input where an earlier condition of its rung already decides it,"
     , "  is not a cover point; the second keeps the decision at rung level."
+    -- The next three sentences, on a condition that raises behind an earlier
+    -- arm, came after the ruled run as well (CATALA-EXPORT-SPEC, "Refined for
+    -- a raise behind an earlier arm"): decided by Claude 2026-11-25, pending
+    -- Meng's review.
+    , "  Where an earlier arm decides such an input instead and L4 answers"
+    , "  there, the input is left out, which loses nothing if another"
+    , "  candidate, at which every condition is true or false, agrees with it"
+    , "  on the conditions L4 reaches there: those of each rung up to the one"
+    , "  that settles the answer. If none does, the decision is covered at"
+    , "  rung level instead, checked the same way, and where the rungs lose"
+    , "  that input too it is not covered, and the reason names the input."
+    , "  Only candidates are checked this way: an input outside them at which"
+    , "  a condition raises can still leave a bucket wrongly proved impossible."
     , "  A decision that is not BOOLEAN and whose body is a CONSIDER is covered"
     , "  only when each WHEN names a number, an option without fields, or"
     , "  EXACTLY a value, and any OTHERWISE comes last; any other is named as"
@@ -235,7 +248,7 @@ coverageWith opts evalConfig = do
         Left why -> pure (Entry name Nothing [] [] (NotCovered why))
         Right (rng, params, target) -> do
           r <- coverTarget ce target
-          pure (Entry name rng params (either (const []) (unreadBy target) r) (either NotCovered Covered r))
+          pure (Entry name rng params (either (const []) (unreadBy target) r) (either (NotCovered . (.ucWhy)) Covered r))
       let (silent, shown) = partitionEntries (null wanted) entries
           solverNote = fmap (.solverVersion) msolver
           line = coverageLine solverNote (length silent) shown

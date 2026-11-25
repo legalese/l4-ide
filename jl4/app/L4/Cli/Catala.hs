@@ -105,15 +105,15 @@ catalaCmd opts = do
       -- §8.4's witness gate (R-V10). The candidates and the evaluator decide
       -- the witnesses; the solver only proves the remaining combinations
       -- impossible, so without one a ladder that has any keeps the grid.
-      (gates, gateNotes) <-
+      (gates, vetoes, gateNotes) <-
         if opts.catBooleanOnly
-          then pure (Map.empty, [])
+          then pure (Map.empty, Map.empty, [])
           else do
             msolver <- either (const Nothing) Just <$> findZ3
             witnessGates evalConfig tc importEnv msolver 10
               (catalaJson fields) (Text.strip . prettyLayoutNF fields)
       mapM_ (\w -> hPutStrLn stderr ("l4 export catala: " <> Text.unpack w)) gateNotes
-      let lowerOpts = LowerOptions { loBooleanOnly = opts.catBooleanOnly, loWitnessGates = gates }
+      let lowerOpts = LowerOptions { loBooleanOnly = opts.catBooleanOnly, loWitnessGates = gates, loLadderVetoes = vetoes }
       case lowerModuleWith lowerOpts (importClosure tc) tc.module' of
         Left lerrs -> do
           putDiagnostics

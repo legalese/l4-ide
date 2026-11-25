@@ -53,6 +53,10 @@ high-fidelity — and unusually useful as a cross-check.
   Beyond twelve such questions, or where a question raises an error at an input that an earlier
   question of its rung already decides (`x ≠ 0 AND 10 / x > 2` at zero), the gate takes each rung
   as one question instead, and the emitted file says so and says why.
+  Where a question raises an error at a candidate at which an earlier rung has already given L4's answer, the candidate is left out, which loses nothing if another candidate, at which every question is true or false, agrees with it on the questions L4 reaches there: those of each rung up to the one that gives the answer.
+  If none does, the gate takes each rung as one question instead, checked the same way: in a rule whose first rung is `n EQUALS 0 OR n EQUALS 100` and whose second divides by `n` through another rule, only zero makes `n EQUALS 0` hold, but a hundred makes the first rung hold as zero does, so the gate is built at rung level, and the emitted file says so.
+  Where the rungs lose that candidate too, no gate is built, and the rule is emitted in the plain boolean rendering instead of the ladder, as it is whenever a question after the first divides, takes a modulo or builds a date in its own text: stderr says why.
+  Only the candidates are checked this way: an input outside them at which a question raises is not seen, so a combination it would realise can still be wrongly proved impossible and go untested.
   An SMT solver, [z3](https://github.com/Z3Prover/z3), is used only to show that the remaining
   combinations are impossible (a higher income band without the lower one, say), and to find a
   witness when no candidate produces a combination; the file says so when it does. Unless a

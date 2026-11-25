@@ -96,6 +96,33 @@ spec bin = do
       serr `shouldSatisfy` ("no witness gate for `reciprocal at zero` (L4 raises an error at n = 0: \"Division by zero in the operation: DIVIDED BY\"); its ladder keeps the exhaustive grid" `isInfixOf`)
       (sout <> serr) `shouldNotSatisfy` ("Catala-renderable" `isInfixOf`)
 
+    -- A ladder whose later condition raises at an input where an earlier one
+    -- gives L4's answer, through a rule it calls, so the lowering cannot read
+    -- the hazard: the gate finds it by evaluating the rule, and the reference
+    -- rendering is emitted instead of the ladder, as for a division written
+    -- in the condition (decided by Claude 2026-11-25, pending Meng's review).
+    -- The message about the gate says what is emitted, for that rule and for
+    -- the one whose division is written in it. The control's first arm is
+    -- reached by another input, so its gate is built and its ladder shipped.
+    -- In the last rule only the first condition as written is reached by
+    -- another input, so its gate is built at rung level. The gates of both
+    -- need a solver to prove their other combinations impossible.
+    it "emits the reference rendering, not the ladder, where the gate finds a later condition raising where L4 answers" $ withZ3 $ do
+      expectGolden bin ["export", "catala", "examples/catala/raising-helper.l4"]
+                       "examples/catala/expected/raising-helper.catala_en"
+      Output code sout serr <- runL4 bin ["export", "catala", "examples/catala/raising-helper.l4"]
+      code `shouldBe` ExitSuccess
+      serr `shouldSatisfy` ("no witness gate for `reciprocal band` (L4 answers at n = 0, but the condition `` n EQUALS (`reciprocal of` OF n) `` raises an error there" `isInfixOf`)
+      serr `shouldSatisfy` ("`reciprocal band`: an exception ladder was derived, but its witness gate found that L4 answers at n = 0" `isInfixOf`)
+      length (filter ("; the short-circuiting reference rendering is emitted instead of its ladder" `isSuffixOf`) (lines serr)) `shouldBe` 2
+      serr `shouldNotSatisfy` ("keeps the exhaustive grid" `isInfixOf`)
+      serr `shouldNotSatisfy` ("`guarded band`" `isInfixOf`)
+      serr `shouldNotSatisfy` ("`zero or a hundred`" `isInfixOf`)
+      length (filter ("  # Mode A fallback: " `isPrefixOf`) (lines sout)) `shouldBe` 2
+      sout `shouldSatisfy` ("### Witness gate for `guarded band`" `isInfixOf`)
+      sout `shouldSatisfy` ("### Witness gate for `zero or a hundred`" `isInfixOf`)
+      length (filter ("The conditions below are the rungs of the ladder as L4 writes them" `isPrefixOf`) (lines sout)) `shouldBe` 1
+
     -- The golden fixtures' witnesses come from the fixed candidate set alone,
     -- so the emitted text does not depend on which solver (or version) runs.
     it "ships no golden whose witnesses needed a solver to find" $ do

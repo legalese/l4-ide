@@ -197,7 +197,20 @@ These are stated here, and printed in `l4 coverage --help`, because you would ot
   A date built in the result of an arm, from numbers, does not stop it.
 - **How many.**
   With _n_ cover points there are 2ⁿ buckets, and past twelve cover points the rule is covered by its conditions as written instead: the report says `AT RUNG LEVEL` and why, and the exit status is 3.
-  It does the same where a condition raises an error at an input that an earlier condition of the same rule already decides, such as `x EQUALS 0` guarding `10 DIVIDED BY x GREATER THAN 2`: that input would otherwise belong to no bucket.
+  It does the same where a condition raises an error at an input that an earlier condition of the same rung already decides, such as `(NOT x EQUALS 0) AND (10 DIVIDED BY x) GREATER THAN 2` at zero: that input would otherwise belong to no bucket.
+- **A later arm that raises where an earlier arm answers.**
+  An input at which a condition raises an error is left out of every bucket.
+  Where L4 answers at it, by an earlier arm, that loses nothing when another input L4 tries, at which every condition is true or false, agrees with the left-out one on the conditions L4 reaches there: the separate conditions of each arm up to the one that answers (in an `UNLESS` chain, of the condition before the first `UNLESS`, and of the rest only where that condition holds).
+  That input takes the same arm, and its bucket is witnessed.
+  So in `BRANCH IF n AT MOST 0 THEN 0 IF 10 DIVIDED BY n GREATER THAN 2 THEN 1 OTHERWISE 2`, zero is left out, but minus one takes the first arm too, and the rule is covered (from `examples/coverage-report/later-arm-covered.l4`).
+  A condition of a later arm is not compared, nor evaluated: add `IF n EQUALS 0 THEN 5` as a third arm, and zero is the only input that makes it true, but L4 never reaches it at zero, and the rule is still covered.
+  When no input L4 tries agrees, the rule is covered by its conditions as written instead, and the same check is made of them.
+  Where they lose the input too, as in `CONSIDER n WHEN 0 THEN 0 WHEN EXACTLY (1 DIVIDED BY n) THEN 1 OTHERWISE 2`, where zero is the only number the first arm takes and each arm is one condition as written, the rule is not covered: the report says at which input L4 answers and which condition raises there, and the exit status is 3 (from `examples/coverage-report/later-arm.l4`).
+  Where they do not, the rule is covered `AT RUNG LEVEL`, and the exit status is 3: in `BRANCH IF n EQUALS 0 OR n EQUALS 100 THEN 0 IF 10 DIVIDED BY n GREATER THAN 2 THEN 1 OTHERWISE 2`, only zero makes `n EQUALS 0` hold, but a hundred makes the first arm hold as zero does.
+  Only the inputs L4 tries are checked this way, the candidates listed under [Inputs that no condition reads](#inputs-that-no-condition-reads).
+  An input outside them at which a condition raises is not seen, and the buckets in which the earlier arm holds can still be wrongly proved impossible, though L4 answers there.
+  For example, a rule whose first arm is `n EQUALS cap`, where `cap` is `3 TIMES 5`, and whose second condition divides by `n MINUS cap`: no condition writes 15, so 15 is not tried, and the two buckets in which the first condition holds are proved impossible, though L4 answers 0 at 15.
+  An input at which the rule itself raises an error, as well as a condition, has no answer to lose, and is left out of every bucket.
 - **Witnessed** means the input realises the bucket and the evaluator agrees.
   The inputs come from a fixed set of candidates, the values listed above under "Inputs that no condition reads", at most eight per bucket.
   An input outside that set is a witness only for a bucket that no candidate lands in: then the solver supplies one, and its row says it was found by the solver.

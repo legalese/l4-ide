@@ -1,0 +1,67 @@
+-- Illustrative rules, not a statute, for a ladder whose later condition
+-- raises an error at an input where an earlier condition already gives L4's
+-- answer.
+--
+-- The lowering refuses such a ladder when it can read the hazard in the
+-- condition itself (a division written there), and emits the
+-- short-circuiting reference rendering instead. Here the division is in a
+-- rule the condition calls, where that reading does not look. The witness
+-- gate evaluates the rule, and finds that at zero L4 answers 0 while the
+-- second condition divides by zero, with no other input reaching the first
+-- condition, so no gate is built and the ladder is refused as well (decided
+-- by Claude 2026-11-25, pending Meng's review).
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`reciprocal of` n MEANS 1 DIVIDED BY n
+
+@export default A band that calls a rule dividing by its input
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE `reciprocal band` n IS
+    BRANCH
+        IF n EQUALS 0 THEN 0
+        IF n EQUALS `reciprocal of` n THEN 1
+        OTHERWISE 2
+
+-- The same rule with the division written in the condition: the lowering
+-- refuses the ladder by reading it, and the message on stderr about the gate
+-- says what is emitted.
+@export A band that divides by its input
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE `reciprocal band by division` n IS
+    BRANCH
+        IF n EQUALS 0 THEN 0
+        IF n EQUALS (1 DIVIDED BY n) THEN 1
+        OTHERWISE 2
+
+-- A control: the second condition divides by zero at zero here too, through
+-- a rule it calls, but minus one also takes the first arm, with the second
+-- condition false there, so every combination is witnessed or proved
+-- impossible, and the gate is built.
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`ten over` n MEANS 10 DIVIDED BY n
+
+@export A band guarded by its first condition
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE `guarded band` n IS
+    BRANCH
+        IF n AT MOST 0 THEN 0
+        IF `ten over` n GREATER THAN 2 THEN 1
+        OTHERWISE 2
+
+-- Here the first condition is two, and only zero makes `n EQUALS 0` hold, so
+-- no input agrees with zero on both of them, and the separate conditions
+-- lose it. But a hundred makes the first condition as written hold, as zero
+-- does, so the gate is built with each rung as one condition, and the
+-- emitted file says so.
+@export A band whose first condition is two
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE `zero or a hundred` n IS
+    BRANCH
+        IF n EQUALS 0 OR n EQUALS 100 THEN 0
+        IF `ten over` n GREATER THAN 2 THEN 1
+        OTHERWISE 2

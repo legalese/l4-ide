@@ -26,9 +26,13 @@ module L4.Coverage.Rungs
   , asNot
   , isBuiltinNamed
   , plainName
+  , rungHolding
   ) where
 
 import Base
+import Optics (cosmosOf, gplate, toListOf)
+import L4.Annotation (rangeOf)
+import L4.Parser.SrcSpan (SrcRange (..))
 import L4.Syntax
 import qualified L4.TypeCheck.Environment as TC
 
@@ -148,3 +152,20 @@ litConsiderArms (Consider ann scrut branches)
     MkBranch _ (When _ (PatLit _ l)) b -> Just (l, b)
     _                                  -> Nothing
 litConsiderArms _ = Nothing
+
+-- | The rung, by its index, that a leaf of the ladder diagram belongs to: the
+-- one whose source span holds the leaf's. The diagram's leaf is not always
+-- equal to the rung's subexpression (its annotation can differ), but it keeps
+-- the span the author wrote it at. Where several rungs share a span, as the
+-- arms of a literal @CONSIDER@ of a BOOLEAN decision do (each spans the whole
+-- @CONSIDER@), the first that has the leaf inside it by equality is taken;
+-- where none does, or no rung's span holds the leaf, 'Nothing'.
+rungHolding :: [Expr Resolved] -> Expr Resolved -> Maybe Int
+rungHolding rungs e = case [ i | Just re <- [rangeOf e], (i, r) <- indexed, maybe False (holds re) (rangeOf r) ] of
+  [i] -> Just i
+  is -> listToMaybe [ i | i <- if null is then map fst indexed else is
+                        , e `elem` toListOf (cosmosOf (gplate @(Expr Resolved))) (rungs !! i) ]
+ where
+  indexed = zip [0 ..] rungs
+  holds :: SrcRange -> SrcRange -> Bool
+  holds inner outer = inner.moduleUri == outer.moduleUri && outer.start <= inner.start && inner.end <= outer.end

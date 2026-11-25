@@ -273,6 +273,7 @@ independently in at least two of: the OpenFisca doc §6, CATALA-EXPORT-SPEC §7/
   ladder rung), any rung whose condition can raise must veto the idiomatic form and force the
   conservative encoding (the Catala bridge's "strictness veto", PR #266). Any strict-boolean
   backend — including our own direct C-family emitters — inherits this hazard class.
+  Measured 2026-11-25 with catala 1.2.1 (`specs/todo/CATALA-EXPORT-SPEC.md` §6.1): for the ladder of a cascade, Catala reaches a later rung's condition only where no earlier arm applies, but for an `UNLESS` ladder it evaluates a proviso's condition where the base does not hold, so the premise holds for provisos and not for cascades.
 - **I9 — No algebraic rewrite without the algebra.** Printers, normalisers and optimisers may
   only apply rewrites the domain's laws actually license. Date addition is non-commutative AND
   non-associative (Monat, ESOP 2024 — who rejected SMT for dates for this reason), so any

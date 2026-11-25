@@ -49,11 +49,20 @@
 --   (@x /= 0 AND 10 / x > 2@ at @x = 0@): that input would land in no leaf
 --   bucket, and a cross over leaves that loses a reachable input is worse
 --   than a coarser model that keeps it;
+-- * a leaf raises at an input where L4 answers, by an earlier arm, and no
+--   other candidate, at which every leaf gives a truth value, agrees with
+--   that input on the leaves of the rungs L4 evaluates there (each rung up
+--   to the one that settles the answer) that give one: no bucket witnessed
+--   by a candidate holds the answer at that input, and a solver could prove
+--   the buckets that would hold it impossible (see 'lostAnswer'; where the
+--   rungs fail the same way, the decision is not covered, and
+--   'ucLostAnswer' says so);
 -- * the caller asked to fall back when some bucket is undecided
 --   ('ceFallbackOnUndecided'), and one is.
 module L4.Cli.Coverage
   ( CoverEnv (..)
   , CoverTarget (..)
+  , Uncovered (..)
   , Level (..)
   , CoverPoint (..)
   , Row (..)
@@ -72,6 +81,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 
 import L4.Annotation (emptyAnno, getAnno, rangeOf)
+import L4.Coverage.Rungs (peelProvisos, rungHolding)
 import qualified L4.Decision.QueryPlan as QP
 import L4.Evaluate.ValueLazy (Environment, NF (..), Value (..))
 import L4.EvaluateLazy (EvalConfig, EvalDirectiveResult (..), EvalDirectiveValue (..), ReductionOutcome (..), execEvalExprInContextOfModule)
@@ -180,19 +190,32 @@ data Cover ans = Cover
 hasUndecided :: Cover ans -> Bool
 hasUndecided c = or [ True | Bucket _ (Undecided _) <- c.cvBuckets ]
 
+-- | Why a decision is not covered.
+data Uncovered = Uncovered
+  { ucWhy :: Text
+  , ucLostAnswer :: Bool
+    -- ^ the leaves, or the rungs, lost an answer: L4 answers at an input
+    -- tried, a later condition raises there, and no bucket witnessed by
+    -- another input holds that answer ('lostAnswer'). The Catala gate does
+    -- not ship a ladder then.
+  }
+
+plainly :: Text -> Uncovered
+plainly why = Uncovered why False
+
 -- | Cover one decision. 'Left' says why not even the rungs could be covered.
 -- An evaluation stopped at a limit (ruled by Meng 2026-11-21, extending L2) is one such reason:
 -- read as "raises", it would drop that input or blame a condition for it.
-coverTarget :: CoverEnv ans -> CoverTarget -> IO (Either Text (Cover ans))
+coverTarget :: CoverEnv ans -> CoverTarget -> IO (Either Uncovered (Cover ans))
 coverTarget ce t =
-  handle (\ (LimitStopped why) -> pure (Left ("the evaluator stopped at a limit at an input it tried: " <> why)))
+  handle (\ (LimitStopped why) -> pure (Left (plainly ("the evaluator stopped at a limit at an input it tried: " <> why))))
     (coverTargetWith ce t)
 
-coverTargetWith :: forall ans. CoverEnv ans -> CoverTarget -> IO (Either Text (Cover ans))
+coverTargetWith :: forall ans. CoverEnv ans -> CoverTarget -> IO (Either Uncovered (Cover ans))
 coverTargetWith ce t
-  | t.ctReadsAssumes = pure (Left "it reads an ASSUME, which a witness input cannot supply")
+  | t.ctReadsAssumes = pure (Left (plainly "it reads an ASSUME, which a witness input cannot supply"))
   | otherwise = case traverse paramOf (zip t.ctParams (map Just t.ctAppArgs <> repeat Nothing)) of
-      Nothing -> pure (Left "a parameter has no declared type")
+      Nothing -> pure (Left (plainly "a parameter has no declared type"))
       Just params -> do
         leaf <- leafLevel params
         case leaf of
@@ -200,7 +223,10 @@ coverTargetWith ce t
             | ce.ceFallbackOnUndecided, (why : _) <- [ w | Bucket _ (Undecided w) <- c.cvBuckets ] ->
                 rungLevel params ("a combination of the leaves could not be decided: " <> why)
             | otherwise -> pure (Right c)
-          Left why -> rungLevel params why
+          -- an answer the leaves lost stays lost if the rungs fail too,
+          -- whatever their own reason
+          Left u -> either (\u' -> Left (Uncovered u'.ucWhy (u'.ucLostAnswer || u.ucLostAnswer))) Right
+                      <$> rungLevel params u.ucWhy
  where
   tc = ce.ceTc
   mods = tc.module' : map (.module') (Rules.transitiveDependencies tc)
@@ -221,23 +247,23 @@ coverTargetWith ce t
 
   rungLevel params why
     | length t.ctRungs > atomLimit =
-        pure (Left (tshow (length t.ctRungs) <> " atomic conditions, past the witness gate's limit of " <> tshow atomLimit))
+        pure (Left (plainly (tshow (length t.ctRungs) <> " atomic conditions, past the witness gate's limit of " <> tshow atomLimit)))
     | otherwise = case lowerAtoms env params t.ctRungs of
-        Left w -> pure (Left w)
+        Left w -> pure (Left (plainly w))
         Right space -> do
-          r <- search params rungPoints space Nothing
+          r <- search params rungPoints space Nothing (map Just [0 ..])
           pure (fmap (Cover (RungLevel why) rungPoints) r)
 
   leafLevel params = case leavesOf of
-    Left why -> pure (Left why)
+    Left why -> pure (Left (plainly why))
     Right pts
-      | null pts -> pure (Left "the rungs have no condition to cover")
+      | null pts -> pure (Left (plainly "the rungs have no condition to cover"))
       | length pts > atomLimit ->
-          pure (Left (tshow (length pts) <> " leaf conditions, past the limit of " <> tshow atomLimit))
+          pure (Left (plainly (tshow (length pts) <> " leaf conditions, past the limit of " <> tshow atomLimit)))
       | otherwise -> case lowerAtoms env params (map (.cpExpr) pts) of
-          Left why -> pure (Left why)
+          Left why -> pure (Left (plainly why))
           Right space -> do
-            r <- search params pts space (Just t.ctRungs)
+            r <- search params pts space (Just t.ctRungs) (map (rungHolding t.ctRungs . (.cpExpr)) pts)
             pure (fmap (Cover LeafLevel pts) r)
 
   ---------------------------------------------------------------------------
@@ -288,10 +314,12 @@ coverTargetWith ce t
   -- Candidates, buckets, the solver
   ---------------------------------------------------------------------------
 
-  -- 'Left' only for the leaf level's own precondition, 'Just rungs': every
-  -- candidate whose rungs the evaluator decides must still have all its leaves
-  -- decided, or the cross would lose an input the rung level keeps.
-  search params pts space guardRungs = do
+  -- 'Left' for the leaf level's own precondition, 'Just rungs' (every
+  -- candidate whose rungs the evaluator decides must still have all its
+  -- leaves decided, or the cross would lose an input the rung level keeps),
+  -- and at either level for an answer the cross would lose ('lostAnswer').
+  -- 'pointRungs' gives the rung each cover point belongs to, where known.
+  search params pts space guardRungs pointRungs = do
     let free = space.asSpace.obFree
         cands = samplePointsUpTo candidateLimit [ (fv, sampleValues space.asSpace fv.fvSort) | fv <- free ]
         vals = map (map snd) cands
@@ -303,15 +331,119 @@ coverTargetWith ce t
       Just rs -> do
         rv <- atomVectors params rs vals
         pure (or [ isJust r && isNothing l | (r, l) <- zip rv vectors ])
+    let witnessesOf = Map.map (take perCombination . reverse) $ Map.fromListWith (<>)
+          [ (bs, [map snd c]) | (c, Just bs) <- zip cands vectors ]
+    lost <- if guarded then pure Nothing
+              else lostAnswer params pts pointRungs (Map.keys witnessesOf) [ map snd c | (c, Nothing) <- zip cands vectors ]
     if guarded
-      then pure (Left "a condition inside a rung raises at an input where an earlier condition of the rung already decides it, so that input would belong to no combination of the separate conditions")
-      else do
-        let witnessesOf = Map.map (take perCombination . reverse) $ Map.fromListWith (<>)
-              [ (bs, [map snd c]) | (c, Just bs) <- zip cands vectors ]
-            combos = [ [ odd (k `div` (2 ^ i)) | i <- [0 .. n - 1] ] | k <- [0 .. (2 ^ n :: Integer) - 1] ]
+      then pure (Left (plainly "a condition inside a rung raises at an input where an earlier condition of the rung already decides it, so that input would belong to no combination of the separate conditions"))
+      else case lost of
+       Just why -> pure (Left (Uncovered why True))
+       Nothing -> do
+        let combos = [ [ odd (k `div` (2 ^ i)) | i <- [0 .. n - 1] ] | k <- [0 .. (2 ^ n :: Integer) - 1] ]
         fmap Right $ for combos \bs -> case Map.lookup bs witnessesOf of
           Just argss -> Bucket bs <$> witnessed argss False
           Nothing -> viaSolver params exprs space bs
+
+  -- An input at which a condition raises belongs to no bucket, and is left
+  -- out of the cross. That loses nothing where L4 gives no answer there
+  -- either. Where it does answer, an earlier arm decided the input before
+  -- the raising condition was reached, and leaving it out loses nothing
+  -- still when another candidate, at which every condition gives true or
+  -- false, agrees with it on the conditions L4 evaluates there that give
+  -- one: that candidate's bucket is witnessed, and it takes the same arm.
+  -- The conditions L4 evaluates are those of each rung up to the one that
+  -- settles the answer, found by evaluating the rungs in order at that
+  -- input ('rungsReached'): a condition of a later rung is not compared,
+  -- and not evaluated, since L4 never reaches it there, and evaluated on its
+  -- own it may hold only there or stop at a limit. A cover point whose rung
+  -- is not known ('rungHolding' finds none) is compared, which can only
+  -- make a decision not covered, never wrongly covered. Where no candidate
+  -- agrees, no witnessed bucket holds that answer, and the buckets that
+  -- would hold it could be "proved impossible", since the solver's script
+  -- asks for every condition to be defined. The first such input, in
+  -- candidate order, is named with the first condition that does not give
+  -- true or false there; the leaf level then falls back to the rungs, and
+  -- where the same holds of the rungs, the decision is not covered. Only
+  -- candidates are looked at: an input outside them at which a condition
+  -- raises is not seen, and can still leave a bucket wrongly proved
+  -- impossible. CROSSWORD 3(c) covers a condition that raises behind an
+  -- earlier one within its rung, which the leaf level's guard above
+  -- handles; this case, behind an earlier arm, is decided by Claude
+  -- 2026-11-25, pending Meng's review. A stop at a limit here is thrown, as
+  -- everywhere (see 'coverTarget'), except while looking for the condition
+  -- to name, which L4 does not reach.
+  lostAnswer params pts pointRungs placed = \case
+    [] -> pure Nothing
+    vals : rest -> do
+      r <- evalExpr (App emptyAnno t.ctName vals)
+      case r of
+        Value _ -> do
+          reached <- rungsReached params vals
+          let compared = [ (j, p) | (j, p, mr) <- zip3 [0 ..] pts pointRungs, maybe True (`elem` reached) mr ]
+          rs <- for compared \(j, p) -> (\x -> (j, x)) <$> evalExpr (bindAt params vals p.cpExpr)
+          let agrees bs = and [ b == (bs !! j) | (j, x) <- rs, Just b <- [truthOf x] ]
+          if any agrees placed
+            then lostAnswer params pts pointRungs placed rest
+            else do
+              culprit <- firstUntrue params vals pts (Map.fromList rs)
+              pure (Just (lostWhy vals culprit))
+        _ -> lostAnswer params pts pointRungs placed rest
+
+  -- The rungs L4 evaluates at an input, by index: each up to the first that
+  -- settles the answer, which in a cascade is the first that holds, and in a
+  -- proviso chain (@c AND NOT d1 AND NOT d2@, whose rungs are @c@, @d1@, @d2@)
+  -- is @c@ when it fails, else the first @d@ that holds. One without a truth
+  -- value ends the list too, since L4 goes no further.
+  rungsReached params vals = go (0 :: Int) t.ctRungs
+   where
+    go _ [] = pure []
+    go i (rung : more) = do
+      x <- evalExpr (bindAt params vals rung)
+      case truthOf x of
+        Just b | b == (provisoChain && i == 0) -> (i :) <$> go (i + 1) more
+        _ -> pure [i]
+
+  provisoChain = case t.ctDecide of
+    MkDecide _ _ _ body -> fmap (uncurry (:)) (peelProvisos body) == Just t.ctRungs
+
+  -- The first cover point that gives no truth value at the input, with what
+  -- it gives, from the values already found or evaluated now; one stopped at
+  -- a limit is passed over, since L4 does not evaluate it there.
+  firstUntrue params vals pts known = go (zip [0 :: Int ..] pts)
+   where
+    go [] = pure Nothing
+    go ((j, p) : more) = do
+      x <- case Map.lookup j known of
+        Just x -> pure (Just x)
+        Nothing -> handle (\ (LimitStopped _) -> pure Nothing) (Just <$> evalExpr (bindAt params vals p.cpExpr))
+      case x of
+        Just v | isNothing (truthOf v) -> pure (Just (p, v))
+        _ -> go more
+
+  lostWhy vals culprit =
+    let there = if null vals then "" else " there"
+        named = case culprit of
+          Just (p, Raised err) -> "the condition " <> quoted p.cpText <> " raises an error" <> there <> " (\"" <> err <> "\")"
+          Just (p, NoValue why) -> "the condition " <> quoted p.cpText <> " gives no answer" <> there <> " (" <> why <> ")"
+          Just (p, Value _) -> "the condition " <> quoted p.cpText <> " is neither true nor false" <> there
+          Nothing -> "its conditions, evaluated together, give no truth values" <> there
+    in case inputsText vals of
+         Nothing -> "L4 answers, but " <> named <> ", so no combination of the conditions holds that answer"
+         Just at -> "L4 answers at " <> at <> ", but " <> named
+                    <> ", and no input tried at which every condition is true or false agrees with it on the"
+                    <> " conditions L4 reaches there, so no combination of the conditions holds that answer"
+
+  truthOf = \case
+    Value (MkNF (ValBool b)) -> Just b
+    _ -> Nothing
+
+  -- A condition in backticks; in double ones, with a space inside, when its
+  -- text has some already (a called rule's name of more than one word), as
+  -- Markdown writes a code span that holds a backtick.
+  quoted txt
+    | Text.any (== '`') txt = "`` " <> txt <> " ``"
+    | otherwise = "`" <> txt <> "`"
 
   -- The decision's answer at each witness. A witness where L4 gives no answer
   -- leaves the bucket undecided, and the reason says what L4 did there and

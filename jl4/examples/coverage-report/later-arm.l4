@@ -1,0 +1,148 @@
+-- A condition that raises an error at an input where an earlier arm already
+-- gives the answer, when no other input the report tries reaches that arm
+-- with the condition giving true or false. At zero the first WHEN matches and
+-- L4 answers 0, but the condition of the second WHEN divides by zero there,
+-- and zero is the only number the first WHEN matches. So no combination of
+-- the conditions holds the answer L4 gives at zero. The conditions as written
+-- are the same as the separate ones here, so covering those instead cannot
+-- help, and the rule is not covered: the report names the input and the
+-- condition. Before, zero was dropped, and with a solver installed the
+-- combinations in which the first condition holds were "proved impossible",
+-- though L4 answers there.
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE `reciprocal band` n IS
+    CONSIDER n
+    WHEN 0 THEN 0
+    WHEN EXACTLY (1 DIVIDED BY n) THEN 1
+    OTHERWISE 2
+
+-- The same rule written with BRANCH and IF, which is not covered either.
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE `reciprocal band by BRANCH` n IS
+    BRANCH
+        IF n EQUALS 0 THEN 0
+        IF n EQUALS (1 DIVIDED BY n) THEN 1
+        OTHERWISE 2
+
+-- The division can be anywhere the second condition reaches: in an argument
+-- to another rule, or two rules deep.
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+DECIDE `twice` x IS x TIMES 2
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE `in an argument` n IS
+    BRANCH
+        IF n EQUALS 0 THEN 0
+        IF `twice` (10 DIVIDED BY n) GREATER THAN 2 THEN 1
+        OTHERWISE 2
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE `ten over` n IS 10 DIVIDED BY n
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE `one more than ten over` n IS `ten over` n PLUS 1
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE `two rules deep` n IS
+    BRANCH
+        IF n EQUALS 0 THEN 0
+        IF `one more than ten over` n GREATER THAN 2 THEN 1
+        OTHERWISE 2
+
+-- The error need not be a division: here the rule the second condition calls
+-- has no WHEN for the one option the first condition matches. That rule's
+-- own bucket for team is undecided, so this file exits 2, not 3.
+DECLARE Plan IS ONE OF basic, pro, team
+
+@nonexhaustive
+GIVEN p IS A Plan
+GIVETH A NUMBER
+DECIDE `listed price` p IS
+    CONSIDER p
+    WHEN basic THEN 5
+    WHEN pro THEN 20
+
+GIVEN p IS A Plan
+GIVETH A NUMBER
+DECIDE `price band` p IS
+    BRANCH
+        IF p EQUALS team THEN 0
+        IF `listed price` p GREATER THAN 10 THEN 1
+        OTHERWISE 2
+
+-- A record input is named in parentheses, so that its fields do not read as
+-- more inputs. Every account with no limit takes the first arm, and the
+-- second condition divides by the limit.
+DECLARE Account HAS
+    balance IS A NUMBER
+    limit IS A NUMBER
+
+GIVEN a IS AN Account
+GIVETH A NUMBER
+DECIDE `usage band` a IS
+    BRANCH
+        IF a's limit EQUALS 0 THEN 0
+        IF a's balance DIVIDED BY a's limit GREATER THAN 1 THEN 1
+        OTHERWISE 2
+
+-- A rule with no inputs at all, whose reason names none.
+GIVETH A NUMBER
+DECIDE `constant band` IS
+    CONSIDER 0
+    WHEN 0 THEN 0
+    WHEN EXACTLY (1 DIVIDED BY 0) THEN 1
+    OTHERWISE 2
+
+-- Only an input the report does not try agrees: fifteen takes the first arm,
+-- as zero does, with the second condition true or false, but no condition
+-- writes 15, so it is not tried, and a witness a solver could find for it does
+-- not count.
+GIVETH A NUMBER
+DECIDE `cap` IS 3 TIMES 5
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE `only the solver agrees` n IS
+    BRANCH
+        IF n EQUALS 0 OR n EQUALS `cap` THEN 0
+        IF 1 DIVIDED BY n GREATER THAN 0 THEN 1
+        OTHERWISE 2
+
+-- Provisos written with AND NOT: at zero the first condition holds, and so
+-- does the second, so L4 answers FALSE without reaching the third, which
+-- divides by zero. Only zero makes the second condition true, so no input
+-- tried agrees with zero on the two conditions L4 reaches there, and the rule
+-- is not covered.
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `positive and not large` n IF
+    (n AT LEAST 0 AND NOT (n EQUALS 0))
+    AND NOT (10 DIVIDED BY n GREATER THAN 5)
+
+-- Covered, but at rung level: at zero no input tried agrees on both separate
+-- conditions of the first arm, since only zero makes the first one hold, but
+-- a hundred makes that arm hold as zero does, so the conditions as written
+-- lose nothing, and the rule is covered by them instead.
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE `zero or a hundred` n IS
+    BRANCH
+        IF n EQUALS 0 OR n EQUALS 100 THEN 0
+        IF 10 DIVIDED BY n GREATER THAN 2 THEN 1
+        OTHERWISE 2
+
+-- A control: here the first arm divides by zero, so L4 raises at zero too,
+-- and zero has no answer to lose. This rule is covered, as before.
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE `reciprocal or two` n IS
+    CONSIDER n
+    WHEN EXACTLY (1 DIVIDED BY n) THEN 1
+    OTHERWISE 2
