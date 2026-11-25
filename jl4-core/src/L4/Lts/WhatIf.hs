@@ -814,6 +814,13 @@ data RunRead
   | ReadsSectionGiven Name
     -- ^ a section @GIVEN@, which a @WITH@ supplies in a run; outside one it
     -- is its @TYPICALLY@ default, or nothing
+  | ReadsClock Text
+    -- ^ the clock, as written: @TODAY@, @NOW@, @CURRENTTIME@, and @RULES
+    -- EFFECTIVE DATE@, which falls back to today. The machine reads the
+    -- system time of the run it is in, so two runs on two days differ, and
+    -- @--fixed-now@ pins only the one command
+  | ReadsOutside Text
+    -- ^ the world outside the file, as written: @FETCH@, @ENV@, @POST@
   deriving stock (Eq, Show)
 
 -- | What in one module a run supplies ('RunRead'), read off its source.
@@ -832,12 +839,39 @@ moduleReads m = MkModuleReads {mrSectionGivens = givens, mrRules = runReadRules 
   where
     givens = Map.keysSet (sectionBinders m)
 
--- | What an expression itself reads that a run supplies, in the order met: a
--- @RECALL@ anywhere in it, then a name that is a section @GIVEN@.
+-- | What an expression itself reads that a run supplies, in the order met:
+-- first what a construct of its own reads (a @RECALL@, a @FETCH@, an @ENV@, a
+-- @POST@), then a name that is a section @GIVEN@ or a builtin that reads the
+-- clock or the world ('namesIn'). The clock and the world are open by a
+-- choice decided by Claude 2026-11-25, pending Meng's review: until review of
+-- smucclaw/l4-ide#1107 they counted as closed, and a @WITHIN@ of @(DATE_SERIAL
+-- TODAY) MODULO 7 PLUS 3@ explored with the deadline 8 under one
+-- @--fixed-now@ and 5 under another. The builtins that only switch the time
+-- an expression is read at (@EVAL UNDER VALID TIME@, @EVER BETWEEN@ and their
+-- kin) are not open on their own: they take the time as an argument.
 directReads :: Set Unique -> Expr Resolved -> [RunRead]
 directReads givens e =
-  [ ReadsLedger | ReadCell {} <- subExprs e ]
-  <> [ ReadsSectionGiven (getOriginal r) | r <- namesIn e, Set.member (getUnique r) givens ]
+  [ r | x <- subExprs e, Just r <- [construct x] ]
+  <> [ r | n <- namesIn e, Just r <- [named n] ]
+  where
+    construct = \ case
+      ReadCell {} -> Just ReadsLedger
+      Fetch {}    -> Just (ReadsOutside "FETCH")
+      Env {}      -> Just (ReadsOutside "ENV")
+      Post {}     -> Just (ReadsOutside "POST")
+      _           -> Nothing
+    named r
+      | Set.member u givens = Just (ReadsSectionGiven (getOriginal r))
+      | u `elem` clock = Just (ReadsClock spelt)
+      | u `elem` outside = Just (ReadsOutside spelt)
+      | otherwise = Nothing
+      where
+        u = getUnique r
+        spelt = unqualifiedNameToText (getOriginal r)
+    clock =
+      [ TypeCheck.todaySerialUnique, TypeCheck.nowSerialUnique
+      , TypeCheck.currentTimeUnique, TypeCheck.rulesEffectiveDateUnique ]
+    outside = [TypeCheck.fetchUnique, TypeCheck.envUnique, TypeCheck.postUnique]
 
 -- | The module's rules whose answer depends on the run they are forced in,
 -- not on the module alone, each with what it reads ('RunRead'): those that
@@ -933,6 +967,8 @@ runReadText written = \ case
   ReadsLedger | written   -> "a ledger with RECALL"
               | otherwise -> "a ledger"
   ReadsSectionGiven n -> "`" <> unqualifiedNameToText n <> "`, a section GIVEN, which a WITH can supply"
+  ReadsClock t -> "the clock (" <> t <> ")"
+  ReadsOutside t -> "the world outside the file (" <> t <> ")"
 
 -- | 'openLocals' over every name in the expression ('namesIn'), not only its
 -- variables: a local applied as a function (@`f` 3@, @`f` WITH x IS 3@) is

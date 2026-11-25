@@ -52,7 +52,7 @@ fixtures =
   <> [ instants </> f | f <- ["clocks.l4", "window.l4", "half.l4", "adjacent.l4", "open.l4", "flip3.l4", "room.l4", "lapse.l4", "merged.l4", "lapse-fixed.l4", "cap-re.l4", "own-lapse.l4", "frac-re.l4", "fx-fork.l4", "fx-barrier.l4", "succ2.l4", "hidden.l4", "succ4.l4", "cap-shift.l4", "frac-start.l4", "frac-wait.l4", "frac-stamp.l4"] ]
   <> [ breached </> f | f <- ["sale.l4", "resell.l4", "continuation.l4"] ]
   <> [ sections </> f | f <- ["sectioned.l4", "two-sections.l4"] ]
-  <> [ deadlines </> f | f <- ["shapes.l4", "given.l4", "carried.l4", "armed.l4", "ledger.l4", "called.l4", "section-given.l4", "section-reader.l4"] ]
+  <> [ deadlines </> f | f <- ["shapes.l4", "given.l4", "carried.l4", "armed.l4", "ledger.l4", "called.l4", "section-given.l4", "section-reader.l4", "clock.l4"] ]
 
 -- | The acceptance run of the fixtures' README: the clock bounded at
 -- closing, the cells the properties read kept.
@@ -953,6 +953,23 @@ spec bin = describe "l4 explore" $ do
         lcode `shouldBe` ExitSuccess
         lout `shouldSatisfy` (why `isInfixOf`)
         (lout <> lerr) `shouldNotSatisfy` ("Internal error" `isInfixOf`)
+
+    -- review of #1107: a deadline that read the clock was worked out, so it
+    -- came out 8 under one --fixed-now and 5 under another
+    it "clock.l4: a WITHIN that reads the clock or the environment, itself or through a rule, is not worked out, under any --fixed-now" $
+      forM_ [ ("clock duty", "the WITHIN reads `clocky`, which reads the clock (TODAY)")
+            , ("today duty", "the WITHIN reads the clock (TODAY)")
+            , ("env duty", "the WITHIN reads `env period`, which reads the world outside the file (ENV)") ] \ (c, reads') ->
+        forM_ ["2025-01-31T15:45:30Z", "2025-02-04T15:45:30Z"] \ now -> do
+          let why = reads' <> ", so it is worked out only in a run and its deadline is not known here"
+          Output code out _ <- runL4 bin ["explore", deadlines </> "clock.l4", "--contract", c, "--fixed-now", now]
+          code `shouldBe` ExitFailure 2
+          out `shouldSatisfy` (("time runs out on pay, in 1 state: " <> why) `isInfixOf`)
+          out `shouldNotSatisfy` ("time passes the deadline" `isInfixOf`)
+          Output lcode lout _ <- runL4 bin ["lts", deadlines </> "clock.l4", "--contract", c, "--fixed-now", now]
+          lcode `shouldBe` ExitSuccess
+          lout `shouldSatisfy` (why `isInfixOf`)
+          lout `shouldSatisfy` ("Next deadline: not known here" `isInfixOf`)
   where
     liveness =
       [ "--eventually", "Alice has bought or stopped"
