@@ -491,7 +491,7 @@ known false green documented as unknown for the length of a queue is the drift t
 
 **Severity: toolchain. A fix is identified and deliberately NOT applied.**
 
-`etc/kie-dmn-check/run.sh:81` compiles the harness's Java source with
+`etc/kie-dmn-check/run.sh:84` compiles the harness's Java source with
 `javac -nowarn --release 11`. Raising it to `--release 21` is the identified fix and was **held
 back on purpose**: it changes what every CI run compiles, so it is not a change to make inside an
 unrelated PR.

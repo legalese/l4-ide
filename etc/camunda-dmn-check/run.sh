@@ -75,7 +75,10 @@ mkdir -p "$out"
 cp="$out/cp.txt"
 if [ ! -s "$cp" ]; then
   echo "# resolving io.camunda:zeebe-dmn $ZEEBE_VERSION into $out (first run only)" >&2
-  mvn -q -B -f "$here/pom.xml" -Dmdep.outputFile="$cp" dependency:build-classpath >&2 \
+  # shellcheck source=../mvn-retry.sh
+  . "$here/../mvn-retry.sh"
+  mvn_retry "zeebe-dmn $ZEEBE_VERSION" "$out/mvn.log" \
+    mvn -q -B -f "$here/pom.xml" -Dmdep.outputFile="$cp" dependency:build-classpath \
     || skip "could not resolve zeebe-dmn $ZEEBE_VERSION from Maven (offline?)"
 fi
 [ -s "$cp" ] || skip "empty classpath after dependency:build-classpath"

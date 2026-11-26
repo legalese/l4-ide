@@ -117,6 +117,8 @@ jobs:
               - 'etc/check-bpmn-*'
               - 'etc/validate-bpmn.mjs'
               - 'etc/kie/**'
+              # check-bpmn-kie.sh sources it to retry its Maven resolution.
+              - 'etc/mvn-retry*'
               - 'jl4/examples/bpmn/**'
               - 'jl4-core/src/L4/Bpmn/**'
               # The DMN side is IN this filter since the BPMN->DMN wiring landed
@@ -190,6 +192,8 @@ jobs:
               - 'jl4/examples/canon/us/regcf/**'
               - 'etc/kie-dmn-check/**'
               - 'etc/camunda-dmn-check/**'
+              # Both run.sh scripts source it to retry their Maven resolution.
+              - 'etc/mvn-retry*'
               - 'etc/validate-dmn.mjs'
               # The XSD sequence-order pair and the law-time date probe:
               # hand-written fixtures, not goldens, so nothing else here matches
@@ -632,6 +636,12 @@ jobs:
       # of the same PR — and push keeps refreshing the shared base cache.
       # Nothing is skipped and no job does less work; the only thing removed is
       # a write with no reader.
+      #
+      # The same exposure as the DMN job's Maven cache, measured 2026-11-26 on
+      # the merge group of #888: `Cache not found for input keys: l4-engines-m2-…`
+      # (the one entry is on refs/heads/unstable), then a cold resolve from
+      # Maven Central. etc/check-bpmn-kie.sh retries that resolve
+      # (etc/mvn-retry.sh) for the reason given at the DMN job's restore step.
       - name: Restore the pinned engine jars
         uses: actions/cache/restore@v4
         id: l4-engines-m2
@@ -1265,6 +1275,20 @@ jobs:
       # 30760823299: `Cache not found for input keys: dmn-engines-m2-…` at
       # 18:18:57 followed by `Cache saved with key: dmn-engines-m2-…` at
       # 18:20:14 — 51 MB written into a scope with no reader.
+      #
+      # THE CONSEQUENCE, measured 2026-11-26 over the merge groups of #887-#891
+      # (six runs: #887, #888, #889, #890 and both runs of #891): every one
+      # logged `Cache not found for input keys: dmn-engines-m2-…` here. The one
+      # entry (`gh cache list --key dmn-engines-m2`, 2026-11-27) is on refs/heads/unstable,
+      # which a merge_group run cannot read. So merge_group runs ALWAYS miss this
+      # cache and ALWAYS resolve KIE and Camunda from Maven Central. When Central
+      # is well that costs little (the log lines `resolving KIE` and `resolving
+      # io.camunda` were 18-25 s apart in those runs, the KIE check included),
+      # and when it is not there is nothing to fall back on. That is why the two
+      # run.sh scripts retry the resolution (etc/mvn-retry.sh): #891's first
+      # merge group spent 6 min 36 s on one resolve, got `No plugin found for
+      # prefix 'dependency'`, SKIPped, and KIE_CHECK_REQUIRED=1 made the skip an
+      # exit 1 that failed the merge group.
       - name: Restore the Maven repository
         uses: actions/cache/restore@v5
         id: dmn-m2
@@ -1273,6 +1297,21 @@ jobs:
           key: dmn-engines-m2-${{ hashFiles('etc/kie-dmn-check/pom.xml', 'etc/camunda-dmn-check/pom.xml') }}
           restore-keys: |
             dmn-engines-m2-
+
+      # Offline and about 25 s: a stub `mvn`, no network. It is the only thing
+      # that shows the retry passes a transient failure and never turns a
+      # persistent one into a pass, since neither can be made to happen on
+      # demand against the real Central.
+      #
+      # `timeout-minutes` is on this step because the selftest kills hung stubs,
+      # and a regression in that very code (the KILL escalation) would leave it
+      # waiting on one. This workflow sets no `timeout-minutes` anywhere, so the
+      # step would otherwise run until GitHub's default job limit of 360 minutes.
+      # Five minutes is about ten times its normal run, and makes that failure
+      # loud and short.
+      - name: Selftest, the Maven resolution retry
+        timeout-minutes: 5
+        run: etc/mvn-retry.selftest.sh
 
       - name: Drools/KIE 8.44.0.Final
         env:

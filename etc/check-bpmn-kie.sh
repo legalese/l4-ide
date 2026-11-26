@@ -195,10 +195,13 @@ DEP_PLUGIN=org.apache.maven.plugins:maven-dependency-plugin:3.6.1
 CP_FILE="$CACHE/cp.txt"
 if [ ! -s "$CP_FILE" ] || [ "$HERE/kie/pom.xml" -nt "$CP_FILE" ]; then
   echo "resolving pinned jBPM dependencies into $CACHE (first run downloads ~44 MB)..."
-  if ! mvn -q -B -f "$HERE/kie/pom.xml" \
+  # shellcheck source=mvn-retry.sh
+  . "$HERE/mvn-retry.sh"
+  if ! mvn_retry "jBPM 7.74.1" "$CACHE/mvn.log" \
+        mvn -q -B -f "$HERE/kie/pom.xml" \
         -Dmaven.repo.local="$CACHE/repo" \
         -Dmdep.outputFile="$CP_FILE" -DincludeScope=runtime \
-        "$DEP_PLUGIN:build-classpath" >"$CACHE/mvn.log" 2>&1; then
+        "$DEP_PLUGIN:build-classpath"; then
     echo "--- last 25 lines of $CACHE/mvn.log ---" >&2
     tail -25 "$CACHE/mvn.log" >&2
     # Maven is installed but could not resolve: that is a broken harness or a
