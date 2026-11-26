@@ -1498,6 +1498,39 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
           renameNotes src =
             [n | n <- (dmnReport (drgOf src)).notes, n.code == "D-RENAME"]
 
+      -- The reserved arm (decided by Claude 2026-11-26, pending Meng's
+      -- review): the L4 name is a FEEL name a caller would use as it stands.
+      it "notes a rename forced by a reserved FEEL name, on an input, a decision and a field" $ do
+        let src = "DECLARE Bill HAS\n\
+                  \  sum IS A NUMBER\n\
+                  \  `two words` IS A NUMBER\n\
+                  \GIVEN floor IS A NUMBER\n\
+                  \      b IS A Bill\n\
+                  \GIVETH A NUMBER\n\
+                  \DECIDE `count` floor b IS floor PLUS b's sum PLUS b's `two words`\n"
+            notes = renameNotes src
+            on el = [n | n <- notes, n.element == el]
+        map (.element) notes `shouldMatchList` ["input_floor", "decision_count", "itemdef_bill"]
+        forM_ notes \n -> n.severity `shouldBe` Lossy
+        case on "input_floor" of
+          [n] -> do
+            n.message `shouldSatisfy` Text.isInfixOf "`floor` is emitted as the FEEL name `floor_`"
+            n.message `shouldSatisfy` Text.isInfixOf "the name of a FEEL function this export calls"
+            n.lost `shouldSatisfy` Text.isInfixOf "sends or reads `floor` reaches nothing and gets null"
+          ns -> expectationFailure ("one note on input_floor, got " <> show (length ns))
+        case on "itemdef_bill" of
+          [n] -> n.message `shouldSatisfy` Text.isInfixOf "`sum` is emitted as the FEEL name `sum_`"
+          ns -> expectationFailure ("one note on itemdef_bill, got " <> show (length ns))
+
+      it "notes no rename for a name stage 1 leaves alone or only folds" $ do
+        -- `floor_` folds to `floor` and is suffixed back to `floor_`: its FEEL
+        -- name IS its L4 name. `two words` is the benign-mangle arm, unbuilt.
+        renameNotes "GIVEN floor_ IS A NUMBER\n\
+                    \      `two words` IS A NUMBER\n\
+                    \GIVETH A NUMBER\n\
+                    \DECIDE `pay` floor_ `two words` IS floor_ PLUS `two words`\n"
+          `shouldBe` []
+
       it "renames inputData x inputData apart, in the declaration AND the references" $ do
         -- Before stage 2, Camunda 8 loaded this file and read one supplied
         -- value twice while KIE rejected it with DUPLICATE_NAME. Now there are

@@ -856,6 +856,14 @@ spec bin = do
           sout `shouldSatisfy` (("<inputData id=\"input_" <> w <> "\" name=\"" <> w <> "_\"") `isInfixOf`)
         sout `shouldSatisfy` ("max(floor(x), floor_)" `isInfixOf`)
 
+      -- A caller sending `floor` gets null, so the rename is reported.
+      it "reports each input renamed for a FEEL function's name with a Lossy D-RENAME note" $ do
+        Output code _ serr <- runL4 bin ["export", "dmn", exportShadowedBuiltinsFixture, "--fidelity-report"]
+        code `shouldBe` ExitSuccess
+        forM_ ["floor", "decimal", "concatenate"] \w ->
+          serr `shouldSatisfy` (("[D-RENAME] lossy — input_" <> w) `isInfixOf`)
+        serr `shouldSatisfy` ("`floor` is emitted as the FEEL name `floor_`, because `floor` is the name of a FEEL function this export calls" `isInfixOf`)
+
       -- `l4 check` refuses the importer of a module with errors, so a constant
       -- from one is no value L4 has: it is refused, not copied.
       it "refuses a constant from an imported module that does not type-check, rather than copying it" $ do

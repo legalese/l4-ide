@@ -6596,22 +6596,55 @@ lowerModule opts modul@(MkModule _ uri _) =
   -- silently wrong -- what is lost is the resemblance between the FEEL text and
   -- the L4 name.
   --
+  -- __The RESERVED arm__ (found missing by the review of this branch,
+  -- 2026-11-26): a name whose fold is a word FEEL reserves, or a FEEL function
+  -- the export calls ('reservedFeelWords'), is suffixed by stage 1 (`sum` is
+  -- `sum_`), and that rename had no note. It is the one rename a caller is
+  -- likely to trip on, because the L4 name is itself a FEEL name and would be
+  -- sent or read as it stands: an input `floor` emitted as `floor_` answers
+  -- null to a caller that sends `floor`, and `@label` is not a key any engine
+  -- reads. So it gets the collision arm's note and severity, and when both
+  -- apply, one note says both. Types are left out: no caller sends or reads a
+  -- type name, and a type's rename is the alias repair 'reservedFeelTypeNames'
+  -- describes. Both choices are decided by Claude 2026-11-26, pending Meng's
+  -- review.
+  --
   -- __The benign-mangle arm (`Advisory`) is deliberately NOT built here.__ §7's
   -- header defers the two-severities-on-one-code shape to a re-ruling against
   -- FIDELITY-SEVERITY-AXIS-SPEC.md §5, and the arm would emit ~169 Advisory
   -- notes on one corpus module while `@label` already carries the source name.
+  -- (A space folded to `_` is that arm, not the reserved one: `two words` is
+  -- not a name a caller can send to FEEL as it stands.)
   renameNotes =
     [ dmnNote "D-RENAME" Lossy eid Nothing
-        ("`" <> l4name <> "` is emitted as the FEEL name `" <> resolved
-           <> "`, not `" <> foldedName <> "`: " <> englishCount (length claimants)
-           <> " " <> kindPlural <> " in this module fold to `" <> foldedName
-           <> "` (" <> Text.intercalate ", " (map tick claimants)
-           <> "), and the first claimant in source order keeps the base name")
-        "the resemblance between the emitted FEEL name and the L4 name it came from; \
-        \the L4 name survives in @label"
+        (if collided
+           then "`" <> l4name <> "` is emitted as the FEEL name `" <> resolved
+             <> "`, not `" <> foldedName <> "`: " <> englishCount (length claimants)
+             <> " " <> kindPlural <> " in this module fold to `" <> foldedName
+             <> "` (" <> Text.intercalate ", " (map tick claimants)
+             <> "), and the first claimant in source order keeps the base name"
+             <> maybe "" (\why -> "; the base itself is suffixed because " <> why) reserved
+           else "`" <> l4name <> "` is emitted as the FEEL name `" <> resolved
+             <> "`, because " <> fromMaybe "" reserved)
+        (if collided && isNothing reserved
+           then "the resemblance between the emitted FEEL name and the L4 name it came from; \
+                \the L4 name survives in @label"
+           else "the L4 name as the name an engine uses: a caller that sends or reads `"
+             <> l4name <> "` reaches nothing and gets null, and must use `" <> resolved
+             <> "`; the L4 name survives only in @label, which no engine reads")
     | (eid, kindPlural, l4name, foldedName, resolved, claimants) <- renameCandidates
-    , resolved /= foldedName
+    , let collided = resolved /= foldedName
+    , let reserved = reservedReason (foldFeelName l4name)
+    , collided || (isJust reserved && resolved /= l4name)
     ]
+
+  reservedReason w
+    | Set.member w reservedFeelFunctions =
+        Just ("`" <> w <> "` is the name of a FEEL function this export calls, \
+              \which a variable of that name would hide")
+    | Set.member w reservedFeelWords =
+        Just ("`" <> w <> "` is a word FEEL reserves")
+    | otherwise = Nothing
 
   renameCandidates =
     [ (iid, "elements of the DRG's flat variable namespace", nm, feelIdentText nm, feel

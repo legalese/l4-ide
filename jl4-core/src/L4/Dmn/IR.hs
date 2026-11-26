@@ -57,7 +57,9 @@ module L4.Dmn.IR
   , feelIdentText
   , feelTypeNameText
   , reservedFeelWords
+  , reservedFeelFunctions
   , reservedFeelTypeNames
+  , foldFeelName
   , uniquifyIn
   , oneLine
     -- * Engine flavors
@@ -525,17 +527,30 @@ feelTypeNameText = suffixReservedIn reservedFeelTypeNames . foldFeelName
 -- aggregate lowering (smucclaw/l4-ide#1103); @min@ and @max@ with it and with
 -- the select idiom before it; @modulo@ with @MODULO@ before both. @not@ was
 -- already reserved above. The rename is stage 1's suffix (@floor_@), the same
--- one a keyword gets, and like a keyword's it carries no note: the @label@
--- keeps the L4 name. It reaches every name in this namespace, so a record
+-- one a keyword gets. It reaches every name in this namespace, so a record
 -- field or a type spelled like one of these is renamed too.
+--
+-- __Either rename carries a Lossy @D-RENAME@ note__ on an input, a decision or
+-- a record field ("L4.Dmn.Lower" @renameNotes@), as a collision rename does:
+-- the L4 name is itself a FEEL name a caller would send or read as it stands,
+-- so a field @sum@ emitted as @sum_@ answers null to a caller using @sum@,
+-- and the @label@ that keeps the L4 name is not a key any engine reads. Until
+-- the review of this branch (2026-11-26) this comment said the rename "carries
+-- no note"; a note on it, at the collision arm's severity, is decided by
+-- Claude 2026-11-26, pending Meng's review.
 reservedFeelWords :: Set Text
 reservedFeelWords = Set.fromList
   [ "true", "false", "null", "and", "or", "not", "if", "then", "else", "for", "in", "return"
   , "some", "every", "satisfies", "instance", "of", "between", "function", "external"
   , "date", "time", "duration", "list", "context"
-  -- built-in functions this exporter calls
-  , "floor", "ceiling", "decimal", "sum", "count", "min", "max", "concatenate", "modulo"
-  ]
+  ] <> reservedFeelFunctions
+
+-- | The second group of 'reservedFeelWords': the FEEL built-in functions this
+-- exporter calls, which a variable of the same name would hide. Kept apart so
+-- that @D-RENAME@ can say which of the two reasons renamed a name.
+reservedFeelFunctions :: Set Text
+reservedFeelFunctions = Set.fromList
+  ["floor", "ceiling", "decimal", "sum", "count", "min", "max", "concatenate", "modulo"]
 
 -- | 'reservedFeelWords' __plus FEEL's built-in type spellings__, which is the
 -- set a /type/ name is checked against ('feelTypeNameText').
