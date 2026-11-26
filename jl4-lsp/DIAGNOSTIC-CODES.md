@@ -101,7 +101,6 @@ Match it with `^\s*Code:\s+(\S+)$`.
 | `check/jsondecode-at-type-parameter`        | A JSONDECODE applied where the type to decode into mentions a type parameter.            |
 | `check/jsondecode-passed-at-type-parameter` | A bare JSONDECODE handed on as a function at a type that mentions a type parameter.      |
 | `check/lifecycle-unavailable`               | THE JOIN or THE DEADLINE with no such position; THE INSTANT outside a PROVIDED guard.    |
-| `check/read-refused`                        | A norm-log read with no instant, inside RAND, ROR or EVERY, or of a wrong arity.         |
 | `check/misattached-section-given`           | A column-1 GIVEN declares a name the declaration below it never uses.                    |
 | `check/misdelivered-implicit-supply`        | A WITH value checked against one section input would reach another of the same spelling. |
 | `check/nonassertable-on-non-definition`     | `@nonassertable` above something that is not a definition.                               |
@@ -109,6 +108,7 @@ Match it with `^\s*Code:\s+(\S+)$`.
 | `check/opened-field-collision-at-opening`   | An input opens a field name an earlier input already opens.                              |
 | `check/opened-field-collision-at-read`      | A bare field name that several opened inputs have, at the read.                          |
 | `check/opening-not-an-instant`              | The value after AFTER is neither a NUMBER nor a DATE.                                    |
+| `check/read-refused`                        | A norm-log read with no instant, in an operand, of wrong arity, or matching no norm.     |
 | `check/regulative-actor-mismatch`           | A party performs an action that belongs to another actor.                                |
 | `check/restated-section-binder`             | A definition's GIVEN restates a name a section GIVEN binds.                              |
 | `check/typically-on-type-variable`          | A TYPICALLY default on a type.                                                           |

@@ -273,13 +273,21 @@ armedOf g grp = fromMaybe g (find (\ e -> e.neFate == FateArmed) grp)
 
 shapeMatches :: NormPattern -> NormEntry -> Bool
 shapeMatches p e =
-  maybe True (\ m -> e.neModal == Just m) p.npModal
+  maybe True (\ m -> modalMatches m e.neModal) p.npModal
     && maybe True (\ a -> e.neActionHead == Just a) p.npAction
     && case p.npBranch of
          AnyBranch    -> True
          TopLevel     -> isNothing e.neOrigin
          ArmedByHence -> ((.noBranch) <$> e.neOrigin) == Just ViaHence
          ArmedByLest  -> ((.noBranch) <$> e.neOrigin) == Just ViaLest
+
+-- | A pattern's modal against an entry's. A @DO@ norm is an obligation like a
+-- @MUST@ one (it fails on the same terms, 'L4.EvaluateLazy.Fates'), and the
+-- checker already takes a @MUST@ pattern to match its site
+-- ('L4.TypeCheck', @readsMatchingNoSite@); the reader must agree, or a read
+-- the checker passes is false on every trace.
+modalMatches :: DeonticModal -> Maybe DeonticModal -> Bool
+modalMatches m entry = entry == Just m || (m == DMust && entry == Just DDo)
 
 -- | The party of a norm instance, as well as any of its entries knew it: the
 -- machine forces a party when the norm meets an event, so a later entry can

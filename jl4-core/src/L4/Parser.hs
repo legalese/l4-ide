@@ -3444,7 +3444,7 @@ readNormExpr = do
     _    <- annoHole (pure narrowed)
     _    <- annoLexeme (spacedSymbol_ TPClose)
     asOf <- optionalWithHole
-      (annoLexeme (spacedKeyword_ TKAs) *> annoLexeme (spacedKeyword_ TKOf) *> annoHole atomicExpr')
+      (tryParser (annoLexeme (spacedKeyword_ TKAs) *> annoLexeme (spacedKeyword_ TKOf)) *> annoHole atomicExpr')
     pure (ReadNorm emptyAnno word phrase mParty modal con (length ws) narrowed asOf)
 
 -- | A @_@ where an expression is expected. The lexer makes it a token only for

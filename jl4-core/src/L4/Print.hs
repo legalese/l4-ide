@@ -1144,7 +1144,7 @@ instance LayoutPrinterWithName a => LayoutPrinter (Expr a) where
         <+> printWithLayout cell
     ReadNorm _ word _ mParty modal con n branch asOf ->
       pretty (readWordText word)
-        <+> parens (hsep ([ "PARTY", maybe "_" printWithLayout mParty
+        <+> parens (hsep ([ "PARTY", maybe "_" parensIfNeeded mParty
                           , printDeonticModal modal, printWithLayout con ]
                           <> replicate n "_"
                           <> [ pretty (readBranchText branch) | branch /= ReadAnyBranch ]))

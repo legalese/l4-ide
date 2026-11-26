@@ -240,6 +240,11 @@ data Frame =
   -- whole read; it asks again, so every such clock is forced before the log
   -- is read (R14).
   | ReadNorm3 ReadWord Rational BearerPattern DeonticModal Resolved ReadBranch (Maybe SrcRange)
+  -- Review of P2b, B2 and S2: closes a contract run that started at the top
+  -- ('beginNormRun'). Carries whether the enclosing force span had read the
+  -- norm log before the run began: the reads the run made are its own, and
+  -- the run's value does not depend on them ('endNormRun').
+  | EndNormRun Bool
   -- STATE-AS-LEDGER M4: restore the acting party once a HENCE/LEST body (and its
   -- App1 continuation) has fully evaluated. Pushed by 'continueWithFollowup'
   -- BEFORE the followup runs (so it is processed LAST, after the whole subtree),
@@ -1580,6 +1585,7 @@ unwindFrame = \ case
     when scoped leaveRelookScope
   RestoreSibling path clock              -> restoreSibling path clock
   RestoreBehind n                        -> restoreBehind n
+  EndNormRun _                           -> whenDeonticLog \ l -> liftIO (writeIORef l.dlRunDepth 0)
   Lockstep ls                            -> unwindLockstep ls
   UpdateThunk rf saved displaced         -> do
     -- Close this force's read span exactly as the success path does (the
@@ -2242,6 +2248,43 @@ tellEventRouted route ev = do
     RouteNotify recipientKey ->
       liftIO (modifyIORef' store (storeAppendOwn recipientKey ev))
 
+-- | Review of P2b, B2 and S2: a contract value applied to its time and events
+-- while no run is on the stack starts a run. The run's reads see the norms
+-- the run writes from here on (not those of an earlier run in the same
+-- directive), and 'EndNormRun' closes it. An operand or a continuation is
+-- applied inside a run, at depth 1, and starts nothing.
+beginNormRun :: WHNF -> [Reference] -> Eval ()
+beginNormRun val rs = when (startsRun val) $ whenDeonticLog \ l -> when l.dlWriteFates do
+  depth <- liftIO (readIORef l.dlRunDepth)
+  when (depth == 0) do
+    liftIO (writeIORef l.dlRunDepth 1)
+    store <- readEvalRef (.envLedger)
+    liftIO (writeIORef l.dlRunStart (length (toList store.normLedger)))
+    accRef <- asks (.ctxReads)
+    before <- liftIO ((.crNormRead) <$> readIORef accRef)
+    pushFrame (EndNormRun before)
+  where
+    startsRun = \ case
+      ValObligation {} -> twoArgs
+      ValQuantified {} -> twoArgs
+      ValROp {}        -> twoArgs
+      _                -> False
+    twoArgs = length rs == 2
+
+-- | The run is over: the entries it wrote that were waiting for a clock are
+-- written, the next run starts at depth 0, and the force span that holds the
+-- run is no longer marked as having read the norm log, because the run's
+-- value is a function of the contract, the time and the events, not of the
+-- log it read as it ran (a marked span was never cached, and a run asked
+-- twice ran twice and wrote every fate twice: review of P2b, S2).
+endNormRun :: Bool -> Eval ()
+endNormRun before = do
+  whenDeonticLog \ l -> when l.dlWriteFates do
+    flushArmed l
+    liftIO (writeIORef l.dlRunDepth 0)
+  accRef <- asks (.ctxReads)
+  liftIO (modifyIORef' accRef \ r -> r { crNormRead = before })
+
 -- | NORM-LOG-SPEC N4b: before the log is read, write what the writer holds
 -- back, forcing the arming clock of every norm whose @Armed@ entry still waits
 -- for it. The writer never forces ('tellArmed'), and a root norm's clock is
@@ -2286,8 +2329,18 @@ finishNormRead word d who modal con branch _site = do
       -- grows between two guards at one instant: a thunk that holds a read
       -- must not be served at a later guard (R12; 'crNormRead' vetoes 'validFor')
       noteCtxRead noReads { crNormRead = True }
+      -- review of P2b, S1: a read inside an operand of RAND, ROR or EVERY
+      -- depends on which sibling ran first. The checker refuses the read
+      -- written there; this one is reached through a rule the operand uses
+      sref <- asks (.siblings)
+      sibs <- liftIO (readIORef sref)
+      when (inCompound sibs) $ userException $ UserError $
+        "a norm-log read (" <> readWordText word <> ") ran inside an operand of RAND, ROR or EVERY (through a rule the operand uses): the operands run side by side, so what it saw would depend on which sibling ran first"
       store <- readEvalRef (.envLedger)
-      let entries = [ e | Fate e <- toList store.normLedger ]
+      -- review of P2b, B2: the entries of this run only; a second run in one
+      -- directive (EVALTRACE twice) has its own norms
+      start <- liftIO (readIORef l.dlRunStart)
+      let entries = [ e | Fate e <- drop start (toList store.normLedger) ]
           pat = readPattern who modal (nameToText (getOriginal con)) branch
       case answerRead word d pat entries of
         Left r  -> userException (UserError ("a norm-log read (" <> readWordText word <> ") cannot be answered: " <> NormRead.prettyRefusal r))
@@ -3269,6 +3322,9 @@ backward val = withPoppedFrameKeepingUpdate $ \ case
     readNormForcing word d (BearerIs (partyKeyWHNF val)) modal con branch site
   Just (ReadNorm3 word d who modal con branch site) ->
     readNormForcing word d who modal con branch site
+  Just (EndNormRun before) -> do
+    endNormRun before
+    continueBackward val
   Just (RestoreSibling path clock) -> do
     restoreSibling path clock
     continueBackward val
@@ -3289,6 +3345,7 @@ backward val = withPoppedFrameKeepingUpdate $ \ case
   Just (BinBuiltin2 binOp val1) ->
     runBinOp binOp val1 val
   Just f@(App1 rs mTy) -> do
+    beginNormRun val rs
     case val of
       ValClosure givens e env' -> do
         noteApplication givens e

@@ -47,6 +47,7 @@ EVER FAILED (PARTY _ MUST pay _ UNDER LEST)
 - `UNDER LEST` or `UNDER HENCE` at the end narrows the pattern to norms that a `LEST` (or a `HENCE`) armed.
   A pattern with neither matches the norm wherever it was armed.
 - `AS OF <instant>` after the closing bracket asks as at that instant, in the past or now.
+- `MUST` also matches a norm written with `DO`, which fails on the same terms.
 
 ## Where a read may be written
 
@@ -80,6 +81,7 @@ Loud, each a named error and never a quiet "no":
 - A read with no instant: not in a `PROVIDED` and with no `AS OF`.
 - A read inside an operand of `RAND`, `ROR` or `EVERY`.
   The operands run side by side, so what the read saw would depend on which sibling ran first; the check that makes this safe is not built.
+  A read written in the operand itself is a check error; one written in a rule the operand uses stops the run when it is reached.
 - The wrong number of `_` for the action's fields.
 - Anything but `_` in an argument place, such as `pay 3`: a parse error at that argument, which does not say that only `_` is allowed.
 - A pattern that names an action declared in this module with a modal no norm of the module has: it could never match.
@@ -91,6 +93,8 @@ Loud, each a named error and never a quiet "no":
 Silent, because the answer is a plain "no" with nothing to say that it is wrong:
 
 - **A pattern that names an action an imported module declares** is not checked against that module's norms, so a misspelling of the modal answers "no".
+- **`UNDER LEST` and `UNDER HENCE` are not checked against the module.**
+  The check that a pattern matches some norm of the module looks at the modal and the action only, so `UNDER LEST` where no `LEST` ever arms such a norm answers "no" on every trace.
 - **The arguments are not compared.**
   `pay _` asks about every payment, not about a payment of a given amount.
 - **A permission that lapsed counts as a cure** of the failure it repairs, because a `MAY` that is not exercised is not a breach.
@@ -103,6 +107,8 @@ Silent, because the answer is a plain "no" with nothing to say that it is wrong:
 
 L4 keeps the record only for a contract that reads it: running a module that contains a read switches it on.
 A read written in a module that is imported does not switch it on, so the read stops with an error naming it.
+`l4 batch` does not switch it on either, whatever module it runs, so a read stops there with the same error.
+Each contract run in one directive (two `EVALTRACE`s in one `#EVAL`) keeps its own record: a read in the second does not see the first's norms.
 
 ## Where the read has been run
 
