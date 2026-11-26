@@ -1508,6 +1508,14 @@ forEachDirectiveFreshHeap prepare runDirective importsEnv baseEnv m n =
 --   * a 'WHNF' closure: a new closure of the same code. One over an empty
 --     environment is left as it is: it reaches no Reference but its arguments,
 --     so it has no state to be isolated from (a record's selectors);
+--   * an imported @ASSUME@ ('ValAssumed'): a new cell holding the same value,
+--     so that the JSON hook of 'forEachDirectiveFreshHeap' ('prepare', which
+--     overwrites the cell of an assumed name) writes into the copy and never
+--     into the host's original. The copy is made on every host, for every
+--     directive of a module whose imports declare an @ASSUME@ or a section
+--     @GIVEN@ (which "L4.Desugar" turns into an @ASSUME@). What it guards
+--     against is not reachable today: the hook's one caller,
+--     'execEvalModuleWithJSON', has no imports to copy;
 --   * any other 'WHNF' (a constructor, a builtin) is left shared. A value the
 --     evaluator has finished, such as a list or an obligation, can name
 --     References that a later force would overwrite; leaving it shared is safe
@@ -1569,12 +1577,19 @@ freshImportsHeap imports
       Unevaluated{}              -> True
       WHNFWhen{}                 -> True
       WHNF (ValClosure _ _ env') -> not (Map.null env')
+      WHNF ValAssumed{}          -> True
       WHNF _                     -> False
 
 -- | Evaluate module with JSON input bindings for batch processing.
 -- JSON keys are matched to ASSUME'd L4 variables by name.
 -- The approach: first evaluate the module normally (which pre-allocates References),
 -- then write JSON values into the References for ASSUME'd variables.
+--
+-- Nothing calls this, or 'execEvalModuleWithJSON' (searched 2026-11-26, every
+-- @*.hs@ outside @dist-newstyle@): @l4 batch@ evaluates each row through
+-- 'LSP.L4.Rules.evaluateOn', once per row, and not through here. Since
+-- 'execEvalModuleWithJSON' hands it no imports, 'freshImportsHeap' copies nothing
+-- for it, and its @prepare@ hook has not been run over an imports' heap.
 evalModuleAndDirectivesWithJSON :: Aeson.Value -> Environment -> Module Resolved -> Eval (Environment, [EvalDirectiveResult])
 evalModuleAndDirectivesWithJSON json env m = do
   ienv <- initialEnvironment
@@ -1588,10 +1603,12 @@ evalModuleAndDirectivesWithJSON json env m = do
   results <- forEachDirectiveFreshHeap (writeJSONToReferences json) nfDirective env baseEnv m (length dirs0)
   pure (moduleEnv, results)
 
+-- | No caller: see 'evalModuleAndDirectivesWithJSON'. It passes no imports.
 execEvalModuleWithJSON :: EvalConfig -> EntityInfo -> Aeson.Value -> Module Resolved -> IO (Environment, [EvalDirectiveResult])
 execEvalModuleWithJSON evalConfig entityInfo json m0@(MkModule _ moduleUri _) = do
-  -- @l4 batch@: the JSON is written into the module-level References, which are
-  -- the ROOT of the evaluation, so discharge and a JSON supply compose — a
+  -- The batch entry point this was written for: the JSON is written into the
+  -- module-level References, which are the ROOT of the evaluation, so
+  -- discharge and a JSON supply compose — a
   -- definition reads its binder through its own parameter, and the value that
   -- parameter is handed at the root is the one the request supplied.
   let m = dischargeModuleWith evalConfig.presumeDefaults m0
