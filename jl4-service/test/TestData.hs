@@ -113,6 +113,7 @@ module TestData (
   powerJL4,
   heavyLibJL4,
   heavyMainJL4,
+  heavyLocalJL4,
   deepJL4,
   partialClausesJL4,
   jsonDecodePersonJL4,
@@ -1729,9 +1730,16 @@ heavy MEANS `count down` 5000
 |]
 
 heavyMainJL4 :: Text
-heavyMainJL4 =
+heavyMainJL4 = "IMPORT heavy_lib\n" <> heavyUseJL4
+
+-- | 'heavyLibJL4' and 'heavyMainJL4' as one file: the oracle for what each
+-- request of an imported value must answer (smucclaw/l4-ide#1116).
+heavyLocalJL4 :: Text
+heavyLocalJL4 = heavyLibJL4 <> heavyUseJL4
+
+heavyUseJL4 :: Text
+heavyUseJL4 =
   [i|
-IMPORT heavy_lib
 
 @export default spends n steps of its own, then reads the imported value
 GIVEN n IS A NUMBER

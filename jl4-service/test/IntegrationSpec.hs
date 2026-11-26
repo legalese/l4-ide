@@ -64,7 +64,7 @@ import System.IO.Error (isPermissionError)
 import System.Timeout (timeout)
 import TestData (maybeSynonymJL4, synonymWrapperJL4)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticDeadlineJL4, deonticShapesJL4, deonticLineBreakJL4, deonticRecordPartyJL4, deonticSpacedPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, considerPlanJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, refusingConditionJL4, refusingDeepJL4, refusingOrJL4, refusingFirstJL4, refusingArmJL4, answeredConditionJL4, refusingDistributedJL4, refusingNotJL4, refusingImpliesJL4, refusingImpliesNestedJL4, refusingSeamOpenJL4, refusingBothArmsJL4, conditionalRefuserJL4, clauseGroupSingleJL4, clauseGroupEnumJL4, handEnumJL4, clauseGroupMixedJL4, handMixedJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, letEnumJL4, rowsClauseGroupJL4, letChainJL4, clauseGroupLetResultJL4, lineBreakJL4, partialClausesJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4, inputThenInputJL4, longClausesJL4, longNumberClausesJL4, catchAllHugeJL4, handCatchAllHugeJL4, newNameHugeJL4, newNameDnfJL4, maybeTableJL4, exactlyNameDnfJL4, exactlyHugeJL4, dnfClauseJL4, handDnfJL4, headingDecodeJL4, withalJL4, refuseNamedDefaultJL4, namedSiteDefaultJL4, constructorNamedDefaultJL4, collideSectionsJL4, collideSpacedJL4, deonticFieldDefaultJL4, deonticNestedFieldDefaultJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticDeadlineJL4, deonticShapesJL4, deonticLineBreakJL4, deonticRecordPartyJL4, deonticSpacedPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, considerPlanJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, heavyLocalJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, refusingConditionJL4, refusingDeepJL4, refusingOrJL4, refusingFirstJL4, refusingArmJL4, answeredConditionJL4, refusingDistributedJL4, refusingNotJL4, refusingImpliesJL4, refusingImpliesNestedJL4, refusingSeamOpenJL4, refusingBothArmsJL4, conditionalRefuserJL4, clauseGroupSingleJL4, clauseGroupEnumJL4, handEnumJL4, clauseGroupMixedJL4, handMixedJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, letEnumJL4, rowsClauseGroupJL4, letChainJL4, clauseGroupLetResultJL4, lineBreakJL4, partialClausesJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4, inputThenInputJL4, longClausesJL4, longNumberClausesJL4, catchAllHugeJL4, handCatchAllHugeJL4, newNameHugeJL4, newNameDnfJL4, maybeTableJL4, exactlyNameDnfJL4, exactlyHugeJL4, dnfClauseJL4, handDnfJL4, headingDecodeJL4, withalJL4, refuseNamedDefaultJL4, namedSiteDefaultJL4, constructorNamedDefaultJL4, collideSectionsJL4, collideSpacedJL4, deonticFieldDefaultJL4, deonticNestedFieldDefaultJL4)
 import TestStoreDir (withStoreDir)
 import TestData (deonticEventRecordsJL4, deonticListPartyJL4, deonticMaybeFieldsJL4)
 
@@ -2209,6 +2209,17 @@ spec = describe "integration" do
           loopMessage = "Infinite loop detected"
 
       it "does not spoil the next single evaluation on the same connection" do
+        -- the oracle comes first: the same three requests of the same rules
+        -- written in one file, where the value is worked out afresh by every
+        -- request as a matter of course
+        let heavyOutcome r
+              | statusCode' r == 500, BS.isInfixOf "Evaluation resource limit exceeded" (LBS.toStrict (responseBody r)) = "limit"
+              | statusCode' r == 200, Just (SimpleResponse x) <- Aeson.decode (responseBody r) = maybe "no value" show (Map.lookup "value" x.fnResult)
+              | otherwise = "status " <> show (statusCode' r) <> ": " <> show (responseBody r)
+        twin <- withServiceFromSourcesOpts stingy "heavy-twin" [("heavy_local.l4", heavyLocalJL4)] \twinUrl twinMgr ->
+          forM [call tooMuch, call 0, call tooMuch] \body ->
+            heavyOutcome <$> evalFunction twinUrl twinMgr "heavy-twin" "use-heavy" body
+        twin `shouldBe` ["limit", "FnLitBool True", "limit"]
         withServiceFromSourcesOpts stingy "heavy-single" sources \baseUrl mgr -> do
           hit <- evalFunction baseUrl mgr "heavy-single" "use-heavy" (call tooMuch)
           statusCode' hit `shouldBe` 500
@@ -2228,6 +2239,22 @@ spec = describe "integration" do
           same <- evalFunction baseUrl mgr "heavy-single" "use-heavy" (call tooMuch)
           statusCode' same `shouldBe` 500
           LBS.toStrict (responseBody same) `shouldSatisfy` BS.isInfixOf "Evaluation resource limit exceeded"
+          -- and the three answers are the file's own, written in one file
+          map heavyOutcome [hit, again, same] `shouldBe` twin
+
+      -- A batch case is stopped alike whatever another case of its batch
+      -- worked out. The case that does not fit sits on either side of one that
+      -- does and works the imported value out: until #1116 the second of them
+      -- answered, the value being kept, and now it is stopped as the first was
+      -- (decided by Claude 2026-11-26, pending Meng's review). At one
+      -- capability the cases run in order.
+      it "stops a case again after another case of the batch has worked the value out, at one capability" do
+        withCapabilities 1 $
+          withServiceFromSourcesOpts stingy "heavy-batch" sources \baseUrl mgr -> do
+            resp <- postBatchTo baseUrl mgr "heavy-batch" "use-heavy" [tooMuch, 0, tooMuch]
+            let stopped = CaseLimited AllocationLimitHit
+                  "Evaluation resource limit exceeded: this case allocated more than the memory limit of 64 MB (--max-eval-memory-mb)"
+            expectBatchOutcomes resp [stopped, CaseAnswered, stopped]
 
       it "does not spoil the next evaluation on a new connection, or a batch case" do
         withServiceFromSourcesOpts stingy "heavy-new" sources \baseUrl mgr -> do
