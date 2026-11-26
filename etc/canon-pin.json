@@ -138,12 +138,24 @@
     "96b2b09a8, so this bump moves that one file and nothing else. Whether those",
     "18 rules gain deadlines or lose their LESTs is an encoding question, left",
     "to commons and NOT answered here. The same caveat applies: re-point at a",
-    "main SHA when the mirror is caught up to commons main."
+    "main SHA when the mirror is caught up to commons main.",
+    "",
+    "FIFTH BRANCH PIN, 2026-11-26: comment text in six sg/penal-code-1871",
+    "modules (theft-378-379, charge-sheet, cbt-405-406, cbt-407-409,",
+    "misappropriation-403, robbery-390-392) changed, and so did three @desc",
+    "strings in theft-378-379 (its building, tent and vessel leaves). The six",
+    "tests/*.ep.golden files moved with the modules, line for line; no other",
+    "golden moved, and `l4 run` output is byte-identical for all twelve modules",
+    "in that directory. It was made in commons on branch",
+    "penal-code-comments-at-pin (b1eedb750), stacked on the previous pin",
+    "20d325ff7, so this bump moves those twelve files and nothing else. The same",
+    "caveat applies: re-point at a main SHA when the mirror is caught up to",
+    "commons main."
   ],
   "repo": "legalese/commons",
-  "sha": "20d325ff7938c388c46687bad5a988e802c0b5e8",
-  "ref": "rebless-lest-1097-at-pin",
-  "pinned": "2026-11-25",
+  "sha": "b1eedb750824b535fbb3cba4f51b6f4ea30403bd",
+  "ref": "penal-code-comments-at-pin",
+  "pinned": "2026-11-26",
   "blessed": [
     {
       "from": "subjects/sg/child-support/encodings/legalese",

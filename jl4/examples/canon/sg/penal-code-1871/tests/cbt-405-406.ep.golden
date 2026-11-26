@@ -294,10 +294,10 @@ GIVETH A STRING
         (`included if` (f's `entrusted with dominion over property`) "dominion over property")))
 
 -- "dishonestly" governs the first two limbs; "intentionally" the third, and
--- the section keeps them on separate rails — Woon, Essential Criminal Law ch 8
--- p 192, draws "Dishonesty" as the head of the upper branch and "Intentionally
--- suffers another person to" as the head of the lower one, with nothing in the
--- figure letting one adverb reach the other branch's verbs.
+-- the section keeps them on separate rails: "dishonestly misappropriates or
+-- converts ... or dishonestly uses or disposes of ... or intentionally suffers
+-- any other person to do so". Each adverb is written in front of its own
+-- verbs, and nothing in the text lets one reach the other's (notes/forks.md, PC-6).
 --
 -- This used to be built as two independent lists — every adverb that held,
 -- then every verb that held — concatenated as "did <adverbs> <verbs>". That

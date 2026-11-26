@@ -7,11 +7,11 @@
 --
 -- All three are built ON TOP of section 405, which `cbt-405-406.l4` already
 -- defines. None of them redefines criminal breach of trust; each adds a
--- CAPACITY to it and raises the punishment. Woon, *Essential Criminal Law*
--- ch. 8, draws exactly that: on p. 196 (s 408) and p. 198 (s 409) the
--- rightmost element before the consequent is a single box reading "Criminal
--- breach of trust in respect of that property", and everything to its left is
--- the capacity. This module has the same shape, because a call to another
+-- CAPACITY to it and raises the punishment. Each section says so in its own
+-- words: the capacity first, then "commits criminal breach of trust in respect
+-- of such property" (s 407) or "... of that property" (ss 408 and 409), the
+-- one element that is s 405 itself, and everything before it is the
+-- capacity. This module has the same shape, because a call to another
 -- rule draws as ONE box on the caller's ladder (`penal-code-general.l4`,
 -- "A design call") and `commits criminal breach of trust` is that call.
 --
@@ -149,7 +149,7 @@
 --    carries `breach of trust IS A CBT Facts`, and every rule below ends in
 --    `commits criminal breach of trust` (c's `breach of trust`). That is the
 --    same nesting `robbery-390-392.l4` uses for `theft IS A Theft Facts`, and
---    it is what makes Woon's single CBT box a single box here. The one
+--    it is what makes s 405 a single call in each rule here. The one
 --    `property` field that Carl Elias Moses turns on is therefore still the
 --    one property, all the way up: s 407's "in respect of SUCH property" and
 --    ss 408 and 409's "in respect of THAT property" cannot come apart from the
@@ -172,9 +172,9 @@
 -- 3. s 408's CAPACITY IS TWO LEAVES, NOT ONE. The section says "being an
 --    employee, AND being in any manner entrusted IN SUCH CAPACITY". It is not
 --    enough that a person who happens to be an employee was entrusted; the
---    entrustment must be made to him as the employee he is. Woon draws this as
---    two boxes in series ("Being an employee" -> "In such capacity entrusted
---    with"), and the bench below has a fixture that separates them: an
+--    entrustment must be made to him as the employee he is ("in such
+--    capacity"). So the two are leaves in series (notes/forks.md, PC-8), and
+--    the bench below has a fixture that separates them: an
 --    employee entrusted in a private capacity is outside s 408 and still
 --    inside s 406.
 --
@@ -184,17 +184,17 @@
 --    than by a separate gate like s 408's. Each `@desc` asks the question that
 --    way round.
 --
--- 5. s 409(1)(c) CARRIES THE CARVE-OUT, WHICH WOON'S FIGURE DROPS. On p. 198
---    the residual limb is drawn as a bare box, "In other professional
---    capacity", in parallel with the other two groups. The statute writes it
+-- 5. s 409(1)(c) CARRIES THE CARVE-OUT. The residual limb is not a bare
+--    "professional capacity", in parallel with the other paragraphs and
+--    overlapping (b): the statute writes it
 --    as "in his professional capacity (OTHER THAN by way of a trade,
 --    profession or business mentioned in paragraph (b))", and that parenthesis
 --    is what makes (c) a residual rather than an overlap with (b). The leaf
---    below is named with the exclusion and its `@desc` spells it out. This
---    encoding follows the statute, not the box. (A figure of parallel branches
---    cannot show an exclusion without an extra node, which is a limit of the
---    drawing rather than a mistake in the book; Woon's own text on the same
---    page concedes that the undefined terms are left to their ordinary sense.)
+--    below is named with the exclusion and its `@desc` spells it out, so a
+--    trade, profession or business already caught by (b) cannot also be
+--    caught by (c). The exclusion is the statute's own parenthesis, and the
+--    leaf name quotes it in full, so the question an officer is asked is
+--    the statute's question and no wider.
 --
 -- 6. s 409(2) AND s 409(3) ARE DEFINITIONS AND AVOIDANCE OF DOUBT, NOT
 --    ELEMENTS. They tell an officer how to answer a capacity leaf; they add no
@@ -206,12 +206,12 @@
 --    does not stop one arising. The s 408(2) extensions of "employee" work the
 --    same way.
 --
--- 7. WOON'S SUB-BOXES ARE KEPT. p. 198 draws paragraph (b) as two columns in
---    series — {Trade | Profession | Business} then {Banker | Merchant | factor
---    | Broker | Attorney | Agent} — and paragraph (g) as "Key executive of a"
---    then {Corporation | Unincorporated association | Partnership}. Both are
---    inlined below at that granularity rather than hidden behind a named
---    sub-rule, so the ladder shows what the page shows. The recital helper
+-- 7. THE STATUTE'S OWN SUB-LISTS ARE KEPT. Paragraph (b) is two lists in
+--    series — "in the way of his trade, profession or business" then "as a
+--    banker, a merchant, a factor, a broker, an attorney or an agent" — and
+--    paragraph (g) is "a key executive of" then "a corporation, an
+--    unincorporated association or a partnership". Both are inlined below, one
+--    leaf per alternative, not behind a named sub-rule (notes/forks.md, PC-9). The recital helper
 --    repeats the (b) condition, as `in violation of what` already repeats the
 --    second-limb condition in `cbt-405-406.l4`.
 --
@@ -744,7 +744,7 @@ GIVETH A Charge
 -- The same agent, with the OTHER column of paragraph (b) removed: he is an
 -- agent, but not in the way of any trade, profession or business of his own.
 -- Paragraph (b) needs both columns, so section 409 is not made out and section
--- 406 still is. Woon draws the two columns in series for exactly this reason.
+-- 406 still is: the statute writes the two lists in series, so both must hold.
 `the Penang agent, not in the way of any trade, profession or business` MEANS `Aggravated CBT Facts` WITH
     particulars           IS `the Penang agent, in the way of his business`'s particulars
     `breach of trust`     IS `the Penang agent, in the way of his business`'s `breach of trust`

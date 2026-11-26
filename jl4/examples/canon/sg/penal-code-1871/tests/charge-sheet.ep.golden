@@ -47,8 +47,8 @@ IMPORT `hurt-321-323A`
 -- `theft` and `theft in dwelling` each carry a `Theft Facts`, and nothing in
 -- the type ties them together. A `Complaint` whose `theft in dwelling`'s nested
 -- theft differed from its own `theft` could return s 380 without s 379 — which
--- s 380 itself forbids, theft being an element of theft in dwelling (Woon,
--- Essential Criminal Law ch. 8 p. 185). The row ALREADY has that shape for
+-- s 380 itself forbids, theft being its first element ("Whoever commits
+-- theft in any building ..."). The row ALREADY has that shape for
 -- robbery: `robbery` nests its own `Theft Facts` beside the `theft` field. It is
 -- handled the same way here — every fixture below supplies the SAME named theft
 -- record to both, and a reader adding one should do likewise. The alternative,
@@ -209,12 +209,12 @@ GIVETH A LIST OF STRING
     intimidation      IS `Chan Yok Tuang, the facts as they were`
     hurt              IS `Ang Boon Han, the hurt intended was grievous`
 
--- Shop theft, the case Woon calls by far the most common version of theft: the
--- router lists s 380 and s 379 on the same taking, the 7-year section first.
--- Woon, Essential Criminal Law ch. 8 p. 185, records that it is not clear from
--- the SPF Annual Crime Brief 2022 which of the two shop theft is prosecuted
--- under, and that cases may straddle both — charged under s 380, reduced to
--- s 379 on a plea of guilt. Both rows firing is that straddle.
+-- Shop theft: the router lists s 380 and s 379 on the same taking, the 7-year
+-- section first. A shop is a building used for the custody of property
+-- (notes/forks.md, PC-2), and theft is the first element of s 380, so
+-- wherever s 380 is made out s 379 is too. Both rows firing is that overlap;
+-- which one a prosecutor lays is a choice the Code leaves to the
+-- prosecutor, and the router does not make it.
 `Tan Mei Ling's complaint` MEANS Complaint WITH
     cheating          IS `Lewis Christine, no deception`
     theft             IS `Tan Mei Ling`
