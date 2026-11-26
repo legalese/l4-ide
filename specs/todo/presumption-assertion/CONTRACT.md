@@ -77,8 +77,21 @@ The contradiction-detecting alternative is deferred there and deferred here (§1
 **Assumed, not ruled.** A request may assert a definition that
 
 - is declared **with no `GIVEN` of its own**: a `WHERE` or `LET … IN` local at any depth (both are allocated the same way, `Machine.hs:1582–1589`), in the exported rule or in a helper it relies on, or a section- or module-level definition without parameters;
-- is defined in the **main module**, not in an `IMPORT` (imported modules are evaluated once at deploy into a shared environment, `jl4-service/src/Compiler.hs:68`, `:332`, `Backend/Jl4.hs:1070`);
+- is defined in the **main module**, not in an `IMPORT` (the reason given was that imported modules are evaluated once at deploy into a shared environment, `jl4-service/src/Compiler.hs:68`, `:332`, `Backend/Jl4.hs:1070`, at `c6d081622`, this document's base for "today"; half of that reason stopped holding on 2026-11-26, and the restriction stays: see the paragraph below);
 - and has a **name that is unique** among the nullary definitions of the main module (§3.1).
+
+**Why the second bullet stays (half of its reason stopped holding 2026-11-26; this paragraph written 2026-11-27, read at `53207b66b`, not run).**
+The reason had two halves: that imported modules are evaluated once at deploy, and that the environment is therefore shared by every request.
+The first half is still so on the direct path: the imports' heap is allocated once, at deploy, and as far as a grep shows no host in the tree forces it (outside `EvaluateLazy.hs`, only tests call `evalExprForLedgerWithEnv` or `moduleEnvForLedger`; the code's own comment, `EvaluateLazy.hs:1519–1523`, allows that a host could); on the wrapper path each request runs in a session of its own (`jl4-service/README.md:550`).
+The second half no longer holds, on either path: each `#EVAL`, `#TRACE` and service request reads an imported rule over a copy of its own, for rules whose free names are all in the environment given (`EvaluateLazy.hs:1532–1536`).
+The copy is made here: `evalModuleAndDirectivesWith` (defined at `jl4-core/src/L4/EvaluateLazy.hs:1418`) calls `forEachDirectiveFreshHeap` (called at `:1435`, defined at `:1472`), which calls `freshImportsHeap` (called at `:1484`, defined at `:1541`), once per directive.
+The service's direct path reaches that from `jl4-service/src/Backend/Jl4.hs:1297`, through `execEvalExprInContextOfModuleWith` (defined at `:1643`) and `execEvalModuleWithDefaults` (called at `:1652`, defined at `:1128`, which calls `evalModuleAndDirectivesWith` at `:1141`).
+The wrapper path reaches it from `Backend/Jl4.hs:2205` (`GetLazyEvaluationDependencies`, `jl4-lsp/src/LSP/L4/Rules.hs:1912`), through `Rules.hs:1455` and `execEvalModuleWithEnvAndImports` (`EvaluateLazy.hs:1116–1118`), which calls the same `execEvalModuleWithDefaults`.
+Meng ruled the behaviour on 2026-11-26 (CLEANSLATE; smucclaw/l4-ide#1116, `legalese/l4-ide#886`): every `#EVAL`, `#TRACE` and service request reads an imported rule afresh, with no opt-out for the service; the ruling is recorded at `EvaluateLazy.hs:1538–1540` and `jl4-service/README.md:552`.
+The restriction itself stays, **assumed, not ruled**, because applying an assertion to each request's copy of the imports' heap is not designed here.
+§13 keeps asserting an imported definition as a non-goal.
+The three cites in the bullet are `c6d081622`'s and were not corrected in place: at `53207b66b` `Compiler.hs:68` is a blank line, `Backend/Jl4.hs:1070` is a line of `evaluateWithCompiledDeontic`'s signature, and `:332` is the `sharedModule` field of a record that also holds the environment; the lines that now hold what they pointed at are `Compiler.hs:143` (the `typecheckAndEvalBundle` call), `Compiler.hs:321` (`importEnv`) and `Backend/Jl4.hs:1303` (`compiled.compiledImportEnv`).
+§9's own cites, and the second reason it gives for the main module's URI (the config matches definitions by `moduleUri`), were not re-checked for this update.
 
 A definition with its own `GIVEN` is applied, possibly several times with different arguments; the ladder draws each application as a call panel keyed by position (DESIGN §27; `WHERE-INLINING-SPEC.md` §10.1), and asserting one application needs an argument-indexed address this version does not define (§13).
 Such an assertion is refused: "`is creditworthy` takes inputs of its own; an application of it cannot be asserted by name".
