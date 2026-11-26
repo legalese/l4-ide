@@ -243,6 +243,11 @@ bpmnOfferingSource   = "examples/bpmn/offering.l4"
 bpmnOfferingGolden   = "examples/bpmn/expected/offering.bpmn"
 bpmnOfferingFidelity = "examples/bpmn/expected/offering.fidelity.txt"
 
+-- A decision and a regulative rule, in a module that imports the prelude and
+-- calls nothing in it: one file for both the DMN and the BPMN report.
+exportImportsPreludeDutyFixture :: FilePath
+exportImportsPreludeDutyFixture = fixtureDir </> "export-imports-prelude-duty.l4"
+
 dmnSource, dmnGolden, dmnMarkdownGolden :: FilePath
 dmnSource         = "examples/dmn/reg-cf.l4"
 dmnGolden         = "examples/dmn/expected/reg-cf.dmn"
@@ -950,6 +955,24 @@ spec bin = do
             ["export", "dmn-md", exportImportsPreludeUnusedFixture, "--fidelity-report"]
           codeMd `shouldBe` ExitSuccess
           serrMd `shouldSatisfy` ("[D-NOT-LIBRARY] advisory" `isInfixOf`)
+
+        -- The note is the DMN reports': the BPMN report leaves it out.
+        it "leaves the D-NOT-LIBRARY note out of the BPMN report" $ do
+          env <- envWithout
+          libCopy <- editedLibraryCopy "l4-dmn-library-bpmn" "prelude.l4" "\n-- edited\n"
+          let withLib = Just (("JL4_LIBRARY_PATH", libCopy) : env)
+          Output code sout serr <- runL4WithEnv withLib bin
+            ["export", "bpmn", exportImportsPreludeDutyFixture, "--fidelity-report"]
+          code `shouldBe` ExitSuccess
+          -- the process was written, and its report printed
+          sout `shouldSatisfy` ("Process_the_payment" `isInfixOf`)
+          serr `shouldSatisfy` ("— Process_the_payment" `isInfixOf`)
+          serr `shouldNotSatisfy` ("D-NOT-LIBRARY" `isInfixOf`)
+          -- the same file over the same folder, exported to DMN, gets the note
+          Output codeDmn _ serrDmn <- runL4WithEnv withLib bin
+            ["export", "dmn", exportImportsPreludeDutyFixture, "--fidelity-report"]
+          codeDmn `shouldBe` ExitSuccess
+          serrDmn `shouldSatisfy` (notLibrary `isInfixOf`)
 
         -- The compiled-in copy is the library only when it type-checks.
         -- The export still exits 0 on a file `l4 check` refuses; that is
