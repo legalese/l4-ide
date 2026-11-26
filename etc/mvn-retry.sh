@@ -64,6 +64,11 @@ _l4_mvn_run_timed() {
       kill -0 "$pid" 2>/dev/null || exit 0
       i=$((i + 1))
     done
+    # CMD may have finished in the instant since the last check; do not mark a
+    # finished run as timed out. (A finish between this check and the next line
+    # can still be read as a timeout, which retries a success and never passes a
+    # failure.)
+    kill -0 "$pid" 2>/dev/null || exit 0
     : >"$flag"
     pkill -TERM -P "$pid" 2>/dev/null || true
     kill -TERM "$pid" 2>/dev/null || true
