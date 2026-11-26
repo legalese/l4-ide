@@ -48,6 +48,10 @@ contains() { # NAME TEXT NEEDLE
 #                  only the helper's `pkill -P` reaches it.
 #   hang-stubborn  as hang-child, but TERM is ignored (and inherited by the
 #                  child), so only the KILL escalation ends it.
+#   hang-exit0     as hang-child, but it exits 0 when it is TERMed. A wrapper
+#                  script does this when the sleeping child it waits for is
+#                  killed first. The attempt was killed, so it must NOT count as
+#                  a success: only the timeout flag says so.
 cat >"$work/bin/mvn" <<'EOF'
 #!/usr/bin/env bash
 n=$(cat "$STUB_COUNT" 2>/dev/null || echo 0)
@@ -61,6 +65,7 @@ case "$STUB_MODE" in
   hang-once) [ "$n" -eq 1 ] && { echo "$$" >>"$STUB_PIDS"; exec sleep 600; } ;;
   hang-child) sleep 600 & echo "$$ $!" >>"$STUB_PIDS"; wait ;;
   hang-stubborn) trap '' TERM; sleep 600 & echo "$$ $!" >>"$STUB_PIDS"; wait ;;
+  hang-exit0) trap 'exit 0' TERM; sleep 600 & echo "$$ $!" >>"$STUB_PIDS"; wait ;;
 esac
 for a in "$@"; do
   case "$a" in -Dmdep.outputFile=*) echo "/stub.jar" >"${a#-Dmdep.outputFile=}" ;; esac
@@ -145,6 +150,11 @@ helper hang-stubborn 1 1
 check "helper, process that ignores TERM: NOT a pass (124)" 124 "$RC"
 contains "helper, process that ignores TERM: says it timed out" "$ERR" "attempt 1/1 failed (timed out after 1s)"
 check "helper, process that ignores TERM: KILLed, nothing left running" 0 "$(leaked)"
+
+helper hang-exit0 2 1
+check "helper, process that exits 0 once TERMed: NOT a pass (124)" 124 "$RC"
+contains "helper, process that exits 0 once TERMed: says it timed out" "$ERR" "attempt 1/1 failed (timed out after 2s)"
+check "helper, process that exits 0 once TERMed: nothing left running" 0 "$(leaked)"
 
 # ---- the harnesses: a persistent failure keeps its old meaning --------------
 # Both DMN harnesses SKIP on a resolution failure, and that SKIP is exit 1 under
