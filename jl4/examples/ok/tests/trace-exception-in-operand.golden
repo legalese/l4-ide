@@ -1,0 +1,108 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+trace-exception-in-operand.l4:29:5-31:26:
+  I found a problem while checking the definition of `nonex leg`:
+    The following branches still need to be considered:
+    
+      OTHERWISE
+    
+trace-exception-in-operand.l4:64:1-74:
+  The model refuses to answer:
+    not modelled
+  
+  ─────
+  ┌ EVALTRACE OF `refuse then fulfilled`, 0, (LIST (EVENT OF Bob, deliver, 9))
+  ├ a OF b, c
+  │┌ a
+  │└ `refuse leg` OR FULFILLED
+  │• ↯ refused: not modelled
+  └ ↯ refused: not modelled
+trace-exception-in-operand.l4:65:1-74:
+  FULFILLED
+  ─────
+  ┌ EVALTRACE OF `fulfilled then refuse`, 0, (LIST (EVENT OF Bob, deliver, 9))
+  ├ a OF b, c
+  │┌ a
+  │└ FULFILLED OR `refuse leg`
+  └ FULFILLED
+trace-exception-in-operand.l4:66:1-67:
+  The model refuses to answer:
+    not modelled
+  
+  ─────
+  ┌ EVALTRACE OF `refuse and del`, 0, (LIST (EVENT OF Bob, deliver, 9))
+  ├ a OF b, c
+  │┌ a
+  │└ `refuse leg` AND `plain del`
+  │• ↯ refused: not modelled
+  └ ↯ refused: not modelled
+trace-exception-in-operand.l4:67:1-67:
+  The model refuses to answer:
+    not modelled
+  
+  ─────
+  ┌ EVALTRACE OF `del and refuse`, 0, (LIST (EVENT OF Bob, deliver, 9))
+  ├ a OF b, c
+  │┌ a
+  │└ `plain del` AND `refuse leg`
+  │• ↯ refused: not modelled
+  └ ↯ refused: not modelled
+trace-exception-in-operand.l4:68:1-71:
+  Division by zero in the operation:
+  DIVIDED BY
+  
+  ─────
+  ┌ EVALTRACE OF `div then fulfilled`, 0, (LIST (EVENT OF Bob, deliver, 9))
+  │┌ LIST (EVENT OF Bob, deliver, 9)
+  │├ (EVENT OF Bob, deliver, 9) FOLLOWED BY (LIST )
+  ││┌ EVENT OF Bob, deliver, 9
+  ││└ EVENT OF (...), (...), 9
+  │└ LIST EVENT OF (...), (...), 9, ...
+  ├ a OF b, c
+  │┌ a
+  │└ `div leg` OR FULFILLED
+  │• ↯ division by zero
+  └ ↯ division by zero
+trace-exception-in-operand.l4:69:1-73:
+  The value
+    3
+  reached a CONSIDER that has no branch for it.
+  Add a WHEN branch for this case, or a catch-all OTHERWISE branch.
+  The typechecker's exhaustiveness warning lists all missing branches.
+  
+  ─────
+  ┌ EVALTRACE OF `nonex then fulfilled`, 0, (LIST (EVENT OF Bob, deliver, 9))
+  ├ a OF b, c
+  │┌ a
+  │└ `nonex leg` OF 3 OR FULFILLED
+  │• ↯ non-exhaustive patterns
+  └ ↯ non-exhaustive patterns
+trace-exception-in-operand.l4:70:1-73:
+  I could not continue evaluating, because I needed to know the value of
+    gate
+  but it is an assumed term.
+  
+  ─────
+  ┌ EVALTRACE OF (`stuck then fulfilled` OF gate), 0, (LIST (EVENT OF Bob, deliver, 9))
+  │┌ `stuck then fulfilled` OF gate
+  ││┌ `stuck then fulfilled`
+  ││└ <function>
+  │├ (`stuck leg` OF gate) ROR FULFILLED
+  │└ `stuck leg` OF gate OR FULFILLED
+  ├ a OF b, c
+  │┌ a
+  │└ `stuck leg` OF gate OR FULFILLED
+  │• ↯ stuck
+  └ ↯ stuck
+trace-exception-in-operand.l4:71:1-59:
+  The model refuses to answer:
+    not modelled
+  
+  ─────
+  ┌ EVALTRACE OF nested, 0, (LIST (EVENT OF Bob, deliver, 9))
+  ├ a OF b, c
+  │┌ a
+  │└ `refuse leg` RAND `plain del` OR FULFILLED
+  │• ↯ refused: not modelled
+  └ ↯ refused: not modelled

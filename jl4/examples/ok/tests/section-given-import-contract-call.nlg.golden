@@ -1,0 +1,39 @@
+executing contract `left reader` at 0 with the following events: party `Alice` did `pay` with 1 at 4 `WAITUNTIL` with 30
+executing contract `left reader` at 0 with the following events: party `Alice` did `pay` with 1 at 7 `WAITUNTIL` with 30
+executing contract `right reader` at 0 with the following events: party `Alice` did `pay` with 1 at 4 `WAITUNTIL` with 30
+executing contract `right reader` at 0 with the following events: party `Alice` did `pay` with 1 at 7 `WAITUNTIL` with 30
+executing contract `or, left reader` at 0 with the following events: party `Alice` did `pay` with 1 at 4 `WAITUNTIL` with 30
+executing contract `or, left reader` at 0 with the following events: party `Alice` did `pay` with 1 at 7 `WAITUNTIL` with 30
+executing contract `or, right reader` at 0 with the following events: party `Alice` did `pay` with 1 at 4 `WAITUNTIL` with 30
+executing contract `or, right reader` at 0 with the following events: party `Alice` did `pay` with 1 at 7 `WAITUNTIL` with 30
+executing contract `both readers` at 0 with the following events: party `Alice` did `pay` with 1 at 4 `WAITUNTIL` with 30
+executing contract `both readers` at 0 with the following events: party `Alice` did `pay` with 1 at 7 `WAITUNTIL` with 30
+executing contract `or, both readers` at 0 with the following events: party `Alice` did `pay` with 1 at 4 `WAITUNTIL` with 30
+executing contract `or, both readers` at 0 with the following events: party `Alice` did `pay` with 1 at 7 `WAITUNTIL` with 30
+executing contract `nested left` at 0 with the following events: party `Alice` did `pay` with 1 at 4 `WAITUNTIL` with 30
+executing contract `nested left` at 0 with the following events: party `Alice` did `pay` with 1 at 7 `WAITUNTIL` with 30
+executing contract `nested right` at 0 with the following events: party `Alice` did `pay` with 1 at 4 `WAITUNTIL` with 30
+executing contract `nested right` at 0 with the following events: party `Alice` did `pay` with 1 at 7 `WAITUNTIL` with 30
+executing contract `under an IF, then` at 0 with the following events: party `Alice` did `pay` with 1 at 4 `WAITUNTIL` with 30
+executing contract `under an IF, then` at 0 with the following events: party `Alice` did `pay` with 1 at 7 `WAITUNTIL` with 30
+executing contract `under an IF, else` at 0 with the following events: party `Alice` did `pay` with 1 at 4 `WAITUNTIL` with 30
+executing contract `under an IF, else` at 0 with the following events: party `Alice` did `pay` with 1 at 7 `WAITUNTIL` with 30
+executing contract `under a CONSIDER` at 0 with the following events: party `Alice` did `pay` with 1 at 4 `WAITUNTIL` with 30
+executing contract `under a CONSIDER` at 0 with the following events: party `Alice` did `pay` with 1 at 7 `WAITUNTIL` with 30
+executing contract `under a WHERE` at 0 with the following events: party `Alice` did `pay` with 1 at 4 `WAITUNTIL` with 30
+executing contract `under a WHERE` at 0 with the following events: party `Alice` did `pay` with 1 at 7 `WAITUNTIL` with 30
+executing contract `under a LET` at 0 with the following events: party `Alice` did `pay` with 1 at 4 `WAITUNTIL` with 30
+executing contract `under a LET` at 0 with the following events: party `Alice` did `pay` with 1 at 7 `WAITUNTIL` with 30
+executing contract `two section GIVENs` at 0 with the following events: party `Alice` did `pay` with 1 at 4 `WAITUNTIL` with 30
+executing contract `two section GIVENs` at 0 with the following events: party `Alice` did `pay` with 1 at 7 `WAITUNTIL` with 30
+executing contract `plain reader` at 0 with the following events: party `Alice` did `pay` with 1 at 4 `WAITUNTIL` with 30
+executing contract `plain reader` at 0 with the following events: party `Alice` did `pay` with 1 at 7 `WAITUNTIL` with 30
+executing contract `no section GIVEN` at 0 with the following events: party `Alice` did `pay` with 1 at 4 `WAITUNTIL` with 30
+executing contract `no section GIVEN` at 0 with the following events: party `Alice` did `pay` with 1 at 7 `WAITUNTIL` with 30
+executing contract `as a HENCE` at 0 with the following events: party `Bob` did `deliver` at 3 party `Alice` did `pay` with 1 at 6 `WAITUNTIL` with 30
+executing contract `as a HENCE` at 0 with the following events: party `Bob` did `deliver` at 3 party `Alice` did `pay` with 1 at 9 `WAITUNTIL` with 30
+executing contract `as a LEST, met` at 0 with the following events: party `Bob` did `deliver` at 3 `WAITUNTIL` with 30
+executing contract `as a LEST, missed` at 0 with the following events: party `Alice` did `pay` with 1 at 12 `WAITUNTIL` with 30
+executing contract `as a LEST, missed` at 0 with the following events: party `Alice` did `pay` with 1 at 17 `WAITUNTIL` with 30
+executing contract `in a HENCE` at 0 with the following events: party `Bob` did `deliver` at 3 party `Alice` did `pay` with 1 at 6 party `Bob` did `deliver` at 7 `WAITUNTIL` with 30
+executing contract `in a HENCE` at 0 with the following events: party `Bob` did `deliver` at 3 party `Alice` did `pay` with 1 at 9 party `Bob` did `deliver` at 7 `WAITUNTIL` with 30

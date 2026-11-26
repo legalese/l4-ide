@@ -1,0 +1,26 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+section-given-import-contract-mid.l4:22:1-24:15:
+  DEONTIC BREACHED:
+    BREACH
+    BY Alice BECAUSE "late"
+    BY Bob
+      who had to do obligatory action
+        MUST deliver
+      before their deadline, which was at
+        10
+section-given-import-contract-mid.l4:32:1-35:15:
+  DEONTIC BREACHED:
+    BREACH
+    BY Alice
+    BECAUSE "late"
+section-given-import-contract-mid.l4:43:1-45:15:
+  DEONTIC BREACHED:
+    BREACH
+    BY Alice BECAUSE "late"
+    BY Bob
+      who had to do obligatory action
+        MUST deliver
+      before their deadline, which was at
+        12

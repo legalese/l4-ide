@@ -257,6 +257,13 @@ data Frame =
   -- Note [Operands in step] and 'startCompound'.
   | Lockstep LockstepFrame
   | App1 {- -} [Reference] (Maybe (Type' Resolved)) -- Added type for type-directed builtins
+  -- smucclaw/l4-ide#1118: the 'App1' of an operand of a compound, which gives
+  -- the operand the time and the events. It is applied exactly as an 'App1'
+  -- is ('asApp1'). It is a frame of its own because the two mean different
+  -- things to a reference evaluated above them: above an 'App1' the reference
+  -- is the function being called, above this one it is the operand being
+  -- evaluated ('topFrameAppliesArguments').
+  | App1Operand {- -} [Reference] (Maybe (Type' Resolved))
   | IfThenElse1 {- -} (Expr Resolved) (Expr Resolved) Environment
   | ConnectiveLeft Connective (Maybe ConnRight) {- -}
     -- ^ the left operand of a built-in connective (NOT's only one) is being
@@ -1627,6 +1634,7 @@ unwindFrame = \ case
   ReadCell1 {}                  -> pure ()
   ReadCell2 {}                  -> pure ()
   App1 {}                       -> pure ()
+  App1Operand {}                -> pure ()
   ConnectiveLeft {}             -> pure ()
   ConnectiveRight {}            -> pure ()
   IfThenElse1 {}                -> pure ()
@@ -2475,7 +2483,7 @@ startCompound env op rexpr1 rexpr2 rs appType = do
       pushFrame $ ContractFrame $ RBinOp1 MkRBinOp1 {args = rs, ..}
       -- apply the arguments of the left hand expression to the
       -- expression
-      pushFrame (App1 rs appType)
+      pushFrame (App1Operand rs appType)
       -- R-Q7B: the operand is handed off here, exactly as a HENCE's
       -- value is, so a continuation that arrives as a VALUE inside a
       -- compound anchors to the obligation the compound is attached
@@ -2614,7 +2622,7 @@ lockstepNext ls = case ls.lsRound of
         setDyn start {dyPath = (ls.lsScope, i) : start.dyPath, dyClock = maybe (StartOf ls.lsScope) At clock, dyMuted = start.dyMuted + 1}
         gate <- mintGate ls.lsGate
         pushFrame (Lockstep running)
-        pushFrame (App1 [ls.lsTime, gate] ls.lsType)
+        pushFrame (App1Operand [ls.lsTime, gate] ls.lsType)
         -- R-Q7B: the operand is handed off here, exactly as a HENCE's value
         -- is ('operandHandoff')
         operandHandoff ls.lsEnv rexpr
@@ -2941,13 +2949,16 @@ forwardExpr env = \ case
     -- allocated, not forwarded -- so an 'App1' carrying arguments on top of the
     -- stack means this reference is the function of that application.
     --
-    -- An operand of RAND or ROR is evaluated in this position too: the compound
-    -- pushes the 'App1' that gives it the time and the events. So an imported
-    -- rule that reads a section GIVEN and returns a contract, written directly
-    -- as such an operand, is still not applied to its own cell here and stops
-    -- with "given signatures' values' lengths do not match"
-    -- (smucclaw/l4-ide#1115; the same before 'allocate_' applied one). The two
-    -- uses of this 'App1' cannot be told apart from here.
+    -- An operand of RAND or ROR is evaluated above an application too: the
+    -- compound's own, which gives the operand the time and the events. That one
+    -- is an 'App1Operand', not an 'App1', so it is not this reference's call
+    -- and an imported rule that reads a section GIVEN and returns a contract is
+    -- applied to its own cell here before it is handed them (smucclaw/l4-ide#1118;
+    -- as an 'App1' it stopped with "given signatures' values' lengths do not
+    -- match"). A reference under an IF, a CONSIDER, a WHERE or a LET that is
+    -- itself the operand is reached with that frame still on top, or, inside a
+    -- HENCE or a LEST, with the hand-off frame ('operandHandoff') on top, which
+    -- is not a call either.
     beingApplied <- topFrameAppliesArguments
     -- A bare JSONDECODE in value position, passed as a function, decodes at
     -- the type its own reference was checked at ('jsonDecodeTargetOfReference').
@@ -3182,7 +3193,7 @@ forwardExpr env = \ case
       Nothing -> userException (UserError (lifecycleValueRefusal p))
 
 backward :: WHNF -> Machine Config
-backward val = withPoppedFrameKeepingUpdate $ \ case
+backward val = withPoppedFrameKeepingUpdate $ \ popped -> case asApp1 <$> popped of
   Nothing -> continueDone val
   Just (BinOp1 binOp e2 env) -> do
     pushFrame (BinOp2 binOp val)
@@ -3783,6 +3794,8 @@ backward val = withPoppedFrameKeepingUpdate $ \ case
     dropTopFrame
     continueBackward val
   Just (ContractFrame cFrame) -> backwardContractFrame val cFrame
+  -- 'asApp1' has turned every 'App1Operand' into the 'App1' it stands for
+  Just App1Operand {} -> internalException $ RuntimeTypeError "an operand's application was not read as an application"
 
 backwardContractFrame :: Value Reference -> ContractFrame -> Machine Config
 backwardContractFrame val = \ case
@@ -4590,7 +4603,7 @@ backwardContractFrame val = \ case
     -- second argument has completed
     pushCFrame $ RBinOp2 MkRBinOp2 {rval1 = val, ..}
     -- pass the arguments to the regulative expression
-    pushFrame $ App1 args Nothing
+    pushFrame $ App1Operand args Nothing
     -- R-Q7B: the right operand is handed off like the left one was
     operandHandoff env rexpr2
     maybeEvaluate env rexpr2
@@ -6019,7 +6032,8 @@ finishRead mode cellVal key site ledger = do
 -- | Is the top of the stack an application waiting for its function?
 --
 -- 'App1' with a NON-empty argument list. The empty one is what
--- 'autoApplyDischargedImport' itself pushes, and must not count.
+-- 'autoApplyDischargedImport' itself pushes, and must not count. Neither does
+-- an 'App1Operand', which a compound pushes above its operand's application.
 topFrameAppliesArguments :: Machine Bool
 topFrameAppliesArguments = do
   stackRef <- asks (.stack)
@@ -6027,6 +6041,12 @@ topFrameAppliesArguments = do
   pure case st.frames of
     App1 (_ : _) _ : _ -> True
     _                  -> False
+
+-- | An 'App1Operand' as the 'App1' it stands for; every other frame as it is.
+asApp1 :: Frame -> Frame
+asApp1 = \ case
+  App1Operand rs mTy -> App1 rs mTy
+  f                  -> f
 
 -- | The type a bare @JSONDECODE@ reference decodes into, when it is passed as
 -- a function (@map JSONDECODE xs@) rather than applied where it is written

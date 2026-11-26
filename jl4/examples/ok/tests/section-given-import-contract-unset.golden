@@ -1,0 +1,15 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+section-given-import-contract-unset.l4:23:1-25:15:
+  I could not continue evaluating, because I needed to know the value of
+    gate
+  but it is an assumed term.
+section-given-import-contract-unset.l4:27:1-29:15:
+  I could not continue evaluating, because I needed to know the value of
+    gate
+  but it is an assumed term.
+section-given-import-contract-unset.l4:31:1-33:15:
+  I could not continue evaluating, because I needed to know the value of
+    gate
+  but it is an assumed term.

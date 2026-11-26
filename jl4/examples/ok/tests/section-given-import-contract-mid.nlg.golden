@@ -1,0 +1,3 @@
+executing contract `both sides` at 0 with the following events: party `Alice` did `pay` with 1 at 7 `WAITUNTIL` with 30
+executing contract `bob first` at 0 with the following events: party `Bob` did `deliver` at 3 party `Alice` did `pay` with 1 at 9 `WAITUNTIL` with 30
+executing contract `plain mid` at 0 with the following events: party `Alice` did `pay` with 1 at 7 `WAITUNTIL` with 30

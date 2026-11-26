@@ -1,0 +1,374 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+section-given-import-contract-call.l4:110:1-112:15:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      30
+    surpassed the deadline of party
+      Bob
+    who had to do obligatory action
+      MUST deliver
+    before their deadline, which was at
+      10
+section-given-import-contract-call.l4:114:1-116:15:
+  DEONTIC BREACHED:
+    BREACH
+    BY Alice BECAUSE "late"
+    BY Bob
+      who had to do obligatory action
+        MUST deliver
+      before their deadline, which was at
+        10
+section-given-import-contract-call.l4:118:1-120:15:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      30
+    surpassed the deadline of party
+      Bob
+    who had to do obligatory action
+      MUST deliver
+    before their deadline, which was at
+      10
+section-given-import-contract-call.l4:122:1-124:15:
+  DEONTIC BREACHED:
+    BREACH
+    BY Bob
+      who had to do obligatory action
+        MUST deliver
+      before their deadline, which was at
+        10
+    BY Alice BECAUSE "late"
+section-given-import-contract-call.l4:126:1-128:15:
+  FULFILLED
+section-given-import-contract-call.l4:130:1-132:15:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      30
+    surpassed the deadline of party
+      Bob
+    who had to do obligatory action
+      MUST deliver
+    before their deadline, which was at
+      10
+    and the breach names, in order
+      Alice BECAUSE "late"
+      Bob
+        who had to do obligatory action
+          MUST deliver
+        before their deadline, which was at
+          10
+section-given-import-contract-call.l4:134:1-136:15:
+  FULFILLED
+section-given-import-contract-call.l4:138:1-140:15:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      30
+    surpassed the deadline of party
+      Bob
+    who had to do obligatory action
+      MUST deliver
+    before their deadline, which was at
+      10
+    and the breach names, in order
+      Bob
+        who had to do obligatory action
+          MUST deliver
+        before their deadline, which was at
+          10
+      Alice BECAUSE "late"
+section-given-import-contract-call.l4:142:1-144:15:
+  FULFILLED
+section-given-import-contract-call.l4:146:1-148:15:
+  DEONTIC BREACHED:
+    BREACH
+    BY Alice BECAUSE "late"
+    BY Alice BECAUSE "late"
+section-given-import-contract-call.l4:150:1-152:15:
+  FULFILLED
+section-given-import-contract-call.l4:154:1-156:15:
+  DEONTIC BREACHED:
+    BREACH
+    BY Alice BECAUSE "late"
+    BY Alice BECAUSE "late"
+section-given-import-contract-call.l4:158:1-160:15:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      30
+    surpassed the deadline of party
+      Bob
+    who had to do obligatory action
+      MUST deliver
+    before their deadline, which was at
+      10
+    and the breach names, in order
+      Bob
+        who had to do obligatory action
+          MUST deliver
+        before their deadline, which was at
+          10
+      Bob
+        who had to do obligatory action
+          MUST deliver
+        before their deadline, which was at
+          12
+section-given-import-contract-call.l4:162:1-164:15:
+  DEONTIC BREACHED:
+    BREACH
+    BY Alice BECAUSE "late"
+    BY Bob
+      who had to do obligatory action
+        MUST deliver
+      before their deadline, which was at
+        10
+    BY Bob
+      who had to do obligatory action
+        MUST deliver
+      before their deadline, which was at
+        12
+section-given-import-contract-call.l4:166:1-168:15:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      30
+    surpassed the deadline of party
+      Bob
+    who had to do obligatory action
+      MUST deliver
+    before their deadline, which was at
+      12
+section-given-import-contract-call.l4:170:1-172:15:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      30
+    surpassed the deadline of party
+      Bob
+    who had to do obligatory action
+      MUST deliver
+    before their deadline, which was at
+      10
+    and the breach names, in order
+      Bob
+        who had to do obligatory action
+          MUST deliver
+        before their deadline, which was at
+          12
+      Bob
+        who had to do obligatory action
+          MUST deliver
+        before their deadline, which was at
+          10
+      Alice BECAUSE "late"
+section-given-import-contract-call.l4:174:1-176:15:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      30
+    surpassed the deadline of party
+      Bob
+    who had to do obligatory action
+      MUST deliver
+    before their deadline, which was at
+      10
+section-given-import-contract-call.l4:178:1-180:15:
+  DEONTIC BREACHED:
+    BREACH
+    BY Alice BECAUSE "late"
+    BY Bob
+      who had to do obligatory action
+        MUST deliver
+      before their deadline, which was at
+        10
+section-given-import-contract-call.l4:182:1-184:15:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      30
+    surpassed the deadline of party
+      Bob
+    who had to do obligatory action
+      MUST deliver
+    before their deadline, which was at
+      10
+section-given-import-contract-call.l4:186:1-188:15:
+  DEONTIC BREACHED:
+    BREACH
+    BY Alice BECAUSE "late"
+    BY Bob
+      who had to do obligatory action
+        MUST deliver
+      before their deadline, which was at
+        10
+section-given-import-contract-call.l4:190:1-192:15:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      30
+    surpassed the deadline of party
+      Bob
+    who had to do obligatory action
+      MUST deliver
+    before their deadline, which was at
+      10
+section-given-import-contract-call.l4:194:1-196:15:
+  DEONTIC BREACHED:
+    BREACH
+    BY Alice BECAUSE "late"
+    BY Bob
+      who had to do obligatory action
+        MUST deliver
+      before their deadline, which was at
+        10
+section-given-import-contract-call.l4:198:1-200:15:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      30
+    surpassed the deadline of party
+      Bob
+    who had to do obligatory action
+      MUST deliver
+    before their deadline, which was at
+      10
+section-given-import-contract-call.l4:202:1-204:15:
+  DEONTIC BREACHED:
+    BREACH
+    BY Alice BECAUSE "late"
+    BY Bob
+      who had to do obligatory action
+        MUST deliver
+      before their deadline, which was at
+        10
+section-given-import-contract-call.l4:206:1-208:15:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      30
+    surpassed the deadline of party
+      Bob
+    who had to do obligatory action
+      MUST deliver
+    before their deadline, which was at
+      10
+section-given-import-contract-call.l4:210:1-212:15:
+  DEONTIC BREACHED:
+    BREACH
+    BY Alice BECAUSE "late"
+    BY Bob
+      who had to do obligatory action
+        MUST deliver
+      before their deadline, which was at
+        10
+section-given-import-contract-call.l4:214:1-216:15:
+  DEONTIC BREACHED:
+    BREACH
+    BY Bob BECAUSE "bob late"
+    BY Bob
+      who had to do obligatory action
+        MUST deliver
+      before their deadline, which was at
+        10
+section-given-import-contract-call.l4:218:1-220:15:
+  DEONTIC BREACHED:
+    BREACH
+    BY Alice BECAUSE "late"
+    BY Bob
+      who had to do obligatory action
+        MUST deliver
+      before their deadline, which was at
+        10
+section-given-import-contract-call.l4:222:1-224:15:
+  FULFILLED
+section-given-import-contract-call.l4:226:1-228:15:
+  DEONTIC BREACHED:
+    BREACH
+    BY Alice
+    BECAUSE "late"
+section-given-import-contract-call.l4:230:1-232:15:
+  DEONTIC BREACHED:
+    party
+      NEVERMATCHESPARTY
+    who did action
+      NEVERMATCHESACT
+    at
+      30
+    surpassed the deadline of party
+      Bob
+    who had to do obligatory action
+      MUST deliver
+    before their deadline, which was at
+      10
+section-given-import-contract-call.l4:234:1-236:15:
+  DEONTIC BREACHED:
+    BREACH
+    BY Alice BECAUSE "late"
+    BY Bob
+      who had to do obligatory action
+        MUST deliver
+      before their deadline, which was at
+        10
+section-given-import-contract-call.l4:238:1-241:15:
+  FULFILLED
+section-given-import-contract-call.l4:243:1-246:15:
+  DEONTIC BREACHED:
+    BREACH
+    BY Alice
+    BECAUSE "late"
+section-given-import-contract-call.l4:248:1-250:15:
+  FULFILLED
+section-given-import-contract-call.l4:252:1-254:15:
+  FULFILLED
+section-given-import-contract-call.l4:256:1-258:15:
+  DEONTIC BREACHED:
+    BREACH
+    BY Alice
+    BECAUSE "late"
+section-given-import-contract-call.l4:260:1-264:15:
+  FULFILLED
+section-given-import-contract-call.l4:266:1-270:15:
+  DEONTIC BREACHED:
+    BREACH
+    BY Alice
+    BECAUSE "late"
