@@ -486,14 +486,20 @@ dmnDrgFor opts tcRes = do
             -- each (the same walk `l4 export catala` takes), so a closed
             -- imported constant can be carried into the model as a decision,
             -- and certified with the checker's facts about its own module.
-            -- 'imChecks' is 'Rules.evaluable': the module type-checks, and so
-            -- does every module it imports, directly or not, so a module with
-            -- no error of its own that imports one with errors is refused too.
-            -- `l4 check` asks that of the module's result and also refuses on
-            -- any other blocking diagnostic in its closure ("LSP.L4.BlockingErrors");
-            -- the two kinds probed (a type mismatch, check/implicit-crosses-import)
-            -- fail 'Rules.evaluable' too, but the two are not shown to agree
-            -- in every case.
+            -- 'imChecks' is 'Rules.evaluable', `l4 run`'s test: the module
+            -- type-checks, and so does every module it imports, directly or
+            -- not, so a module with no error of its own that imports one with
+            -- errors is refused too. `l4 check` asks something else: only that
+            -- the module's own check succeeded, and that no blocking diagnostic
+            -- is in its closure ("LSP.L4.BlockingErrors"), which is how an
+            -- import's errors reach it. The two kinds probed (a type mismatch,
+            -- check/implicit-crosses-import) fail 'Rules.evaluable' too, but
+            -- the two tests do not agree in every case: an IMPORT that resolves
+            -- to nothing is dropped before 'Rules.evaluable' looks, so a module
+            -- with one is copied from, while `l4 check` refuses it
+            -- (import/module-not-found). The copy's value is the one `l4 run`
+            -- prints, though `l4 run` exits 1 on the missing module (found by
+            -- the review of this branch, 2026-11-26).
             , dloImportedModules =
                 [ MkImportedModule
                     { imModule             = dep.module'
@@ -563,6 +569,14 @@ dmnDrgFor opts tcRes = do
 -- check instead). A library lowered by name that called into its imports
 -- would need the import rule above extended to the compiled-in copy. Leaving
 -- it so is decided by Claude 2026-11-26, pending Meng's review.
+--
+-- The import rule for a @$JL4_LIBRARY_PATH@ file looks only at the imports
+-- that resolved: an IMPORT that resolves to nothing is dropped before
+-- 'Rules.transitiveDependencies' or 'Rules.evaluable' sees it, so it passes
+-- both (with only @prelude.l4@ and @daydate.l4@ in that directory,
+-- @date-compat@ resolves nowhere, and @YMD@ is still lowered, to the value
+-- @l4 run@ prints, while @l4 check@ refuses the file with
+-- @import/module-not-found@).
 --
 -- Paths are compared canonically (symbolic links and @..@ resolved) because
 -- the variable may be spelled relative or through a link.

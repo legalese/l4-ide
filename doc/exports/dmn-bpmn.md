@@ -119,8 +119,11 @@ Each copy carries an advisory `D-IMPORTED` note, because the model now holds the
 Everything else read from an imported module is written as L4 text with a Blocking note, which, as the next section says, costs the whole file on both engines (with one exception given there):
 
 - a constant that reads an `ASSUME`, `RULES EFFECTIVE DATE`, or an `IS ONE OF` value the imported module declares, and an imported `ASSUME` read directly;
-- any constant from an imported file that `l4 check` refuses, because it has errors of its own or imports a file that has (`l4 check` on your file then reports `import/module-has-errors`), even a constant that reads nothing from the part with the error; the export still exits 0 on such a file, which is [smucclaw/l4-ide#1110](https://github.com/smucclaw/l4-ide/issues/1110);
+- any constant from an imported file that has errors of its own or imports a file that has (`l4 check` on your file then reports `import/module-has-errors`), even a constant that reads nothing from the part with the error; the export still exits 0 on such a file, which is [smucclaw/l4-ide#1110](https://github.com/smucclaw/l4-ide/issues/1110);
 - any function of your own imported module, called or passed.
+
+The test for errors is the one `l4 run` makes: the imported file, and every file it imports, type-checks.
+It is not shown to agree with `l4 check` in every case, and it does not in one: an `IMPORT` that finds no file is refused by `l4 check` (`import/module-not-found`) and not by this test, so a constant from a file with such an import is still copied, with the value `l4 run` prints.
 
 A copied constant is lowered exactly as it would be in your own file, so one that has no FEEL form there has none here either: a `Date 2024 1 15` constant is written as L4 text with a Blocking note, in your file or in an imported one.
 It is checked the same way too: a copied constant whose `CONSIDER` misses a case, which L4's checker warns about in the imported file, gets the same Blocking `D-PARTIAL` note it would get in yours, and so does every decision that reads it.
@@ -161,6 +164,7 @@ Either way, the library must also type-check with the files it imports: the buil
 The same goes for a library folder that differs from the copy built into your `l4` in any character, a comment included, though not in its line endings: if `JL4_LIBRARY_PATH` names a checkout's `jl4-core/libraries` whose files are not the ones your `l4` was built with, every call into a changed file, or into a library file that imports one, gets a Blocking note, so export with the `l4` built from that checkout, or leave `JL4_LIBRARY_PATH` unset.
 An `l4` built after an edit to `jl4-core/libraries` alone is not one built from those files: a plain `cabal build` does not re-embed them (see `jl4-core/libraries/README.md`).
 The report names each library file it does not take for the library once, in an advisory `D-NOT-LIBRARY` note that says why; the Blocking notes are on the calls.
+One case passes this test that `l4 check` refuses: a library file whose own `IMPORT` finds no file at all is still taken for the library (with only `prelude.l4` and `daydate.l4` in the folder, `daydate`'s import of `date-compat` finds nothing, and `YMD` is still lowered, to the value `l4 run` prints), although `l4 check` refuses your file.
 Still written as L4, with a Blocking note, and so still fatal to the whole file on both engines: `SQRT` (undefined below zero), `TRUNC` (no single FEEL function), `minimum` and `maximum` (L4 gives no answer on an empty list, while FEEL's `min` and `max` of an empty list answer null on Camunda 8.7.6 and fail the decision on KIE 8.44), and `min` and `max` over `MAYBE NUMBER`, which skip a `NOTHING`.
 
 **The empty list.** `EMPTY` is written as FEEL's empty list, `[]`, so `count EMPTY` is `count([])` and `xs EQUALS EMPTY` is `xs = []`.

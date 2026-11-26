@@ -565,8 +565,11 @@ data ImportedModule = MkImportedModule
   , imClauseMatrixRanges :: ![SrcRange]
     -- ^ 'checkerClauseMatrixRanges' of the imported module's own check
   , imChecks             :: !Bool
-    -- ^ @l4 check@ accepts the imported module: it reported no error, and
-    -- neither did any module it imports, directly or not. Its errors are not
+    -- ^ the imported module type-checks, and so does every module it
+    -- imports, directly or not (the CLI passes 'LSP.L4.Rules.evaluable',
+    -- @l4 run@'s test; how that compares with @l4 check@'s is in
+    -- "L4.Cli.Export", and an IMPORT that resolves to nothing is where they
+    -- differ: it passes this, and @l4 check@ refuses it). Its errors are not
     -- the importer's (the importer is told only that the import has errors),
     -- so a constant there can be typed one way and defined another, and a
     -- module whose own import has errors is not evaluated by @l4 run@ at all
@@ -4035,8 +4038,10 @@ lowerModule opts modul@(MkModule _ uri _) =
   -- a reference to one without depending on the verdict it feeds; only those
   -- a KEPT decide (or a computed field) reaches are emitted.
   --
-  -- Only a module that `l4 check` accepts contributes ('imChecks'): no error
-  -- of its own, and none in any module it imports. `l4 check` refuses the
+  -- Only a module that type-checks, with every module it imports, contributes
+  -- ('imChecks'): no error of its own, and none in any module it imports
+  -- (`l4 run`'s test, which differs from `l4 check`'s on an IMPORT that
+  -- resolves to nothing; see 'imChecks'). `l4 check` refuses the
   -- importer of a module with errors (import/module-has-errors), so a
   -- constant from it is no value L4 has, and copying `the rate` defined as a
   -- STRING under a NUMBER signature would carry the string into the model.
