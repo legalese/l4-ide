@@ -1,0 +1,34 @@
+fidelity report — DMN 1.3 (XML), camunda flavor
+  [D-LITERALEXPR] advisory — decision_rounded_down  (main.l4:29:28-35)
+      `rounded down` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision_rounded_up  (main.l4:33:26-35)
+      `rounded up` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision_rounded  (main.l4:37:23-30)
+      `rounded` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision_total  (main.l4:48:27-38)
+      `total` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision_how_many  (main.l4:52:30-43)
+      `how many` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision_capped  (main.l4:57:26-35)
+      `capped` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-LITERALEXPR] advisory — decision_at_least_the_cap  (main.l4:62:36-45)
+      `at least the cap` is not a guarded chain (IF / BRANCH / CONSIDER), so it has no rows, so it is emitted as a boxed literal expression rather than a decision table; the expression is FEEL, and an engine evaluates it
+      lost: the decision-table analyses (gap, overlap, consistency): the literal computes, but it is not rules a checker can reach
+  [D-PARAM-AS-INPUT] advisory — input_amounts
+      the GIVEN parameter `amounts` of two decisions (`total`, `how many`) became the one shared model input `input_amounts`; those decisions can no longer be applied twice to different subjects within this model, and the argument expressions at their call sites are discarded
+      lost: per-call-site argument binding: L4 applied these decisions to expressions; the DMN model reads one global value
+  [D-PARAM-AS-INPUT] advisory — input_cap
+      the GIVEN parameter `cap` of two decisions (`capped`, `at least the cap`) became the one shared model input `input_cap`; those decisions can no longer be applied twice to different subjects within this model, and the argument expressions at their call sites are discarded
+      lost: per-call-site argument binding: L4 applied these decisions to expressions; the DMN model reads one global value
+  [D-PARAM-AS-INPUT] advisory — input_x
+      the GIVEN parameter `x` of six decisions (`rounded down`, `rounded up`, `rounded`, `band`, `capped`, `at least the cap`) became the one shared model input `input_x`; those decisions can no longer be applied twice to different subjects within this model, and the argument expressions at their call sites are discarded
+      lost: per-call-site argument binding: L4 applied these decisions to expressions; the DMN model reads one global value
+  [D-NONFEEL] advisory — decision_band  (main.l4:42:8-24)
+      the input expression `decimal(x, 0)` is outside S-FEEL (which admits only arithmetic, simple values and comparisons)
+      lost: completeness, consistency and overlap checking, all of which DMN's analysis is defined over S-FEEL only

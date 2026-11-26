@@ -30,17 +30,22 @@ module DmnExport (spec, drgAsCli) where
 import Base
 import qualified Base.Text as Text
 
-import L4.API.VirtualFS (TypeCheckWithDepsResult (..), VFS, checkWithImports, emptyVFS)
+import L4.API.VirtualFS (TypeCheckWithDepsResult (..), VFS, checkWithImports, emptyVFS, vfsFromList)
+import L4.Cycles (apiLibraryFile)
 import qualified Base.Set as Set
-import L4.Annotation (rangeOf)
 import L4.Dmn.Emit (emitDrg, escapeXmlAttr, escapeXmlText)
 import L4.Dmn.IR
-import L4.Dmn.Lower (DmnLowerOptions (..), lowerModule, moduleTitle, resolveMaybePredicates)
+import L4.Dmn.Lower
+  ( DmnLowerOptions (..), ImportedModule (..), checkerClauseMatrixRanges
+  , checkerMissingMatchRanges, lowerModule, moduleTitle, resolveMaybePredicates )
 import L4.Dmn.Markdown (emitMarkdown, markdownReport)
 import L4.EvaluateLazy.Exceptions (UserEvalException (..))
+import L4.Import.Resolution (ResolvedImport (..), extractImportNames)
+import qualified Base.Map as Map
 import L4.Interchange.Fidelity
 import L4.Syntax (Module, Resolved)
 import qualified L4.TypeCheck as TC
+import L4.TypeCheck (CheckResult (..))
 import L4.TypeCheck.Types (Severity (..))
 
 import Data.Time.Calendar (fromGregorian)
@@ -1349,6 +1354,39 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       feelIdentText "not" `shouldBe` "not_"
       feelIdentText "not!" `shouldBe` "not_"
 
+    -- A variable spelled like a FEEL function this exporter calls hides the
+    -- function: KIE refused `max(floor(x), floor)` with an input named
+    -- `floor` ("Not an invocable"). So those names are reserved like keywords.
+    it "suffixes a name spelled like a FEEL function the export calls" $ do
+      forM_ ["floor", "ceiling", "decimal", "sum", "count", "min", "max", "concatenate", "modulo"] \w ->
+        feelIdentText w `shouldBe` (w <> "_")
+      -- the whole folded name only, as for a keyword
+      feelIdentText "max count" `shouldBe` "max_count"
+
+    -- Which module is the library is the caller's to say: a recogniser that
+    -- names none leaves every prelude call to the loud refusal.
+    it "lowers a prelude call as the library's only when the caller's recogniser says it is the library" $ do
+      let src =
+            "IMPORT prelude\n\
+            \GIVEN xs IS A LIST OF NUMBER\n\
+            \GIVETH A NUMBER\n\
+            \DECIDE `how many` xs IS count xs\n"
+          textOf drg = case (decisionNamed "how many" drg).dcnLogic of
+            LogicLiteral x -> x.feText
+            _              -> "(not a boxed literal)"
+      textOf (drgOf src) `shouldBe` "count(xs)"
+      textOf (drgAdjusted (\o -> o { dloLibraryModule = const Nothing }) src) `shouldBe` "count OF xs"
+
+    it "renames an input spelled like a FEEL function, so the call still reaches the function" $ do
+      let src =
+            "GIVEN x IS A NUMBER\n\
+            \      floor IS A NUMBER\n\
+            \GIVETH A NUMBER\n\
+            \DECIDE `f` x floor IS FLOOR x PLUS floor\n"
+      case (decisionNamed "f" (drgOf src)).dcnLogic of
+        LogicLiteral x -> x.feText `shouldBe` "floor(x) + floor_"
+        _              -> expectationFailure "expected a boxed literal for `f`"
+
     it "gives type names their own function, with the same map and the same dot policy" $ do
       -- §5.1-2 and §5.3.6. A `.` in a typeRef QName is DMN's IMPORT PREFIX
       -- separator and this exporter emits no imports, so a dot passed through
@@ -1459,6 +1497,55 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
             [n | n <- (dmnReport (drgOf src)).notes, n.code == "D-FEELNAME"]
           renameNotes src =
             [n | n <- (dmnReport (drgOf src)).notes, n.code == "D-RENAME"]
+
+      -- The reserved arm (decided by Claude 2026-11-26, pending Meng's
+      -- review): the L4 name is a FEEL name a caller would use as it stands.
+      it "notes a rename forced by a reserved FEEL name, on an input, a decision and a field" $ do
+        let src = "DECLARE Bill HAS\n\
+                  \  sum IS A NUMBER\n\
+                  \  `two words` IS A NUMBER\n\
+                  \GIVEN floor IS A NUMBER\n\
+                  \      b IS A Bill\n\
+                  \GIVETH A NUMBER\n\
+                  \DECIDE `count` floor b IS floor PLUS b's sum PLUS b's `two words`\n"
+            notes = renameNotes src
+            on el = [n | n <- notes, n.element == el]
+        map (.element) notes `shouldMatchList` ["input_floor", "decision_count", "itemdef_bill"]
+        forM_ notes \n -> n.severity `shouldBe` Lossy
+        case on "input_floor" of
+          [n] -> do
+            n.message `shouldSatisfy` Text.isInfixOf "`floor` is emitted as the FEEL name `floor_`"
+            n.message `shouldSatisfy` Text.isInfixOf "the name of a FEEL function this export calls"
+            n.lost `shouldSatisfy` Text.isInfixOf "sends or reads `floor` reaches nothing, and must use `floor_`"
+          ns -> expectationFailure ("one note on input_floor, got " <> show (length ns))
+        case on "itemdef_bill" of
+          [n] -> n.message `shouldSatisfy` Text.isInfixOf "`sum` is emitted as the FEEL name `sum_`"
+          ns -> expectationFailure ("one note on itemdef_bill, got " <> show (length ns))
+
+      -- `date` is not a FEEL keyword, and the note does not call it one; nor
+      -- is `not`, FEEL's boolean function, which the export itself calls.
+      it "says whether a reserved name is a FEEL keyword or the name of a FEEL type or function" $ do
+        let notes = renameNotes "GIVEN date IS A NUMBER\n\
+                                \      for IS A NUMBER\n\
+                                \      not IS A NUMBER\n\
+                                \GIVETH A NUMBER\n\
+                                \DECIDE `pay` date for not IS date PLUS for PLUS not\n"
+            msgOf el = [n.message | n <- notes, n.element == el]
+        msgOf "input_date" `shouldBe`
+          ["`date` is emitted as the FEEL name `date_`, because `date` is the name of a FEEL type or built-in function"]
+        msgOf "input_for" `shouldBe`
+          ["`for` is emitted as the FEEL name `for_`, because `for` is a FEEL keyword"]
+        msgOf "input_not" `shouldBe`
+          ["`not` is emitted as the FEEL name `not_`, because `not` is the name of a FEEL type or built-in function"]
+
+      it "notes no rename for a name stage 1 leaves alone or only folds" $ do
+        -- `floor_` folds to `floor` and is suffixed back to `floor_`: its FEEL
+        -- name IS its L4 name. `two words` is the benign-mangle arm, unbuilt.
+        renameNotes "GIVEN floor_ IS A NUMBER\n\
+                    \      `two words` IS A NUMBER\n\
+                    \GIVETH A NUMBER\n\
+                    \DECIDE `pay` floor_ `two words` IS floor_ PLUS `two words`\n"
+          `shouldBe` []
 
       it "renames inputData x inputData apart, in the declaration AND the references" $ do
         -- Before stage 2, Camunda 8 loaded this file and read one supplied
@@ -2737,6 +2824,31 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
         [n.code | n <- notes, n.element == "the fixture-shaped rebind"]
           `shouldBe` ["D-RULEDATE-UNBOUND"]
 
+      -- smucclaw/l4-ide#1104: 'drgOmitted' is the data the CLI's empty-model
+      -- refusal reads, so it must name exactly the decides the population
+      -- notes name, each with its own reason.
+      -- smucclaw/l4-ide#1038: a rule the checker took for a computed field is
+      -- named in drgTakenForFields; the function the desugaring made out of
+      -- the computed field itself is not.
+      it "names a rule taken for a computed field, and not the computed field" $ do
+        let field =
+              "DECLARE Employee HAS salary IS A NUMBER\n\
+              \                     bonus IS A NUMBER MEANS salary * 0.1\n"
+            rule =
+              "GIVEN n IS A NUMBER\n\
+              \GIVETH A NUMBER\n\
+              \DECIDE bonus n IS n * 2\n"
+        (drgOf (field <> "\n" <> rule)).drgTakenForFields `shouldBe` ["bonus"]
+        (drgOf field).drgTakenForFields `shouldBe` []
+        (drgOf (field <> "\nGIVEN h IS A NUMBER\nGIVETH A NUMBER\nDECIDE `pay` h IS h PLUS 1\n")).drgTakenForFields
+          `shouldBe` []
+
+      it "records every population drop in drgOmitted, with the reason the note gives" $ do
+        drg <- rebindDrg
+        let unbound = [n.element | n <- (dmnReport drg).notes, n.code == "D-RULEDATE-UNBOUND"]
+        [n | (n, DroppedRuleDateRebind) <- drg.drgOmitted] `shouldBe` unbound
+        length drg.drgOmitted `shouldBe` 3
+
       it "still drops on --include-tests: the gate is structural, not test-ness" $ do
         src <- Text.readFile (examplesRoot </> "dmn" </> "not-ok" </> "ruledate-rebind.l4")
         let drg = drgAdjusted (\o -> o { dloIncludeTests = True }) src
@@ -3831,6 +3943,441 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
         LogicTable _   -> expectationFailure "expected a boxed literal for `excluded`"
         LogicContext _ -> expectationFailure "expected a boxed literal for `excluded`"
 
+  -- smucclaw/l4-ide#1103. Each form below is the one measured to agree with
+  -- `l4 run` on both engines (rounding.l4 and its cases carry that, through
+  -- the engine baseline); these pin the TEXT, and that the refusals stay
+  -- refusals. An unlowered call is L4 text in a FEEL slot, which makes both
+  -- engines reject the whole file, so 'L4Verbatim' is the property to watch.
+  describe "rounding builtins and prelude aggregates (#1103)" $ do
+    let withBody gives body =
+          "IMPORT prelude\n\
+          \GIVEN x IS A NUMBER\n\
+          \      y IS A NUMBER\n\
+          \      xs IS A LIST OF NUMBER\n\
+          \      m IS A MAYBE NUMBER\n\
+          \GIVETH " <> gives <> "\n\
+          \`answer` x y xs m MEANS " <> body <> "\n"
+        answerOf src = case (decisionNamed "answer" (drgOf src)).dcnLogic of
+          LogicLiteral x -> x
+          _              -> error "expected a boxed literal for `answer`"
+        lowersTo body want = do
+          let a = answerOf (withBody "A NUMBER" body)
+          (a.feText, a.feFragment) `shouldBe` (want, FullFeel)
+        refused gives body =
+          (answerOf (withBody gives body)).feFragment `shouldBe` L4Verbatim
+
+    it "lowers FLOOR and CEILING to floor and ceiling" $ do
+      "FLOOR x" `lowersTo` "floor(x)"
+      "CEILING (x MINUS y)" `lowersTo` "ceiling(x - y)"
+
+    it "lowers ROUND to decimal(x, 0), which rounds a half to even as L4 does" $
+      "ROUND (x PLUS y)" `lowersTo` "decimal(x + y, 0)"
+
+    it "lowers prelude sum with a leading 0, so an empty list sums to 0" $
+      "sum xs" `lowersTo` "sum(concatenate([0], xs))"
+
+    it "lowers prelude count, min and max to the FEEL builtins" $ do
+      "count xs" `lowersTo` "count(xs)"
+      "min x y" `lowersTo` "min(x, y)"
+      "max x 1" `lowersTo` "max(x, 1)"
+
+    -- EMPTY is FEEL's empty list, never the string "EMPTY": FEEL reads a
+    -- non-list argument as a list of one, so count("EMPTY") answered 1 where
+    -- `count EMPTY` is 0 in L4.
+    it "renders EMPTY under count and sum as the empty list" $ do
+      "count EMPTY" `lowersTo` "count([])"
+      "sum EMPTY" `lowersTo` "sum(concatenate([0], []))"
+
+    -- The prelude's MAYBE NUMBER min and max skip a NOTHING; FEEL's do not
+    -- mean that, so the oracle gate must refuse them.
+    it "refuses the prelude's MAYBE NUMBER min and max" $ do
+      refused "A MAYBE NUMBER" "min m (JUST 1)"
+      refused "A MAYBE NUMBER" "max m (JUST 1)"
+
+    -- minimum is undefined on an empty list in L4 and null in FEEL (a FAILED
+    -- decision on KIE); SQRT is partial; TRUNC has no single FEEL function.
+    it "leaves minimum, maximum, SQRT and TRUNC unlowered" $ do
+      refused "A NUMBER" "minimum xs"
+      refused "A NUMBER" "maximum xs"
+      refused "A NUMBER" "SQRT x"
+      refused "A NUMBER" "TRUNC x 2"
+
+    -- Provenance, not the name: a module's own sum and min are not the
+    -- prelude's, whatever they compute.
+    it "declines a locally defined sum, count, min and max" $ do
+      let src =
+            "GIVEN list IS A LIST OF NUMBER\n\
+            \GIVETH A NUMBER\n\
+            \sum list MEANS 42\n\
+            \GIVEN list IS A LIST OF NUMBER\n\
+            \GIVETH A NUMBER\n\
+            \count list MEANS 7\n\
+            \GIVEN a IS A NUMBER\n\
+            \      b IS A NUMBER\n\
+            \GIVETH A NUMBER\n\
+            \min a b MEANS a\n\
+            \GIVEN a IS A NUMBER\n\
+            \      b IS A NUMBER\n\
+            \GIVETH A NUMBER\n\
+            \max a b MEANS b\n\
+            \GIVEN xs IS A LIST OF NUMBER\n\
+            \      x IS A NUMBER\n\
+            \GIVETH A NUMBER\n\
+            \`answer` xs x MEANS sum xs PLUS count xs PLUS min x 1 PLUS max x 2\n"
+      (answerOf src).feText `shouldSatisfy` \t ->
+        not (Text.isInfixOf "concatenate" t) && not (Text.isInfixOf "count(xs)" t)
+          && not (Text.isInfixOf "min(x, 1)" t) && not (Text.isInfixOf "max(x, 2)" t)
+
+  -- EMPTY, the empty list. The typechecker stamps it a constructor like any
+  -- other, so it used to become the string constant "EMPTY" wherever a
+  -- constructor does, a wrong answer in every position: `count EMPTY` as
+  -- count("EMPTY"), `xs EQUALS EMPTY` as xs = "EMPTY", and a WHEN EMPTY clause
+  -- as an input entry "EMPTY" that no list equals. It is FEEL's `[]` in an
+  -- expression, an output entry among them, and never an input entry, whose
+  -- simple values have no list form: a test against it is a boolean column.
+  describe "EMPTY, the empty list" $ do
+    let literalNamed nm src = case (decisionNamed nm (drgOf src)).dcnLogic of
+          LogicLiteral x -> x
+          _              -> error ("expected a boxed literal for " <> show nm)
+
+    it "renders a constant defined as EMPTY, and an equality test against it, as FEEL's []" $ do
+      let src =
+            "GIVETH A LIST OF NUMBER\n\
+            \`no amounts` MEANS EMPTY\n\
+            \GIVEN xs IS A LIST OF NUMBER\n\
+            \GIVETH A BOOLEAN\n\
+            \DECIDE `is empty` xs IS xs EQUALS EMPTY\n"
+      (literalNamed "no amounts" src).feText `shouldBe` "[]"
+      (literalNamed "is empty" src).feText `shouldBe` "xs = []"
+
+    it "makes a WHEN EMPTY clause a boolean column, never an input entry of EMPTY or []" $ do
+      let src =
+            "GIVEN list IS A LIST OF NUMBER\n\
+            \GIVETH A STRING\n\
+            \DECIDE `size of` EMPTY IS \"none\"\n\
+            \DECIDE `size of` (x FOLLOWED BY xs) IS \"some\"\n"
+          xml = emitDrg (drgOf src)
+      xml `shouldSatisfy` (not . Text.isInfixOf "\"EMPTY\"")
+      xml `shouldSatisfy` (not . Text.isInfixOf "<text>[]</text>")
+      xml `shouldSatisfy` Text.isInfixOf "list_ = []"
+
+  -- smucclaw/l4-ide#1102. The export writes one file and no DMN import, so a
+  -- reference to a value from another module names nothing in the model: KIE
+  -- refuses the file ("Unknown variable"); Camunda takes the caller's value. The
+  -- engine-relevant property is that every FEEL name a decision reads is an
+  -- element of the model, or else the reference is refused (Blocking), never
+  -- rendered as a name. The engine legs are in the CLI suite
+  -- (jl4/tests-cli/CliTest/DmnBpmn.hs, fixture export-imported-constant.l4).
+  describe "imported constants (#1102)" $ do
+    let limits =
+          "IMPORT prelude\n\
+          \`hours per day` MEANS 8\n\
+          \`days per week` MEANS 5\n\
+          \`the longest week` MEANS `hours per day` TIMES `days per week` PLUS 2\n\
+          \`the threshold` MEANS 100\n\
+          \`the allowance` MEANS sum (LIST 10, 20)\n\
+          \`an unused constant` MEANS 7\n\
+          \DECLARE Colour IS ONE OF red, green\n\
+          \`default colour` MEANS red\n\
+          \GIVEN f IS A NUMBER\n\
+          \GIVETH A NUMBER\n\
+          \DECIDE `weekly hours at` f IS 42 TIMES f\n"
+        importing body = "IMPORT prelude\nIMPORT limits\n" <> body
+        drgImp = drgGeneral (vfsFromList [("limits", limits)]) id defaultDmnFlavor (const "Test")
+        idOf nm drg = (decisionNamed nm drg).dcnId
+        notesCoded c drg = [n | n <- (dmnReport drg).notes, n.code == c]
+        blockingOf drg = [n | n <- (dmnReport drg).notes, n.severity == Blocking]
+        literalOf nm drg = case (decisionNamed nm drg).dcnLogic of
+          LogicLiteral x -> x
+          _              -> error ("expected a boxed literal for " <> show nm)
+
+    it "copies a closed constant read in a guard, with its requirement edge" $ do
+      let drg = drgImp $ importing
+            "GIVEN hours IS A NUMBER\n\
+            \GIVETH A BOOLEAN\n\
+            \DECIDE `long` hours IS hours GREATER THAN `the threshold`\n"
+      (literalOf "the threshold" drg).feText `shouldBe` "100"
+      (decisionNamed "long" drg).dcnRequirements
+        `shouldSatisfy` elem (RequiredDecision (idOf "the threshold" drg))
+      (literalOf "long" drg).feText `shouldBe` "hours > the_threshold"
+      map (.element) (notesCoded "D-IMPORTED" drg) `shouldBe` [idOf "the threshold" drg]
+      map (.severity) (notesCoded "D-IMPORTED" drg) `shouldBe` [Advisory]
+      blockingOf drg `shouldBe` []
+      -- the copy's type is read against ITS module's substitution: an
+      -- importer's own would leave `MEANS 100` at Any
+      (decisionNamed "the threshold" drg).dcnType `shouldBe` DmnNumber
+
+    it "copies the closed constants a copied constant reads, with the edges between them" $ do
+      let drg = drgImp $ importing
+            "GIVEN hours IS A NUMBER\n\
+            \GIVETH A BOOLEAN\n\
+            \DECIDE `long` hours IS hours GREATER THAN `the longest week`\n"
+      (literalOf "the longest week" drg).feText `shouldBe` "hours_per_day * days_per_week + 2"
+      (decisionNamed "the longest week" drg).dcnRequirements `shouldMatchList`
+        [ RequiredDecision (idOf "hours per day" drg)
+        , RequiredDecision (idOf "days per week" drg)
+        ]
+      -- nothing else from the imported module is copied
+      [d.dcnName | d <- drgDecisions drg] `shouldMatchList`
+        ["long", "the longest week", "hours per day", "days per week"]
+      blockingOf drg `shouldBe` []
+
+    -- A prelude function is closed too: it reads no input. The copy is then
+    -- lowered like any other body, here through #1103's `sum`.
+    it "copies a constant that calls a prelude function" $ do
+      let drg = drgImp $ importing
+            "GIVEN x IS A NUMBER\n\
+            \GIVETH A BOOLEAN\n\
+            \DECIDE `within allowance` x IS x AT MOST `the allowance`\n"
+      (literalOf "the allowance" drg).feText `shouldBe` "sum(concatenate([0], [10, 20]))"
+      blockingOf drg `shouldBe` []
+
+    -- An imported module's own errors are not reported to the importer, so a
+    -- constant there can hold a name that never resolved. It reads something
+    -- unknown, so it is not closed.
+    it "does not copy a constant whose module failed to resolve one of its names" $ do
+      let broken = drgGeneral (vfsFromList [("broken", "`the allowance` MEANS sum (LIST 10, 20)\n")])
+                     id defaultDmnFlavor (const "Test")
+                     "IMPORT broken\n\
+                     \GIVEN x IS A NUMBER\n\
+                     \GIVETH A BOOLEAN\n\
+                     \DECIDE `within allowance` x IS x EQUALS `the allowance`\n"
+      [d.dcnName | d <- drgDecisions broken] `shouldBe` ["within allowance"]
+      (literalOf "within allowance" broken).feFragment `shouldBe` L4Verbatim
+
+    -- A copy is certified exactly as a local constant is. The checker's
+    -- warning that this CONSIDER is not exhaustive is in the IMPORTED
+    -- module's diagnostics, so a copy certified from the importer's alone was
+    -- certified total, and its reader with it, where the same text written
+    -- locally is Blocking twice.
+    it "certifies a copied constant with its own module's checker facts, exactly as a local one" $ do
+      let partialLib =
+            "IMPORT prelude\n\
+            \GIVETH A NUMBER\n\
+            \`first of nothing` MEANS\n\
+            \  CONSIDER (LIST 5, 6)\n\
+            \  WHEN EMPTY THEN 0\n"
+          readerSrc =
+            "GIVEN h IS A NUMBER\n\
+            \GIVETH A NUMBER\n\
+            \DECIDE `g2` h IS h PLUS `first of nothing`\n"
+          copied = drgGeneral (vfsFromList [("partial", partialLib)]) id defaultDmnFlavor (const "Test")
+                     ("IMPORT prelude\nIMPORT partial\n" <> readerSrc)
+          written = drgAdjusted id (partialLib <> readerSrc)
+          verdicts nm drg =
+            [ (n.code, n.severity)
+            | n <- (dmnReport drg).notes, n.element == idOf nm drg, n.code /= "D-IMPORTED"
+            ]
+      verdicts "first of nothing" copied `shouldMatchList` verdicts "first of nothing" written
+      verdicts "g2" copied `shouldMatchList` verdicts "g2" written
+      verdicts "first of nothing" copied `shouldSatisfy` elem ("D-PARTIAL", Blocking)
+      verdicts "g2" copied `shouldSatisfy` elem ("D-PARTIAL", Blocking)
+
+    -- A module with errors: `l4 check` refuses its importer, and the
+    -- importer's own check result does not carry them. `the rate` is typed
+    -- NUMBER and defined as a STRING, so copying it would carry "three".
+    it "does not copy a constant from an imported module that does not type-check" $ do
+      let unchecked = drgGeneral
+                        (vfsFromList [("rates", "GIVETH A NUMBER\n`the rate` MEANS \"three\"\n")])
+                        id defaultDmnFlavor (const "Test")
+                        "IMPORT rates\n\
+                        \GIVEN h IS A NUMBER\n\
+                        \GIVETH A NUMBER\n\
+                        \DECIDE `pay` h IS h TIMES `the rate`\n"
+      [d.dcnName | d <- drgDecisions unchecked] `shouldBe` ["pay"]
+      (literalOf "pay" unchecked).feFragment `shouldBe` L4Verbatim
+      notesCoded "D-IMPORTED" unchecked `shouldBe` []
+      blockingOf unchecked `shouldSatisfy` (not . null)
+
+    -- One import further on: `hop` has no error of its own, but it imports
+    -- `rates`, so `l4 check` refuses `hop` and `l4 run` evaluates nothing in
+    -- it. Its `clean` reads nothing from `rates` and is still not copied: the
+    -- whole module is refused (decided by Claude 2026-11-26, pending Meng's
+    -- review).
+    it "does not copy a constant from an imported module whose own import does not type-check" $ do
+      let unchecked = drgGeneral
+                        (vfsFromList
+                          [ ("rates", "GIVETH A NUMBER\n`the rate` MEANS \"three\"\n")
+                          , ("hop", "IMPORT rates\nGIVETH A NUMBER\n`clean` MEANS 5\n")
+                          ])
+                        id defaultDmnFlavor (const "Test")
+                        "IMPORT hop\n\
+                        \GIVEN h IS A NUMBER\n\
+                        \GIVETH A NUMBER\n\
+                        \DECIDE `pay` h IS h TIMES `clean`\n"
+      [d.dcnName | d <- drgDecisions unchecked] `shouldBe` ["pay"]
+      (literalOf "pay" unchecked).feFragment `shouldBe` L4Verbatim
+      notesCoded "D-IMPORTED" unchecked `shouldBe` []
+      blockingOf unchecked `shouldSatisfy` (not . null)
+
+    it "still copies a constant from an imported module whose imports all type-check" $ do
+      let checked = drgGeneral
+                        (vfsFromList
+                          [ ("rates", "GIVETH A NUMBER\n`the rate` MEANS 3\n")
+                          , ("hop", "IMPORT rates\nGIVETH A NUMBER\n`clean` MEANS 5\n")
+                          ])
+                        id defaultDmnFlavor (const "Test")
+                        "IMPORT hop\n\
+                        \GIVEN h IS A NUMBER\n\
+                        \GIVETH A NUMBER\n\
+                        \DECIDE `pay` h IS h TIMES `clean`\n"
+      [d.dcnName | d <- drgDecisions checked] `shouldMatchList` ["pay", "clean"]
+      blockingOf checked `shouldBe` []
+
+    it "passes a copied constant into a BKM that reads it" $ do
+      let drg = drgImp $ importing
+            "GIVEN y IS A NUMBER\n\
+            \GIVETH A NUMBER\n\
+            \DECIDE `scaled` y IS y TIMES `the threshold`\n\
+            \GIVEN x IS A NUMBER\n\
+            \GIVETH A NUMBER\n\
+            \DECIDE `doubled limit` x IS `scaled` (x TIMES 2) PLUS `scaled` 1\n"
+      map (.fpName) (bkmNamed "scaled" drg).bkmParams `shouldBe` ["y", "the_threshold"]
+      (literalOf "doubled limit" drg).feText `shouldBe`
+        "scaled(y: x * 2, the_threshold: the_threshold) + scaled(y: 1, the_threshold: the_threshold)"
+      (decisionNamed "doubled limit" drg).dcnRequirements
+        `shouldSatisfy` elem (RequiredDecision (idOf "the threshold" drg))
+      blockingOf drg `shouldBe` []
+
+    it "refuses an imported constant that reads an imported constructor" $ do
+      let drg = drgImp $ importing
+            "GIVETH A BOOLEAN\n\
+            \DECIDE `is red` IS `default colour` EQUALS red\n"
+      (literalOf "is red" drg).feFragment `shouldBe` L4Verbatim
+      [d.dcnName | d <- drgDecisions drg] `shouldBe` ["is red"]
+      notesCoded "D-IMPORTED" drg `shouldBe` []
+
+    -- Not closed, so not copied: a constant that reads law time (this model's
+    -- own input, which the copy would read under the importer's rule date),
+    -- one that reads an ASSUME, and the ASSUME itself read directly. Each
+    -- reader is refused, Blocking. The positive control is a closed constant
+    -- of the same module, which IS copied: it shows the module checked, so
+    -- the refusals are not F2's refusal of a module with errors.
+    it "refuses an imported constant that reads RULES EFFECTIVE DATE or an ASSUME, and an imported ASSUME" $ do
+      let lawLib =
+            "ASSUME `the base rate` IS A NUMBER\n\
+            \GIVETH A NUMBER\n\
+            \`the doubled base` MEANS `the base rate` TIMES 2\n\
+            \GIVETH A DATE\n\
+            \`the rule date` MEANS `RULES EFFECTIVE DATE`\n\
+            \GIVETH A NUMBER\n\
+            \`the fixed rate` MEANS 4\n"
+          drg = drgGeneral (vfsFromList [("lawlib", lawLib)]) id defaultDmnFlavor (const "Test")
+                  "IMPORT lawlib\n\
+                  \GIVETH A DATE\n\
+                  \DECIDE `in force from` IS `the rule date`\n\
+                  \GIVEN h IS A NUMBER\n\
+                  \GIVETH A NUMBER\n\
+                  \DECIDE `pay` h IS h TIMES `the base rate`\n\
+                  \GIVEN h IS A NUMBER\n\
+                  \GIVETH A NUMBER\n\
+                  \DECIDE `pay twice` h IS h TIMES `the doubled base`\n\
+                  \GIVEN h IS A NUMBER\n\
+                  \GIVETH A NUMBER\n\
+                  \DECIDE `pay fixed` h IS h TIMES `the fixed rate`\n"
+          readers = ["in force from", "pay", "pay twice"]
+      [d.dcnName | d <- drgDecisions drg] `shouldMatchList` (readers <> ["pay fixed", "the fixed rate"])
+      map (.element) (notesCoded "D-IMPORTED" drg) `shouldBe` [idOf "the fixed rate" drg]
+      (literalOf "pay fixed" drg).feText `shouldBe` "h * the_fixed_rate"
+      forM_ readers \nm -> (literalOf nm drg).feFragment `shouldBe` L4Verbatim
+      [n.element | n <- blockingOf drg] `shouldMatchList` map (`idOf` drg) readers
+
+    it "still refuses a call to an imported function" $ do
+      let drg = drgImp $ importing
+            "GIVEN h IS A NUMBER\n\
+            \GIVETH A NUMBER\n\
+            \DECIDE `monthly hours at` h IS `weekly hours at` h TIMES 52 DIVIDED BY 12\n"
+      (literalOf "monthly hours at" drg).feFragment `shouldBe` L4Verbatim
+
+    -- An imported constant is never a member of THIS module's population: it
+    -- is not a fixture, not inert, and not listed among the decisions left
+    -- out, which speak of this module only.
+    it "copies nothing for a decision left out as test scaffolding, and does not list the constant as left out" $ do
+      let drg = drgImp $ importing
+            "GIVETH A LIST OF NUMBER\n\
+            \DECIDE `sample limits` IS LIST `the threshold`, 1\n\
+            \#EVAL LIST (`sample limits`)\n"
+      notesCoded "D-IMPORTED" drg `shouldBe` []
+      map fst drg.drgOmitted `shouldBe` ["sample limits"]
+
+  -- smucclaw/l4-ide#1101. KIE resolves a typeRef to an enum or an alias only
+  -- when that definition comes earlier in the document (TYPE_DEF_NOT_FOUND
+  -- otherwise), so the engine-relevant property is: no definition names a
+  -- definition that comes after it, except inside a cycle of records, which
+  -- KIE accepts in either order (measured 2026-11-25; see
+  -- 'itemDefsInDependencyOrder').
+  describe "itemDefinition order (#1101)" $ do
+    let defNamed n comps base vals =
+          MkItemDefinition ("itemdef_" <> n) n n base vals
+            [MkItemComponent (n <> "_c" <> Text.pack (show i)) c c t | (i, (c, t)) <- zip [1 :: Int ..] comps]
+        record n comps = defNamed n comps Nothing Nothing
+        enum n = defNamed n [] (Just DmnString) (Just ["a", "b"])
+        alias n = defNamed n [] (Just DmnString) Nothing
+        named n = DmnNamed n DmnString
+        -- the names a definition refers to that come LATER in the list
+        forwardRefs defs =
+          [ (d.idfName, r)
+          | (i, d) <- zip [0 :: Int ..] defs
+          , DmnNamed r _ <- maybeToList d.idfBase <> map (.icmType) d.idfComponents
+          , Just j <- [lookup r (zip (map (.idfName) defs) [0 ..])]
+          , j > i
+          ]
+        order = map (.idfName) . itemDefsInDependencyOrder
+
+    it "moves an enum and an alias up to the first record that names them, and nothing else" $ do
+      let defs =
+            [ record "group" [("kind", named "kind"), ("leader", named "pupil")]
+            , record "pupil" [("grade", named "grade_optional"), ("buddy", named "pupil")]
+            , record "club" [("founder", named "member")]
+            , record "member" [("club", named "club")]
+            , enum "kind"
+            , enum "grade"
+            , alias "grade_optional"
+            ]
+      order defs
+        `shouldBe` ["grade_optional", "pupil", "kind", "group", "club", "member", "grade"]
+
+    it "leaves a list already in dependency order unchanged" $ do
+      let defs =
+            [ enum "kind"
+            , record "pupil" [("age", DmnNumber)]
+            , record "group" [("kind", named "kind"), ("leader", named "pupil")]
+            , enum "unused"
+            ]
+      order defs `shouldBe` map (.idfName) defs
+
+    it "keeps a cycle in the order given, without pulling its later member up" $ do
+      -- `club` and `member` refer to each other, and `fee` sits between
+      -- them: nothing forces `member` up past it.
+      let defs =
+            [ record "club" [("founder", named "member")]
+            , record "fee" [("amount", DmnNumber)]
+            , record "member" [("club", named "club")]
+            ]
+      order defs `shouldBe` ["club", "fee", "member"]
+
+    it "emits no forward reference outside a cycle in any golden subject" $
+      forM_ goldenSubjects \(srcPath, _, _) -> do
+        src <- Text.readFile (examplesRoot </> srcPath)
+        let defs = (drgAsCli srcPath src).drgItemDefs
+            isRecordCycle (a, b) = (b, a) `elem` reachable || a == b
+            reachable =
+              [ (d.idfName, r)
+              | d <- defs, DmnNamed r _ <- map (.icmType) d.idfComponents ]
+            bad = filter (not . isRecordCycle) (forwardRefs defs)
+        -- 'reachable' is one hop, which is all the corpus's cycles need; a
+        -- longer cycle would show up here as a false alarm, never a miss.
+        bad `shouldBe` []
+
+    it "the exhibit's enum and alias come before the records that name them" $ do
+      src <- Text.readFile (examplesRoot </> "dmn" </> "itemdef-order.l4")
+      let names = map (.idfName) (drgAsCli "itemdef-order.l4" src).drgItemDefs
+          pos n = lookup n (zip names [0 :: Int ..])
+      pos "kind_of_group" `shouldSatisfy` (< pos "group")
+      pos "grade_optional" `shouldSatisfy` (< pos "pupil")
+      -- and the mutually recursive pair keeps its source order
+      pos "crafts_club" `shouldSatisfy` (< pos "club_member")
+
   describe "golden" $ forM_ goldenSubjects \(srcPath, stem, label) -> do
     it (label <> ", as DMN 1.3 XML") $
       goldenOf examplesRoot srcPath (stem <> ".dmn") emitDrg
@@ -3998,7 +4545,8 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
     let testDrg ns = MkDrg
           { drgId = "definitions_t", drgName = "t"
           , drgNamespace = "ns", drgFlavor = FlavorCamunda
-          , drgItemDefs = [], drgNodes = ns, drgNotes = []
+          , drgItemDefs = [], drgNodes = ns, drgNotes = [], drgOmitted = []
+          , drgTakenForFields = []
           }
         lit frag t = LogicLiteral (MkFeelExpr t frag)
         bkmNode nm krs body = NodeBkm MkBkm
@@ -4226,6 +4774,21 @@ goldenSubjects =
     , "refuse"
     , "the refusal exhibit"
     )
+    -- The ITEMDEFINITION-ORDER exhibit (smucclaw/l4-ide#1101): every type is
+    -- declared after a type that uses it, and the self- and mutually
+    -- recursive records are there to show a cycle keeps its source order.
+    -- Engine-checked in CI through its `.engine-baseline.txt`.
+  , ( "dmn" </> "itemdef-order.l4"
+    , "itemdef-order"
+    , "the itemDefinition-order exhibit"
+    )
+    -- The ROUNDING exhibit (smucclaw/l4-ide#1103): FLOOR, CEILING, ROUND and
+    -- the prelude's sum, count, min and max, with cases at the edges where
+    -- FEEL could differ from L4. Engine-checked in CI through its baseline.
+  , ( "dmn" </> "rounding.l4"
+    , "rounding"
+    , "the rounding-and-aggregates exhibit"
+    )
   ]
 
 -- | The `.kie.` golden pairs (§13.6): ONLY the subjects whose bytes actually
@@ -4390,26 +4953,46 @@ drgGeneral vfs adjust flavor mkName src = case checkWithImports vfs src of
                 -- CLI uses (jl4/app/L4/Cli/Export.hs). If these two ever stopped
                 -- agreeing, a golden would move without any source moving.
                 , dloMaybePredicates =
-                    resolveMaybePredicates tc.tcdModule tc.tcdEnvironment tc.tcdEntityInfo
+                    resolveMaybePredicates apiLibraryFile tc.tcdModule tc.tcdEnvironment tc.tcdEntityInfo
                 , dloIncludeTests = False
-                , dloMissingMatchRanges =
-                    [ r
-                    | e@(TC.MkCheckErrorWithContext (TC.CheckWarning (TC.PatternMatchesMissing _ _)) _) <-
-                        tc.tcdErrors
-                    , Just r <- [rangeOf e]
-                    ]
+                , dloMissingMatchRanges = checkerMissingMatchRanges tc.tcdErrors
                 -- L1's Decide-level channel (clause matrices), extracted by
-                -- the same comprehension as the CLI (jl4/app/L4/Cli/Export.hs)
-                , dloClauseMatrixRanges =
-                    [ r
-                    | e@(TC.MkCheckErrorWithContext (TC.CheckWarning (TC.PatternClausesMissing {})) _) <-
-                        tc.tcdErrors
-                    , Just r <- [rangeOf e]
-                    ]
+                -- the same function as the CLI (jl4/app/L4/Cli/Export.hs)
+                , dloClauseMatrixRanges = checkerClauseMatrixRanges tc.tcdErrors
                 , dloExternalRefNames = Just Set.empty
+                -- #1102: the same transitive import closure the CLI passes
+                -- (jl4/app/L4/Cli/Export.hs), from the same check results.
+                , dloImportedModules =
+                    [ MkImportedModule
+                        { imModule             = ri.riTypeChecked.program
+                        , imSubstitution       = ri.riTypeChecked.substitution
+                        , imMissingMatchRanges = checkerMissingMatchRanges ri.riTypeChecked.errors
+                        , imClauseMatrixRanges = checkerClauseMatrixRanges ri.riTypeChecked.errors
+                        , imChecks             = importAccepted tc.tcdResolvedImports ri.riModuleName
+                        }
+                    | ri <- tc.tcdResolvedImports
+                    ]
+                -- The API pipeline names every module @project:/<name>.l4@
+                -- and looks a name up among the libraries before the VFS, so
+                -- there @project:/prelude.l4@ is the library.
+                , dloLibraryModule = apiLibraryFile
                 }
           )
           tc.tcdModule
+
+-- | The harness's 'imChecks', as the CLI's is @Rules.evaluable@: the module
+-- named reported no error, and neither did any module it imports, directly or
+-- not. The API pipeline resolves every import or fails, and refuses a cycle,
+-- so each name imported is in the list and the walk ends.
+importAccepted :: [ResolvedImport] -> Text -> Bool
+importAccepted ris = ok
+ where
+  byName = Map.fromList [(ri.riModuleName, ri) | ri <- ris]
+  ok name = case Map.lookup name byName of
+    Nothing -> False
+    Just ri ->
+      not (any ((== SError) . TC.severity) ri.riTypeChecked.errors)
+        && all ok (extractImportNames ri.riParsed)
 
 -- | Phase 4 fixtures: the default lowering with an options adjuster.
 drgAdjusted :: (DmnLowerOptions -> DmnLowerOptions) -> Text -> Drg

@@ -1,0 +1,29 @@
+-- smucclaw/l4-ide#1102: closed constants read from an imported module.
+-- `l4 export dmn` writes one file and no DMN import, so before #1102 each
+-- reference below was a FEEL name with nothing behind it: KIE refused the
+-- whole file (Unknown variable), and Camunda answered null to cases sending none.
+IMPORT prelude
+IMPORT `export-imported-limits`
+
+-- in a guard, through a chain of two more imported constants
+GIVEN hours IS A NUMBER
+GIVETH A STRING
+DECIDE `band` hours IS
+  IF hours GREATER THAN `the longest week` THEN "over"
+  ELSE IF hours EQUALS `the longest week` THEN "at"
+       ELSE "under"
+
+-- inside a business knowledge model: `scaled` is called with two different
+-- arguments, so it is emitted as a BKM, and the constant is passed in
+GIVEN y IS A NUMBER
+GIVETH A NUMBER
+DECIDE `scaled` y IS y TIMES `the threshold`
+
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+DECIDE `doubled limit` x IS `scaled` (x TIMES 2) PLUS `scaled` 1
+
+-- under a list quantifier
+GIVEN items IS A LIST OF NUMBER
+GIVETH A BOOLEAN
+DECIDE `all within` items IS all (GIVEN n YIELD n AT MOST `the threshold`) items

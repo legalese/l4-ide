@@ -1,0 +1,43 @@
+{
+  "cases": [
+    {
+      "name": "over the longest week, one item over the threshold",
+      "context": { "hours": 43, "x": 3, "items": [1, 200] },
+      "expect": {
+        "band": "over",
+        "doubled_limit": 700,
+        "all_within": false,
+        "the_longest_week": 42,
+        "the_threshold": 100,
+        "hours_per_day": 8,
+        "days_per_week": 5
+      }
+    },
+    {
+      "name": "at the longest week, every item at most the threshold",
+      "context": { "hours": 42, "x": 0, "items": [1, 100] },
+      "expect": {
+        "band": "at",
+        "doubled_limit": 100,
+        "all_within": true,
+        "the_longest_week": 42,
+        "the_threshold": 100,
+        "hours_per_day": 8,
+        "days_per_week": 5
+      }
+    },
+    {
+      "name": "under the longest week",
+      "context": { "hours": 41, "x": 1, "items": [] },
+      "expect": {
+        "band": "under",
+        "doubled_limit": 300,
+        "all_within": true,
+        "the_longest_week": 42,
+        "the_threshold": 100,
+        "hours_per_day": 8,
+        "days_per_week": 5
+      }
+    }
+  ]
+}

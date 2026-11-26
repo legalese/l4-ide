@@ -1,0 +1,35 @@
+-- The same calls as `export-shadow-prelude/uses-shadow.l4`, with the real
+-- libraries: a control for that fixture. Each call is lowered as the
+-- library's, from the compiled-in copy or from $JL4_LIBRARY_PATH.
+IMPORT prelude
+IMPORT daydate
+
+GIVEN xs IS A LIST OF NUMBER
+GIVETH A NUMBER
+DECIDE `how many` xs IS count xs
+
+GIVEN xs IS A LIST OF NUMBER
+GIVETH A NUMBER
+DECIDE `how much` xs IS sum xs
+
+GIVEN a IS A NUMBER
+      b IS A NUMBER
+GIVETH A NUMBER
+DECIDE `the bigger` a b IS max a b
+
+GIVEN x  IS A NUMBER
+      xs IS A LIST OF NUMBER
+GIVETH A BOOLEAN
+DECIDE `is listed` x xs IS elem x xs
+
+GIVEN xs IS A LIST OF NUMBER
+GIVETH A BOOLEAN
+DECIDE `all positive` xs IS all (GIVEN n YIELD n > 0) xs
+
+GIVEN m IS A MAYBE NUMBER
+GIVETH A BOOLEAN
+DECIDE `is given` m IS isJust m
+
+GIVETH A DATE
+DECIDE `the start` IS YMD 2024 1 2
+

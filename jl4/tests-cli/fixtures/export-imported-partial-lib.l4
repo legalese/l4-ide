@@ -1,0 +1,11 @@
+-- smucclaw/l4-ide#1102: the module `export-imported-partial.l4` imports.
+-- `first of nothing` is a closed constant, so `l4 export dmn` copies it into
+-- the importing model, but its CONSIDER has no row for a non-empty list: the
+-- checker warns that the match is not exhaustive, here, in this module's own
+-- diagnostics, and `l4 run` refuses to evaluate it.
+IMPORT prelude
+
+GIVETH A NUMBER
+`first of nothing` MEANS
+  CONSIDER (LIST 5, 6)
+  WHEN EMPTY THEN 0

@@ -1,0 +1,10 @@
+# Expected external-engine verdicts for the rounding-and-aggregates exhibit
+# (rounding.l4, smucclaw/l4-ide#1103). Same format and contract as
+# regcf-corpus.engine-baseline.txt: one line per engine, matched as a FIXED
+# SUBSTRING by the dmn-engines job of .github/workflows/pr-checks.yml.
+#
+# Measured 2026-11-25. Before #1103 this module exported with 8 Blocking
+# notes (FLOOR OF x and the rest as L4 text), and both engines refused the
+# whole file: KIE "0 case(s), 16 error(s)", Camunda "0 parsed".
+KIE 8.44.0.Final VERDICT: 1 file(s), 9 case(s), 0 error(s), 0 warning(s), 72/72 decision(s) SUCCEEDED, 72/72 value(s) as expected
+Camunda 8.7.6 (zeebe-dmn) VERDICT: 1 file(s), 9 case(s), 1 parsed, 0 error(s), 72/72 decision(s) evaluated, 72/72 value(s) as expected

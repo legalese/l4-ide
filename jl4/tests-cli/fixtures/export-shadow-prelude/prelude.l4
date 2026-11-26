@@ -1,0 +1,46 @@
+-- NOT the L4 prelude: a module of the author's own that happens to be called
+-- `prelude.l4`, beside the file that imports it. With JL4_LIBRARY_PATH unset,
+-- it outranks the copy compiled into `l4`, so `uses-shadow.l4` imports THIS.
+-- Each function has the prelude's name and type and a different body. Before
+-- the export asked which module is the library, it lowered these calls as the
+-- prelude's (`count(xs)`, `sum(...)`, `every`, `list contains`, `x != null`)
+-- while `l4 run` evaluated the bodies below. `shadow marker` is not in the
+-- real prelude, so `uses-shadow.l4` type-checks only if this copy won.
+GIVEN a    IS A TYPE
+      list IS A LIST OF a
+GIVETH A NUMBER
+count list MEANS 42
+
+GIVEN list IS A LIST OF NUMBER
+GIVETH A NUMBER
+sum list MEANS 7
+
+GIVEN x IS A NUMBER
+      y IS A NUMBER
+GIVETH A NUMBER
+max x y MEANS x PLUS y
+
+GIVEN a    IS A TYPE
+      x    IS AN a
+      list IS A LIST OF a
+GIVETH A BOOLEAN
+elem x list MEANS FALSE
+
+GIVEN a    IS A TYPE
+      f    IS A FUNCTION FROM a TO BOOLEAN
+      list IS A LIST OF a
+GIVETH A BOOLEAN
+all f list MEANS FALSE
+
+GIVEN a IS A TYPE
+      x IS A MAYBE a
+GIVETH A BOOLEAN
+isJust x MEANS FALSE
+
+GIVEN a IS A TYPE
+      x IS A MAYBE a
+GIVETH A BOOLEAN
+isNothing x MEANS FALSE
+
+GIVETH A NUMBER
+`shadow marker` MEANS 1

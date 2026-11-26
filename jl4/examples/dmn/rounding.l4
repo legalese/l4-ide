@@ -1,0 +1,144 @@
+-- The ROUNDING-AND-AGGREGATES exhibit for the DMN exporter
+-- (smucclaw/l4-ide#1103).
+--
+-- FLOOR, CEILING and ROUND, and the prelude's min, max, sum and count, each
+-- have a FEEL 1.3 builtin, and until #1103 the exporter wrote them as L4 text
+-- into a FEEL slot, which made BOTH engines refuse the whole file. Each form
+-- below was chosen by measuring both engines against `l4 run` at the edges
+-- where FEEL could differ from L4:
+--
+--   * ROUND rounds a half to the EVEN neighbour (2.5 gives 2, 3.5 gives 4,
+--     -2.5 gives -2), so it lowers to `decimal(x, 0)`, which does the same,
+--     and not to `round half up`.
+--   * FLOOR and CEILING are `floor` and `ceiling`, checked on negatives.
+--   * sum of an EMPTY list is 0 in L4 and null in FEEL, so sum lowers to
+--     `sum(concatenate([0], xs))`; count of an empty list is 0 in both.
+--   * min and max lower only for the prelude's NUMBER versions.
+--
+-- `band` puts a ROUND in a decision table's input expression, so the table
+-- path is exercised as well as the boxed literal one.
+--
+-- Cases: rounding.cases.json, every expected value from the evaluations at
+-- the end of this file. Each applies a decision directly, so none of them is
+-- taken for test scaffolding and left out of the model.
+
+IMPORT prelude
+
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+DECIDE `rounded down` x IS FLOOR x
+
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+DECIDE `rounded up` x IS CEILING x
+
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+DECIDE `rounded` x IS ROUND x
+
+GIVEN x IS A NUMBER
+GIVETH A STRING
+DECIDE `band` x IS
+    IF ROUND x AT LEAST 3
+    THEN "high"
+    ELSE "low"
+
+GIVEN amounts IS A LIST OF NUMBER
+GIVETH A NUMBER
+DECIDE `total` amounts IS sum amounts
+
+GIVEN amounts IS A LIST OF NUMBER
+GIVETH A NUMBER
+DECIDE `how many` amounts IS count amounts
+
+GIVEN x IS A NUMBER
+      cap IS A NUMBER
+GIVETH A NUMBER
+DECIDE `capped` x cap IS min x cap
+
+GIVEN x IS A NUMBER
+      cap IS A NUMBER
+GIVETH A NUMBER
+DECIDE `at least the cap` x cap IS max x cap
+
+-- x = 2.5, cap = 1, amounts = []
+#EVAL `rounded down` 2.5
+#EVAL `rounded up` 2.5
+#EVAL `rounded` 2.5
+#EVAL `band` 2.5
+#EVAL `capped` 2.5 1
+#EVAL `at least the cap` 2.5 1
+#EVAL `total` (LIST)
+#EVAL `how many` (LIST)
+-- x = 3.5, cap = 4, amounts = [3, 1, 2]
+#EVAL `rounded down` 3.5
+#EVAL `rounded up` 3.5
+#EVAL `rounded` 3.5
+#EVAL `band` 3.5
+#EVAL `capped` 3.5 4
+#EVAL `at least the cap` 3.5 4
+#EVAL `total` (LIST 3, 1, 2)
+#EVAL `how many` (LIST 3, 1, 2)
+-- x = -2.5, cap = 0, amounts = [0.1, 0.2]
+#EVAL `rounded down` (-2.5)
+#EVAL `rounded up` (-2.5)
+#EVAL `rounded` (-2.5)
+#EVAL `band` (-2.5)
+#EVAL `capped` (-2.5) 0
+#EVAL `at least the cap` (-2.5) 0
+#EVAL `total` (LIST 0.1, 0.2)
+#EVAL `how many` (LIST 0.1, 0.2)
+-- x = 0.5, cap = 0.5, amounts = []
+#EVAL `rounded down` 0.5
+#EVAL `rounded up` 0.5
+#EVAL `rounded` 0.5
+#EVAL `band` 0.5
+#EVAL `capped` 0.5 0.5
+#EVAL `at least the cap` 0.5 0.5
+#EVAL `total` (LIST)
+#EVAL `how many` (LIST)
+-- x = -0.5, cap = -1, amounts = [3, 1, 2]
+#EVAL `rounded down` (-0.5)
+#EVAL `rounded up` (-0.5)
+#EVAL `rounded` (-0.5)
+#EVAL `band` (-0.5)
+#EVAL `capped` (-0.5) (-1)
+#EVAL `at least the cap` (-0.5) (-1)
+#EVAL `total` (LIST 3, 1, 2)
+#EVAL `how many` (LIST 3, 1, 2)
+-- x = 1.5, cap = 2, amounts = []
+#EVAL `rounded down` 1.5
+#EVAL `rounded up` 1.5
+#EVAL `rounded` 1.5
+#EVAL `band` 1.5
+#EVAL `capped` 1.5 2
+#EVAL `at least the cap` 1.5 2
+#EVAL `total` (LIST)
+#EVAL `how many` (LIST)
+-- x = -1.5, cap = -1.5, amounts = [0.1, 0.2]
+#EVAL `rounded down` (-1.5)
+#EVAL `rounded up` (-1.5)
+#EVAL `rounded` (-1.5)
+#EVAL `band` (-1.5)
+#EVAL `capped` (-1.5) (-1.5)
+#EVAL `at least the cap` (-1.5) (-1.5)
+#EVAL `total` (LIST 0.1, 0.2)
+#EVAL `how many` (LIST 0.1, 0.2)
+-- x = 2.7, cap = 10, amounts = []
+#EVAL `rounded down` 2.7
+#EVAL `rounded up` 2.7
+#EVAL `rounded` 2.7
+#EVAL `band` 2.7
+#EVAL `capped` 2.7 10
+#EVAL `at least the cap` 2.7 10
+#EVAL `total` (LIST)
+#EVAL `how many` (LIST)
+-- x = -3, cap = -4, amounts = [3, 1, 2]
+#EVAL `rounded down` (-3)
+#EVAL `rounded up` (-3)
+#EVAL `rounded` (-3)
+#EVAL `band` (-3)
+#EVAL `capped` (-3) (-4)
+#EVAL `at least the cap` (-3) (-4)
+#EVAL `total` (LIST 3, 1, 2)
+#EVAL `how many` (LIST 3, 1, 2)

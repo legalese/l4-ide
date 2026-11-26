@@ -1,0 +1,20 @@
+-- Raw L4 where FEEL was wanted, beside a decision that is plain FEEL. `as
+-- text` becomes a boxed literal whose text is L4 (Blocking D-LITERALEXPR), and
+-- `banded`'s first test becomes an input column whose text is L4 (Blocking
+-- D-NONFEELINPUT). Neither engine runs any decision of such a file, `pay`
+-- included: KIE 8.44 refuses to load it and Camunda 8.7.6 to parse it, and
+-- both notes say so.
+GIVEN x IS A NUMBER
+GIVETH A STRING
+DECIDE `as text` x IS x AS STRING
+
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+DECIDE `banded` x IS
+  IF x AS STRING EQUALS "1" THEN 1
+  ELSE IF x > 5 THEN 2
+            ELSE 3
+
+GIVEN h IS A NUMBER
+GIVETH A NUMBER
+DECIDE `pay` h IS h PLUS 1

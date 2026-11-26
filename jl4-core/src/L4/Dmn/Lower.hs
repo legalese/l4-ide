@@ -84,6 +84,11 @@ module L4.Dmn.Lower
   , moduleTitle
   , DmnLowerOptions (..)
   , defaultDmnLowerOptions
+  , embeddedLibraryModule
+  , loweredLibraryFiles
+  , ImportedModule (..)
+  , checkerMissingMatchRanges
+  , checkerClauseMatrixRanges
   , MaybePredicates (..)
   , resolveMaybePredicates
     -- * Reusable pieces
@@ -116,7 +121,7 @@ import Data.Ratio (denominator, numerator)
 import Data.Time.Calendar (Day, fromGregorianValid, showGregorian, toModifiedJulianDay)
 import Optics
 
-import L4.Annotation (Anno_ (..), emptyAnno, getAnno)
+import L4.Annotation (Anno_ (..), emptyAnno, getAnno, rangeOf)
 import L4.Desugar (carameliseExpr)
 import L4.Parser.SrcSpan (SrcRange, prettySrcRange)
 import L4.Print (prettyLayout)
@@ -253,6 +258,14 @@ data NameEnv = MkNameEnv
     -- reference nothing beyond @_self@ (no module globals, no sibling
     -- computed reads), so the inline cannot smuggle unliftable environment
     -- references into a BKM body.
+  , neHomeUri :: !(Maybe NormalizedUri)
+    -- ^ the module being exported, when there is one (smucclaw/l4-ide#1102).
+    -- A bare reference to a value defined in ANOTHER module that is not an
+    -- element of this model (not in 'neVars') has no FEEL name behind it:
+    -- rendered as one, it is a variable KIE refuses to compile and Camunda
+    -- takes the caller's value of that name, null if none is sent. With this
+    -- set, such a reference refuses instead ('verbatim', Blocking). 'Nothing'
+    -- for 'renderFeel', which holds an expression and no module.
   }
 
 -- | One member of a BKM's λ-lifted closure (§6.2): either a module element
@@ -325,6 +338,7 @@ emptyNameEnv = MkNameEnv
   , neInlineHere = Set.empty
   , neInlineFuel = 16
   , neComputedInline = Map.empty
+  , neHomeUri    = Nothing
   }
 
 -- | A parameterised decide, as a quantifier binder needs to see it: the @GIVEN@
@@ -371,6 +385,8 @@ data TableCtx = MkTableCtx
     -- reference. See 'constantOf' and 'renderFeelIn' respectively.
   , tcSubst        :: !TC.Substitution
   , tcUri          :: !NormalizedUri
+  , tcLibrary      :: !(NormalizedUri -> Maybe Text)
+    -- ^ 'dloLibraryModule', for the provenance tests ('fromPrelude')
   }
 
 -- | Enough to satisfy 'rowsToDmn' standing alone. Knows no constructors, so a
@@ -390,6 +406,7 @@ defaultTableCtx = MkTableCtx
   , tcDateConstants = Map.empty
   , tcSubst        = Map.empty
   , tcUri          = toNormalizedUri (Uri "")
+  , tcLibrary      = embeddedLibraryModule
   }
 
 -- | The typechecker's answer to "what type is this expression?", bundled — the
@@ -409,6 +426,9 @@ data TypeOracle = MkTypeOracle
   { toTypes :: !TypeEnv
   , toSubst :: !TC.Substitution
   , toUri   :: !NormalizedUri
+  , toLibrary :: !(NormalizedUri -> Maybe Text)
+    -- ^ 'dloLibraryModule': which modules are the standard library, for the
+    -- provenance tests 'fromPrelude' and 'fromDaydate'
   }
 
 -- | An oracle that knows only what each node's own annotation already says.
@@ -431,6 +451,7 @@ noTypeOracle = MkTypeOracle
   { toTypes = emptyTypeEnv
   , toSubst = Map.empty
   , toUri   = toNormalizedUri (Uri "")
+  , toLibrary = embeddedLibraryModule
   }
 
 oracleOf :: TableCtx -> TypeOracle
@@ -438,6 +459,7 @@ oracleOf ctx = MkTypeOracle
   { toTypes = ctx.tcTypes
   , toSubst = ctx.tcSubst
   , toUri   = ctx.tcUri
+  , toLibrary = ctx.tcLibrary
   }
 
 data DmnLowerOptions = MkDmnLowerOptions
@@ -503,7 +525,84 @@ data DmnLowerOptions = MkDmnLowerOptions
     -- filter then FAILS SAFE (drops nothing, reports what it would have
     -- dropped). The CLI supplies a sibling-directory scan; the golden harness
     -- supplies its VFS's contents.
+  , dloImportedModules :: ![ImportedModule]
+    -- ^ every module this one reaches through @IMPORT@, transitively, each
+    -- with what ITS OWN check produced (smucclaw/l4-ide#1102). Read for one
+    -- thing only: a CLOSED constant defined in one of them (see
+    -- 'importedClosedSet') that a decision of this module reads is emitted as
+    -- a decision of this model, with a @D-IMPORTED@ note, because this
+    -- exporter emits no DMN @import@ (spec §18). Empty: no constant is copied,
+    -- and every reference to an imported value refuses (see 'neHomeUri').
+  , dloLibraryModule :: !(NormalizedUri -> Maybe Text)
+    -- ^ the standard-library file a module IS (@prelude.l4@, @daydate.l4@)
+    -- when this run resolved it as the library, and 'Nothing' for every other
+    -- module. The provenance tests ('fromPrelude', 'fromDaydate',
+    -- 'resolveMaybePredicates') ask this, not the module's file name: a
+    -- @prelude.l4@ beside the exported file outranks the copy compiled into
+    -- the binary, and is the author's own module, not the library.
+    --
+    -- Each pipeline knows its own answer, so each caller supplies it: the CLI
+    -- accepts the compiled-in copy and a file in @$JL4_LIBRARY_PATH@
+    -- (jl4\/app\/L4\/Cli\/Export.hs); the API pipeline, whose @project:\/@
+    -- names are looked up among the libraries first, accepts those
+    -- ('L4.Cycles.apiLibraryFile', in the golden harness). The default,
+    -- 'embeddedLibraryModule', accepts the compiled-in copy alone, so a caller
+    -- that supplies nothing loses recognition (a loud, Blocking refusal of
+    -- each call) rather than trusting a file it cannot vouch for.
   }
+
+-- | One module the exported module imports, with what its own check produced
+-- (smucclaw/l4-ide#1102). A constant copied out of it is certified exactly as
+-- a local constant is, so the copy needs the same checker facts a local
+-- constant gets from 'dloMissingMatchRanges' and 'dloClauseMatrixRanges', and
+-- those are in the imported module's diagnostics, not the importer's.
+data ImportedModule = MkImportedModule
+  { imModule             :: !(Module Resolved)
+  , imSubstitution       :: !TC.Substitution
+    -- ^ an importer starts from an empty substitution, so an imported body's
+    -- inference variables resolve only against its own module's
+  , imMissingMatchRanges :: ![SrcRange]
+    -- ^ 'checkerMissingMatchRanges' of the imported module's own check
+  , imClauseMatrixRanges :: ![SrcRange]
+    -- ^ 'checkerClauseMatrixRanges' of the imported module's own check
+  , imChecks             :: !Bool
+    -- ^ the imported module type-checks, and so does every module it
+    -- imports, directly or not (the CLI passes 'LSP.L4.Rules.evaluable',
+    -- @l4 run@'s test; how that compares with @l4 check@'s is in
+    -- "L4.Cli.Export", and an IMPORT that resolves to nothing is where they
+    -- differ: it passes this, and @l4 check@ refuses it). Its errors are not
+    -- the importer's (the importer is told only that the import has errors),
+    -- so a constant there can be typed one way and defined another, and a
+    -- module whose own import has errors is not evaluated by @l4 run@ at all
+    -- (smucclaw/l4-ide#1025), so its constants are no value L4 has. Such a
+    -- module's constants are never closed (see 'importedConstantPool'), all
+    -- of them, even one that reads nothing from the module with the error:
+    -- refusing the whole module is decided by Claude 2026-11-26, pending
+    -- Meng's review, because it is the rule @l4 check@ and @l4 run@ apply.
+    -- The export still exits 0 on an importer that @l4 check@ refuses; that
+    -- is smucclaw/l4-ide#1110, which this does not fix.
+  }
+
+-- | The source ranges of the checker's @PatternMatchesMissing@ warnings, for
+-- @DMN-SAFE@'s L1. One definition, used by every caller for the exported
+-- module and for each module it imports, so that what "the checker warned"
+-- means cannot drift between them.
+checkerMissingMatchRanges :: [TC.CheckErrorWithContext] -> [SrcRange]
+checkerMissingMatchRanges diags =
+  [ r
+  | e@(TC.MkCheckErrorWithContext (TC.CheckWarning (TC.PatternMatchesMissing _ _)) _) <- diags
+  , Just r <- [rangeOf e]
+  ]
+
+-- | The source ranges (clause-head hulls) of the checker's
+-- @PatternClausesMissing@ warnings: L1's Decide-level channel. See
+-- 'checkerMissingMatchRanges'.
+checkerClauseMatrixRanges :: [TC.CheckErrorWithContext] -> [SrcRange]
+checkerClauseMatrixRanges diags =
+  [ r
+  | e@(TC.MkCheckErrorWithContext (TC.CheckWarning (TC.PatternClausesMissing {})) _) <- diags
+  , Just r <- [rangeOf e]
+  ]
 
 defaultDmnLowerOptions :: DmnLowerOptions
 defaultDmnLowerOptions = MkDmnLowerOptions
@@ -515,7 +614,16 @@ defaultDmnLowerOptions = MkDmnLowerOptions
   , dloMissingMatchRanges = []
   , dloClauseMatrixRanges = []
   , dloExternalRefNames   = Nothing
+  , dloImportedModules    = []
+  , dloLibraryModule      = embeddedLibraryModule
   }
+
+-- | The library file a module is when it is the copy compiled into this
+-- binary (@jl4-embedded:\/prelude.l4@), and 'Nothing' otherwise. The default
+-- 'dloLibraryModule'; "L4.Cycles" recognises the compiled-in copy by the same
+-- prefix ('L4.Cycles.libraryFile').
+embeddedLibraryModule :: NormalizedUri -> Maybe Text
+embeddedLibraryModule u = Text.stripPrefix "jl4-embedded:/" (fromNormalizedUri u).getUri
 
 -- | Find the prelude's @isJust@ and @isNothing@ by SHAPE, not by module path.
 --
@@ -536,7 +644,7 @@ defaultDmnLowerOptions = MkDmnLowerOptions
 -- @isJust@ ALONGSIDE the prelude fall back to no recognition rather than to the
 -- wrong one: two candidates, so 'Nothing'.
 --
--- __Two PROVENANCE conditions on top of the shape, and neither is a path
+-- __Three PROVENANCE conditions on top of the shape, and none is a path
 -- test.__ 'Unique' carries the URI of the module that minted it, so:
 --
 --   * both survivors must come from the SAME module — one prelude defines the
@@ -551,29 +659,31 @@ defaultDmnLowerOptions = MkDmnLowerOptions
 -- The "exactly one survivor" sentence above USED to claim it covered that case;
 -- it did not, and the case it named was the one it missed.
 --
--- __Still not filtered by the module's PATH.__ The prelude's URI differs between
--- the CLI (a real file path, or @jl4-embedded:@, or an XDG store) and the VFS
--- harness (@project:\/prelude.l4@), so a path test would recognise the
--- combinators in one and not the other — the same drift this function exists to
--- prevent, only harder to see. Comparing URIs for EQUALITY is immune to that,
--- because both sides are minted by the same resolver in the same run.
---
--- __What is still not established, stated rather than glossed:__ that the
--- defining module is the L4 prelude and not some other imported library that
--- happens to define both names at both types. Closing that would need the
--- BODIES, and 'TC.EntityInfo' carries only types. A library that reimplements
--- @isJust@ and @isNothing@ at @MAYBE a -> BOOLEAN@ and is imported INSTEAD of
--- the prelude will be recognised; a library imported ALONGSIDE it will not.
+-- __And a third: the module is the prelude, as the caller's recogniser
+-- judges it__ ('dloLibraryModule', passed here as the first argument; both
+-- call sites pass the same one they put in the options). Without it, a module
+-- that reimplements @isJust@ and @isNothing@ at @MAYBE a -> BOOLEAN@ and is
+-- imported INSTEAD of the prelude was recognised, and that includes a
+-- @prelude.l4@ of the author's own beside the exported file, which outranks
+-- the compiled-in copy when @JL4_LIBRARY_PATH@ is unset: its
+-- @\`isJust\` x MEANS FALSE@ was rendered @x != null@ (found by the review of
+-- smucclaw/l4-ide#1103, 2026-11-26). The recogniser is not a path test: the
+-- prelude's URI differs between the CLI (@jl4-embedded:@, or a file in
+-- @JL4_LIBRARY_PATH@) and the VFS harness (@project:\/prelude.l4@), and each
+-- caller supplies the rule for its own pipeline, so neither recognises what
+-- the other would not.
 resolveMaybePredicates
-  :: Module Resolved   -- ^ the module being exported; a definition from HERE is not the prelude's
+  :: (NormalizedUri -> Maybe Text)   -- ^ 'dloLibraryModule'
+  -> Module Resolved   -- ^ the module being exported; a definition from HERE is not the prelude's
   -> TC.Environment
   -> TC.EntityInfo
   -> Maybe MaybePredicates
-resolveMaybePredicates (MkModule _ selfUri _) env info = do
+resolveMaybePredicates library (MkModule _ selfUri _) env info = do
   j <- soleMatch "isJust"
   n <- soleMatch "isNothing"
   guard (j.moduleUri == n.moduleUri)
   guard (j.moduleUri /= selfUri)
+  guard (library j.moduleUri == Just preludeLibraryFile)
   pure (MkMaybePredicates { mpIsJust = j, mpIsNothing = n })
  where
   soleMatch nm = case filter shaped (Map.findWithDefault [] (NormalName nm) env) of
@@ -1037,8 +1147,8 @@ foldDateLiteral oracle e = case e of
  where
   dateHead r =
     getUnique r == TC.dateFromDMYUnique
-      || (fromDaydate r && named r ["Date", "Days to date"])
-  ymdHead r = fromDaydate r && named r ["YMD", "Year month day"]
+      || (fromDaydate oracle.toLibrary r && named r ["Date", "Days to date"])
+  ymdHead r = fromDaydate oracle.toLibrary r && named r ["YMD", "Year month day"]
   named r ns = nameOf r `elem` ns || unqualifiedNameToText (getActual r) `elem` ns
 
 -- | Provenance: does this reference resolve to a definition in the standard
@@ -1047,8 +1157,8 @@ foldDateLiteral oracle e = case e of
 -- Asked of @all@ \/ @any@ before either is lowered to a FEEL quantifier
 -- (#936): they are ordinary prelude @DECIDE@s, so the same reasoning as
 -- 'fromDaydate' applies unchanged.
-fromPrelude :: Resolved -> Bool
-fromPrelude = definedIn "prelude.l4"
+fromPrelude :: (NormalizedUri -> Maybe Text) -> Resolved -> Bool
+fromPrelude library = definedIn library preludeLibraryFile
 
 -- | Provenance: does this reference resolve to a definition in the @daydate@
 -- library?
@@ -1062,24 +1172,52 @@ fromPrelude = definedIn "prelude.l4"
 -- answer is exact for the thing that matters: a same-named function defined
 -- anywhere else resolves to a different module and declines.
 --
--- Matched on the URI's BASENAME rather than its full path, because the same
--- library is reached under several spellings — a @file://@ path under
--- @JL4_LIBRARY_PATH@, the repo's own @jl4-core\/libraries@, or the embedded
--- copy seeded into the VFS under the @jl4-embedded@ scheme (see the resolution
--- order in CLAUDE.md §5). Every one of them ends in @daydate.l4@, and nothing
--- else does: a user module that shadows @YMD@ lives in its own file, and one
--- that shadows it while ALSO being called @daydate.l4@ is the library, by
--- resolution.
-fromDaydate :: Resolved -> Bool
-fromDaydate = definedIn "daydate.l4"
+-- __Which module is the library is the caller's to say__ ('dloLibraryModule'),
+-- because the same library is reached under several spellings — the embedded
+-- copy under the @jl4-embedded@ scheme, a @file://@ path under
+-- @JL4_LIBRARY_PATH@, or @project:\/daydate.l4@ in the API pipeline — and
+-- because a file merely CALLED @daydate.l4@ is not one of them. This used to
+-- match the URI's basename, on the reasoning that a module called
+-- @daydate.l4@ "is the library, by resolution". It is not: with
+-- @JL4_LIBRARY_PATH@ unset, a @daydate.l4@ (or @prelude.l4@) beside the
+-- exported file outranks the compiled-in copy (resolution order, CLAUDE.md
+-- §5), so it is the author's own module, and its @YMD@, @sum@ or @all@ was
+-- lowered as the library's while @l4 run@ evaluated the author's body
+-- (found by the review of smucclaw/l4-ide#1103, 2026-11-26).
+fromDaydate :: (NormalizedUri -> Maybe Text) -> Resolved -> Bool
+fromDaydate library = definedIn library daydateLibraryFile
 
--- | The basename of the module that minted this reference's defining
--- occurrence. See 'fromDaydate' for why the BASENAME is the right granularity.
-definedIn :: Text -> Resolved -> Bool
-definedIn base r =
-  Text.takeWhileEnd (\c -> c /= '/' && c /= '\\') uriText == base
- where
-  uriText = (fromNormalizedUri (getUnique r).moduleUri).getUri
+-- | The library files whose functions the lowering recognises by where they
+-- are defined ('fromPrelude', 'fromDaydate', and 'resolveMaybePredicates' for
+-- the prelude): the only files for which it matters to the model whether the
+-- caller's 'dloLibraryModule' takes a module for the library. The CLI reports
+-- a library file it does not take only when it is one of these
+-- (@D-NOT-LIBRARY@, "L4.Cli.Export"), because any other file changes nothing
+-- in the model either way. A provenance test for another file adds its name
+-- here.
+loweredLibraryFiles :: [Text]
+loweredLibraryFiles = [preludeLibraryFile, daydateLibraryFile]
+
+preludeLibraryFile, daydateLibraryFile :: Text
+preludeLibraryFile = "prelude.l4"
+daydateLibraryFile = "daydate.l4"
+
+-- | The URI every builtin 'Unique' carries (@jl4:builtin@), read off one of
+-- them rather than spelled again here.
+builtinModuleUri :: NormalizedUri
+builtinModuleUri = TC.trueUnique.moduleUri
+
+-- | Does this reference's defining occurrence live in the library file
+-- @base@, as the caller's recogniser ('dloLibraryModule') judges the module
+-- that minted it? See 'fromDaydate'.
+definedIn :: (NormalizedUri -> Maybe Text) -> Text -> Resolved -> Bool
+definedIn library base r = library (getUnique r).moduleUri == Just base
+
+-- | The last path segment of a module URI (@weeklimit.l4@), which is what a
+-- fidelity note may name: never the directory it was found in.
+moduleBaseName :: NormalizedUri -> Text
+moduleBaseName u =
+  Text.takeWhileEnd (\c -> c /= '/' && c /= '\\') (fromNormalizedUri u).getUri
 
 intLitOf :: Expr Resolved -> Maybe Integer
 intLitOf = \case
@@ -1094,6 +1232,17 @@ constantRefIn ctors r
   | u == TC.trueUnique    = Just (VBool True)
   | u == TC.falseUnique   = Just (VBool False)
   | isBuiltinSumCon r     = Nothing
+  -- EMPTY, the empty list. The typechecker stamps it @Constructor@ like any
+  -- other, so 'isConstantRef' used to make it the string constant @"EMPTY"@:
+  -- @count EMPTY@ exported as @count("EMPTY")@, which is 1 in FEEL where L4
+  -- says 0, and a @WHEN EMPTY@ arm as an input entry @"EMPTY"@, which no list
+  -- equals. It has no simple value: FEEL's @[]@ is a list, and S-FEEL's
+  -- simple literals are numbers, strings, booleans and dates only (DMN 1.3
+  -- grammar rule 33), so it can never be a cell endpoint. 'renderFeelIn'
+  -- renders it @[]@ in an expression, where @xs = []@ is FEEL's list
+  -- equality, and a test of it becomes its own boolean column (see
+  -- 'fallbackCell'), never an input entry.
+  | u == TC.emptyUnique   = Nothing
   | isConstantRef ctors r = Just (VStr (nameOf r))
   | otherwise             = Nothing
  where
@@ -1904,11 +2053,17 @@ renderFeelIn names ctors oracle top = let (_, txt, frag) = go top in MkFeelExpr 
     -- R8-d′. Refused here, the expression falls through to 'verbatim' and the
     -- refusal stays loud.
     App _ r [] | getUnique r == TC.nothingUnique, flatMaybe e -> (atomPrec, "null", FullFeel)
+               -- EMPTY is FEEL's empty list. 'FullFeel', never 'SFeel', for
+               -- the reason NOTHING's `null` is: a list is not a simple
+               -- literal (grammar rule 33), so it must not reach a cell
+               -- endpoint. 'constantRefIn' refuses it a 'FeelValue' for the
+               -- same reason.
+               | getUnique r == TC.emptyUnique                -> (atomPrec, "[]", FullFeel)
                | isBuiltinSumCon r                            -> verbatim e
                -- A BARE reference to an emitted BKM (§6.3-2): a BKM is an
                -- invocable, not a variable, and its FEEL name no longer names
                -- a decision variable — rendering it bare would be valid-looking
-               -- FEEL that KIE refuses and Camunda nulls. Verbatim, Blocking.
+               -- FEEL that Camunda evaluates as a name (unmeasured). Verbatim, Blocking.
                | Map.member (getUnique r) names.neBkms        -> verbatim e
                -- #936 Gap 2. Under a quantifier binder, a BARE reference to a
                -- decide the binder shadows names a GLOBAL decision computed
@@ -1921,6 +2076,12 @@ renderFeelIn names ctors oracle top = let (_, txt, frag) = go top in MkFeelExpr 
                -- silent wrong answer the issue is about.
                | Set.member (getUnique r) names.neInlineHere  ->
                    maybe (verbatim e) goIn (inlineBody names (getUnique r) [])
+               -- #1102, option 2: a value from another module that is not an
+               -- element of this model. Its FEEL name would name nothing (KIE
+               -- refuses the file, Camunda takes the caller's value), so it refuses. A
+               -- CLOSED imported constant never reaches here: 'lowerModule'
+               -- emits it as a decision (option 1), so it is in 'neVars'.
+               | foreignUnbound r                             -> verbatim e
                | otherwise                                    -> (atomPrec, nullaryText r, SFeel)
     -- JUST x IS x. FEEL has one flat null and no tag, so the constructor has no
     -- image; the payload does. (R8-d′)
@@ -2219,6 +2380,58 @@ renderFeelIn names ctors oracle top = let (_, txt, frag) = go top in MkFeelExpr 
     -- not merely reasoned about.
     App _ r [xE, listE]
       | preludeElem r -> call e "list contains" [listE, xE]
+    -- smucclaw/l4-ide#1103: the rounding builtins and the prelude's numeric
+    -- aggregates, which FEEL 1.3 has as builtin functions (DMN 1.3 §10.3.4).
+    -- Before this they fell to 'verbatim', and the L4 text in a FEEL slot made
+    -- BOTH engines refuse the whole file, not only the one decision.
+    --
+    -- __Each form was chosen by measurement, not by name__, on KIE 8.44.0.Final
+    -- and Camunda 8.7.6 on 2026-11-25, against what `l4 run` answers:
+    --
+    --   * @FLOOR x@ is @floor(x)@ and @CEILING x@ is @ceiling(x)@, agreeing at
+    --     2.5, -2.5, -0.5, 0.5 and -3.
+    --   * @ROUND x@ is @decimal(x, 0)@, NOT @round half up(x, 0)@: L4 rounds a
+    --     half to the even neighbour (Haskell's 'round' on a 'Rational', in the
+    --     evaluator), and so does @decimal@; both engines agreed with L4 at 0.5,
+    --     1.5, -0.5, -1.5, 2.5, 3.5, -2.5, 2.7 and -2.7.
+    --   * @sum xs@ is @sum(concatenate([0], xs))@, NOT @sum(xs)@: on an empty
+    --     list L4 answers 0 and FEEL's @sum([])@ answers null on both engines.
+    --     The leading 0 changes no other sum, and gives 0 on both.
+    --   * @count xs@ is @count(xs)@, which answers 0 on an empty list on both.
+    --   * @min a b@ and @max a b@ are @min(a, b)@ and @max(a, b)@, but only on
+    --     the prelude's NUMBER overloads: the MAYBE NUMBER ones (which skip a
+    --     NOTHING) have a different meaning from FEEL's, so the gate is the
+    --     oracle saying the call and both operands are a plain number, and an
+    --     unknown type declines. @minimum@ and @maximum@ are not lowered: L4
+    --     leaves them undefined on an empty list (@nonexhaustive@), and FEEL's
+    --     @min([])@ is null on Camunda and fails the decision on KIE ("The
+    --     parameter 'list', in function min(), cannot be null or empty";
+    --     measured 2026-11-26, KIE 8.44.0.Final and Camunda 8.7.6).
+    --
+    -- __What none of them fixes__: FEEL's number is a 34-digit decimal and
+    -- L4's an exact rational (spec §2.4.4), and a rounding function turns a
+    -- last-digit difference into a whole unit at a boundary. @FLOOR (x DIVIDED
+    -- BY 3 TIMES 3)@ at x = 1 is 1 in L4 and 0 on both engines (measured).
+    --
+    -- The prelude ones are recognised by PROVENANCE then name, as 'preludeElem'
+    -- and 'listQuantKeyword' are, so a module's own @sum@ or @min@ is left
+    -- alone. SQRT and TRUNC are deliberately absent: SQRT is partial (L5) and
+    -- TRUNC has no single FEEL function, so both keep the 'verbatim' refusal.
+    -- The forms are decided by Claude 2026-11-25, pending Meng's review.
+    App _ r [x]
+      | getUnique r == TC.floorUnique   -> call e "floor" [x]
+      | getUnique r == TC.ceilingUnique -> call e "ceiling" [x]
+      | getUnique r == TC.roundUnique   -> callWith e "decimal" [x] ["0"]
+      | preludeNamed r "count"          -> call e "count" [x]
+      | preludeNamed r "sum", plainNumber e ->
+          let (_, t, f) = go x
+          in if f == L4Verbatim
+               then verbatim e
+               else (atomPrec, "sum(concatenate([0], " <> t <> "))", max FullFeel f)
+    App _ r [a, b]
+      | preludeNamed r "min" || preludeNamed r "max"
+      , all plainNumber [e, a, b] ->
+          call e (if preludeNamed r "min" then "min" else "max") [a, b]
     -- #936 Gap 2, the saturated-call half. Checked BEFORE un-lifting, because
     -- un-lifting is what discards the argument: under a binder that argument is
     -- the bound element and discarding it is the defect.
@@ -2528,6 +2741,25 @@ renderFeelIn names ctors oracle top = let (_, txt, frag) = go top in MkFeelExpr 
     call whole fn args =
       nary whole FullFeel (\ts -> fn <> "(" <> Text.intercalate ", " ts <> ")") args
 
+    -- 'call' with constant FEEL arguments appended after the rendered ones.
+    callWith whole fn args consts =
+      nary whole FullFeel (\ts -> fn <> "(" <> Text.intercalate ", " (ts <> consts) <> ")") args
+
+    -- The oracle says this expression is a plain NUMBER: not a MAYBE, a list,
+    -- an EITHER, or a type it could not read. Fails closed.
+    plainNumber x = oracleClassify oracle x == (DmnNumber, Nothing, noTypeFlags)
+
+    -- Defined in another module (not this one, not a builtin), not a
+    -- constructor, and not an element this model emits. See 'neHomeUri'.
+    foreignUnbound r = case names.neHomeUri of
+      Nothing   -> False
+      Just home ->
+        let u = getUnique r
+        in u.moduleUri /= home
+             && u.moduleUri /= builtinModuleUri
+             && not (Map.member u names.neVars)
+             && isNothing (constantRefIn ctors r)
+
     verbatim whole = (atomPrec, prettyLayout whole, L4Verbatim)
 
     parenIf True t  = "(" <> t <> ")"
@@ -2545,7 +2777,7 @@ renderFeelIn names ctors oracle top = let (_, txt, frag) = go top in MkFeelExpr 
   -- @every@ \/ @some@, or not a list quantifier at all.
   listQuantKeyword :: Resolved -> Maybe Text
   listQuantKeyword r
-    | not (fromPrelude r) = Nothing
+    | not (fromPrelude oracle.toLibrary r) = Nothing
     | named ["all"]       = Just "every"
     | named ["any"]       = Just "some"
     | otherwise           = Nothing
@@ -2554,9 +2786,13 @@ renderFeelIn names ctors oracle top = let (_, txt, frag) = go top in MkFeelExpr 
 
   -- The prelude's list-membership @DECIDE@, and nothing else of that name.
   preludeElem :: Resolved -> Bool
-  preludeElem r =
-    fromPrelude r
-      && (nameOf r == "elem" || unqualifiedNameToText (getActual r) == "elem")
+  preludeElem r = preludeNamed r "elem"
+
+  -- A prelude @DECIDE@ of this name, and nothing else of that name.
+  preludeNamed :: Resolved -> Text -> Bool
+  preludeNamed r n =
+    fromPrelude oracle.toLibrary r
+      && (nameOf r == n || unqualifiedNameToText (getActual r) == n)
 
   -- The predicate's binder and the body to render under it. Three shapes, and
   -- nothing else — an unrecognised predicate falls to 'verbatim', which is the
@@ -3100,7 +3336,8 @@ annTypeSource o e = case (getAnno e).extra.resolvedInfo of
 -- through the context it is in the middle of building.
 annTypeOf :: TypeEnv -> TC.Substitution -> NormalizedUri -> Expr Resolved -> DmnType
 annTypeOf env subst uri =
-  oracleType MkTypeOracle { toTypes = env, toSubst = subst, toUri = uri }
+  -- 'oracleType' reads no provenance, so the library recogniser is inert here.
+  oracleType MkTypeOracle { toTypes = env, toSubst = subst, toUri = uri, toLibrary = embeddedLibraryModule }
 
 -- | FEEL's type system is numbers, strings, booleans, dates, lists and contexts
 -- — no algebraic data types. What it /does/ have is the __context__, which is a
@@ -3305,14 +3542,35 @@ dmnNote c sev el rng msg lostWhat =
 -- Shared by the decision-table path and the boxed-literal select-idiom path,
 -- because the failure is the same in both and a reader must not have to know
 -- which shape the exporter chose.
+--
+-- What it costs, measured 2026-11-26 on KIE 8.44.0.Final and Camunda 8.7.6
+-- (spec §7): Camunda refuses to parse the whole file, and so does KIE to load
+-- it, with two exceptions, one each way. KIE loads a file whose only such
+-- text is a table's defaultOutputEntry and answers null for it, reported as
+-- success. Camunda parses a file whose only such text reads as a FEEL name (a
+-- bare `TBD`, the prelude's refusal, which is not a closed constant and so is
+-- not copied), answers the other decisions, and for that one evaluates the
+-- text as a name, while KIE refuses the file (`Unknown variable 'TBD'`); that
+-- second exception is the one the D-LITERALEXPR and D-NONFEELINPUT notes
+-- already give, and was found missing here by the review of this branch
+-- (2026-11-26). Evaluated as a name, the text is not null for certain: a case
+-- that gave another decision's input `TBD` the value "oops" got "oops" for
+-- this decision, and the same case without it got null (found by the review
+-- of this branch, 2026-11-26, and measured again on a boxed literal). The
+-- consequence this note used to give, a failure "loudly when the rule
+-- fires", was not what KIE does: it refuses the file before any rule fires.
 nonFeelOutput :: Text -> Maybe SrcRange -> FeelExpr -> FidelityNote
 nonFeelOutput el rng fe =
   dmnNote "D-NONFEELOUTPUT" Blocking el rng
     ("the output entry `" <> fe.feText
        <> "` is L4 source, not FEEL: this backend has no FEEL rendering for it, so the text \
           \was emitted verbatim and NO DMN engine can evaluate it")
-    "execution: an engine fails to compile the entry -- loudly when the rule fires, but \
-    \SILENTLY (a null result, reported as success) when it is the defaultOutputEntry"
+    "execution of every decision in the file: Camunda 8.7.6 refuses to parse the file, and \
+    \KIE 8.44 to load it, with two exceptions: KIE loads a file whose only such text is a \
+    \table's defaultOutputEntry and SILENTLY answers null for that decision, reported as \
+    \success, and Camunda parses a file whose only such text reads as a FEEL name, such as \
+    \a bare `TBD`, and answers for that decision whatever the caller supplies under that \
+    \name, null when it supplies nothing, while KIE still refuses the file"
 
 -- | @D-MAYBE-NULL@ (R8-a, R8-b): a @MAYBE τ@ was lowered to τ's own @typeRef@.
 --
@@ -3434,13 +3692,21 @@ tableNotes ctx decomposed columnCells columns policy rows inlined cappedBodies =
   -- verified corpus shapes reached the shipped DMN through that gap — one with
   -- only D-UNDECOMPOSABLE, and two (a `Proj` of a verbatim object; a select
   -- idiom over an unrenderable operand) with no note at all.
+  --
+  -- What it costs, measured 2026-11-26 on KIE 8.44.0.Final and Camunda 8.7.6
+  -- (spec §7, the D-NONFEELINPUT row): both refuse the whole file. The
+  -- consequence this note used to give, that every rule testing the column is
+  -- silently treated as non-matching, was not what either engine does.
   nonFeelInputNotes =
     [ dmnNote "D-NONFEELINPUT" Blocking here (bestRange c.cellSubject)
         ("the input expression `" <> col.icExpr.feText
            <> "` is L4 source, not FEEL: this backend has no FEEL rendering for it, so the \
-              \text was emitted verbatim and NO DMN engine can evaluate this column")
-        "execution: the table is well-formed DMN but the engine fails to compile the column, \
-        \and every rule that tests it is silently treated as non-matching"
+              \text was emitted verbatim and NO DMN engine can evaluate this column, and the \
+              \whole file goes with it: KIE 8.44 refuses to load the file, and Camunda 8.7.6 \
+              \refuses to parse it unless the text happens to read as a FEEL name")
+        "execution of every decision in the file: the table is well-formed DMN, but neither \
+        \engine will compile the column, and each refuses the file over it (Camunda not when \
+        \the text reads as a FEEL name)"
     | (col, c) <- zip columns columnCells
     , col.icExpr.feFragment == L4Verbatim
     ]
@@ -3600,6 +3866,13 @@ lowerModule opts modul@(MkModule _ uri _) =
                        <> concatMap snd lowered
                        <> phase4Notes
                        <> serviceNotes
+                       <> importedConstantNotes
+    , drgOmitted   =
+        [ (decideName d, reason)
+        | d <- allDecides
+        , Just reason <- [Map.lookup (getUnique (decideResolved d)) popVerdict.pvDropped]
+        ]
+    , drgTakenForFields = map decideName (filter authoredDecide computedSelectorDecides)
     }
  where
   modelId = sanitiseId opts.dloModelName
@@ -3753,14 +4026,168 @@ lowerModule opts modul@(MkModule _ uri _) =
   allDecides = map snd allDecidesAnn
   assumes = [a | Assume _ a <- decls]
 
+  -- smucclaw/l4-ide#1038 (open): the checker stamps a rule 'ComputedSelector'
+  -- when it shares its name with a computed field of a record, so the rule is
+  -- in 'computedSelectorDecides' and leaves the model with the functions the
+  -- desugaring made out of computed fields. Told apart from those by its last
+  -- @GIVEN@ binder: 'L4.Desugar.makeComputedDecide' builds that binder
+  -- (@_self@) with no source range, and one the author wrote has one. A rule
+  -- with no @GIVEN@ at all is the author's too, since every synthetic one has
+  -- @_self@. Only the refusal for an empty model reads this ('drgTakenForFields');
+  -- beside other decisions such a rule still leaves the model with no note,
+  -- which is #1038's to fix.
+  authoredDecide (MkDecide _ (MkTypeSig _ (MkGivenSig _ gs) _) _ _) = case reverse gs of
+    []           -> True
+    (self' : _)  -> isJust (rangeOf (getAnno self'))
+
+  -- smucclaw/l4-ide#1102, option 1: the CLOSED constants of imported modules
+  -- that a decide of this module reads. A closed constant is a 0-ary decide
+  -- whose body reads nothing but builtins, prelude and daydate functions, and
+  -- other closed constants (not law time, which is this model's own input; not
+  -- a constructor of an imported type, whose itemDefinition this model does
+  -- not carry), so it can be emitted as a decision of this model whose only
+  -- edges are to other copied constants, and its value cannot depend on
+  -- anything the importing module could supply differently. Each is emitted after this module's own
+  -- decisions, with a D-IMPORTED note, and its body is first resolved against
+  -- its own module's substitution (see 'dloImportedModules').
+  --
+  -- __They join the EMITTED population, never the filtered one.__
+  -- 'popVerdict' classifies this module's decides only, so an imported
+  -- constant is never a fixture, never inert, never in 'drgOmitted' (the
+  -- empty-model refusal speaks of "this module"). The candidate set below is
+  -- what any local body reaches, kept or not, so that 'piForcedRef' can count
+  -- a reference to one without depending on the verdict it feeds; only those
+  -- a KEPT decide (or a computed field) reaches are emitted.
+  --
+  -- Only a module that type-checks, with every module it imports, contributes
+  -- ('imChecks'): no error of its own, and none in any module it imports
+  -- (`l4 run`'s test, which differs from `l4 check`'s on an IMPORT that
+  -- resolves to nothing; see 'imChecks'). `l4 check` refuses the
+  -- importer of a module with errors (import/module-has-errors), so a
+  -- constant from it is no value L4 has, and copying `the rate` defined as a
+  -- STRING under a NUMBER signature would carry the string into the model.
+  -- One import further on, a module with no error of its own that imports
+  -- such a module is refused by `l4 check` and not evaluated by `l4 run`, so
+  -- its constants are not copied either (found by the review of this branch,
+  -- 2026-11-26; decided by Claude 2026-11-26, pending Meng's review).
+  --
+  -- Anything else read from another module (a constant that reads an ASSUME,
+  -- law time or an imported constructor, or that comes from a module with
+  -- errors; an ASSUME itself; a function used as a value) is not copied; the
+  -- renderer refuses it instead ('neHomeUri'). Both choices are decided by
+  -- Claude 2026-11-25, pending Meng's review.
+  importedConstantPool :: [(Unique, (Anno, Decide Resolved))]
+  importedConstantPool =
+    nubOrdOn fst
+      [ (getUnique (decideResolved d), (ann, over decideBody (TC.applyFinalSubstitution subst mUri) d))
+      | MkImportedModule { imModule = m@(MkModule _ mUri _), imSubstitution = subst, imChecks = True }
+          <- opts.dloImportedModules
+      , mUri /= uri
+      , Decide ann d <- topDecls m
+      , null (A.decideParams d)
+      , not (isComputedSelectorKind (decideResolved d))
+      ]
+
+  -- The least fixpoint: closed over builtins first, then over each other.
+  -- A cycle among constants never enters it.
+  importedClosedSet :: Set Unique
+  importedClosedSet = grow Set.empty
+   where
+    grow acc =
+      let acc' = Set.fromList
+            [ u
+            | (u, (_, d)) <- importedConstantPool
+            , all (\r -> libraryRef r || Set.member (getUnique r) acc) (freeRefs d)
+            -- 'freeRefs' sees only 'Ref's. A name that failed to resolve in
+            -- the imported module (which may not have checked: an import's
+            -- errors are not the importer's) reads something unknown.
+            , null [() | OutOfScope {} <- toList (view decideBody d)]
+            ]
+      in if acc' == acc then acc else grow acc'
+    -- A builtin, or a function of the prelude or daydate library (whose
+    -- calls this renderer lowers where it can, and refuses loudly where it
+    -- cannot, so a copy that uses one it cannot lower carries its own
+    -- Blocking note). Not law time, and not a module of the user's.
+    libraryRef r =
+      let u = getUnique r
+      in (u.moduleUri == builtinModuleUri && u /= TC.rulesEffectiveDateUnique)
+           || fromPrelude opts.dloLibraryModule r || fromDaydate opts.dloLibraryModule r
+
+  -- The closed constants reached from these bodies, directly or through
+  -- another closed constant.
+  importedConstantsReachedFrom :: [Decide Resolved] -> Set Unique
+  importedConstantsReachedFrom roots = go Set.empty (concatMap refsIn roots)
+   where
+    poolMap = Map.fromList importedConstantPool
+    refsIn d = [u | r <- freeRefs d, let u = getUnique r, Set.member u importedClosedSet]
+    go seen [] = seen
+    go seen (u : us)
+      | Set.member u seen = go seen us
+      | otherwise = go (Set.insert u seen)
+          (maybe [] (refsIn . snd) (Map.lookup u poolMap) <> us)
+
+  importedConstantUniques :: Set Unique
+  importedConstantUniques =
+    importedConstantsReachedFrom (allDecides <> computedSelectorDecides)
+
+  importedClosedConstants :: [(Anno, Decide Resolved)]
+  importedClosedConstants =
+    [p | (u, p) <- importedConstantPool, Set.member u importedConstantUniques]
+
+  importedConstantsAnn =
+    [ p
+    | (u, p) <- importedConstantPool
+    , Set.member u reachedByEmitted
+    ]
+   where
+    reachedByEmitted = importedConstantsReachedFrom
+      (map snd localDecidesAnn <> computedSelectorDecides)
+
+  importedDecides = map snd importedConstantsAnn
+
+  -- Advisory: the value is faithful (closed, so it reads nothing this model
+  -- could supply differently), but the model now carries a COPY, and a later
+  -- edit to the imported module changes nothing here until the export is run
+  -- again. Advisory rather than Lossy, and the copies' place after this
+  -- module's own decisions, are decided by Claude 2026-11-25, pending Meng's
+  -- review (spec §18).
+  importedConstantNotes :: [FidelityNote]
+  importedConstantNotes =
+    [ dmnNote "D-IMPORTED" Advisory did (getAnno d).range
+        ( "`" <> decideName d <> "` is defined in the imported module `"
+            <> moduleBaseName (getUnique (decideResolved d)).moduleUri
+            <> "`; this model carries its value as a decision of its own, "
+            <> "since the export writes one file and no DMN import"
+        )
+        "the link to the imported module: a later change there reaches this model only when it is exported again"
+    | d <- importedDecides
+    , Just did <- [Map.lookup (getUnique (decideResolved d)) decideByUnique]
+    ]
+
   ------------------------------------------------------------------------
   -- Phase 4: the call-graph analysis (L4.Dmn.Analysis), over the FULL
   -- decide population — the population filter itself is one of its outputs.
   ------------------------------------------------------------------------
 
+  -- The imported constants (#1102) are in the call graph and the safety
+  -- analysis, so a local caller sees its callee and a clock-reading or
+  -- partial constant is certified like a local one; they are not in the
+  -- population filter (see 'importedClosedConstants'). "Like a local one"
+  -- needs the checker's facts about the copy as well as its body: those are in
+  -- the imported module's own diagnostics, which 'ImportedModule' carries, so
+  -- L1's two channels and L2's decorator read the copies' modules too.
+  --
+  -- The rest of 'A.SafetyInput' is the importer's and needs nothing from the
+  -- imported module. 'A.siEnumFields' and 'A.siComponentTypes' describe this
+  -- module's declared types, and a copy can hold no value of a type its own
+  -- module declares, because 'importedClosedSet' refuses that module's
+  -- constructors and selectors; for the library's types a copy sees exactly
+  -- what a local constant sees. 'A.siSubst' changes nothing in a copy, whose
+  -- body 'importedConstantPool' has already resolved against its own module's
+  -- substitution.
   callGraph :: A.CallGraph
   callGraph =
-    A.buildCallGraph allDecides
+    A.buildCallGraph (allDecides <> map snd importedClosedConstants)
       [dir | Directive _ dir <- decls]
       -- non-Decide top-level expressions whose references keep a decide
       -- alive: TIMEZONE declarations and the computed-field selector bodies
@@ -3774,9 +4201,12 @@ lowerModule opts modul@(MkModule _ uri _) =
   safetyIssues =
     A.analyzeSafety
       A.MkSafetyInput
-        { A.siMissingRanges  = opts.dloMissingMatchRanges
-        , A.siClauseMatrixRanges = opts.dloClauseMatrixRanges
-        , A.siNonexhaustive  = A.nonexhaustiveDecides allDecides
+        { A.siMissingRanges  =
+            opts.dloMissingMatchRanges <> concatMap (.imMissingMatchRanges) opts.dloImportedModules
+        , A.siClauseMatrixRanges =
+            opts.dloClauseMatrixRanges <> concatMap (.imClauseMatrixRanges) opts.dloImportedModules
+        , A.siNonexhaustive  =
+            A.nonexhaustiveDecides (allDecides <> map snd importedClosedConstants)
         , A.siEnumFields     =
             Map.fromList
               [ ( getUnique tn
@@ -3795,7 +4225,7 @@ lowerModule opts modul@(MkModule _ uri _) =
         , A.siSubst          = opts.dloSubstitution
         , A.siUri            = uri
         }
-      callGraph allDecides
+      callGraph (allDecides <> map snd importedClosedConstants)
    where
     componentTysOf = \case
       RecordDecl _ _ fs -> [ty | MkTypedName _ _ ty _ _ <- fs]
@@ -3811,7 +4241,8 @@ lowerModule opts modul@(MkModule _ uri _) =
         , A.piExternalRefNames = opts.dloExternalRefNames
         , A.piForcedRef        = \r ->
             let u = getUnique r
-            in (u.moduleUri == uri || u == TC.rulesEffectiveDateUnique)
+            in (u.moduleUri == uri || u == TC.rulesEffectiveDateUnique
+                  || Set.member u importedConstantUniques)
                  && not (Set.member u constructors)
                  && not (Set.member u selectors)
                  && not (Set.member u computedSelfUniques)
@@ -3830,9 +4261,10 @@ lowerModule opts modul@(MkModule _ uri _) =
   -- consumer below reads this list, so a dropped decision mints no node, no
   -- FEEL name and no inputData — and its absence is never silent, because
   -- 'populationNotes' names every drop.
-  decidesAnn = [p | p@(_, d) <- allDecidesAnn, kept d]
+  localDecidesAnn = [p | p@(_, d) <- allDecidesAnn, kept d]
    where
     kept d = not (Map.member (getUnique (decideResolved d)) popVerdict.pvDropped)
+  decidesAnn = localDecidesAnn <> importedConstantsAnn
   decides = map snd decidesAnn
 
   -- Tier-1, DMN-SAFE, parameterised, kept: the un-lift set (§2.1, §2.4).
@@ -4112,6 +4544,8 @@ lowerModule opts modul@(MkModule _ uri _) =
   ------------------------------------------------------------------------
 
   -- Every module-local DECLARE that has an itemDefinition, in source order.
+  -- (Source order is the order they are minted in and names are uniquified in;
+  -- the emitted order is the dependency order of 'itemDefs', #1101.)
   --
   -- __Referenced or not.__ Reachability-gating would make the artifact depend
   -- on which decisions happened to survive lowering -- a moving target that
@@ -4254,8 +4688,16 @@ lowerModule opts modul@(MkModule _ uri _) =
   -- so one with no referrer is noise in an artifact whose whole claim is that
   -- every line in it means something. The gate is the emitted 'DmnType's, not
   -- the L4, so what is minted and what is pointed at cannot disagree.
+  --
+  -- __That is the order they are minted in, not the order they are emitted
+  -- in__ (smucclaw/l4-ide#1101). KIE resolves a component's typeRef to an
+  -- enum or an alias only when the definition comes earlier in the document,
+  -- and both an enum declared after the record that uses it and every alias
+  -- (appended here after all the bases) would come later, so the list is put
+  -- in dependency order, keeping this order wherever nothing forces otherwise
+  -- ('itemDefsInDependencyOrder', which records what was measured).
   itemDefs :: [ItemDefinition]
-  itemDefs = baseItemDefs <> aliasItemDefs <> hydratedItemDefs
+  itemDefs = itemDefsInDependencyOrder (baseItemDefs <> aliasItemDefs <> hydratedItemDefs)
 
   -- §4.4. The stored components verbatim -- same names, same typeRefs, so a
   -- reader can diff the two definitions and see exactly what hydration added --
@@ -4351,8 +4793,8 @@ lowerModule opts modul@(MkModule _ uri _) =
            <> "` (hydrated) is L4 source, not FEEL (`" <> ce.ceExpr.feText
            <> "`): it is a DERIVED field whose MEANS body this backend has no FEEL rendering \
               \for, so the text was emitted verbatim and NO DMN engine can evaluate it")
-        "execution: an engine fails to compile the hydrated record, and with it every decision \
-        \that reads a component through it"
+        "execution of every decision in the file, not only those that read a component \
+        \through the record: KIE 8.44 refuses to load the file and Camunda 8.7.6 to parse it"
     | h <- hydratorNodes
     , LogicContext es <- [h.dcnLogic]
     , ce <- es
@@ -4772,7 +5214,7 @@ lowerModule opts modul@(MkModule _ uri _) =
     ]
 
   moduleOracle = MkTypeOracle
-    { toTypes = typeEnv, toSubst = opts.dloSubstitution, toUri = uri }
+    { toTypes = typeEnv, toSubst = opts.dloSubstitution, toUri = uri, toLibrary = opts.dloLibraryModule }
 
   -- The law-time PREDICATE idiom (regcf.l4:119-121):
   --
@@ -4966,6 +5408,7 @@ lowerModule opts modul@(MkModule _ uri _) =
     , neBinderSubst = Map.empty
     , neInlineHere = Set.empty
     , neInlineFuel = 16
+    , neHomeUri    = Just uri
     }
 
   -- #936 Gap 2's raw material: every KEPT, PARAMETERISED decide, with its body
@@ -6179,22 +6622,68 @@ lowerModule opts modul@(MkModule _ uri _) =
   -- silently wrong -- what is lost is the resemblance between the FEEL text and
   -- the L4 name.
   --
+  -- __The RESERVED arm__ (found missing by the review of this branch,
+  -- 2026-11-26): a name whose fold is a FEEL keyword, the name of a FEEL type
+  -- or built-in function, or a FEEL function the export calls
+  -- ('reservedFeelWords'), is suffixed by stage 1 (`sum` is `sum_`), and that
+  -- rename had no note. It is the one rename a caller is likely to trip on,
+  -- because the L4 name is itself a FEEL name and would be sent or read as it
+  -- stands: a caller that sends `floor` for an input emitted as `floor_`
+  -- reaches nothing (Camunda 8.7.6 answered null for each decision that reads
+  -- it, and KIE 8.44 skipped each one, `Required dependency 'floor_' not
+  -- found`), and `@label` is not a key any engine reads. So it gets the
+  -- collision arm's note and severity, and when both
+  -- apply, one note says both. Types are left out: no caller sends or reads a
+  -- type name, and a type's rename is the alias repair 'reservedFeelTypeNames'
+  -- describes. Both choices are decided by Claude 2026-11-26, pending Meng's
+  -- review.
+  --
   -- __The benign-mangle arm (`Advisory`) is deliberately NOT built here.__ §7's
   -- header defers the two-severities-on-one-code shape to a re-ruling against
   -- FIDELITY-SEVERITY-AXIS-SPEC.md §5, and the arm would emit ~169 Advisory
   -- notes on one corpus module while `@label` already carries the source name.
+  -- (A space folded to `_` belongs to that arm, not the reserved one, so
+  -- `two_words` gets no note, although a caller that sends `two words`
+  -- reaches nothing too: FEEL names may contain spaces, and for an input sent
+  -- as `two words` Camunda 8.7.6 answered null and KIE 8.44 skipped the
+  -- decision (`Required dependency 'two_words' not found`), as for `floor`
+  -- (found by the review of this branch, 2026-11-26; measured the same day).
+  -- Whether a rename that only folds should get a note is left to that
+  -- re-ruling.)
   renameNotes =
     [ dmnNote "D-RENAME" Lossy eid Nothing
-        ("`" <> l4name <> "` is emitted as the FEEL name `" <> resolved
-           <> "`, not `" <> foldedName <> "`: " <> englishCount (length claimants)
-           <> " " <> kindPlural <> " in this module fold to `" <> foldedName
-           <> "` (" <> Text.intercalate ", " (map tick claimants)
-           <> "), and the first claimant in source order keeps the base name")
-        "the resemblance between the emitted FEEL name and the L4 name it came from; \
-        \the L4 name survives in @label"
+        (if collided
+           then "`" <> l4name <> "` is emitted as the FEEL name `" <> resolved
+             <> "`, not `" <> foldedName <> "`: " <> englishCount (length claimants)
+             <> " " <> kindPlural <> " in this module fold to `" <> foldedName
+             <> "` (" <> Text.intercalate ", " (map tick claimants)
+             <> "), and the first claimant in source order keeps the base name"
+             <> maybe "" (\why -> "; the base itself is suffixed because " <> why) reserved
+           else "`" <> l4name <> "` is emitted as the FEEL name `" <> resolved
+             <> "`, because " <> fromMaybe "" reserved)
+        (if collided && isNothing reserved
+           then "the resemblance between the emitted FEEL name and the L4 name it came from; \
+                \the L4 name survives in @label"
+           else "the L4 name as the name an engine uses: a caller that sends or reads `"
+             <> l4name <> "` reaches nothing, and must use `" <> resolved
+             <> "` (for an input sent by its L4 name, Camunda 8.7.6 answered null for each \
+                \decision that reads it, and KIE 8.44 skipped each one); the L4 name survives \
+                \only in @label, which no engine reads")
     | (eid, kindPlural, l4name, foldedName, resolved, claimants) <- renameCandidates
-    , resolved /= foldedName
+    , let collided = resolved /= foldedName
+    , let reserved = reservedReason (foldFeelName l4name)
+    , collided || (isJust reserved && resolved /= l4name)
     ]
+
+  reservedReason w
+    | Set.member w reservedFeelFunctions =
+        Just ("`" <> w <> "` is the name of a FEEL function this export calls, \
+              \which a variable of that name would hide")
+    | Set.member w feelTypeAndFunctionWords =
+        Just ("`" <> w <> "` is the name of a FEEL type or built-in function")
+    | Set.member w reservedFeelWords =
+        Just ("`" <> w <> "` is a FEEL keyword")
+    | otherwise = Nothing
 
   renameCandidates =
     [ (iid, "elements of the DRG's flat variable namespace", nm, feelIdentText nm, feel
@@ -6303,7 +6792,7 @@ lowerModule opts modul@(MkModule _ uri _) =
     -- fields, so asking `oracleOf tctx` while computing `tcOutputType` would
     -- force the record that is being built.
     oracle0 = MkTypeOracle
-      { toTypes = typeEnv, toSubst = opts.dloSubstitution, toUri = uri }
+      { toTypes = typeEnv, toSubst = opts.dloSubstitution, toUri = uri, toLibrary = opts.dloLibraryModule }
 
     givethSrc = case mGiveth of
       Just (MkGivethSig _ ty) -> Just ty
@@ -6330,6 +6819,7 @@ lowerModule opts modul@(MkModule _ uri _) =
       , tcDateConstants = dateConstants
       , tcSubst        = opts.dloSubstitution
       , tcUri          = uri
+      , tcLibrary      = opts.dloLibraryModule
       }
 
     subExprs = toListOf (cosmosOf (gplate @(Expr Resolved))) body
@@ -6677,7 +7167,10 @@ lowerModule opts modul@(MkModule _ uri _) =
                 ("`" <> decideName d <> "` is " <> renderFidelityLoss loss
                    <> ", so it is emitted as a boxed literal expression rather than a \
                       \decision table" <> verbatimTail)
-                "every decision-table analysis: gap, overlap, consistency and manual review"
+                (if rendered.feFragment == L4Verbatim
+                   then "execution of every decision in the file, not only this one, and \
+                        \every decision-table analysis: gap, overlap, consistency and manual review"
+                   else "every decision-table analysis: gap, overlap, consistency and manual review")
             else
               dmnNote code Advisory did (bestRange body)
                 ("`" <> decideName d <> "` is " <> renderFidelityLoss loss
@@ -6691,10 +7184,20 @@ lowerModule opts modul@(MkModule _ uri _) =
       rendered = renderFeelIn nameEnv constructors (oracleOf tctx) body
       code     = fidelityLossCode loss
       blocking = code == "D-SUMTYPE" || rendered.feFragment == L4Verbatim
+      -- What the raw L4 costs, measured 2026-11-26 on KIE 8.44.0.Final and
+      -- Camunda 8.7.6 (spec §7, the D-LITERALEXPR row): neither engine runs any
+      -- decision of a file holding such text, unless the text happens to read
+      -- as a FEEL name (`TBD`), which Camunda parses and evaluates as a name:
+      -- null, or what the caller supplies under it (a case giving an input
+      -- `TBD` the value "oops" got "oops" for a decision that `MEANS TBD`;
+      -- found by the review of this branch, 2026-11-26).
       verbatimTail
         | rendered.feFragment == L4Verbatim =
             ". Its body could not be rendered as FEEL, so the emitted text is raw L4 \
-            \that NO engine can evaluate"
+            \that NO engine can evaluate, and the whole file goes with it: KIE 8.44 \
+            \refuses to load the file, and Camunda 8.7.6 refuses to parse it unless the \
+            \text happens to read as a FEEL name, when it answers for this decision \
+            \whatever the caller supplies under that name, null when it supplies nothing"
         | otherwise = ""
 
     -- D1: the author's reasons, kept IN THE ARTIFACT rather than only in a
@@ -6830,7 +7333,7 @@ lowerModule opts modul@(MkModule _ uri _) =
     ]
    where
     isListQuant r =
-      fromPrelude r
+      fromPrelude opts.dloLibraryModule r
         && ( nameOf r `elem` ["all", "any"]
                || unqualifiedNameToText (getActual r) `elem` ["all", "any"] )
 

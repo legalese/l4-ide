@@ -1,0 +1,11 @@
+-- smucclaw/l4-ide#1102: a copied constant is certified exactly as a local one.
+-- Written in this file, `first of nothing` is reported Blocking (D-PARTIAL),
+-- and so is `g2`, which reads it. Before the copy was certified with its own
+-- module's checker warnings, it was exported with no Blocking note at all, and
+-- KIE and Camunda both answered `g2` with null where `l4 run` refuses.
+IMPORT prelude
+IMPORT `export-imported-partial-lib`
+
+GIVEN h IS A NUMBER
+GIVETH A NUMBER
+DECIDE `g2` h IS h PLUS `first of nothing`

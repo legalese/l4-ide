@@ -1,0 +1,13 @@
+-- EMPTY in a decision table (spec §17.8): `up to` has it as an output entry,
+-- which is FEEL's `[]`, and `size of` tests a list against it, which becomes
+-- a boolean column `xs = []` with a `true` entry. Before, the output was the
+-- string "EMPTY", and the test an input `xs` against the entry "EMPTY",
+-- which no list equals.
+
+GIVEN h IS A NUMBER
+GIVETH A LIST OF NUMBER
+DECIDE `up to` h IS IF h GREATER THAN 1 THEN LIST h ELSE EMPTY
+
+GIVEN xs IS A LIST OF NUMBER
+GIVETH A STRING
+DECIDE `size of` xs IS IF xs EQUALS EMPTY THEN "none" ELSE "some"

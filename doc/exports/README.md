@@ -70,6 +70,7 @@ Pass `--fail-on blocking|lossy|advisory` to make the command exit non-zero at th
 default is `none`, and deliberately so: **Blocking usually describes the target's limits rather
 than a defect in your file**, and fires on most realistic exports. Read the report; do not assume
 a clean exit means a complete translation.
+When each of the 1,049 `.l4` files under `jl4/examples/` and `doc/` in this repository was exported on 2026-11-26, a Blocking note was in 441 of the 764 DMN files written, all 764 `dmn-md` files and all 49 BPMN files (`l4 export bpmn` writes one only for a file with one regulative rule, unless `--rule` names one).
 
 OpenFisca, Catala and yscript do not emit fidelity reports. They rely on refusal — plus, in
 Catala's case, a machine-checked equivalence argument — see those pages. yscript's refusal is

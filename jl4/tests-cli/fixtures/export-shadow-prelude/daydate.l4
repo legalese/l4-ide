@@ -1,0 +1,9 @@
+-- NOT the L4 date library: a module of the author's own called `daydate.l4`,
+-- beside the file that imports it, whose `YMD` adds a year. Before the export
+-- asked which module is the library, `YMD 2024 1 2` was written as
+-- date("2024-01-02") while `l4 run` answered 2 January 2025.
+GIVEN year  IS A NUMBER
+      month IS A NUMBER
+      day   IS A NUMBER
+GIVETH A DATE
+`YMD` year month day MEANS DATE_FROM_DMY day month (year PLUS 1)

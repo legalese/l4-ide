@@ -1,0 +1,8 @@
+-- The module `export-imported-hop.l4` imports. It has no error of its own,
+-- but it imports `export-imported-unchecked-lib.l4`, which does not
+-- type-check, so `l4 check` refuses it (import/module-has-errors) and `l4 run`
+-- evaluates nothing in it. Its `clean` is therefore not copied either.
+IMPORT `export-imported-unchecked-lib`
+
+GIVETH A NUMBER
+`clean` MEANS 5

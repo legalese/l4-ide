@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/" xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/" xmlns:di="http://www.omg.org/spec/DMN/20180521/DI/" id="definitions_rounding" name="rounding" namespace="https://legalese.com/l4/dmn/rounding" exporter="jl4">
+  <inputData id="input_x" name="x">
+    <variable id="input_x_var" name="x" typeRef="number"/>
+  </inputData>
+  <inputData id="input_amounts" name="amounts">
+    <variable id="input_amounts_var" name="amounts" typeRef="Any"/>
+  </inputData>
+  <inputData id="input_cap" name="cap">
+    <variable id="input_cap_var" name="cap" typeRef="number"/>
+  </inputData>
+  <decision id="decision_rounded_down" name="rounded_down" label="rounded down">
+    <variable id="decision_rounded_down_var" name="rounded_down" label="rounded down" typeRef="number"/>
+    <informationRequirement id="decision_rounded_down_ir1">
+      <requiredInput href="#input_x"/>
+    </informationRequirement>
+    <literalExpression id="decision_rounded_down_literal">
+      <text>floor(x)</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_rounded_up" name="rounded_up" label="rounded up">
+    <variable id="decision_rounded_up_var" name="rounded_up" label="rounded up" typeRef="number"/>
+    <informationRequirement id="decision_rounded_up_ir1">
+      <requiredInput href="#input_x"/>
+    </informationRequirement>
+    <literalExpression id="decision_rounded_up_literal">
+      <text>ceiling(x)</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_rounded" name="rounded">
+    <variable id="decision_rounded_var" name="rounded" typeRef="number"/>
+    <informationRequirement id="decision_rounded_ir1">
+      <requiredInput href="#input_x"/>
+    </informationRequirement>
+    <literalExpression id="decision_rounded_literal">
+      <text>decimal(x, 0)</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_band" name="band">
+    <variable id="decision_band_var" name="band" typeRef="string"/>
+    <informationRequirement id="decision_band_ir1">
+      <requiredInput href="#input_x"/>
+    </informationRequirement>
+    <decisionTable id="decision_band_table" hitPolicy="UNIQUE" preferredOrientation="Rule-as-Row" outputLabel="band">
+      <input id="decision_band_i1" label="ROUND OF x">
+        <inputExpression id="decision_band_i1_expr" typeRef="number">
+          <text>decimal(x, 0)</text>
+        </inputExpression>
+      </input>
+      <output id="decision_band_o1">
+        <defaultOutputEntry id="decision_band_o1_default">
+          <text>"low"</text>
+        </defaultOutputEntry>
+      </output>
+      <rule id="decision_band_r1">
+        <description>(ROUND OF x) AT LEAST 3</description>
+        <inputEntry id="decision_band_r1_i1">
+          <text>&gt;= 3</text>
+        </inputEntry>
+        <outputEntry id="decision_band_r1_o1">
+          <text>"high"</text>
+        </outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <decision id="decision_total" name="total">
+    <variable id="decision_total_var" name="total" typeRef="number"/>
+    <informationRequirement id="decision_total_ir1">
+      <requiredInput href="#input_amounts"/>
+    </informationRequirement>
+    <literalExpression id="decision_total_literal">
+      <text>sum(concatenate([0], amounts))</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_how_many" name="how_many" label="how many">
+    <variable id="decision_how_many_var" name="how_many" label="how many" typeRef="number"/>
+    <informationRequirement id="decision_how_many_ir1">
+      <requiredInput href="#input_amounts"/>
+    </informationRequirement>
+    <literalExpression id="decision_how_many_literal">
+      <text>count(amounts)</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_capped" name="capped">
+    <variable id="decision_capped_var" name="capped" typeRef="number"/>
+    <informationRequirement id="decision_capped_ir1">
+      <requiredInput href="#input_cap"/>
+    </informationRequirement>
+    <informationRequirement id="decision_capped_ir2">
+      <requiredInput href="#input_x"/>
+    </informationRequirement>
+    <literalExpression id="decision_capped_literal">
+      <text>min(x, cap)</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_at_least_the_cap" name="at_least_the_cap" label="at least the cap">
+    <variable id="decision_at_least_the_cap_var" name="at_least_the_cap" label="at least the cap" typeRef="number"/>
+    <informationRequirement id="decision_at_least_the_cap_ir1">
+      <requiredInput href="#input_cap"/>
+    </informationRequirement>
+    <informationRequirement id="decision_at_least_the_cap_ir2">
+      <requiredInput href="#input_x"/>
+    </informationRequirement>
+    <literalExpression id="decision_at_least_the_cap_literal">
+      <text>max(x, cap)</text>
+    </literalExpression>
+  </decision>
+  <dmndi:DMNDI>
+    <dmndi:DMNDiagram id="definitions_rounding_diagram" name="rounding">
+      <dmndi:DMNShape id="input_x_shape" dmnElementRef="input_x">
+        <dc:Bounds x="60" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_amounts_shape" dmnElementRef="input_amounts">
+        <dc:Bounds x="280" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_cap_shape" dmnElementRef="input_cap">
+        <dc:Bounds x="500" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_rounded_down_shape" dmnElementRef="decision_rounded_down">
+        <dc:Bounds x="60" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_rounded_up_shape" dmnElementRef="decision_rounded_up">
+        <dc:Bounds x="280" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_rounded_shape" dmnElementRef="decision_rounded">
+        <dc:Bounds x="500" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_band_shape" dmnElementRef="decision_band">
+        <dc:Bounds x="720" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_total_shape" dmnElementRef="decision_total">
+        <dc:Bounds x="940" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_how_many_shape" dmnElementRef="decision_how_many">
+        <dc:Bounds x="1160" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_capped_shape" dmnElementRef="decision_capped">
+        <dc:Bounds x="1380" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_at_least_the_cap_shape" dmnElementRef="decision_at_least_the_cap">
+        <dc:Bounds x="1600" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNEdge id="decision_rounded_down_ir1_edge" dmnElementRef="decision_rounded_down_ir1">
+        <di:waypoint x="150" y="220"/>
+        <di:waypoint x="150" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_rounded_up_ir1_edge" dmnElementRef="decision_rounded_up_ir1">
+        <di:waypoint x="150" y="220"/>
+        <di:waypoint x="370" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_rounded_ir1_edge" dmnElementRef="decision_rounded_ir1">
+        <di:waypoint x="150" y="220"/>
+        <di:waypoint x="590" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_band_ir1_edge" dmnElementRef="decision_band_ir1">
+        <di:waypoint x="150" y="220"/>
+        <di:waypoint x="810" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_total_ir1_edge" dmnElementRef="decision_total_ir1">
+        <di:waypoint x="370" y="220"/>
+        <di:waypoint x="1030" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_how_many_ir1_edge" dmnElementRef="decision_how_many_ir1">
+        <di:waypoint x="370" y="220"/>
+        <di:waypoint x="1250" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_capped_ir1_edge" dmnElementRef="decision_capped_ir1">
+        <di:waypoint x="590" y="220"/>
+        <di:waypoint x="1470" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_capped_ir2_edge" dmnElementRef="decision_capped_ir2">
+        <di:waypoint x="150" y="220"/>
+        <di:waypoint x="1470" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_at_least_the_cap_ir1_edge" dmnElementRef="decision_at_least_the_cap_ir1">
+        <di:waypoint x="590" y="220"/>
+        <di:waypoint x="1690" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_at_least_the_cap_ir2_edge" dmnElementRef="decision_at_least_the_cap_ir2">
+        <di:waypoint x="150" y="220"/>
+        <di:waypoint x="1690" y="140"/>
+      </dmndi:DMNEdge>
+    </dmndi:DMNDiagram>
+  </dmndi:DMNDI>
+</definitions>

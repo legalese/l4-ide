@@ -63,6 +63,7 @@ import Optics (gplate, toListOf)
 
 import L4.Annotation (Anno_ (..), getAnno)
 import L4.Desugar (carameliseExpr)
+import L4.Dmn.IR (DropReason (..))
 import qualified L4.Export as Export
 import L4.Parser.SrcSpan (SrcRange (..))
 import L4.Syntax
@@ -849,12 +850,8 @@ data PopulationInput = MkPopulationInput
     -- question, rebinding is a representability fact.
   }
 
-data DropReason
-  = DroppedFixture        -- ^ satisfied @FIXTURE(a)–(d)@
-  | DroppedFixtureHelper  -- ^ in the fixture-side transitive closure
-  | DroppedRegulative     -- ^ uncalled regulative body
-  | DroppedRuleDateRebind -- ^ rebinds law time (@EVAL UNDER RULES EFFECTIVE AT@), §15.12
-  deriving stock (Eq, Show)
+-- 'DropReason' is defined in "L4.Dmn.IR", which carries it on the 'Drg'
+-- ('drgOmitted'), and re-exported from here beside the filter that computes it.
 
 data PopulationVerdict = MkPopulationVerdict
   { pvDropped           :: !(Map Unique DropReason)
