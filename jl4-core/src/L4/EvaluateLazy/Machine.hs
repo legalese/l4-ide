@@ -2307,6 +2307,13 @@ beginNormRun :: WHNF -> [Reference] -> Eval ()
 beginNormRun val rs = when (startsRun val) $ whenDeonticLog \ l -> when l.dlWriteFates do
   depth <- liftIO (readIORef l.dlRunDepth)
   when (depth == 0) do
+    -- review of P2b, second review, finding 1: the run before this one has
+    -- ended, and a root norm of it that saw no event is still waiting for its
+    -- clock (the writer never forces one). Written now, as the end of the
+    -- directive writes it, it is in the log before this run's window begins;
+    -- left waiting, this run's first read forced and wrote it inside the
+    -- window, and the read counted another run's norm
+    flushArmedFinal l
     liftIO (writeIORef l.dlRunDepth 1)
     store <- readEvalRef (.envLedger)
     liftIO (writeIORef l.dlRunStart (length (toList store.normLedger)))
