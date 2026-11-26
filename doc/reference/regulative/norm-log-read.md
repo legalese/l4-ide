@@ -123,7 +123,6 @@ Silent, because the answer is a plain "no" with nothing to say that it is wrong:
 
 L4 keeps the record only for a contract that reads it: running a module that contains a read switches it on.
 A read written in a module that is imported does not switch it on, so the read stops with an error naming it.
-`l4 batch` does not switch it on either, whatever module it runs, so a read stops there with the same error.
 Each contract run in one directive (two `EVALTRACE`s in one `#EVAL`) keeps its own record: a read in the second does not see the first's norms.
 
 ## Where the read has been run
