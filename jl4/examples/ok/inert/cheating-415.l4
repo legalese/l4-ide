@@ -1,7 +1,7 @@
 
 
 -- Singapore Penal Code Section 415: Cheating
--- Translated from the layman/woon.ts representation to L4 with inert elements
+-- Written in L4 with inert elements
 --
 -- This demonstrates how inert elements (bare strings) serve as grammatical
 -- scaffolding to make the logical structure readable while not affecting
@@ -46,7 +46,7 @@ DECLARE Person
     HAS name IS A STRING
 
 -- Full Section 415 structure with proper indentation
--- The structure mirrors woon.ts cheating definition
+-- The structure follows the nesting of the section's own wording
 
 GIVEN p1 IS A BOOLEAN
       `by deceiving any person` IS A BOOLEAN
@@ -102,7 +102,7 @@ DECIDE `commits cheating` IF
 #EVAL `commits cheating` TRUE TRUE TRUE FALSE TRUE FALSE FALSE FALSE FALSE FALSE FALSE FALSE FALSE FALSE FALSE FALSE TRUE TRUE TRUE
 
 
--- The "cheating tautology" from woon.ts: "whether such deception was or was not
+-- The "cheating tautology": "whether such deception was or was not
 -- the sole or main inducement" - demonstrates a phrase that is structurally
 -- a tautology when the boolean leaves are set appropriately.
 

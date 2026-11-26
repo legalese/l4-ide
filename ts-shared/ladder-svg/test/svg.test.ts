@@ -485,9 +485,8 @@ test("a folded placeholder keeps its neutral only while UNKNOWN — a pinned fol
 /* ------------------------------------------------- the head terminal (headAsSink) */
 
 /** The head box is the decision's own name drawn as the rightmost node. In a Layman
- *  Allen normalised diagram the consequent is an ORDINARY box — Woon's robbery figure
- *  draws `Commits Robbery` exactly like `voluntarily` — so the emit must not decorate
- *  it. The one thing it must do is decline to advertise a click: a head's value is
+ *  Allen normalised diagram the consequent is an ORDINARY box, drawn exactly like any
+ *  other element, so the emit must not decorate it. The one thing it must do is decline to advertise a click: a head's value is
  *  derived from the body, and `lad-clickable` on it would offer to set what cannot be
  *  set. That affordance keys off `act`, which a head never carries. */
 test("a head box draws like a leaf and is never advertised as clickable", () => {

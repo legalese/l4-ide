@@ -1593,12 +1593,11 @@ function measureImplies(e: Implies, ctx: Ctx): Measured {
  * The HEAD as a terminal node (`ViewSpec.headAsSink`) — the decision's own name, in a
  * box, sitting between the body and the sink terminal.
  *
- * Why it is worth a node at all. A Layman Allen normalised diagram (Woon, *Essential
- * Criminal Law* ch 8) is read left to right and names BOTH ends: `Offender` at the left
- * margin, `Commits Robbery` at the right. Our ladder has always drawn the left end as a
- * power terminal and the right end as another, so the picture said what had to be true
- * and never said what followed — the reader had to carry the rule's name in from the
- * caption. This puts it in the diagram, where a textbook page can be laid beside it.
+ * Why it is worth a node at all. A Layman Allen normalised diagram is read left to right
+ * and names BOTH ends: the subject at the left margin, the consequent at the right. Our
+ * ladder has always drawn the left end as a power terminal and the right end as another,
+ * so the picture said what had to be true and never said what followed — the reader had
+ * to carry the rule's name in from the caption. This puts it in the diagram itself.
  *
  * Three properties, each load-bearing:
  *

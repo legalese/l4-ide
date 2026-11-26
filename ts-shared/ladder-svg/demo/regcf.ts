@@ -75,8 +75,8 @@ const LSP_PORT = Number(process.env.JL4_LSP_PORT || 5019);
  * Opt-in second variant (`LADDER_HEAD_AS_SINK=1`): the same figures with the decision's
  * own name boxed as the RIGHTMOST node, written to `<slug>-head.{svg,txt}` beside the
  * originals. This is the Layman Allen reading — subject at the left margin, consequent
- * at the right (Woon, *Essential Criminal Law* ch 8) — and it is a second variant rather
- * than a replacement so the existing figures, and anything citing them, do not move.
+ * at the right — and it is a second variant rather than a replacement so the existing
+ * figures, and anything citing them, do not move.
  *
  * Only `.svg` and `.txt` get a `-head` twin. `.mmd` and `.sentences` are emitted from
  * the `FunDecl`, never from the `Scene`, so `headAsSink` cannot reach them; a twin that
