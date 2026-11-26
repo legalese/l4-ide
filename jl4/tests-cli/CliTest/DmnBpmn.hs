@@ -199,6 +199,9 @@ exportPreludeCallsFixture  = fixtureDir </> "export-prelude-calls.l4"
 exportAlteredPreludeFixture, exportAlteredPreludeLib :: FilePath
 exportAlteredPreludeFixture = fixtureDir </> "export-altered-prelude" </> "uses-altered.l4"
 exportAlteredPreludeLib     = fixtureDir </> "export-altered-prelude" </> "lib"
+-- A date-compat.l4 of the author's own that breaks the compiled-in daydate.
+exportBrokenDateCompatFixture :: FilePath
+exportBrokenDateCompatFixture = fixtureDir </> "export-broken-date-compat" </> "uses-daydate.l4"
 -- What the seven calls in those fixtures become when lowered as the
 -- library's.
 preludeCallForms :: [String]
@@ -866,6 +869,20 @@ spec bin = do
           -- daydate.l4 and the date-compat.l4 it imports are unedited, so they
           -- are still the library
           sout `shouldSatisfy` ("<text>date(\"2024-01-02\")</text>" `isInfixOf`)
+
+        -- The compiled-in copy is the library only when it type-checks.
+        -- The export still exits 0 on a file `l4 check` refuses; that is
+        -- smucclaw/l4-ide#1110, not fixed here.
+        it "lowers no Date or YMD from the compiled-in daydate when the date-compat.l4 beside the file breaks it" $ do
+          env <- envWithout
+          Output code sout serr <- runL4WithEnv (Just env) bin
+            ["export", "dmn", exportBrokenDateCompatFixture, "--fidelity-report"]
+          code `shouldBe` ExitSuccess
+          -- the author's date-compat.l4 won resolution
+          serr `shouldSatisfy` ("[chosen]   project root:" `isInfixOf`)
+          sout `shouldNotSatisfy` ("date(" `isInfixOf`)
+          forM_ ["the_day", "the_ymd"] \d ->
+            serr `shouldSatisfy` (("[D-LITERALEXPR] blocking — decision_" <> d) `isInfixOf`)
 
       it "renames an input spelled like a FEEL function the export calls" $ do
         Output code sout _ <- runL4 bin ["export", "dmn", exportShadowedBuiltinsFixture]

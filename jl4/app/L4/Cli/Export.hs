@@ -509,7 +509,9 @@ dmnDrgFor opts tcRes = do
 -- copy compiled into this binary, or a file in the @$JL4_LIBRARY_PATH@
 -- directory, which outranks every other place the resolver looks (CLAUDE.md
 -- §5), __whose text is the compiled-in copy of the same name__ (line endings
--- aside), and every module it imports is one of these too. Nothing else is the
+-- aside), and every module it imports is one of these too; and in either case
+-- only a module that type-checks with every module it imports
+-- ('Rules.evaluable'). Nothing else is the
 -- library, whatever it is called: a @prelude.l4@ beside the exported file
 -- outranks the compiled-in copy when that variable is unset, and is the
 -- author's own module. Nor is a library found in the per-user store or the
@@ -539,17 +541,24 @@ dmnDrgFor opts tcRes = do
 -- the binary was built from (found by the review of this branch, 2026-11-26;
 -- the release workflow runs @l4-cli-test@ on Windows).
 --
--- The compiled-in copy is trusted without looking at what its own imports
--- resolve to. That differs from the rule above, and on purpose: of the
+-- The compiled-in copy, too, is the library only when it type-checks with
+-- every module it imports. Its imports are not otherwise looked at: of the
 -- libraries whose calls are lowered by name, the prelude imports nothing, and
--- @daydate@ imports @date-compat@ but calls nothing in it, so an author's
--- @date-compat.l4@, which the embedded @daydate@ does resolve when it sits in
--- the project root, cannot change what @Date@ or @YMD@ mean (measured
--- 2026-11-26: with one defining @DATE@ as 1 January 1999 beside the file,
--- @l4 run@ and the export both give 2 January 2024 for @Date 2 1 2024@ and
--- @YMD 2024 1 2@). A library lowered by name that called into its imports
--- would need the rule above extended to it. Leaving it so is decided by
--- Claude 2026-11-26, pending Meng's review.
+-- @daydate@ imports @date-compat@, which the embedded @daydate@ resolves to an
+-- author's @date-compat.l4@ in the project root. Such a file broke @daydate@
+-- by defining a name @daydate@ defines too (@check/ambiguous-identifier@), so
+-- @l4 check@ and @l4 run@ refused the importer, while the export, which then
+-- trusted the compiled-in copy whatever it checked to, wrote
+-- @date("2024-03-02")@ for @Date 2 3 2024@ and @YMD 2024 3 2@ with Advisory
+-- notes only (@jl4/tests-cli/fixtures/export-broken-date-compat/@; found by
+-- the review of this branch, 2026-11-26). One that leaves @daydate@ checking
+-- has not been seen to change what @Date@ or @YMD@ mean (measured 2026-11-26:
+-- with one defining @DATE@ as 1 January 1999 beside the file, @l4 run@ and the
+-- export both give 2 January 2024 for @Date 2 1 2024@ and @YMD 2024 1 2@; the
+-- review's attempts to shadow the builtins @daydate@ calls each broke its
+-- check instead). A library lowered by name that called into its imports
+-- would need the import rule above extended to the compiled-in copy. Leaving
+-- it so is decided by Claude 2026-11-26, pending Meng's review.
 --
 -- Paths are compared canonically (symbolic links and @..@ resolved) because
 -- the variable may be spelled relative or through a link.
@@ -570,14 +579,17 @@ dmnLibraryModule deps = do
       library u = embeddedLibraryModule u <|> Map.lookup u byText
       -- `daydate.l4` imports `date-compat.l4`: a file whose own text is the
       -- compiled-in copy's is the library only when what it imports is too.
+      -- Either kind is the library only when it type-checks with its imports.
       trusted = Map.fromList
         [ (u, f)
         | dep <- deps
         , let u = Rules.moduleUriOf dep
-        , Just f <- [Map.lookup u byText]
-        , all (isJust . library . Rules.moduleUriOf) (Rules.transitiveDependencies dep)
+        , Just f <- [library u]
+        , Rules.evaluable dep
+        , isJust (embeddedLibraryModule u)
+            || all (isJust . library . Rules.moduleUriOf) (Rules.transitiveDependencies dep)
         ]
-  pure \u -> embeddedLibraryModule u <|> Map.lookup u trusted
+  pure \u -> Map.lookup u trusted
  where
   canonical p = either (\(_ :: SomeException) -> p) id <$> try (canonicalizePath p)
   lf = Text.replace "\r\n" "\n"

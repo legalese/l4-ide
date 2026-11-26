@@ -1,0 +1,13 @@
+-- Run with JL4_LIBRARY_PATH unset. The `date-compat.l4` beside this file is
+-- the author's own, and the compiled-in `daydate` resolves its own
+-- `IMPORT date-compat` to it, so `daydate` does not type-check here
+-- (check/ambiguous-identifier), and `l4 check` and `l4 run` both refuse this
+-- file ("The imported module daydate has errors"). Its `Date` and `YMD` are
+-- refused too, not lowered as the library's.
+IMPORT daydate
+
+GIVETH A DATE
+DECIDE `the day` IS Date 2 3 2024
+
+GIVETH A DATE
+DECIDE `the ymd` IS YMD 2024 3 2
