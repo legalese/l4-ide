@@ -439,7 +439,11 @@ moduleDecideNames (MkModule _ _ sec) = goSec sec
 --
 -- With the DRG it returns the notes 'dmnLibraryModule' gives, one for each of
 -- @prelude.l4@ and @daydate.l4@ that this run loaded and does not take for the
--- library, which the callers put at the head of their reports.
+-- library. The DMN and dmn-md callers put them at the head of their reports,
+-- so that a reader meets the cause before the refusals it explains, and
+-- @l4 export bpmn@ leaves them out: its report carries none of the DMN model's
+-- notes, so it has no refused call for them to explain. Both placements are
+-- decided by Claude 2026-11-26, pending Meng's review.
 dmnDrgFor :: ExportOptions -> Rules.TypeCheckResult -> IO (Drg, [FidelityNote])
 dmnDrgFor opts tcRes = do
   -- Which loaded modules are the standard library, for the lowering's
@@ -603,12 +607,16 @@ dmnDrgFor opts tcRes = do
 -- them (see "L4.API.EmbeddedLibraries.TH" and @jl4-core/libraries/README.md@).
 -- A library file means a module this run took from the compiled-in copies or
 -- from that folder under the name of a compiled-in file; an author's own
--- @prelude.l4@ elsewhere is the author's module and gets none. The note is
+-- @prelude.l4@ elsewhere is the author's module and gets none: its calls are
+-- refused as any module's are, each with its own Blocking note. The note is
 -- __Advisory__: the loss is reported where it happens, on each refused call,
 -- as a Blocking note of its own, and a module that calls nothing in the file
 -- loses nothing, so a Blocking note here would fail @--fail-on blocking@ on
--- an export that is whole. Both are decided by Claude 2026-11-26, pending
--- Meng's review.
+-- an export that is whole. Its element is @definitions@, and it has no range,
+-- because it is about a file the run loaded, not an element of the model or a
+-- place in the exported file. The note, its severity, the author's own
+-- @prelude.l4@ getting none, and its element and range are each decided by
+-- Claude 2026-11-26, pending Meng's review.
 dmnLibraryModule :: [Rules.TypeCheckResult] -> IO (NormalizedUri -> Maybe Text, [FidelityNote])
 dmnLibraryModule deps = do
   mLibDir <- traverse canonical =<< lookupEnv "JL4_LIBRARY_PATH"
@@ -799,7 +807,8 @@ exportBpmn opts tcRes = do
   -- (PROCESS-TRACK.md §8.3). Unconditional — a module with no decisions yields
   -- an empty table, which wires nothing and reports nothing, which is right.
   -- The library notes are the DMN report's, not this one's: a BPMN file
-  -- carries no decision logic.
+  -- carries no decision logic (decided by Claude 2026-11-26, pending Meng's
+  -- review; see 'dmnDrgFor').
   (drg, _) <- dmnDrgFor opts tcRes
   let policy = fromMaybe AssumeDays opts.exportDeadlineUnit
       bx =
