@@ -1301,7 +1301,7 @@ spec bin = do
           -- to an alias only when the alias comes EARLIER in the document, and
           -- `itemdef_claim`'s `assessed grade` component points at
           -- `Grade_optional`, which the emitter used to append after every base
-          -- definition. FIXED 2026-11-25 (smucclaw/l4-ide#1101): definitions
+          -- definition. Fixed by smucclaw/l4-ide#1101's change: definitions
           -- are now emitted in dependency order, and this leg asserts the
           -- error is GONE, so the refusal above is the only thing KIE rejects.
           -- The exhibit that pins the order on both engines as a MustPass is
