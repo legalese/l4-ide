@@ -928,7 +928,7 @@ spec bin = do
           code `shouldBe` ExitSuccess
           -- the call into math.l4 is refused either way, and the DMN is the same
           serr `shouldSatisfy` ("[D-LITERALEXPR] blocking — decision_magnitude" `isInfixOf`)
-          sout `shouldBe` soutPlain
+          map (filter (/= '\r')) (lines sout) `shouldBe` map (filter (/= '\r')) (lines soutPlain)
           serr `shouldNotSatisfy` ("D-NOT-LIBRARY" `isInfixOf`)
           -- With prelude.l4 edited instead, the one note is on prelude.l4, and
           -- none is on the math.l4 that imports it.
