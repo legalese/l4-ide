@@ -1,0 +1,9 @@
+-- Imported by fn.l4: a rule WITH an input whose body names `taken now`, the
+-- rule with no inputs of taken.l4 that reads a ledger (smucclaw/l4-ide#1116).
+
+IMPORT prelude
+IMPORT taken
+
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+`closed to` n MEANS `taken now` AND n GREATER THAN 0

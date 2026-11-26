@@ -1,0 +1,9 @@
+-- smucclaw/l4-ide#1116. An #EVALTRACE of `taken now`, a rule of taken.l4 with
+-- no inputs that reads a ledger, with nothing before it: the answer and the
+-- trace of reading the rule against an empty ledger. trace-after-skip.l4 asks
+-- the same after a #TRACE that committed `taken`.
+
+IMPORT prelude
+IMPORT taken
+
+#EVALTRACE `taken now`

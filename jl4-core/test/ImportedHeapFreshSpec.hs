@@ -1,0 +1,192 @@
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedStrings #-}
+
+-- | smucclaw\/l4-ide#1116, in the process that evaluates twice: an imported
+-- rule with no inputs that reads a ledger must answer each evaluation from that
+-- evaluation's own ledger, whatever an earlier evaluation of the same imports
+-- left behind.
+--
+-- A host that keeps the imports' environment between evaluations evaluates a
+-- file on a heap that an earlier evaluation may have forced. jl4-lsp's Shake
+-- cache is such a host: 'LSP.L4.Rules.evaluateOn' builds the environment as the
+-- union of one cached 'GetLazyEvaluationDependenciesFile' result per import, and
+-- evaluates the file on it with 'execEvalModuleWithEnvAndImports'
+-- (jl4-lsp/src/LSP/L4/Rules.hs:1455). (Whether jl4-service's direct path does
+-- the same was not read for this test; the issue measured its decision routes
+-- unaffected.)
+--
+-- The module under test has two directives. One evaluates the imported rule
+-- against an empty ledger. The other is a @#TRACE@ that commits @taken@ and
+-- then reads the rule. Run alone, on an environment no other evaluation has
+-- touched, the first answers FALSE and the second passes its buy over
+-- (@WITHIN 9@). Each is then evaluated on ONE environment after the other,
+-- in each order, and must give the answer it gives alone.
+--
+-- Two evaluations of one module against one environment would not show this.
+-- The first forcer's answer persists, so the second evaluation gives what the
+-- first did, right or wrong, and "the second is the first's" holds under the
+-- fault. So each evaluation here is of a module that holds ONE of the two
+-- directives, cut from a single type check (so the imports' 'Unique's are the
+-- ones the environment was built from), and what it gives is compared with what
+-- the same module gives on an environment of its own.
+--
+-- The clock is pinned, because the examples of @l4 run@ that put one directive
+-- of an imported file before the importer's own (@own-eval.l4@ in
+-- @jl4\/tests-cli\/fixtures\/run-imported@) give the importer the answer it
+-- gives alone with the clock free, and the wrong one with it pinned
+-- (measured on an unfixed build, 2026-11-26).
+--
+-- What this pins is the contract of 'execEvalModuleWithEnv' and
+-- 'execEvalModuleWithEnvAndImports', the calls that take the imports' environment
+-- ('evaluateOn' passes the one it keeps): each directive of the module sees the
+-- imports' rules afresh, whatever has been forced in the environment it is
+-- given. A repair that leaves those calls as they are, and gives each
+-- directive its own imports some other way, would not satisfy it.
+module ImportedHeapFreshSpec (spec) where
+
+import Control.Monad (foldM, forM, forM_)
+import Data.List (mapAccumL)
+import qualified Data.Map.Strict as Map
+import Data.Maybe (catMaybes)
+import qualified Data.Text as Text
+import Data.Time (UTCTime (..), fromGregorian, secondsToDiffTime)
+import Test.Hspec
+
+import L4.API.VirtualFS (checkWithImports, vfsFromList)
+import L4.Evaluate.ValueLazy (Environment)
+import L4.EvaluateLazy
+  ( EvalConfig
+  , EvalDirectiveResult (..)
+  , EvalDirectiveValue (..)
+  , ReductionOutcome (..)
+  , execEvalModuleWithEnv
+  , resolveEvalConfig
+  )
+import L4.Import.Resolution (ResolvedImport (..), TypeCheckWithDepsResult (..), extractImportNames)
+import L4.Print (prettyLayout)
+import L4.Syntax (Module (..), Resolved, Section (..), TopDecl (..))
+import L4.TracePolicy (apiDefaultPolicy)
+import L4.TypeCheck.Types (CheckResult (..))
+
+fixedNow :: UTCTime
+fixedNow = UTCTime (fromGregorian 2026 1 1) (secondsToDiffTime 0)
+
+-- | jl4\/tests-cli\/fixtures\/run-imported\/taken.l4, less its comment.
+takenSrc :: Text.Text
+takenSrc = Text.unlines
+  [ "IMPORT prelude"
+  , ""
+  , "GIVEN dflt IS A BOOLEAN"
+  , "GIVETH A BOOLEAN"
+  , "`is taken` dflt MEANS fromMaybe dflt (RECALL OFFICIAL's `taken`)"
+  , ""
+  , "GIVETH A BOOLEAN"
+  , "`taken now` MEANS `is taken` WITH dflt IS FALSE"
+  ]
+
+-- | The importer: jl4\/tests-cli\/fixtures\/run-imported\/eval-first.l4, less
+-- its comment, with the @#EVAL@ as its first directive and the skip trace its
+-- second.
+mainSrc :: Text.Text
+mainSrc = Text.unlines
+  [ "IMPORT prelude"
+  , "IMPORT taken"
+  , ""
+  , "DECLARE Actor IS ONE OF Bob"
+  , "DECLARE Mode IS ONE OF peek, skip"
+  , "DECLARE Act IS ONE OF"
+  , "    go HAS mode IS A Mode"
+  , "    buy"
+  , ""
+  , "GIVETH A DEONTIC Actor Act"
+  , "`shop` MEANS"
+  , "    PARTY Bob"
+  , "    MAY buy PROVIDED NOT `taken now`"
+  , "    WITHIN 10"
+  , "    HENCE COMMIT `taken` IS TRUE HENCE `shop`"
+  , "    LEST FULFILLED"
+  , ""
+  , "GIVETH A DEONTIC Actor Act"
+  , "`start` MEANS"
+  , "    PARTY Bob"
+  , "    MAY go m"
+  , "    WITHIN 10"
+  , "    HENCE COMMIT `taken` IS (IF m EQUALS peek THEN NOT `taken now` ELSE TRUE) HENCE `shop`"
+  , "    LEST FULFILLED"
+  , ""
+  , "#EVAL `taken now`"
+  , ""
+  , "#TRACE `start` AT 0 WITH"
+  , "    PARTY Bob DOES go skip AT 1"
+  , "    PARTY Bob DOES buy AT 2"
+  ]
+
+-- | The module with every directive dropped but the @n@th, counting from 0 in
+-- source order. The rest of the module is untouched, so it still refers to the
+-- imports by the 'Unique's of the one type check.
+onlyDirective :: Int -> Module Resolved -> Module Resolved
+onlyDirective n (MkModule a uri s) = MkModule a uri (snd (section 0 s))
+  where
+    section i (MkSection sa name aka given decls) =
+      let (i', decls') = mapAccumL decl i decls
+      in (i', MkSection sa name aka given (catMaybes decls'))
+    decl i = \ case
+      Directive da d -> (i + 1, if i == n then Just (Directive da d) else Nothing)
+      Section sa s' -> let (i', s'') = section i s' in (i', Just (Section sa s''))
+      other -> (i, Just other)
+
+-- | The imports' heaps as @l4 lts@ assembles them (jl4-lsp's
+-- @GetLazyEvaluationDependenciesFile@): every resolved import evaluated on top
+-- of its own imports' heaps, dependencies first, and their union. Copied from
+-- @jl4\/tests\/LtsList.hs@ (@importsEnv@), which a core test cannot import.
+-- Each call is a new environment, nothing in it forced.
+importsEnv :: EvalConfig -> [ResolvedImport] -> IO Environment
+importsEnv cfg imports = fst <$> foldM visit (mempty, Map.empty) (Map.keys byName)
+  where
+    byName = Map.fromList [ (ri.riModuleName, ri) | ri <- imports ]
+    visit (acc, memo) name = case Map.lookup name memo of
+      Just _  -> pure (acc, memo)
+      Nothing -> case Map.lookup name byName of
+        Nothing -> pure (acc, memo)
+        Just ri -> do
+          let deps = extractImportNames ri.riParsed
+          (acc', memo') <- foldM visit (acc, memo) deps
+          let depEnv = mconcat [ e | d <- deps, Just e <- [Map.lookup d memo'] ]
+          (own, _) <- execEvalModuleWithEnv cfg ri.riTypeChecked.entityInfo depEnv ri.riTypeChecked.program
+          let env = own <> depEnv
+          pure (acc' <> env, Map.insert name env memo')
+
+render :: EvalDirectiveResult -> Text.Text
+render res = case res.result of
+  Reduction (Reduced nf) -> prettyLayout nf
+  other                  -> Text.pack (show other)
+
+spec :: Spec
+spec = describe "an imported rule that reads a ledger, evaluated again on the imports' one environment (#1116)" do
+  forM_
+    [ ("an #EVAL of it, then the skip trace", [0, 1])
+    , ("the skip trace, then an #EVAL of it", [1, 0])
+    ] \ (order, directives) ->
+    it ("answers each evaluation from its own ledger: " <> order) do
+      cfg <- resolveEvalConfig (Just fixedNow) apiDefaultPolicy
+      r <- case checkWithImports (vfsFromList [("taken.l4", takenSrc)]) mainSrc of
+        Left errs -> fail ("typecheck failed: " <> show errs)
+        Right ok  -> pure ok
+      let evaluate env i = do
+            (_, results) <- execEvalModuleWithEnv cfg r.tcdEntityInfo env (onlyDirective i r.tcdModule)
+            pure (map render results)
+      -- each directive on an environment of its own: the answer to ask for
+      alone <- forM [0, 1] \ i -> do
+        env <- importsEnv cfg r.tcdResolvedImports
+        (,) i <$> evaluate env i
+      case alone of
+        [(_, [eval]), (_, [skip])] -> do
+          eval `shouldBe` "FALSE"
+          skip `shouldSatisfy` Text.isInfixOf "WITHIN 9"
+        _ -> expectationFailure ("each module was to hold one directive: " <> show alone)
+      -- the two, one after the other, on one environment
+      shared <- do
+        env <- importsEnv cfg r.tcdResolvedImports
+        forM directives \ i -> (,) i <$> evaluate env i
+      Map.fromList shared `shouldBe` Map.fromList alone

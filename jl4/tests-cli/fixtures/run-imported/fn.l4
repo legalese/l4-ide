@@ -1,0 +1,39 @@
+-- smucclaw/l4-ide#1116. two-traces.l4 reading the ledger through a rule WITH an
+-- input: `closed to` of fn-lib.l4, whose body names `taken now` of taken.l4,
+-- is called from both traces. It is a function and not a constant, but the
+-- `taken now` in its body must read each trace's own ledger all the same. The
+-- first trace gives two COMMITs and WITHIN 10, the second one COMMIT and
+-- WITHIN 9, as each does alone.
+
+IMPORT prelude
+IMPORT `fn-lib`
+
+DECLARE Actor IS ONE OF Bob
+DECLARE Mode IS ONE OF peek, skip
+DECLARE Act IS ONE OF
+    go HAS mode IS A Mode
+    buy
+
+GIVETH A DEONTIC Actor Act
+`shop` MEANS
+    PARTY Bob
+    MAY buy PROVIDED NOT `closed to` 1
+    WITHIN 10
+    HENCE COMMIT `taken` IS TRUE HENCE `shop`
+    LEST FULFILLED
+
+GIVETH A DEONTIC Actor Act
+`start` MEANS
+    PARTY Bob
+    MAY go m
+    WITHIN 10
+    HENCE COMMIT `taken` IS (IF m EQUALS peek THEN NOT `closed to` 1 ELSE TRUE) HENCE `shop`
+    LEST FULFILLED
+
+#TRACE `start` AT 0 WITH
+    PARTY Bob DOES go peek AT 1
+    PARTY Bob DOES buy AT 2
+
+#TRACE `start` AT 0 WITH
+    PARTY Bob DOES go skip AT 1
+    PARTY Bob DOES buy AT 2

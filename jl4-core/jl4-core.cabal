@@ -317,6 +317,7 @@ test-suite jl4-core-test
     LedgerSubstrateSpec
     LedgerThunkCacheSpec
     InterruptedForceSpec
+    ImportedHeapFreshSpec
     RecordLedgerSpec
     LedgerRenderingSpec
     M4PartyLedgerSpec

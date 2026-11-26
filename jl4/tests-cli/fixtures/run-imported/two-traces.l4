@@ -1,0 +1,39 @@
+-- smucclaw/l4-ide#1116. Two traces of one contract whose `buy` is allowed only
+-- while `taken now`, a rule of taken.l4 with no inputs that reads the ledger,
+-- is false. The first trace (peek) reads `taken now` before `taken` is
+-- committed. The second (skip) commits `taken` at once, so its `buy` is passed
+-- over, as it is when that trace is run alone (one COMMIT, WITHIN 9). Each
+-- #TRACE has a ledger of its own, and each must read an imported rule afresh.
+
+IMPORT prelude
+IMPORT taken
+
+DECLARE Actor IS ONE OF Bob
+DECLARE Mode IS ONE OF peek, skip
+DECLARE Act IS ONE OF
+    go HAS mode IS A Mode
+    buy
+
+GIVETH A DEONTIC Actor Act
+`shop` MEANS
+    PARTY Bob
+    MAY buy PROVIDED NOT `taken now`
+    WITHIN 10
+    HENCE COMMIT `taken` IS TRUE HENCE `shop`
+    LEST FULFILLED
+
+GIVETH A DEONTIC Actor Act
+`start` MEANS
+    PARTY Bob
+    MAY go m
+    WITHIN 10
+    HENCE COMMIT `taken` IS (IF m EQUALS peek THEN NOT `taken now` ELSE TRUE) HENCE `shop`
+    LEST FULFILLED
+
+#TRACE `start` AT 0 WITH
+    PARTY Bob DOES go peek AT 1
+    PARTY Bob DOES buy AT 2
+
+#TRACE `start` AT 0 WITH
+    PARTY Bob DOES go skip AT 1
+    PARTY Bob DOES buy AT 2

@@ -1,0 +1,11 @@
+-- Imported by every file in this directory: a rule with no inputs that reads
+-- a ledger, `taken now`, beside the reader it calls (smucclaw/l4-ide#1116).
+
+IMPORT prelude
+
+GIVEN dflt IS A BOOLEAN
+GIVETH A BOOLEAN
+`is taken` dflt MEANS fromMaybe dflt (RECALL OFFICIAL's `taken`)
+
+GIVETH A BOOLEAN
+`taken now` MEANS `is taken` WITH dflt IS FALSE

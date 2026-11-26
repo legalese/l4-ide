@@ -1,0 +1,33 @@
+-- smucclaw/l4-ide#1116, a guard. skip-alone.l4 importing a file that DEFINES
+-- `taken now` and has an #EVAL of it. The skip trace here passes the buy over
+-- (one COMMIT, WITHIN 9), with the clock free and pinned, as it does without
+-- the import. It must go on doing so.
+
+IMPORT prelude
+IMPORT `own-eval-self-b`
+
+DECLARE Actor IS ONE OF Bob
+DECLARE Mode IS ONE OF peek, skip
+DECLARE Act IS ONE OF
+    go HAS mode IS A Mode
+    buy
+
+GIVETH A DEONTIC Actor Act
+`shop` MEANS
+    PARTY Bob
+    MAY buy PROVIDED NOT `taken now`
+    WITHIN 10
+    HENCE COMMIT `taken` IS TRUE HENCE `shop`
+    LEST FULFILLED
+
+GIVETH A DEONTIC Actor Act
+`start` MEANS
+    PARTY Bob
+    MAY go m
+    WITHIN 10
+    HENCE COMMIT `taken` IS (IF m EQUALS peek THEN NOT `taken now` ELSE TRUE) HENCE `shop`
+    LEST FULFILLED
+
+#TRACE `start` AT 0 WITH
+    PARTY Bob DOES go skip AT 1
+    PARTY Bob DOES buy AT 2

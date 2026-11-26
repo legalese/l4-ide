@@ -1,0 +1,40 @@
+-- smucclaw/l4-ide#1116. `l4 batch` over an @export that reads `taken now`, a rule
+-- of taken.l4 with no inputs that reads a ledger. Each row is a session of its
+-- own (jl4/app/L4/Cli/Batch.hs, `processRow`: a fresh `runOneshot` for each),
+-- so rows do not share an imported rule. A row is the file's directives that
+-- `l4 batch` keeps, a #TRACE among them, and then its own #EVAL of the export,
+-- and those do share it: the #TRACE here reads `taken now` after it commits
+-- `taken`, and the row's answer, read against an empty ledger, is FALSE.
+
+IMPORT prelude
+IMPORT taken
+
+DECLARE Actor IS ONE OF Bob
+DECLARE Mode IS ONE OF peek, skip
+DECLARE Act IS ONE OF
+    go HAS mode IS A Mode
+    buy
+
+GIVETH A DEONTIC Actor Act
+`shop` MEANS
+    PARTY Bob
+    MAY buy PROVIDED NOT `taken now`
+    WITHIN 10
+    HENCE COMMIT `taken` IS TRUE HENCE `shop`
+    LEST FULFILLED
+
+GIVETH A DEONTIC Actor Act
+`start` MEANS
+    PARTY Bob
+    MAY go m
+    WITHIN 10
+    HENCE COMMIT `taken` IS (IF m EQUALS peek THEN NOT `taken now` ELSE TRUE) HENCE `shop`
+    LEST FULFILLED
+
+@export default
+GIVETH A BOOLEAN
+`closed now` MEANS `taken now`
+
+#TRACE `start` AT 0 WITH
+    PARTY Bob DOES go skip AT 1
+    PARTY Bob DOES buy AT 2
