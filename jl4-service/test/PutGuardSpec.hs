@@ -327,6 +327,7 @@ spec = describe "PUT deployment compatibility guard (end-to-end)" do
 testOpts :: Options
 testOpts = Options
   { port = 0
+  , host = "127.0.0.1"
   , storePath = "/tmp/jl4-service-test-putguard"
   , serverName = Nothing
   , lazyLoad = False

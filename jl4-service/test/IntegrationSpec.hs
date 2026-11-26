@@ -7986,6 +7986,7 @@ safeHead [] = error "safeHead: empty list"
 testOptions :: Options
 testOptions = Options
   { port = 0
+  , host = "127.0.0.1" -- no test serves from these options, but one that did would stay on this machine
   , storePath = "/tmp/jl4-service-test"
   , serverName = Nothing
   , lazyLoad = False

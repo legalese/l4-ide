@@ -22,6 +22,7 @@ import qualified Version
 import Data.Aeson (toJSON, (.=))
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as Aeson.Key
+import Data.String (fromString)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text.Encoding
@@ -102,6 +103,7 @@ defaultMain = do
   -- Log effective configuration
   logInfo logger "Starting jl4-service"
     [ ("port", toJSON port)
+    , ("host", toJSON options.host)
     , ("storePath", toJSON storePath)
     , ("debug", toJSON debug)
     , ("lazyLoad", toJSON lazyLoad)
@@ -193,14 +195,16 @@ defaultMain = do
                responseLBS (mkStatus 500 "Internal Server Error")
                       [("Content-Type", "application/json")]
                       "{\"error\":\"Internal server error\"}"
-      settings = setHost "*"
+      settings = setHost (fromString (Text.unpack options.host))
                $ setPort port
                $ setOnException onExc
                $ setOnExceptionResponse onExcResponse
                $ defaultSettings
 
   logInfo logger "Server ready"
-    [("port", toJSON port)]
+    [ ("host", toJSON options.host)
+    , ("port", toJSON port)
+    ]
   runSettings settings (middleware $ app env)
 
 -- | CORS middleware — allows all origins for development.

@@ -829,6 +829,7 @@ All options can also be set via environment variables. CLI arguments take preced
 | Option                        | Env Var                         | Description                                                                                                                                                                                                                                   | Default          |
 | ----------------------------- | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
 | `--port`, `-p`                | `JL4_PORT`                      | HTTP port                                                                                                                                                                                                                                     | `8080`           |
+| `--host`                      | `JL4_HOST`                      | Address to listen on: `*` for every interface, or an address such as `127.0.0.1` to accept connections from this machine only (see [Listening on one address](#listening-on-one-address))                                                     | `*`              |
 | `--store-path`                | `JL4_STORE_PATH`                | Directory for persisting deployment bundles                                                                                                                                                                                                   | `/tmp/jl4-store` |
 | `--server-name`, `-s`         | `JL4_SERVER_NAME`               | Server URL for OpenAPI metadata                                                                                                                                                                                                               | -                |
 | `--lazy-load`                 | `JL4_LAZY_LOAD`                 | Register deployments as pending on startup; compile on first evaluation/function access (optimistic 2s timeout, returns 202 if still compiling). File browsing always works immediately.                                                      | `false`          |
@@ -858,6 +859,22 @@ In a container, `-N` may count the host's cores rather than the container's CPU 
 If it does, the service runs more batch cases at once than it has CPU for, and each case's clock counts the others' work again.
 In a container with a CPU quota, set `+RTS -N<cpus> -RTS` or `GHCRTS=-N<cpus>` to the quota.
 Each capability also costs memory: measured on 2026-10-02, the idle service used 106 MB at `-N10` and 59 MB at `-N1`, the same as on the non-threaded runtime the service used before.
+
+### Listening on one address
+
+By default the service accepts connections on every network interface of the machine, as it did before `--host` existed.
+That is what a deployment that other machines call wants, and it is the default so that no deployment changes.
+A service that only this machine should reach, such as a test, a probe or a local demo, should say so with `--host 127.0.0.1`: other machines then cannot connect to it.
+The repository's own gate starts the service this way in `etc/probe-service-restart.mjs`.
+
+The value is handed to Warp's `setHost` as written, so `*` means every interface and anything else is an address or a host name to bind.
+Prefer the literal address to a name.
+Measured on macOS on 2026-11-26, `--host localhost` bound `[::1]`, the IPv6 loopback, and a request to `127.0.0.1` on that port got no answer.
+A value that cannot be bound stops the service at start with the resolver's error.
+`JL4_HOST=` with nothing after it counts as unset.
+
+In a container, leave the default.
+A port published by the container runtime arrives on the container's own network interface and not on its loopback address, so `--host 127.0.0.1` there would make the service unreachable from outside; this is reasoned, not measured.
 
 ## Logging
 
