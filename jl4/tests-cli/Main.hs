@@ -123,6 +123,12 @@ evalBlockIn n out =
 resultIn :: Int -> Output -> T.Text
 resultIn n o = evalBlockIn n (filter (/= '\r') o.outStdout)
 
+-- | The result of the @n@th evaluation, from @Result:@ to @Trace:@: what two
+-- runs of the same rules in different files can be compared on, since the
+-- header names the file and the range.
+resultBodyIn :: Int -> Output -> T.Text
+resultBodyIn n o = fst (T.breakOn "Trace:" (snd (T.breakOn "Result:" (resultIn n o))))
+
 -- | The diagnostic that @l4 run@ printed on standard error against a range
 -- starting at column 1 of the given line: from its @Range:@ row to the next
 -- @File:@ row. Empty when none starts there.
@@ -904,6 +910,32 @@ sectionGivenImportOperandCall = "examples/ok/section-given-import-operand-call.l
 sectionGivenImportOperandUnset = "examples/ok/section-given-import-operand-unset.l4"
 sectionGivenImportOperandChain = "examples/ok/section-given-import-operand-chain.l4"
 
+-- Contracts imported from a file whose section GIVEN has a default, used as
+-- operands of RAND and ROR (smucclaw/l4-ide#1118); the file they come from, the
+-- one that imports it, one that has a section GIVEN of its own, one that
+-- imports that, and one whose section GIVEN has no default.
+sectionGivenImportContractDef, sectionGivenImportContractCall, sectionGivenImportContractMid, sectionGivenImportContractChain, sectionGivenImportContractUnset :: FilePath
+sectionGivenImportContractDef = "examples/ok/section-given-import-contract-def.l4"
+sectionGivenImportContractCall = "examples/ok/section-given-import-contract-call.l4"
+sectionGivenImportContractMid = "examples/ok/section-given-import-contract-mid.l4"
+sectionGivenImportContractChain = "examples/ok/section-given-import-contract-chain.l4"
+sectionGivenImportContractUnset = "examples/ok/section-given-import-contract-unset.l4"
+
+-- | @l4 run@ on the files of an import chain joined into ONE file, the first
+-- file first and every IMPORT line dropped: the same rules with their section
+-- GIVENs beside them, whose answers an importer's must equal.
+runJoinedFiles :: FilePath -> [FilePath] -> IO Output
+runJoinedFiles bin files = withSystemTempDirectory "l4-joined-files" \dir -> do
+  texts <- traverse (fmap TE.decodeUtf8 . BS.readFile) files
+  let joined = dir </> "joined.l4"
+      withoutImports = filter (not . ("IMPORT " `T.isPrefixOf`)) . T.lines
+  BS.writeFile joined (TE.encodeUtf8 (T.unlines (concatMap ((<> [""]) . withoutImports) texts)))
+  runL4 bin ["run", joined]
+
+-- | How many evaluations a run printed.
+evaluationCount :: Output -> Int
+evaluationCount o = T.count "Evaluation[" (T.pack (filter (/= '\r') o.outStdout))
+
 -- A mixfix call whose first operand is itself a call.
 renderMixfixOperandFixture :: FilePath
 renderMixfixOperandFixture = fixtureDir </> "render-mixfix-operand.l4"
@@ -1196,6 +1228,8 @@ coreFixtures =
   , renderBrokenImportFixture, renderBrokenImportLib, renderHebrewWordsFixture
   , renderSectionGivenEvalFixture, sectionGivenBridgeSource
   , sectionGivenImportOperandCall, sectionGivenImportOperandUnset, sectionGivenImportOperandChain
+  , sectionGivenImportContractDef, sectionGivenImportContractCall, sectionGivenImportContractMid
+  , sectionGivenImportContractChain, sectionGivenImportContractUnset
   , renderMixfixOperandFixture, renderMixfixNestedFixture, renderSectionGivenBlanksFixture
   , regulativeActionParamSource
   , everyRandSource
@@ -1875,6 +1909,61 @@ spec bin = do
       forM_ [1 .. 7] \n -> do
         evalBlockIn n out `shouldSatisfy` T.isInfixOf "needed to know the value of"
         evalBlockIn n out `shouldSatisfy` T.isInfixOf "an assumed term"
+
+  -- smucclaw/l4-ide#1118. The same defect for a CONTRACT. A rule that reads a
+  -- section GIVEN and returns a contract, defined in an IMPORTED file, stopped
+  -- with "given signatures' values' lengths do not match" when an importer
+  -- wrote it as an operand of RAND or ROR, or under an IF that was the
+  -- operand: the compound applies its operand to the time and the events, and
+  -- those reached the closure in place of the section GIVEN. Each answer is
+  -- compared with the answer to the same rules joined into one file, and some
+  -- are named, so that two runs that stopped alike would not pass.
+  describe "l4 run: an imported contract that reads a section GIVEN, used as an operand of RAND or ROR" $ do
+    it "gives, in every position, the answer the same rules give in one file" $ do
+      imported <- runL4 bin ["run", sectionGivenImportContractCall]
+      single <- runJoinedFiles bin [sectionGivenImportContractDef, sectionGivenImportContractCall]
+      let Output code sout serr = imported
+          resultAt n = resultBodyIn n imported
+      code `shouldBe` ExitSuccess
+      (sout <> serr) `shouldNotSatisfy` ("Internal error" `isInfixOf`)
+      evaluationCount imported `shouldBe` 39
+      evaluationCount single `shouldBe` 39
+      forM_ [1 .. 39] \n -> resultBodyIn n imported `shouldBe` resultBodyIn n single
+      -- `left reader`: Alice pays at 4, inside her 5, and then at 7, after it
+      resultAt 1 `shouldNotSatisfy` T.isInfixOf "BY Alice"
+      resultAt 2 `shouldSatisfy` T.isInfixOf "BY Alice BECAUSE \"late\""
+      -- `or, left reader`: in time she satisfies the alternative
+      T.strip (T.drop (T.length "Result:") (resultAt 5)) `shouldBe` "FULFILLED"
+      -- `both readers`: the same contract twice, so Alice breaches twice
+      T.count "BY Alice BECAUSE \"late\"" (resultAt 10) `shouldBe` 2
+      -- `under an IF, else`, late
+      resultAt 20 `shouldSatisfy` T.isInfixOf "BY Alice BECAUSE \"late\""
+
+    it "gives its answer through a middle file that has a section GIVEN of its own and uses it as an operand or a HENCE" $ do
+      mid <- runL4 bin ["run", sectionGivenImportContractMid]
+      chain <- runL4 bin ["run", sectionGivenImportContractChain]
+      single <- runJoinedFiles bin
+        [sectionGivenImportContractDef, sectionGivenImportContractMid, sectionGivenImportContractChain]
+      forM_ [mid, chain] \o -> do
+        o.outExit `shouldBe` ExitSuccess
+        o.outStdout `shouldNotSatisfy` ("Internal error" `isInfixOf`)
+      evaluationCount mid `shouldBe` 3
+      evaluationCount chain `shouldBe` 4
+      evaluationCount single `shouldBe` 7
+      forM_ [1 .. 3] \n -> resultBodyIn n mid `shouldBe` resultBodyIn n single
+      forM_ [1 .. 4] \n -> resultBodyIn n chain `shouldBe` resultBodyIn (n + 3) single
+      forM_ [chain, mid] \o -> resultBodyIn 1 o `shouldSatisfy` T.isInfixOf "BY Alice BECAUSE \"late\""
+
+    it "says it is stuck on the assumed term, never that L4 has a bug, where the section GIVEN has no default" $ do
+      imported@(Output code sout serr) <- runL4 bin ["run", sectionGivenImportContractUnset]
+      single <- runJoinedFiles bin [sectionGivenImportContractDef, sectionGivenImportContractUnset]
+      code `shouldBe` ExitFailure 1
+      (sout <> serr) `shouldNotSatisfy` ("Internal error" `isInfixOf`)
+      evaluationCount imported `shouldBe` 3
+      forM_ [1 .. 3] \n -> do
+        resultBodyIn n imported `shouldSatisfy` T.isInfixOf "needed to know the value of"
+        resultBodyIn n imported `shouldSatisfy` T.isInfixOf "an assumed term"
+        resultBodyIn n imported `shouldBe` resultBodyIn n single
 
   -- `Marker WITHAL` on a record with no fields checks to a named application
   -- with nothing written. It used to render as a field list with no fields

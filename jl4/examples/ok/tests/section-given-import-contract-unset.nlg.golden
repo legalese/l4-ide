@@ -1,0 +1,3 @@
+executing contract `the leg` at 0 with the following events: party `Alice` did `pay` with 1 at 4 `WAITUNTIL` with 30
+executing contract `left` at 0 with the following events: party `Alice` did `pay` with 1 at 4 `WAITUNTIL` with 30
+executing contract `right` at 0 with the following events: party `Alice` did `pay` with 1 at 4 `WAITUNTIL` with 30

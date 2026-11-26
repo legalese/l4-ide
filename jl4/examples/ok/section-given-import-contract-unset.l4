@@ -1,0 +1,33 @@
+-- An imported contract that reads a section GIVEN WITH NO DEFAULT, as an operand
+-- (smucclaw/l4-ide#1118).
+--
+-- `unset leg` comes from ok/section-given-import-contract-def.l4, where `gate`
+-- has no TYPICALLY, so nothing can say which branch the contract takes. Every
+-- evaluation here stops, and the message is the one a single file gives: the
+-- evaluation "needed to know the value of gate, but it is an assumed term". As
+-- an operand of RAND or ROR it used to stop with an internal error instead,
+-- which tells the reader to report a bug in L4 for a program that is only
+-- missing an input.
+
+IMPORT `section-given-import-contract-def`
+
+GIVETH A DEONTIC Person Action
+`the leg` MEANS `unset leg`
+
+GIVETH A DEONTIC Person Action
+`left` MEANS `unset leg` RAND (PARTY Bob MUST deliver WITHIN 10)
+
+GIVETH A DEONTIC Person Action
+`right` MEANS (PARTY Bob MUST deliver WITHIN 10) ROR `unset leg`
+
+#TRACE `the leg` AT 0 WITH
+  PARTY Alice DOES pay 1 AT 4
+  WAITUNTIL 30
+
+#TRACE `left` AT 0 WITH
+  PARTY Alice DOES pay 1 AT 4
+  WAITUNTIL 30
+
+#TRACE `right` AT 0 WITH
+  PARTY Alice DOES pay 1 AT 4
+  WAITUNTIL 30

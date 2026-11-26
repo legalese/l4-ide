@@ -1,0 +1,270 @@
+-- An imported contract that reads a section GIVEN, named as an operand of RAND
+-- or ROR (smucclaw/l4-ide#1118).
+--
+-- `pay leg` comes from ok/section-given-import-contract-def.l4, where `dl` is 5
+-- by default, so Alice has until 5 to pay. Named here, it is a closure that has
+-- to be applied to that module's own cell before it is a contract. Evaluating
+-- it on its own, or as a HENCE or a LEST, always did that. As an operand of
+-- RAND or ROR it did not: the compound applies its operand to the time and the
+-- events, and those two arguments reached the closure in place of the cell. A
+-- reader of one section GIVEN then stopped with "given signatures' values'
+-- lengths do not match" (evaluations 1 to 26), and a reader of two took the
+-- time and the events for its two inputs and went on, giving a wrong answer
+-- with no error (27 and 28, `two section GIVENs`). The same happened when the
+-- reader sat under an IF, a CONSIDER, a WHERE or a LET that was itself the
+-- operand. Parentheses change nothing: the parser keeps no node for them.
+--
+-- Evaluations 1 to 28 are the fourteen operand shapes, each run twice: Alice
+-- pays at 4 (in time) and at 7 (late), and Bob never acts. Evaluations 29 to 39
+-- are the cases that already worked, and must go on working (the last two have
+-- a compound inside a HENCE, where the operand was applied already). In a
+-- single file, with the section GIVEN beside the rule, every evaluation gives
+-- the answer it gives here; the CLI test that runs this file compares the two.
+
+IMPORT `section-given-import-contract-def`
+
+GIVETH A DEONTIC Person Action
+`left reader` MEANS
+    `pay leg` RAND (PARTY Bob MUST deliver WITHIN 10)
+
+GIVETH A DEONTIC Person Action
+`right reader` MEANS
+    (PARTY Bob MUST deliver WITHIN 10) RAND `pay leg`
+
+GIVETH A DEONTIC Person Action
+`or, left reader` MEANS
+    `pay leg` ROR (PARTY Bob MUST deliver WITHIN 10)
+
+GIVETH A DEONTIC Person Action
+`or, right reader` MEANS
+    (PARTY Bob MUST deliver WITHIN 10) ROR `pay leg`
+
+GIVETH A DEONTIC Person Action
+`both readers` MEANS
+    `pay leg` RAND `pay leg`
+
+GIVETH A DEONTIC Person Action
+`or, both readers` MEANS
+    `pay leg` ROR `pay leg`
+
+GIVETH A DEONTIC Person Action
+`nested left` MEANS
+    (`pay leg` RAND (PARTY Bob MUST deliver WITHIN 10)) RAND (PARTY Bob MUST deliver WITHIN 12)
+
+GIVETH A DEONTIC Person Action
+`nested right` MEANS
+    (PARTY Bob MUST deliver WITHIN 12) RAND ((PARTY Bob MUST deliver WITHIN 10) ROR `pay leg`)
+
+GIVETH A DEONTIC Person Action
+`under an IF, then` MEANS
+    (IF TRUE THEN `pay leg` ELSE FULFILLED) RAND (PARTY Bob MUST deliver WITHIN 10)
+
+GIVETH A DEONTIC Person Action
+`under an IF, else` MEANS
+    (IF FALSE THEN FULFILLED ELSE `pay leg`) RAND (PARTY Bob MUST deliver WITHIN 10)
+
+GIVETH A DEONTIC Person Action
+`under a CONSIDER` MEANS
+    (CONSIDER TRUE
+     WHEN TRUE THEN `pay leg`
+     WHEN FALSE THEN FULFILLED) RAND (PARTY Bob MUST deliver WITHIN 10)
+
+GIVETH A DEONTIC Person Action
+`under a WHERE` MEANS
+    (`pay leg` WHERE `unused` MEANS 1) RAND (PARTY Bob MUST deliver WITHIN 10)
+
+GIVETH A DEONTIC Person Action
+`under a LET` MEANS
+    (LET `unused` MEANS 1 IN `pay leg`) RAND (PARTY Bob MUST deliver WITHIN 10)
+
+GIVETH A DEONTIC Person Action
+`two section GIVENs` MEANS
+    `pay then deliver` RAND (PARTY Bob MUST deliver WITHIN 10)
+
+GIVETH A DEONTIC Person Action
+`plain reader` MEANS
+    `pay leg`
+
+GIVETH A DEONTIC Person Action
+`no section GIVEN` MEANS
+    `plain leg` RAND (PARTY Bob MUST deliver WITHIN 10)
+
+GIVETH A DEONTIC Person Action
+`as a HENCE` MEANS
+    PARTY Bob MUST deliver WITHIN 10 HENCE `pay leg` LEST BREACH BY Bob BECAUSE "late"
+
+GIVETH A DEONTIC Person Action
+`as a LEST, met` MEANS
+    PARTY Bob MUST deliver WITHIN 10 HENCE FULFILLED LEST `pay leg`
+
+GIVETH A DEONTIC Person Action
+`as a LEST, missed` MEANS
+    PARTY Bob MUST deliver WITHIN 10 HENCE FULFILLED LEST `pay leg`
+
+GIVETH A DEONTIC Person Action
+`in a HENCE` MEANS
+    PARTY Bob MUST deliver WITHIN 10
+    HENCE (`pay leg` RAND (PARTY Bob MUST deliver WITHIN 5))
+    LEST BREACH BY Bob BECAUSE "late"
+
+#TRACE `left reader` AT 0 WITH
+  PARTY Alice DOES pay 1 AT 4
+  WAITUNTIL 30
+
+#TRACE `left reader` AT 0 WITH
+  PARTY Alice DOES pay 1 AT 7
+  WAITUNTIL 30
+
+#TRACE `right reader` AT 0 WITH
+  PARTY Alice DOES pay 1 AT 4
+  WAITUNTIL 30
+
+#TRACE `right reader` AT 0 WITH
+  PARTY Alice DOES pay 1 AT 7
+  WAITUNTIL 30
+
+#TRACE `or, left reader` AT 0 WITH
+  PARTY Alice DOES pay 1 AT 4
+  WAITUNTIL 30
+
+#TRACE `or, left reader` AT 0 WITH
+  PARTY Alice DOES pay 1 AT 7
+  WAITUNTIL 30
+
+#TRACE `or, right reader` AT 0 WITH
+  PARTY Alice DOES pay 1 AT 4
+  WAITUNTIL 30
+
+#TRACE `or, right reader` AT 0 WITH
+  PARTY Alice DOES pay 1 AT 7
+  WAITUNTIL 30
+
+#TRACE `both readers` AT 0 WITH
+  PARTY Alice DOES pay 1 AT 4
+  WAITUNTIL 30
+
+#TRACE `both readers` AT 0 WITH
+  PARTY Alice DOES pay 1 AT 7
+  WAITUNTIL 30
+
+#TRACE `or, both readers` AT 0 WITH
+  PARTY Alice DOES pay 1 AT 4
+  WAITUNTIL 30
+
+#TRACE `or, both readers` AT 0 WITH
+  PARTY Alice DOES pay 1 AT 7
+  WAITUNTIL 30
+
+#TRACE `nested left` AT 0 WITH
+  PARTY Alice DOES pay 1 AT 4
+  WAITUNTIL 30
+
+#TRACE `nested left` AT 0 WITH
+  PARTY Alice DOES pay 1 AT 7
+  WAITUNTIL 30
+
+#TRACE `nested right` AT 0 WITH
+  PARTY Alice DOES pay 1 AT 4
+  WAITUNTIL 30
+
+#TRACE `nested right` AT 0 WITH
+  PARTY Alice DOES pay 1 AT 7
+  WAITUNTIL 30
+
+#TRACE `under an IF, then` AT 0 WITH
+  PARTY Alice DOES pay 1 AT 4
+  WAITUNTIL 30
+
+#TRACE `under an IF, then` AT 0 WITH
+  PARTY Alice DOES pay 1 AT 7
+  WAITUNTIL 30
+
+#TRACE `under an IF, else` AT 0 WITH
+  PARTY Alice DOES pay 1 AT 4
+  WAITUNTIL 30
+
+#TRACE `under an IF, else` AT 0 WITH
+  PARTY Alice DOES pay 1 AT 7
+  WAITUNTIL 30
+
+#TRACE `under a CONSIDER` AT 0 WITH
+  PARTY Alice DOES pay 1 AT 4
+  WAITUNTIL 30
+
+#TRACE `under a CONSIDER` AT 0 WITH
+  PARTY Alice DOES pay 1 AT 7
+  WAITUNTIL 30
+
+#TRACE `under a WHERE` AT 0 WITH
+  PARTY Alice DOES pay 1 AT 4
+  WAITUNTIL 30
+
+#TRACE `under a WHERE` AT 0 WITH
+  PARTY Alice DOES pay 1 AT 7
+  WAITUNTIL 30
+
+#TRACE `under a LET` AT 0 WITH
+  PARTY Alice DOES pay 1 AT 4
+  WAITUNTIL 30
+
+#TRACE `under a LET` AT 0 WITH
+  PARTY Alice DOES pay 1 AT 7
+  WAITUNTIL 30
+
+#TRACE `two section GIVENs` AT 0 WITH
+  PARTY Alice DOES pay 1 AT 4
+  WAITUNTIL 30
+
+#TRACE `two section GIVENs` AT 0 WITH
+  PARTY Alice DOES pay 1 AT 7
+  WAITUNTIL 30
+
+#TRACE `plain reader` AT 0 WITH
+  PARTY Alice DOES pay 1 AT 4
+  WAITUNTIL 30
+
+#TRACE `plain reader` AT 0 WITH
+  PARTY Alice DOES pay 1 AT 7
+  WAITUNTIL 30
+
+#TRACE `no section GIVEN` AT 0 WITH
+  PARTY Alice DOES pay 1 AT 4
+  WAITUNTIL 30
+
+#TRACE `no section GIVEN` AT 0 WITH
+  PARTY Alice DOES pay 1 AT 7
+  WAITUNTIL 30
+
+#TRACE `as a HENCE` AT 0 WITH
+  PARTY Bob DOES deliver AT 3
+  PARTY Alice DOES pay 1 AT 6
+  WAITUNTIL 30
+
+#TRACE `as a HENCE` AT 0 WITH
+  PARTY Bob DOES deliver AT 3
+  PARTY Alice DOES pay 1 AT 9
+  WAITUNTIL 30
+
+#TRACE `as a LEST, met` AT 0 WITH
+  PARTY Bob DOES deliver AT 3
+  WAITUNTIL 30
+
+#TRACE `as a LEST, missed` AT 0 WITH
+  PARTY Alice DOES pay 1 AT 12
+  WAITUNTIL 30
+
+#TRACE `as a LEST, missed` AT 0 WITH
+  PARTY Alice DOES pay 1 AT 17
+  WAITUNTIL 30
+
+#TRACE `in a HENCE` AT 0 WITH
+  PARTY Bob DOES deliver AT 3
+  PARTY Alice DOES pay 1 AT 6
+  PARTY Bob DOES deliver AT 7
+  WAITUNTIL 30
+
+#TRACE `in a HENCE` AT 0 WITH
+  PARTY Bob DOES deliver AT 3
+  PARTY Alice DOES pay 1 AT 9
+  PARTY Bob DOES deliver AT 7
+  WAITUNTIL 30
