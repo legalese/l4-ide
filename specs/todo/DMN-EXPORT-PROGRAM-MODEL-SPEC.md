@@ -2314,8 +2314,11 @@ some every satisfies instance of between function external date time duration li
    is this step's; since the review of this branch (2026-11-26) it carries a Lossy `D-RENAME` note on
    an input, a decision or a record field, as a keyword's suffix now does (§7, the `D-RENAME` row), and
    the `@label` keeps the L4 name. It reaches every name in the namespace, a record field or a type
-   included; the corpus has none of those, and 10 elements in it are renamed (5 decisions named `sum`,
-   2 named `count`, 3 inputs named `floor`), decided by Claude 2026-11-26, pending Meng's review.
+   included; the corpus has none of those, and 11 elements in it are renamed (5 decisions named `sum`,
+   2 named `count`, 4 inputs named `floor`); `ok/nlg-head-placement.l4` has two of the `floor`
+   inputs, and the second is emitted as `floor__2` with a collision note that also names the reserved
+   word, so 10 notes give the reserved reason alone. Renaming every such name, fields and types
+   included, is decided by Claude 2026-11-26, pending Meng's review.
    The first group's words are of two kinds, which the `D-RENAME` note tells apart since the same
    review: FEEL's keywords and literal words (`true` to `external`, but for `not`), and the names of
    FEEL types or built-in functions (`date`, `time`, `duration`, `not`, `list`, `context`), which are
