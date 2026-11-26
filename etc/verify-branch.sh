@@ -232,11 +232,12 @@ if echo "$DIFF_FILES" | grep -q '^jl4-service/'; then
     PROBE_B_OUT="$PROBEDIR/probe-b.out"
     step "probe (b): jl4-service answers the same after a restart" \
       bash -c "cd '$WT' && node etc/probe-service-restart.mjs '$SVC_COPY' | tee '$PROBE_B_OUT'; exit \${PIPESTATUS[0]}"
-    # The probe passes without the listener check on a machine with no
-    # non-loopback IPv4 address; the summary must not read as if it had made it.
-    if grep -q 'listens on loopback only was not made' "$PROBE_B_OUT" 2>/dev/null; then
-      note "probe (b) did not check the listener: this machine has no non-loopback IPv4 address"
-    fi
+    # The probe can pass without having checked the listener (a machine with no
+    # non-loopback IPv4 address; a jl4-service without --host) and says so on a
+    # line that starts with WARN:. The summary must not read as if it had.
+    while IFS= read -r warn_line; do
+      note "probe (b) $warn_line"
+    done < <(grep '^WARN: ' "$PROBE_B_OUT" 2>/dev/null)
   else RESULTS+=("FAIL  probe (b): no built jl4-service to start"); FAILED=1; fi
 else NOT_PROBED+=("(b) service restart"); fi
 
