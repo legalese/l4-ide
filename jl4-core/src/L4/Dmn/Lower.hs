@@ -6607,13 +6607,16 @@ lowerModule opts modul@(MkModule _ uri _) =
   -- the L4 name.
   --
   -- __The RESERVED arm__ (found missing by the review of this branch,
-  -- 2026-11-26): a name whose fold is a word FEEL reserves, or a FEEL function
-  -- the export calls ('reservedFeelWords'), is suffixed by stage 1 (`sum` is
-  -- `sum_`), and that rename had no note. It is the one rename a caller is
-  -- likely to trip on, because the L4 name is itself a FEEL name and would be
-  -- sent or read as it stands: an input `floor` emitted as `floor_` answers
-  -- null to a caller that sends `floor`, and `@label` is not a key any engine
-  -- reads. So it gets the collision arm's note and severity, and when both
+  -- 2026-11-26): a name whose fold is a FEEL keyword, the name of a FEEL type
+  -- or built-in function, or a FEEL function the export calls
+  -- ('reservedFeelWords'), is suffixed by stage 1 (`sum` is `sum_`), and that
+  -- rename had no note. It is the one rename a caller is likely to trip on,
+  -- because the L4 name is itself a FEEL name and would be sent or read as it
+  -- stands: a caller that sends `floor` for an input emitted as `floor_`
+  -- reaches nothing (Camunda 8.7.6 answered null for each decision that reads
+  -- it, and KIE 8.44 skipped each one, `Required dependency 'floor_' not
+  -- found`), and `@label` is not a key any engine reads. So it gets the
+  -- collision arm's note and severity, and when both
   -- apply, one note says both. Types are left out: no caller sends or reads a
   -- type name, and a type's rename is the alias repair 'reservedFeelTypeNames'
   -- describes. Both choices are decided by Claude 2026-11-26, pending Meng's
@@ -6623,8 +6626,14 @@ lowerModule opts modul@(MkModule _ uri _) =
   -- header defers the two-severities-on-one-code shape to a re-ruling against
   -- FIDELITY-SEVERITY-AXIS-SPEC.md §5, and the arm would emit ~169 Advisory
   -- notes on one corpus module while `@label` already carries the source name.
-  -- (A space folded to `_` is that arm, not the reserved one: `two words` is
-  -- not a name a caller can send to FEEL as it stands.)
+  -- (A space folded to `_` belongs to that arm, not the reserved one, so
+  -- `two_words` gets no note, although a caller that sends `two words`
+  -- reaches nothing too: FEEL names may contain spaces, and for an input sent
+  -- as `two words` Camunda 8.7.6 answered null and KIE 8.44 skipped the
+  -- decision (`Required dependency 'two_words' not found`), as for `floor`
+  -- (found by the review of this branch, 2026-11-26; measured the same day).
+  -- Whether a rename that only folds should get a note is left to that
+  -- re-ruling.)
   renameNotes =
     [ dmnNote "D-RENAME" Lossy eid Nothing
         (if collided
@@ -6640,8 +6649,10 @@ lowerModule opts modul@(MkModule _ uri _) =
            then "the resemblance between the emitted FEEL name and the L4 name it came from; \
                 \the L4 name survives in @label"
            else "the L4 name as the name an engine uses: a caller that sends or reads `"
-             <> l4name <> "` reaches nothing and gets null, and must use `" <> resolved
-             <> "`; the L4 name survives only in @label, which no engine reads")
+             <> l4name <> "` reaches nothing, and must use `" <> resolved
+             <> "` (for an input sent by its L4 name, Camunda 8.7.6 answered null for each \
+                \decision that reads it, and KIE 8.44 skipped each one); the L4 name survives \
+                \only in @label, which no engine reads")
     | (eid, kindPlural, l4name, foldedName, resolved, claimants) <- renameCandidates
     , let collided = resolved /= foldedName
     , let reserved = reservedReason (foldFeelName l4name)
@@ -6652,8 +6663,10 @@ lowerModule opts modul@(MkModule _ uri _) =
     | Set.member w reservedFeelFunctions =
         Just ("`" <> w <> "` is the name of a FEEL function this export calls, \
               \which a variable of that name would hide")
+    | Set.member w feelTypeAndFunctionWords =
+        Just ("`" <> w <> "` is the name of a FEEL type or built-in function")
     | Set.member w reservedFeelWords =
-        Just ("`" <> w <> "` is a word FEEL reserves")
+        Just ("`" <> w <> "` is a FEEL keyword")
     | otherwise = Nothing
 
   renameCandidates =

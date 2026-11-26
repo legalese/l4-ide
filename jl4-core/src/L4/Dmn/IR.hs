@@ -57,6 +57,8 @@ module L4.Dmn.IR
   , feelIdentText
   , feelTypeNameText
   , reservedFeelWords
+  , feelKeywords
+  , feelTypeAndFunctionWords
   , reservedFeelFunctions
   , reservedFeelTypeNames
   , foldFeelName
@@ -533,21 +535,36 @@ feelTypeNameText = suffixReservedIn reservedFeelTypeNames . foldFeelName
 -- __Either rename carries a Lossy @D-RENAME@ note__ on an input, a decision or
 -- a record field ("L4.Dmn.Lower" @renameNotes@), as a collision rename does:
 -- the L4 name is itself a FEEL name a caller would send or read as it stands,
--- so a field @sum@ emitted as @sum_@ answers null to a caller using @sum@,
--- and the @label@ that keeps the L4 name is not a key any engine reads. Until
--- the review of this branch (2026-11-26) this comment said the rename "carries
--- no note"; a note on it, at the collision arm's severity, is decided by
--- Claude 2026-11-26, pending Meng's review.
+-- so a caller that sends @floor@ for an input emitted as @floor_@ reaches
+-- nothing (measured on that input: Camunda 8.7.6 answered null for each
+-- decision that reads it, and KIE 8.44 skipped each one, @Required dependency
+-- 'floor_' not found@), and the @label@ that keeps the L4 name is not a key
+-- any engine reads. Until the review of this branch (2026-11-26) this comment
+-- said the rename "carries no note"; a note on it, at the collision arm's
+-- severity, is decided by Claude 2026-11-26, pending Meng's review.
+--
+-- The words of the first group are of two kinds, which the note tells apart
+-- ('feelKeywords' and 'feelTypeAndFunctionWords').
 reservedFeelWords :: Set Text
-reservedFeelWords = Set.fromList
+reservedFeelWords = feelKeywords <> feelTypeAndFunctionWords <> reservedFeelFunctions
+
+-- | FEEL's keywords and literal words (@true@, @null@, @in@, @for@ and the
+-- rest): the first kind of 'reservedFeelWords'.
+feelKeywords :: Set Text
+feelKeywords = Set.fromList
   [ "true", "false", "null", "and", "or", "not", "if", "then", "else", "for", "in", "return"
   , "some", "every", "satisfies", "instance", "of", "between", "function", "external"
-  , "date", "time", "duration", "list", "context"
-  ] <> reservedFeelFunctions
+  ]
+
+-- | The second kind of 'reservedFeelWords': not keywords, but the names of
+-- FEEL types or built-in functions (@date@, @time@ and @duration@ are
+-- functions, and @list@ and @context@ types).
+feelTypeAndFunctionWords :: Set Text
+feelTypeAndFunctionWords = Set.fromList ["date", "time", "duration", "list", "context"]
 
 -- | The second group of 'reservedFeelWords': the FEEL built-in functions this
 -- exporter calls, which a variable of the same name would hide. Kept apart so
--- that @D-RENAME@ can say which of the two reasons renamed a name.
+-- that @D-RENAME@ can say which of the reasons renamed a name.
 reservedFeelFunctions :: Set Text
 reservedFeelFunctions = Set.fromList
   ["floor", "ceiling", "decimal", "sum", "count", "min", "max", "concatenate", "modulo"]

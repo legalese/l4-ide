@@ -941,7 +941,8 @@ spec bin = do
           sout `shouldSatisfy` (("<inputData id=\"input_" <> w <> "\" name=\"" <> w <> "_\"") `isInfixOf`)
         sout `shouldSatisfy` ("max(floor(x), floor_)" `isInfixOf`)
 
-      -- A caller sending `floor` gets null, so the rename is reported.
+      -- A caller sending `floor` reaches nothing (null on Camunda, a skipped
+      -- decision on KIE), so the rename is reported.
       it "reports each input renamed for a FEEL function's name with a Lossy D-RENAME note" $ do
         Output code _ serr <- runL4 bin ["export", "dmn", exportShadowedBuiltinsFixture, "--fidelity-report"]
         code `shouldBe` ExitSuccess

@@ -103,14 +103,13 @@ L4 lets you use a type before you declare it, but KIE does not load a model in w
 A record that refers to itself, or two records that refer to each other, is written in your order: KIE 8.44 and Camunda 8.7.6 both load and run such a model, measured on `jl4/examples/dmn/itemdef-order.l4`.
 No other engine has been checked.
 
-**Names.** Each element's `name`, the one FEEL uses and the one an engine's input keys must match, is written in ASCII letters, digits and underscores: every other character, a space or an accented letter alike, becomes an underscore, and a run of them becomes one, so `two words` is `two_words` and `Größe` is `Gr_e`.
+**Names.** Each element's `name`, the one FEEL uses and the one an engine's input keys must match, is written in ASCII letters, digits and underscores: every other character, a space or an accented letter alike, becomes an underscore, and a run of them becomes one, dropped at either end, with one put in front of a name that starts with a digit; so `two words` is `two_words` and `Größe` is `Gr_e`.
 An element whose `name` had to change keeps your L4 name in its `label`; one whose L4 name needed no change, such as `plain`, has no `label`.
-A name that is a word FEEL reserves, or the name of a FEEL function the export calls (`sum`, `count`, `floor`, `list`, `date` and others), gets an underscore at the end, so an input `floor` is `floor_`.
-On an input, a decision or a record field, the report gives that rename a Lossy `D-RENAME` note, because a caller that sends or reads `floor` gets null: it must use `floor_`.
+A name that is a FEEL keyword, such as `in` or `for`, the name of a FEEL type or built-in function, such as `date` or `list`, or the name of a FEEL function the export calls (`floor`, `ceiling`, `decimal`, `sum`, `count`, `min`, `max`, `concatenate`, `modulo`), gets an underscore at the end, so an input `GIVEN floor IS A NUMBER` is the input `floor_`, and a case must supply `floor_`.
+On an input, a decision or a record field, the report gives that rename a Lossy `D-RENAME` note, because a caller that uses the L4 name reaches nothing and must use `floor_`: for an input sent as `floor`, Camunda 8.7.6 answers null and KIE 8.44 skips each decision that needs it (`Required dependency 'floor_' not found`).
 A type so named is renamed the same way, with no note, because no caller sends a type's name.
 Two names that come out the same get a number on the second, `amount_2`, with the same note.
-A name that FEEL reserves gets an underscore on the end: its keywords, such as `in`, `date` and `list`, and the functions the export calls, `floor`, `ceiling`, `decimal`, `sum`, `count`, `min`, `max`, `concatenate` and `modulo`.
-So an input `GIVEN floor IS A NUMBER` is the input `floor_`, and a case must supply `floor_`.
+A name changed only by the folding above, such as `two words`, gets no note, although a caller that sends `two words` reaches nothing in the same way (measured on both engines).
 The functions are reserved because FEEL looks a function's name up among the variables first: left as `floor`, the input hid the function, and KIE 8.44 failed each decision that called a function hidden this way (Camunda 8.7.6 did not), measured on `jl4/tests-cli/fixtures/export-shadowed-builtins.l4`.
 
 **Values from a file you import.** `l4 export dmn` writes one DMN file and no DMN `<import>`, so a decision can read only what is in that file.
@@ -169,7 +168,7 @@ One case passes this test that `l4 check` refuses: a library file whose own `IMP
 Still written as L4, with a Blocking note, and so still fatal to the whole file on both engines: `SQRT` (undefined below zero), `TRUNC` (no single FEEL function), `minimum` and `maximum` (L4 gives no answer on an empty list, while FEEL's `min` and `max` of an empty list answer null on Camunda 8.7.6 and fail the decision on KIE 8.44), and `min` and `max` over `MAYBE NUMBER`, which skip a `NOTHING`.
 
 **The empty list.** `EMPTY` is written as FEEL's empty list, `[]`, so `count EMPTY` is `count([])` and `xs EQUALS EMPTY` is `xs = []`.
-In a decision table, a rule that tests a list against `EMPTY`, such as a `WHEN EMPTY` clause of a `CONSIDER` or a guard `IF xs EQUALS EMPTY`, gets a column of its own that holds the whole test, `xs = []` (or `list_ = []` for an input called `list`, a name FEEL reserves), with the entry `true`, because the simple tests a table cell holds have no form for a list: their values are numbers, strings, booleans and dates.
+In a decision table, a rule that tests a list against `EMPTY`, such as a `WHEN EMPTY` clause of a `CONSIDER` or a guard `IF xs EQUALS EMPTY`, gets a column of its own that holds the whole test, `xs = []` (or `list_ = []` for an input called `list`, the name of a FEEL type), with the entry `true`, because the simple tests a table cell holds have no form for a list: their values are numbers, strings, booleans and dates.
 Older versions of `l4` wrote `EMPTY` as the text `"EMPTY"`, which gave a wrong answer wherever it was read: no list equals `"EMPTY"`, so a test against it never held and an empty list fell to the wrong rule, and a decision that `MEANS EMPTY` answered the text.
 Measured on KIE 8.44 and Camunda 8.7.6 with `jl4/tests-cli/fixtures/export-empty-list-table.l4`: 2 of 4 answers right before the change, 4 of 4 after it, on each engine.
 

@@ -1516,11 +1516,23 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
           [n] -> do
             n.message `shouldSatisfy` Text.isInfixOf "`floor` is emitted as the FEEL name `floor_`"
             n.message `shouldSatisfy` Text.isInfixOf "the name of a FEEL function this export calls"
-            n.lost `shouldSatisfy` Text.isInfixOf "sends or reads `floor` reaches nothing and gets null"
+            n.lost `shouldSatisfy` Text.isInfixOf "sends or reads `floor` reaches nothing, and must use `floor_`"
           ns -> expectationFailure ("one note on input_floor, got " <> show (length ns))
         case on "itemdef_bill" of
           [n] -> n.message `shouldSatisfy` Text.isInfixOf "`sum` is emitted as the FEEL name `sum_`"
           ns -> expectationFailure ("one note on itemdef_bill, got " <> show (length ns))
+
+      -- `date` is not a FEEL keyword, and the note does not call it one.
+      it "says whether a reserved name is a FEEL keyword or the name of a FEEL type or function" $ do
+        let notes = renameNotes "GIVEN date IS A NUMBER\n\
+                                \      for IS A NUMBER\n\
+                                \GIVETH A NUMBER\n\
+                                \DECIDE `pay` date for IS date PLUS for\n"
+            msgOf el = [n.message | n <- notes, n.element == el]
+        msgOf "input_date" `shouldBe`
+          ["`date` is emitted as the FEEL name `date_`, because `date` is the name of a FEEL type or built-in function"]
+        msgOf "input_for" `shouldBe`
+          ["`for` is emitted as the FEEL name `for_`, because `for` is a FEEL keyword"]
 
       it "notes no rename for a name stage 1 leaves alone or only folds" $ do
         -- `floor_` folds to `floor` and is suffixed back to `floor_`: its FEEL
