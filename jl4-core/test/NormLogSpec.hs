@@ -48,6 +48,7 @@ import L4.EvaluateLazy
   , resolveEvalConfig
   )
 import L4.Parser (execProgramParserWithHintPass)
+import L4.Print (prettyLayout)
 import L4.Syntax (DeonticModal (..), RawName (..), moduleReadsNormLog)
 import L4.TypeCheck.Types (AnchorRefusal (..), CheckResult (..), CheckErrorWithContext (..), CheckError (..), CheckWarning (..), ReadRefusal (..))
 import L4.TracePolicy (apiDefaultPolicy)
@@ -1405,6 +1406,27 @@ spec = describe "the norm log writer (NORM-LOG-SPEC, P1)" do
         -- the control: the same read with _ for the argument parses
         parses [ "x MEANS OUTSTANDING (PARTY Tenant MUST pay _)" ] `shouldBe` True
         parses [ "x MEANS OUTSTANDING (PARTY Tenant MUST pay 3)" ] `shouldBe` False
+
+      it "R22: AS after a read, not followed by OF, is not a parse error at OF (review of P2b, N2)" do
+        let parses body = case execProgramParserWithHintPass (toNormalizedUri (Uri "file:///norm-log-r22")) (Text.unlines body) of
+              Left _ -> False
+              Right _ -> True
+        -- the control: the read with its own AS OF parses
+        parses [ "x MEANS OUTSTANDING (PARTY Tenant MUST pay _) AS OF 3" ] `shouldBe` True
+        -- AS STRING is the postfix operator of as-string.l4, applied to the
+        -- read's answer; the AS OF option used to take the AS and fail at STRING
+        parses [ "x MEANS OUTSTANDING (PARTY Tenant MUST pay _) AS STRING" ] `shouldBe` True
+
+      it "R23: a bracketed bearer is printed in brackets, so the printed read parses again and prints the same (review of P2b, N1)" do
+        let parse text = execProgramParserWithHintPass (toNormalizedUri (Uri "file:///norm-log-r23")) text
+        case parse "x MEANS OUTSTANDING (PARTY (a PLUS b) MUST pay _)\n" of
+          Left _ -> expectationFailure "the read with a bracketed bearer did not parse"
+          Right (m1, _, _) -> do
+            let printed = prettyLayout m1
+            printed `shouldSatisfy` Text.isInfixOf "PARTY ("
+            case parse printed of
+              Left _ -> expectationFailure ("the printed read did not parse again: " <> Text.unpack printed)
+              Right (m2, _, _) -> prettyLayout m2 `shouldBe` printed
 
       it "R12: a read named once and used in two guards is read again at the second, not served from the first" do
         -- the shared-thunk probe (NORM-LOG-SPEC N4): `pending` is one rule
