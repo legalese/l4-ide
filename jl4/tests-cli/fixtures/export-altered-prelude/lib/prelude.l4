@@ -1,0 +1,15 @@
+-- NOT the L4 prelude: a library directory's `prelude.l4` whose `sum` and
+-- `count` have the library's names and types and different bodies, for
+-- JL4_LIBRARY_PATH to name. Before the export compared a library file's text
+-- with the copy compiled into `l4`, a file here was taken for the library by
+-- its directory alone, so `sum xs PLUS count xs` was written as
+-- `sum(concatenate([0], xs)) + count(xs)` (5 for LIST 1, 2 on both engines)
+-- while `l4 run` evaluated these bodies (49).
+GIVEN list IS A LIST OF NUMBER
+GIVETH A NUMBER
+sum list MEANS 42
+
+GIVEN a    IS A TYPE
+      list IS A LIST OF a
+GIVETH A NUMBER
+count list MEANS 7

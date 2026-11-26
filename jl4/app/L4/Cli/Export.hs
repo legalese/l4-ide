@@ -63,9 +63,12 @@ module L4.Cli.Export
   ) where
 
 import Base
+import qualified Base.Map as Map
 import qualified Base.Text as Text
 import Control.Exception (SomeException, try)
 import qualified Base.Set as Set
+import qualified Data.ByteString as ByteString
+import qualified Data.Text.Encoding as Text (encodeUtf8)
 import Options.Applicative
 import System.Directory (canonicalizePath, doesDirectoryExist, listDirectory)
 import System.Environment (lookupEnv)
@@ -76,6 +79,7 @@ import qualified LSP.Core.Shake as Shake
 import qualified LSP.L4.Rules as Rules
 import Language.LSP.Protocol.Types (normalizedFilePathToUri, uriToFilePath)
 
+import qualified L4.API.EmbeddedLibraries as EmbeddedLibraries
 import L4.Bpmn.Emit (renderBpmn)
 import L4.Bpmn.IR (BpmnExport (..), BpmnOptions (..), DeadlineUnitPolicy (..))
 import L4.Bpmn.Lower (stateGraphToBpmn)
@@ -489,30 +493,64 @@ dmnDrgFor opts tcRes = do
 -- | The standard-library file a loaded module is, for 'dloLibraryModule': the
 -- copy compiled into this binary, or a file in the @$JL4_LIBRARY_PATH@
 -- directory, which outranks every other place the resolver looks (CLAUDE.md
--- §5). Nothing else is the library, whatever it is called: a @prelude.l4@
--- beside the exported file outranks the compiled-in copy when that variable
--- is unset, and is the author's own module. Nor is a library found in the
--- per-user store or the editor bundle, which the resolver reaches only when
--- @$JL4_LIBRARY_PATH@ names a directory without it; those fail closed, so each
--- call into them is refused (Blocking) rather than lowered as the library's.
+-- §5), __whose text is byte for byte the compiled-in copy of the same name__,
+-- and every module it imports is one of these too. Nothing else is the
+-- library, whatever it is called: a @prelude.l4@ beside the exported file
+-- outranks the compiled-in copy when that variable is unset, and is the
+-- author's own module. Nor is a library found in the per-user store or the
+-- editor bundle, which the resolver reaches only when @$JL4_LIBRARY_PATH@
+-- names a directory without it. Each of these fails closed: its calls are
+-- refused (Blocking) rather than lowered as the library's.
+--
+-- Why the text, and not the directory alone: the lowering writes the
+-- library's calls as the FEEL the compiled-in copy's bodies mean
+-- (@sum(concatenate([0], xs))@ for @sum@), so a directory whose @prelude.l4@
+-- defines @sum@ differently was exported as the built-in @sum@ while @l4 run@
+-- evaluated its own: @sum xs PLUS count xs@ over a @prelude.l4@ defining them
+-- as 42 and 7 answered 5 on both engines against L4's 49, with Advisory notes
+-- only (found by the review of this branch, 2026-11-26). Comparing the text
+-- with the copy this binary carries is the one check that cannot be fooled by
+-- a body, and it costs a library tree that differs from the binary's copy in
+-- any byte, a comment included, the lowering of all its calls: a binary older
+-- than the tree its @$JL4_LIBRARY_PATH@ names now gets a Blocking note on
+-- every library call, where it used to lower them. Requiring the text and not
+-- the meaning is decided by Claude 2026-11-26, pending Meng's review.
 --
 -- Paths are compared canonically (symbolic links and @..@ resolved) because
 -- the variable may be spelled relative or through a link.
 dmnLibraryModule :: [Rules.TypeCheckResult] -> IO (NormalizedUri -> Maybe Text)
 dmnLibraryModule deps = do
   mLibDir <- traverse canonical =<< lookupEnv "JL4_LIBRARY_PATH"
-  fromLibDir <- case mLibDir of
+  sameText <- case mLibDir of
     Nothing -> pure []
     Just libDir -> fmap catMaybes $ for deps \dep -> do
-      let MkModule _ u _ = dep.module'
+      let u = Rules.moduleUriOf dep
       case uriToFilePath (fromNormalizedUri u) of
         Nothing -> pure Nothing
         Just p -> do
           dir <- canonical (takeDirectory p)
-          pure (if dir == libDir then Just (u, Text.pack (takeFileName p)) else Nothing)
-  pure \u -> embeddedLibraryModule u <|> lookup u fromLibDir
+          same <- isCompiledInCopy p
+          pure (if dir == libDir && same then Just (u, Text.pack (takeFileName p)) else Nothing)
+  let byText = Map.fromList sameText
+      library u = embeddedLibraryModule u <|> Map.lookup u byText
+      -- `daydate.l4` imports `date-compat.l4`: a file whose own text is the
+      -- compiled-in copy's is the library only when what it imports is too.
+      trusted = Map.fromList
+        [ (u, f)
+        | dep <- deps
+        , let u = Rules.moduleUriOf dep
+        , Just f <- [Map.lookup u byText]
+        , all (isJust . library . Rules.moduleUriOf) (Rules.transitiveDependencies dep)
+        ]
+  pure \u -> embeddedLibraryModule u <|> Map.lookup u trusted
  where
   canonical p = either (\(_ :: SomeException) -> p) id <$> try (canonicalizePath p)
+  isCompiledInCopy p = do
+    r <- try (ByteString.readFile p)
+    pure case (r, EmbeddedLibraries.lookupEmbeddedLibrary (Text.pack (takeBaseName p))) of
+      (Right bytes, Just src) -> bytes == Text.encodeUtf8 src
+      (Left (_ :: SomeException), _) -> False
+      (_, Nothing) -> False
 
 exportDmn :: ExportOptions -> Rules.TypeCheckResult -> IO FidelityReport
 exportDmn opts tcRes = do

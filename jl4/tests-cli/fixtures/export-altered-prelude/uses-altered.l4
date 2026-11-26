@@ -1,0 +1,9 @@
+-- Run with JL4_LIBRARY_PATH naming `lib/` beside this file, whose `prelude.l4`
+-- is not the copy compiled into `l4` (see it). Its calls are refused, as a
+-- call into any module of the author's own is, rather than lowered as the
+-- library's.
+IMPORT prelude
+
+GIVEN xs IS A LIST OF NUMBER
+GIVETH A NUMBER
+DECIDE `total` xs IS sum xs PLUS count xs

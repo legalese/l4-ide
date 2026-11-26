@@ -188,6 +188,10 @@ exportComputedFieldOnlyFixture = fixtureDir </> "export-computed-field-only.l4"
 exportShadowPreludeFixture, exportPreludeCallsFixture :: FilePath
 exportShadowPreludeFixture = fixtureDir </> "export-shadow-prelude" </> "uses-shadow.l4"
 exportPreludeCallsFixture  = fixtureDir </> "export-prelude-calls.l4"
+-- A JL4_LIBRARY_PATH directory whose prelude.l4 is not the compiled-in copy.
+exportAlteredPreludeFixture, exportAlteredPreludeLib :: FilePath
+exportAlteredPreludeFixture = fixtureDir </> "export-altered-prelude" </> "uses-altered.l4"
+exportAlteredPreludeLib     = fixtureDir </> "export-altered-prelude" </> "lib"
 -- What the seven calls in those fixtures become when lowered as the
 -- library's.
 preludeCallForms :: [String]
@@ -807,6 +811,35 @@ spec bin = do
             ["export", "dmn", exportPreludeCallsFixture]
           code `shouldBe` ExitSuccess
           forM_ preludeCallForms \form -> sout `shouldSatisfy` (form `isInfixOf`)
+
+        -- The directory is not enough: the text must be the compiled-in copy's.
+        it "lowers no call into a JL4_LIBRARY_PATH prelude.l4 whose sum and count are not the library's" $ do
+          env <- envWithout
+          Output code sout serr <- runL4WithEnv (Just (("JL4_LIBRARY_PATH", exportAlteredPreludeLib) : env)) bin
+            ["export", "dmn", exportAlteredPreludeFixture, "--fidelity-report"]
+          code `shouldBe` ExitSuccess
+          sout `shouldSatisfy` (not . ("sum(concatenate([0], xs))" `isInfixOf`))
+          sout `shouldSatisfy` (not . ("count(xs)" `isInfixOf`))
+          serr `shouldSatisfy` ("[D-LITERALEXPR] blocking — decision_total" `isInfixOf`)
+
+        it "lowers no prelude call from a JL4_LIBRARY_PATH copy that differs from the compiled-in one by a comment" $ do
+          env <- envWithout
+          tmp <- getTemporaryDirectory
+          let libCopy = tmp </> "l4-dmn-library-edited"
+              libSrc  = ".." </> "jl4-core" </> "libraries"
+          removePathForcibly libCopy
+          createDirectoryIfMissing True libCopy
+          files <- filter ((== ".l4") . takeExtension) <$> listDirectory libSrc
+          forM_ files \f -> copyFile (libSrc </> f) (libCopy </> f)
+          appendFile (libCopy </> "prelude.l4") "\n-- edited\n"
+          Output code sout _ <- runL4WithEnv (Just (("JL4_LIBRARY_PATH", libCopy) : env)) bin
+            ["export", "dmn", exportPreludeCallsFixture]
+          code `shouldBe` ExitSuccess
+          forM_ (filter (not . ("date(" `isInfixOf`)) preludeCallForms) \form ->
+            sout `shouldNotSatisfy` (form `isInfixOf`)
+          -- daydate.l4 and the date-compat.l4 it imports are unedited, so they
+          -- are still the library
+          sout `shouldSatisfy` ("<text>date(\"2024-01-02\")</text>" `isInfixOf`)
 
       it "renames an input spelled like a FEEL function the export calls" $ do
         Output code sout _ <- runL4 bin ["export", "dmn", exportShadowedBuiltinsFixture]
