@@ -6,7 +6,7 @@ A second payment counts only once the first is settled.
 A waiver applies only to a duty that is still outstanding.
 While a contract runs, L4 keeps a record of what became of each duty, permission and prohibition in it, and the phrases on this page ask that record a question from inside a rule.
 
-**Status (2026-11-24): the spelling on this page is decided by Claude 2026-11-24, pending Meng's review.**
+**Status (2026-11-27): the spelling on this page is decided by Claude 2026-11-24, pending Meng's review, and so are three of the rules it describes, each marked where it stands: an `AS OF` after the contract's clock is refused, `MUST` matches a norm written with `DO`, and `UNDER LEST` and `UNDER HENCE` are not checked against the module (all decided by Claude 2026-11-26).**
 Whether the four phrases below are the right words is a question for Meng (card N4b of the norm log's rulings, `specs/todo/NORM-LOG-SPEC.md` §6.5).
 If Meng rules for other words, the words on this page change and what they do does not.
 Nothing on this page is in a released `l4` until the branch that builds it is merged.
@@ -47,8 +47,9 @@ EVER FAILED (PARTY _ MUST pay _ UNDER LEST)
 - `UNDER LEST` or `UNDER HENCE` at the end narrows the pattern to norms that a `LEST` (or a `HENCE`) armed.
   A pattern with neither matches the norm wherever it was armed.
 - `AS OF <instant>` after the closing bracket asks as at that instant, in the past or now.
-  An instant after the contract's clock is refused (below).
+  An instant after the contract's clock is refused (below; decided by Claude 2026-11-26, pending Meng's review).
 - `MUST` also matches a norm written with `DO`, which fails on the same terms.
+  That is decided by Claude 2026-11-26, pending Meng's review: the check that a pattern matches some norm already took a `MUST` pattern to match a `DO` norm, and a read it passes has to be one that can be answered.
 
 ## Where a read may be written
 
@@ -58,7 +59,8 @@ Written with neither, it is a check error that says so.
 
 A read is answered from the record as it stands when the read is reached, and only as at an instant the contract has reached.
 The contract's clock is the latest instant the run has been at: the event a guard is being checked against, or the latest instant in a norm already recorded.
-An `AS OF` after it asks about what has not happened yet, so it is refused by name and not answered from the part of the record written so far.
+An `AS OF` after it asks about what has not happened yet, so it is refused by name and not answered from the part of the record written so far (decided by Claude 2026-11-26, pending Meng's review: the other way to answer it is as at the clock, which is a different question from the one written).
+The clock is kept for the whole run and after it, so a read made outside any run, after a run in the same directive, is answered from that last run's norms and clock.
 A read written with no `AS OF` in a guard asks at the event's own instant, which is never in the future.
 A rule that holds a read is asked again every time something uses it, so its answer in one guard is never kept for the next.
 To share a read between guards, give the rule the instant it asks at, and pass `THE INSTANT` from each guard, as `pending (THE INSTANT)` below does: a rule cannot reach `THE INSTANT` itself.
@@ -87,6 +89,7 @@ pending t MEANS OUTSTANDING (PARTY _ MUST deliver) AS OF t
 ```
 
 and each guard says `PROVIDED pending (THE INSTANT)`.
+A shared rule may also hold a constant `AS OF`, and is refused wherever the contract has not yet reached that instant when the rule is read.
 
 ## What happens when a read cannot be answered
 
@@ -97,7 +100,7 @@ Loud, each a named error and never a quiet "no":
 - A read inside an operand of `RAND`, `ROR` or `EVERY`.
   The operands run side by side, so what the read saw would depend on which sibling ran first; the check that makes this safe is not built.
   A read written in the operand itself is a check error; one written in a rule the operand uses stops the run when it is reached.
-- An `AS OF` later than the contract's clock, and any read made before a contract has run (a plain `#EVAL` of a read).
+- An `AS OF` later than the contract's clock, and any read made before a contract has run (a plain `#EVAL` of a read): decided by Claude 2026-11-26, pending Meng's review.
 - The wrong number of `_` for the action's fields.
 - Anything but `_` in an argument place, such as `pay 3`: a parse error at that argument, which does not say that only `_` is allowed.
 - A pattern that names an action declared in this module with a modal no norm of the module has: it could never match.
@@ -111,6 +114,7 @@ Silent, because the answer is a plain "no" with nothing to say that it is wrong:
 - **A pattern that names an action an imported module declares** is not checked against that module's norms, so a misspelling of the modal answers "no".
 - **`UNDER LEST` and `UNDER HENCE` are not checked against the module.**
   The check that a pattern matches some norm of the module looks at the modal and the action only, so `UNDER LEST` where no `LEST` ever arms such a norm answers "no" on every trace.
+  That was left as it is by a decision of Claude 2026-11-26, pending Meng's review, because the check needs, for each action, which `LEST` and `HENCE` arm it.
 - **The arguments are not compared.**
   `pay _` asks about every payment, not about a payment of a given amount.
 - **A permission that lapsed counts as a cure** of the failure it repairs, because a `MAY` that is not exercised is not a breach.
@@ -123,7 +127,8 @@ Silent, because the answer is a plain "no" with nothing to say that it is wrong:
 
 L4 keeps the record only for a contract that reads it: running a module that contains a read switches it on.
 A read written in a module that is imported does not switch it on, so the read stops with an error naming it.
-Each contract run in one directive (two `EVALTRACE`s in one `#EVAL`) keeps its own record: a read in the second does not see the first's norms.
+Each contract run in one directive (two `EVALTRACE`s in one `#EVAL`) keeps its own record: a read in the second does not see the first's norms, whether or not the first saw an event.
+A contract run started inside another one (an `EVALTRACE` written in a guard or a `LEST`) is part of the run that holds it: it reads that run's norms and they read its.
 
 ## Where the read has been run
 
