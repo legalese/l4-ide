@@ -1243,7 +1243,9 @@ spec = describe "the norm log writer (NORM-LOG-SPEC, P1)" do
             Nothing -> []
           performed rs i = not (null [ () | e <- fatesOf i rs, e.neFate == FatePerformed, e.neActionHead == Just "pay" ])
           -- does the guard hold at the event of trace 0?
-          holds body = do { rs <- run False (src body); pure (performed rs 0) }
+          -- (and that the run produced a result at all: a guard that cannot be
+          -- answered is an error, not a "no", and the error leaves no result)
+          holds body = do { rs <- run False (src body); length rs `shouldBe` 1; pure (performed rs 0) }
           lestPay g =
             [ "c MEANS"
             , "  PARTY Alice MUST deliver WITHIN 3"
@@ -1262,7 +1264,8 @@ spec = describe "the norm log writer (NORM-LOG-SPEC, P1)" do
         holds (lestPay "EVER FAILED (PARTY Bob MUST deliver)") `shouldReturn` False
         -- deliver was armed from the top level, so under LEST there is none
         holds (lestPay "EVER FAILED (PARTY Alice MUST deliver UNDER LEST)") `shouldReturn` False
-        holds (lestPay "EVER FAILED (PARTY Alice MAY deliver)") `shouldReturn` False
+        -- a MAY read of a norm that is only ever a MUST is a check error (R9), not a run
+        refusals (lestPay "EVER FAILED (PARTY Alice MAY deliver)") `shouldBe` [ReadMatchesNoSite (NormalName "deliver")]
 
       it "R3: AS OF reads the past: a norm performed at 4 was still outstanding as of 2, and not as of 5" do
         let asOf t =
@@ -1447,6 +1450,69 @@ spec = describe "the norm log writer (NORM-LOG-SPEC, P1)" do
         checked own `shouldBe` True
         rs <- run False (src own)
         Text.pack (show (map (.result) rs)) `shouldSatisfy` Text.isInfixOf "only known as written"
+
+      it "R17: a MUST pattern reads a norm written with DO, as the checker already takes it to (review of P2b, B3)" do
+        -- the checker maps DO to MUST when it looks for a site, so a read of
+        -- `MUST deliver` against a DO site passes the check; it must also be
+        -- answered, not false on every trace
+        let doSite g =
+              [ "c MEANS"
+              , "  PARTY Alice DO deliver WITHIN 3"
+              , "  HENCE FULFILLED"
+              , "  LEST (PARTY Alice MUST pay n PROVIDED " <> g <> " WITHIN 10)"
+              , "#TRACE c AT 0 WITH"
+              , "  PARTY Alice DOES pay 1 AT 5"
+              ]
+        checked (doSite "EVER FAILED (PARTY _ MUST deliver)") `shouldBe` True
+        holds (doSite "EVER FAILED (PARTY _ MUST deliver)") `shouldReturn` True
+        holds (doSite "NOT EVER FAILED (PARTY _ MUST deliver)") `shouldReturn` False
+
+      it "R19: a second contract run in one directive does not read the first's norms (review of P2b, B2)" do
+        -- c's delivery fails in the first run; g's guard asks whether any
+        -- delivery ever failed, and g's own run has none
+        let two =
+              [ "c MEANS PARTY Alice MUST deliver WITHIN 3"
+              , "GIVETH DEONTIC Person Action"
+              , "g MEANS PARTY Bob MUST pay n PROVIDED NOT EVER FAILED (PARTY _ MUST deliver) WITHIN 10"
+              , "#EVAL LIST (EVALTRACE c 0 (LIST EVENT Bob (pay 50) 5)), (EVALTRACE g 0 (LIST EVENT Bob (pay 1) 7))"
+              ]
+        checked two `shouldBe` True
+        rs <- run False (src two)
+        length [ () | e <- fatesOf 0 rs, e.neFate == FatePerformed, e.neActionHead == Just "pay" ] `shouldBe` 1
+        length [ () | e <- fatesOf 0 rs, e.neFate == FateArmed, e.neActionHead == Just "deliver" ] `shouldBe` 1
+
+      it "R20: a run named once and used twice is run once, though it holds a read (review of P2b, S2)" do
+        -- the run's value does not depend on the log it read as it ran; a
+        -- force span marked as a read of the log was never cached, so the
+        -- second use ran the contract again and wrote every fate again
+        let twice =
+              [ "c MEANS PARTY Alice MUST deliver PROVIDED OUTSTANDING (PARTY _ MUST deliver) WITHIN 10"
+              , "GIVETH DEONTIC Person Action"
+              , "r MEANS EVALTRACE c 0 (LIST EVENT Alice deliver 2)"
+              , "#EVAL LIST r, r"
+              ]
+        checked twice `shouldBe` True
+        rs <- run False (src twice)
+        length [ () | e <- fatesOf 0 rs, e.neFate == FateArmed, e.neActionHead == Just "deliver" ] `shouldBe` 1
+
+      it "R21: a read behind a rule an operand of RAND uses is refused when it is reached, by name (review of P2b, S1)" do
+        -- the checker refuses a read written inside an operand; one written
+        -- in a rule the operand names was not seen, and answered by whichever
+        -- sibling ran first
+        let behind =
+              [ "a MEANS PARTY Alice MUST pay n PROVIDED helper WITHIN 10"
+              , "GIVETH A BOOLEAN"
+              , "helper MEANS EVER FAILED (PARTY _ MUST deliver) AS OF 0"
+              , "GIVETH DEONTIC Person Action"
+              , "b MEANS PARTY Bob MUST deliver WITHIN 10"
+              , "GIVETH DEONTIC Person Action"
+              , "c MEANS a RAND b"
+              , "#TRACE c AT 0 WITH"
+              , "  PARTY Alice DOES pay 1 AT 1"
+              ]
+        checked behind `shouldBe` True
+        rs <- run False (src behind)
+        Text.pack (show (map (.result) rs)) `shouldSatisfy` Text.isInfixOf "inside an operand of RAND"
 
       it "R8: a module's reads are found from its names, and the pass costs a fraction of one evaluation" do
         let readsLog body = case checkWithImports (vfsFromList []) (src body) of
