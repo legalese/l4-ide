@@ -565,10 +565,18 @@ data ImportedModule = MkImportedModule
   , imClauseMatrixRanges :: ![SrcRange]
     -- ^ 'checkerClauseMatrixRanges' of the imported module's own check
   , imChecks             :: !Bool
-    -- ^ the imported module's own check reported no error. Its errors are not
+    -- ^ @l4 check@ accepts the imported module: it reported no error, and
+    -- neither did any module it imports, directly or not. Its errors are not
     -- the importer's (the importer is told only that the import has errors),
-    -- so a constant there can be typed one way and defined another; such a
-    -- module's constants are never closed (see 'importedConstantPool').
+    -- so a constant there can be typed one way and defined another, and a
+    -- module whose own import has errors is not evaluated by @l4 run@ at all
+    -- (smucclaw/l4-ide#1025), so its constants are no value L4 has. Such a
+    -- module's constants are never closed (see 'importedConstantPool'), all
+    -- of them, even one that reads nothing from the module with the error:
+    -- refusing the whole module is decided by Claude 2026-11-26, pending
+    -- Meng's review, because it is the rule @l4 check@ and @l4 run@ apply.
+    -- The export still exits 0 on an importer that @l4 check@ refuses; that
+    -- is smucclaw/l4-ide#1110, which this does not fix.
   }
 
 -- | The source ranges of the checker's @PatternMatchesMissing@ warnings, for
@@ -4027,10 +4035,15 @@ lowerModule opts modul@(MkModule _ uri _) =
   -- a reference to one without depending on the verdict it feeds; only those
   -- a KEPT decide (or a computed field) reaches are emitted.
   --
-  -- Only a module whose own check reported no error contributes: `l4 check`
-  -- refuses the importer of such a module (import/module-has-errors), so a
+  -- Only a module that `l4 check` accepts contributes ('imChecks'): no error
+  -- of its own, and none in any module it imports. `l4 check` refuses the
+  -- importer of a module with errors (import/module-has-errors), so a
   -- constant from it is no value L4 has, and copying `the rate` defined as a
   -- STRING under a NUMBER signature would carry the string into the model.
+  -- One import further on, a module with no error of its own that imports
+  -- such a module is refused by `l4 check` and not evaluated by `l4 run`, so
+  -- its constants are not copied either (found by the review of this branch,
+  -- 2026-11-26; decided by Claude 2026-11-26, pending Meng's review).
   --
   -- Anything else read from another module (a constant that reads an ASSUME,
   -- law time or an imported constructor, or that comes from a module with

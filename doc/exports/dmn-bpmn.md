@@ -115,7 +115,7 @@ Each copy carries an advisory `D-IMPORTED` note, because the model now holds the
 Everything else read from an imported module is written as L4 text with a Blocking note, which, as the next section says, costs the whole file on both engines (with one exception given there):
 
 - a constant that reads an `ASSUME`, `RULES EFFECTIVE DATE`, or an `IS ONE OF` value the imported module declares, and an imported `ASSUME` read directly;
-- any constant from an imported file that has errors of its own (`l4 check` on your file then reports `import/module-has-errors`);
+- any constant from an imported file that `l4 check` refuses, because it has errors of its own or imports a file that has (`l4 check` on your file then reports `import/module-has-errors`), even a constant that reads nothing from the part with the error; the export still exits 0 on such a file, which is [smucclaw/l4-ide#1110](https://github.com/smucclaw/l4-ide/issues/1110);
 - any function of your own imported module, called or passed.
 
 A copied constant is lowered exactly as it would be in your own file, so one that has no FEEL form there has none here either: a `Date 2024 1 15` constant is written as L4 text with a Blocking note, in your file or in an imported one.

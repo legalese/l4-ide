@@ -169,6 +169,9 @@ exportImportedPartialFixture = fixtureDir </> "export-imported-partial.l4"
 -- A constant read from an imported module that does not type-check.
 exportImportedUncheckedFixture :: FilePath
 exportImportedUncheckedFixture = fixtureDir </> "export-imported-unchecked.l4"
+-- An import with no error of its own that imports one with errors.
+exportImportedHopFixture :: FilePath
+exportImportedHopFixture = fixtureDir </> "export-imported-hop.l4"
 -- Inputs spelled like a FEEL function the export calls.
 -- Raw L4 in a boxed literal and in an input column, beside plain FEEL.
 exportRawL4Fixture, exportRawL4Cases :: FilePath
@@ -861,6 +864,15 @@ spec bin = do
         serr `shouldSatisfy` ("1 blocking" `isInfixOf`)
         sout `shouldSatisfy` (not . ("id=\"decision_the_rate\"" `isInfixOf`))
         sout `shouldSatisfy` (not . ("\"three\"" `isInfixOf`))
+
+      -- One import further on, the module `l4 check` refuses has no error of
+      -- its own. The exit code (0) is smucclaw/l4-ide#1110, not fixed here.
+      it "refuses a constant from an imported module whose own import does not type-check" $ do
+        Output code sout serr <- runL4 bin ["export", "dmn", exportImportedHopFixture, "--fidelity-report"]
+        code `shouldBe` ExitSuccess
+        serr `shouldSatisfy` ("[D-LITERALEXPR] blocking — decision_pay2" `isInfixOf`)
+        serr `shouldSatisfy` (not . ("D-IMPORTED" `isInfixOf`))
+        sout `shouldSatisfy` (not . ("id=\"decision_clean\"" `isInfixOf`))
 
     -- FIXTURE(d)'s importer view must see a BACKTICKED import. A hyphenated
     -- module name can only be imported as IMPORT `interp-common`, and the

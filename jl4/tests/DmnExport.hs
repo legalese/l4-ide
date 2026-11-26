@@ -40,7 +40,8 @@ import L4.Dmn.Lower
   , checkerMissingMatchRanges, lowerModule, moduleTitle, resolveMaybePredicates )
 import L4.Dmn.Markdown (emitMarkdown, markdownReport)
 import L4.EvaluateLazy.Exceptions (UserEvalException (..))
-import L4.Import.Resolution (ResolvedImport (..))
+import L4.Import.Resolution (ResolvedImport (..), extractImportNames)
+import qualified Base.Map as Map
 import L4.Interchange.Fidelity
 import L4.Syntax (Module, Resolved)
 import qualified L4.TypeCheck as TC
@@ -4139,6 +4140,41 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
       notesCoded "D-IMPORTED" unchecked `shouldBe` []
       blockingOf unchecked `shouldSatisfy` (not . null)
 
+    -- One import further on: `hop` has no error of its own, but it imports
+    -- `rates`, so `l4 check` refuses `hop` and `l4 run` evaluates nothing in
+    -- it. Its `clean` reads nothing from `rates` and is still not copied: the
+    -- whole module is refused (decided by Claude 2026-11-26, pending Meng's
+    -- review).
+    it "does not copy a constant from an imported module whose own import does not type-check" $ do
+      let unchecked = drgGeneral
+                        (vfsFromList
+                          [ ("rates", "GIVETH A NUMBER\n`the rate` MEANS \"three\"\n")
+                          , ("hop", "IMPORT rates\nGIVETH A NUMBER\n`clean` MEANS 5\n")
+                          ])
+                        id defaultDmnFlavor (const "Test")
+                        "IMPORT hop\n\
+                        \GIVEN h IS A NUMBER\n\
+                        \GIVETH A NUMBER\n\
+                        \DECIDE `pay` h IS h TIMES `clean`\n"
+      [d.dcnName | d <- drgDecisions unchecked] `shouldBe` ["pay"]
+      (literalOf "pay" unchecked).feFragment `shouldBe` L4Verbatim
+      notesCoded "D-IMPORTED" unchecked `shouldBe` []
+      blockingOf unchecked `shouldSatisfy` (not . null)
+
+    it "still copies a constant from an imported module whose imports all type-check" $ do
+      let checked = drgGeneral
+                        (vfsFromList
+                          [ ("rates", "GIVETH A NUMBER\n`the rate` MEANS 3\n")
+                          , ("hop", "IMPORT rates\nGIVETH A NUMBER\n`clean` MEANS 5\n")
+                          ])
+                        id defaultDmnFlavor (const "Test")
+                        "IMPORT hop\n\
+                        \GIVEN h IS A NUMBER\n\
+                        \GIVETH A NUMBER\n\
+                        \DECIDE `pay` h IS h TIMES `clean`\n"
+      [d.dcnName | d <- drgDecisions checked] `shouldMatchList` ["pay", "clean"]
+      blockingOf checked `shouldBe` []
+
     it "passes a copied constant into a BKM that reads it" $ do
       let drg = drgImp $ importing
             "GIVEN y IS A NUMBER\n\
@@ -4883,8 +4919,7 @@ drgGeneral vfs adjust flavor mkName src = case checkWithImports vfs src of
                         , imSubstitution       = ri.riTypeChecked.substitution
                         , imMissingMatchRanges = checkerMissingMatchRanges ri.riTypeChecked.errors
                         , imClauseMatrixRanges = checkerClauseMatrixRanges ri.riTypeChecked.errors
-                        , imChecks             =
-                            not (any ((== SError) . TC.severity) ri.riTypeChecked.errors)
+                        , imChecks             = importAccepted tc.tcdResolvedImports ri.riModuleName
                         }
                     | ri <- tc.tcdResolvedImports
                     ]
@@ -4895,6 +4930,20 @@ drgGeneral vfs adjust flavor mkName src = case checkWithImports vfs src of
                 }
           )
           tc.tcdModule
+
+-- | The harness's 'imChecks', as the CLI's is @Rules.evaluable@: the module
+-- named reported no error, and neither did any module it imports, directly or
+-- not. The API pipeline resolves every import or fails, and refuses a cycle,
+-- so each name imported is in the list and the walk ends.
+importAccepted :: [ResolvedImport] -> Text -> Bool
+importAccepted ris = ok
+ where
+  byName = Map.fromList [(ri.riModuleName, ri) | ri <- ris]
+  ok name = case Map.lookup name byName of
+    Nothing -> False
+    Just ri ->
+      not (any ((== SError) . TC.severity) ri.riTypeChecked.errors)
+        && all ok (extractImportNames ri.riParsed)
 
 -- | Phase 4 fixtures: the default lowering with an options adjuster.
 drgAdjusted :: (DmnLowerOptions -> DmnLowerOptions) -> Text -> Drg

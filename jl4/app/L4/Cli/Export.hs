@@ -475,13 +475,17 @@ dmnDrgFor opts tcRes = do
             -- each (the same walk `l4 export catala` takes), so a closed
             -- imported constant can be carried into the model as a decision,
             -- and certified with the checker's facts about its own module.
+            -- 'imChecks' is 'Rules.evaluable', the verdict `l4 check` gives
+            -- that module: it type-checks, and so does every module it
+            -- imports, directly or not. A module with no error of its own
+            -- that imports one with errors is refused too.
             , dloImportedModules =
                 [ MkImportedModule
                     { imModule             = dep.module'
                     , imSubstitution       = dep.substitution
                     , imMissingMatchRanges = checkerMissingMatchRanges dep.infos
                     , imClauseMatrixRanges = checkerClauseMatrixRanges dep.infos
-                    , imChecks             = dep.success
+                    , imChecks             = Rules.evaluable dep
                     }
                 | dep <- Rules.transitiveDependencies tcRes
                 ]
