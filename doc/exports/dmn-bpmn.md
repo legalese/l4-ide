@@ -103,7 +103,8 @@ L4 lets you use a type before you declare it, but KIE does not load a model in w
 A record that refers to itself, or two records that refer to each other, is written in your order: KIE 8.44 and Camunda 8.7.6 both load and run such a model, measured on `jl4/examples/dmn/itemdef-order.l4`.
 No other engine has been checked.
 
-**Names.** Every element keeps your L4 name in its `label`, and its `name`, the one FEEL uses and the one an engine's input keys must match, is written in letters, digits and underscores.
+**Names.** Each element's `name`, the one FEEL uses and the one an engine's input keys must match, is written in ASCII letters, digits and underscores: every other character, a space or an accented letter alike, becomes an underscore, and a run of them becomes one, so `two words` is `two_words` and `Größe` is `Gr_e`.
+An element whose `name` had to change keeps your L4 name in its `label`; one whose L4 name needed no change, such as `plain`, has no `label`.
 A name that FEEL reserves gets an underscore on the end: its keywords, such as `in`, `date` and `list`, and the functions the export calls, `floor`, `ceiling`, `decimal`, `sum`, `count`, `min`, `max`, `concatenate` and `modulo`.
 So an input `GIVEN floor IS A NUMBER` is the input `floor_`, and a case must supply `floor_`.
 The functions are reserved because FEEL looks a function's name up among the variables first: left as `floor`, the input hid the function, and KIE 8.44 failed each decision that called a function hidden this way (Camunda 8.7.6 did not), measured on `jl4/tests-cli/fixtures/export-shadowed-builtins.l4`.
