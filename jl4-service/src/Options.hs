@@ -352,10 +352,11 @@ hostFromEnv = \case
   Just host | not (null host) -> Text.pack host
   _ -> "*"
 
--- | The value of @--host@ on the command line. An empty one is refused: Warp
--- reads it as every interface, so a script that meant @--host "$ADDRESS"@ to
--- keep the service on one address would, with @ADDRESS@ unset, expose it on
--- all of them without a word.
+-- | The value of @--host@ on the command line. An empty one is refused: on
+-- macOS (measured with @lsof@, 2026-11-26; not measured elsewhere) it listened
+-- on every interface, so a script that meant @--host "$ADDRESS"@ to keep the
+-- service on one address would, with @ADDRESS@ unset, expose it on all of them
+-- without a word.
 hostArgument :: String -> Either String Text
 hostArgument "" = Left "--host needs an address; write * for every interface"
 hostArgument host = Right (Text.pack host)

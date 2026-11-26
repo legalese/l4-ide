@@ -867,7 +867,7 @@ Each capability also costs memory: measured on 2026-10-02, the idle service used
 By default the service accepts connections on every network interface of the machine, as it did before `--host` existed.
 That is what a deployment that other machines call wants, and it is the default so that no deployment changes.
 A service that only this machine should reach, such as a test, a probe or a local demo, should say so with `--host 127.0.0.1`: other machines then cannot connect to it.
-The repository's own gate starts the service this way in `etc/probe-service-restart.mjs`.
+The repository's own gate starts the service this way in `etc/probe-service-restart.mjs`, and starts a binary that has no `--host` without it, with a warning.
 
 The value is handed to Warp's `setHost` as written, so `*` means every interface and anything else is an address or a host name to bind.
 Prefer the literal address to a name.

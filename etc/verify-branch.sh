@@ -35,6 +35,9 @@
 #   (b) jl4-service/: the same calls before and after a restart, with the
 #       service listening on 127.0.0.1 only (etc/probe-service-restart.mjs).
 #       FAIL on any difference, or if the service answers outside loopback.
+#       A `WARN:` line from the probe (a binary without --host, or a machine
+#       with no non-loopback IPv4 address: the listener was not checked) does
+#       not fail the step, and is copied into the summary.
 #   (c) jl4/tests-cli/: new assertions comparing output without dropping '\r'
 #       (etc/probe-cli-crlf.mjs). WARN only: it reads text, not behaviour.
 #

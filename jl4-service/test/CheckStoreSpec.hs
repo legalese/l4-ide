@@ -294,7 +294,7 @@ spec = describe "jl4-service --check-store" do
       it "takes the address to listen on" do
         hostFor Nothing ["--host", "127.0.0.1"] `shouldReturn` Just "127.0.0.1"
 
-      it "refuses an empty --host, which Warp would read as every interface" do
+      it "refuses an empty --host, which listened on every interface on macOS" do
         info <- buildOpts
         let refused = case parseOptionsPure "jl4-service" info ["--host", ""] of
               Left (Right (message, code)) ->

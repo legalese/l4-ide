@@ -51,9 +51,9 @@
 //                      on a machine with no address to try, or on a binary
 //                      without `--host`.
 //
-//   Exit 0: same answers, and no answer from outside loopback. 1: an answer
-//   differs, or the service answered outside loopback. 2: the probe could not
-//   run.
+//   Exit 0: same answers, and either no answer from outside loopback or a
+//   `WARN:` line saying the listener was not checked. 1: an answer differs, or
+//   the service answered outside loopback. 2: the probe could not run.
 //   Needs `zip` on PATH.
 
 import { spawn, spawnSync } from "node:child_process";
@@ -108,10 +108,17 @@ const log = join(dir, "service.log");
 // Does this binary have --host? One built before the option exits on it.
 function knowsHost() {
   const r = spawnSync(bin, ["--help"], { encoding: "utf8", timeout: 30000 });
-  if (r.error || r.status !== 0)
+  if (r.error || r.status !== 0) {
+    const why = r.error
+      ? String(r.error)
+      : r.signal
+        ? `killed by ${r.signal}`
+        : `exit ${r.status}`;
+    const said = `${r.stderr ?? ""}`.trim().split("\n").slice(-3).join(" | ");
     die(
-      `could not run \`${bin} --help\` to see whether it has --host: ${r.error ?? `exit ${r.status}`}`,
+      `could not run \`${bin} --help\` to see whether it has --host: ${why}${said ? ` (${said})` : ""}`,
     );
+  }
   return /--host\b/.test(`${r.stdout}${r.stderr}`);
 }
 
