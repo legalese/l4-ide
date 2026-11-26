@@ -247,9 +247,9 @@ not table-shaped. Separate change, separate spec.
 
 ## 9. Reading through calls to other rules (2026-09-29)
 
-**What prompted it.** Textbook diagrams of the Penal Code — Woon's _Essential Criminal Law_ — end in an arrow: `[conditions] → not murder by reason of sudden fight`.
+**What prompted it.** A Penal Code exception is an implication from its conditions to a negative: s 300 Exception 4 says culpable homicide is not murder if it is committed without premeditation in a sudden fight in the heat of passion upon a sudden quarrel, and without the offender taking undue advantage or acting in a cruel or unusual manner, which reads `[conditions] → not murder by reason of sudden fight`.
 The encoding carries that as a separate rule (`` `Exception 4 to section 300 applies` ``) that the offence calls as a defeater.
-The diagram's arrow is then a property of the encoding — the exception applying and the offence being made out never hold together — and `l4 verify` could not check it, because a call to another rule was an opaque leaf.
+The implication is then a property of the encoding — the exception applying and the offence being made out never hold together — and `l4 verify` could not check it, because a call to another rule was an opaque leaf.
 Measured before this change on a two-rule probe: a correct encoding and a deliberately broken one (the offence forgets its exception) both reported **no findings**.
 The tool could not tell them apart.
 Meng's ruling (BETAMAX): substitute through calls, arguments included.

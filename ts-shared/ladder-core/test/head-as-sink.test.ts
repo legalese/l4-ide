@@ -1,10 +1,9 @@
 /** HEAD AS SINK (`ViewSpec.headAsSink`) — the decision's own name as the rightmost node.
  *
- * A Layman Allen normalised diagram names both ends of the run: in Woon, *Essential
- * Criminal Law* ch 8, the robbery figure runs `Offender` at the left margin through the
- * elements to `Commits Robbery` at the right. Our ladder has always drawn both ends as
- * bare power terminals, so the picture stated the antecedent and left the consequent to
- * the caption. This option draws it.
+ * A Layman Allen normalised diagram names both ends of the run: the subject at the left
+ * margin, then the elements, then the consequent at the right. Our ladder has always
+ * drawn both ends as bare power terminals, so the picture stated the antecedent and left
+ * the consequent to the caption. This option draws it.
  *
  * What the tests below are actually defending, in order of how expensive each would be
  * to discover later:
