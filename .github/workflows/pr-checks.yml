@@ -1298,6 +1298,13 @@ jobs:
           restore-keys: |
             dmn-engines-m2-
 
+      # Offline and about 15 s: a stub `mvn`, no network. It is the only thing
+      # that shows the retry passes a transient failure and never turns a
+      # persistent one into a pass, since neither can be made to happen on
+      # demand against the real Central.
+      - name: Selftest, the Maven resolution retry
+        run: etc/mvn-retry.selftest.sh
+
       - name: Drools/KIE 8.44.0.Final
         env:
           KIE_CHECK_REQUIRED: "1"
