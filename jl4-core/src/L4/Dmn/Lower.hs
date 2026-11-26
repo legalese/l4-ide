@@ -3533,12 +3533,16 @@ dmnNote c sev el rng msg lostWhat =
 -- text is a table's defaultOutputEntry and answers null for it, reported as
 -- success. Camunda parses a file whose only such text reads as a FEEL name (a
 -- bare `TBD`, the prelude's refusal, which is not a closed constant and so is
--- not copied), answers the other decisions and null for that one, while KIE
--- refuses the file (`Unknown variable 'TBD'`); that second exception is the
--- one the D-LITERALEXPR and D-NONFEELINPUT notes already give, and was found
--- missing here by the review of this branch (2026-11-26). The consequence
--- this note used to give, a failure "loudly when the rule fires", was not
--- what KIE does: it refuses the file before any rule fires.
+-- not copied), answers the other decisions, and for that one evaluates the
+-- text as a name, while KIE refuses the file (`Unknown variable 'TBD'`); that
+-- second exception is the one the D-LITERALEXPR and D-NONFEELINPUT notes
+-- already give, and was found missing here by the review of this branch
+-- (2026-11-26). Evaluated as a name, the text is not null for certain: a case
+-- that gave another decision's input `TBD` the value "oops" got "oops" for
+-- this decision, and the same case without it got null (found by the review
+-- of this branch, 2026-11-26, and measured again on a boxed literal). The
+-- consequence this note used to give, a failure "loudly when the rule
+-- fires", was not what KIE does: it refuses the file before any rule fires.
 nonFeelOutput :: Text -> Maybe SrcRange -> FeelExpr -> FidelityNote
 nonFeelOutput el rng fe =
   dmnNote "D-NONFEELOUTPUT" Blocking el rng
@@ -3549,7 +3553,8 @@ nonFeelOutput el rng fe =
     \KIE 8.44 to load it, with two exceptions: KIE loads a file whose only such text is a \
     \table's defaultOutputEntry and SILENTLY answers null for that decision, reported as \
     \success, and Camunda parses a file whose only such text reads as a FEEL name, such as \
-    \a bare `TBD`, and answers null for that decision, while KIE still refuses the file"
+    \a bare `TBD`, and answers for that decision whatever the caller supplies under that \
+    \name, null when it supplies nothing, while KIE still refuses the file"
 
 -- | @D-MAYBE-NULL@ (R8-a, R8-b): a @MAYBE τ@ was lowered to τ's own @typeRef@.
 --
@@ -7153,13 +7158,17 @@ lowerModule opts modul@(MkModule _ uri _) =
       -- What the raw L4 costs, measured 2026-11-26 on KIE 8.44.0.Final and
       -- Camunda 8.7.6 (spec §7, the D-LITERALEXPR row): neither engine runs any
       -- decision of a file holding such text, unless the text happens to read
-      -- as a FEEL name (`TBD`), which Camunda parses and answers null for.
+      -- as a FEEL name (`TBD`), which Camunda parses and evaluates as a name:
+      -- null, or what the caller supplies under it (a case giving an input
+      -- `TBD` the value "oops" got "oops" for a decision that `MEANS TBD`;
+      -- found by the review of this branch, 2026-11-26).
       verbatimTail
         | rendered.feFragment == L4Verbatim =
             ". Its body could not be rendered as FEEL, so the emitted text is raw L4 \
             \that NO engine can evaluate, and the whole file goes with it: KIE 8.44 \
             \refuses to load the file, and Camunda 8.7.6 refuses to parse it unless the \
-            \text happens to read as a FEEL name, when it answers null for this decision"
+            \text happens to read as a FEEL name, when it answers for this decision \
+            \whatever the caller supplies under that name, null when it supplies nothing"
         | otherwise = ""
 
     -- D1: the author's reasons, kept IN THE ARTIFACT rather than only in a
