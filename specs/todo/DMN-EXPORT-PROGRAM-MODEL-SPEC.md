@@ -2318,7 +2318,8 @@ some every satisfies instance of between function external date time duration li
    2 named `count`, 3 inputs named `floor`), decided by Claude 2026-11-26, pending Meng's review.
    The first group's words are of two kinds, which the `D-RENAME` note tells apart since the same
    review: FEEL's keywords and literal words (`true` to `external`), and the names of FEEL types or
-   built-in functions (`date`, `time`, `duration`, `list`, `context`), which are not keywords.
+   built-in functions (`date`, `time`, `duration`, `list`, `context`), which are not keywords;
+   telling the two apart is decided by Claude 2026-11-26, pending Meng's review.
 
 **Stage 2 — `uniquifyIn : Scope -> [Text] -> [Text]`** over a stable source-order traversal:
 first claimant keeps the base, the nth gets `base_<n>` for the least free `n ≥ 2`. **Scopes, widened

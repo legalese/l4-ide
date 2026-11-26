@@ -544,7 +544,8 @@ feelTypeNameText = suffixReservedIn reservedFeelTypeNames . foldFeelName
 -- severity, is decided by Claude 2026-11-26, pending Meng's review.
 --
 -- The words of the first group are of two kinds, which the note tells apart
--- ('feelKeywords' and 'feelTypeAndFunctionWords').
+-- ('feelKeywords' and 'feelTypeAndFunctionWords'), decided by Claude
+-- 2026-11-26, pending Meng's review.
 reservedFeelWords :: Set Text
 reservedFeelWords = feelKeywords <> feelTypeAndFunctionWords <> reservedFeelFunctions
 
