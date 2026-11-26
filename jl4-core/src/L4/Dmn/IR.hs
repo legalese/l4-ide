@@ -553,15 +553,23 @@ reservedFeelWords = feelKeywords <> feelTypeAndFunctionWords <> reservedFeelFunc
 -- rest): the first kind of 'reservedFeelWords'.
 feelKeywords :: Set Text
 feelKeywords = Set.fromList
-  [ "true", "false", "null", "and", "or", "not", "if", "then", "else", "for", "in", "return"
+  [ "true", "false", "null", "and", "or", "if", "then", "else", "for", "in", "return"
   , "some", "every", "satisfies", "instance", "of", "between", "function", "external"
   ]
 
 -- | The second kind of 'reservedFeelWords': not keywords, but the names of
--- FEEL types or built-in functions (@date@, @time@ and @duration@ are
+-- FEEL types or built-in functions (@date@, @time@, @duration@ and @not@ are
 -- functions, and @list@ and @context@ types).
+--
+-- @not@ is FEEL's boolean function, which this export itself calls (an L4
+-- @NOT@ is written @not(…)@, and so is a negated unary test), and it was filed
+-- as a keyword until the review of this branch (2026-11-26). It is filed here,
+-- with @date@, which the export also calls, and not in
+-- 'reservedFeelFunctions', whose note says a variable of that name would hide
+-- the function: that was measured for @floor@, @decimal@ and @concatenate@,
+-- and not for @not@. Decided by Claude 2026-11-26, pending Meng's review.
 feelTypeAndFunctionWords :: Set Text
-feelTypeAndFunctionWords = Set.fromList ["date", "time", "duration", "list", "context"]
+feelTypeAndFunctionWords = Set.fromList ["date", "time", "duration", "not", "list", "context"]
 
 -- | The second group of 'reservedFeelWords': the FEEL built-in functions this
 -- exporter calls, which a variable of the same name would hide. Kept apart so

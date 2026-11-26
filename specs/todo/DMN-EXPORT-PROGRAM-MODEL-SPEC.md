@@ -2317,9 +2317,14 @@ some every satisfies instance of between function external date time duration li
    included; the corpus has none of those, and 10 elements in it are renamed (5 decisions named `sum`,
    2 named `count`, 3 inputs named `floor`), decided by Claude 2026-11-26, pending Meng's review.
    The first group's words are of two kinds, which the `D-RENAME` note tells apart since the same
-   review: FEEL's keywords and literal words (`true` to `external`), and the names of FEEL types or
-   built-in functions (`date`, `time`, `duration`, `list`, `context`), which are not keywords;
-   telling the two apart is decided by Claude 2026-11-26, pending Meng's review.
+   review: FEEL's keywords and literal words (`true` to `external`, but for `not`), and the names of
+   FEEL types or built-in functions (`date`, `time`, `duration`, `not`, `list`, `context`), which are
+   not keywords; telling the two apart is decided by Claude 2026-11-26, pending Meng's review.
+   `not` is FEEL's boolean function, which the export itself writes for an L4 `NOT` and a negated
+   unary test; it was filed as a keyword until the review of this branch found it (2026-11-26), and
+   it is filed with `date`, which the export also calls, rather than with the function names above,
+   whose note says a variable of that name hides the function, which was measured for `floor`,
+   `decimal` and `concatenate` and not for `not`; decided by Claude 2026-11-26, pending Meng's review.
 
 **Stage 2 — `uniquifyIn : Scope -> [Text] -> [Text]`** over a stable source-order traversal:
 first claimant keeps the base, the nth gets `base_<n>` for the least free `n ≥ 2`. **Scopes, widened
