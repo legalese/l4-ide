@@ -404,6 +404,8 @@ _Settled 2026-11-22 (decided by Claude, pending Meng's review), before the build
   _Built in P1, and what the review of P1 found (2026-11-23):_ the link is carried as the `Lifecycle` record's fourth unique, a number that keys the log's own table of hand-offs.
   A compound's entry carries the same link as its operands (the `LEST (x RAND y)` case above), and an identity of its own: its site is the place of its first operand that is still an expression (the site the machine already keeps for the compound; none when both operands are values) and its activation counts the times that site was entered, so two compounds in one trace are told apart.
   A continuation defined in an imported module is shared between directives, and carries the key its first evaluation made; the key now carries the evaluation's epoch, and one made by another evaluation is dropped, not read against this evaluation's table (read as it was, it named an unrelated `LEST`'s norm as the parent of a `HENCE` norm).
+  (Since smucclaw/l4-ide#1116 each directive of a file reads an imported module's rules over its own copy of the imports' heap, so a continuation defined in an imported module is no longer shared between the directives of one file, and the first sentence of this paragraph describes the evaluator as it was when P1 was built.
+  The epoch check stays, for any route that evaluates on a heap it keeps.)
   So a norm armed by a shared continuation in a later directive has no parent link.
   N11 rules the norm log per evaluation, like the ledger; the review's control run with the writer off found the same gap in the ledger (a second `#EVAL` of a shared imported residual prints no ledger), so it is inherited from import sharing, not added by the writer.
   The link is not recoverable across evaluations, and the entry says nothing rather than something wrong.
@@ -759,6 +761,7 @@ Each of these is "not built, because", not a gap nobody saw.
   N17 moves barrier members into the step layer, and the instant arrives with it.
 - `observed` goes backwards in log position under `ROR`, whose left side still runs over the whole trace first (§6.1 N3); N17 is the phase that ends it.
 - A parent link made in another evaluation is dropped: a continuation shared from an imported module carries the link of the evaluation that made it, and N11 makes the norm log per evaluation (§6.1 N8).
+  (Between the directives of one file this lapsed with smucclaw/l4-ide#1116: each directive makes an imported residual itself, and the link it carries is its own.)
 - A party the machine never forced is stored as written (`WrittenBearer`), and N7's rule (3) waits for N12's instants.
 
 **What the review of P1 changed (2026-11-23).**
@@ -782,6 +785,7 @@ Kept so that a later editor does not un-change a repair.
   The residual now keeps its parent link and drops the stamp (decided by Claude 2026-11-23, pending Meng's review: the lineage stays, because the residual still descends from the same hand-off).
 - W2c: two identical directives over an imported residual armed the norm at different instants: the re-verifier saw observed 5 in the first directive and 0 in the second; the red run here saw the first (effective 0, observed 5) and stopped at that assertion.
   Both directives now write 0 and 0.
+  (After smucclaw/l4-ide#1116 the second directive makes the residual itself, as the first does, and writes what the first writes (effective 3 and observed 5, then 0 and 0), which is also what the rules written in the file give; `NormLogSpec` W2c pins both.)
 - M1b: the extra corpus's control did not reach a file whose only trace is an imported `#EVAL r`; it follows the import closure now, by text (`runsATrace`), so a file that mentions `TRACE` only in a comment would count as one that runs a trace.
 - The N3 property of every entry covers every directive of a fixture, not only the first.
 - The merge with `unstable` @ `b33800df7` (the work and open-obligation limits of #1075) kept one way to name a compound's place, `unstable`'s `rsite` and its `operandsSite`, and deleted the norm log's own `operandsSite`.

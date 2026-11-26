@@ -1917,10 +1917,15 @@ jl4RulesIn scope evalConfig rootDirectory recorder = do
   -- imports recursed with a growing call stack in the key, so an imported
   -- module, and every #EVAL and #ASSERT in it, was evaluated once per import
   -- path, each time into a heap of its own. Everything above a module now
-  -- shares its one heap, as everything above a module in a chain always did; a
-  -- thunk forced from one importer is forced for all of them. Two importers
-  -- forcing one thunk at once is the case the NOTE above 'evalRef' allows for:
-  -- a thunk is blackholed per thread, so the second thread evaluates it too.
+  -- shares its one heap, as everything above a module in a chain always did.
+  -- It shares it to copy: each directive of an importer evaluates over its own
+  -- copy of the imports' heap ('EvaluateLazy.forEachDirectiveFreshHeap',
+  -- smucclaw\/l4-ide#1116), so a thunk one directive forces is not forced for
+  -- another, of that importer or of any other, and no directive forces the
+  -- shared heap. (Before #1116 it did, and a thunk forced from one importer was
+  -- forced for all of them.) Two threads forcing one thunk at once, which the
+  -- NOTE above 'evalRef' allows for, does not arise between the directives of
+  -- two importers, since each forces a copy.
   define shakeRecorder $ \GetLazyEvaluationDependenciesFile f -> do
     imports <- dependencyImports f
     tcRes   <- use_  SuccessfulTypeCheck f
