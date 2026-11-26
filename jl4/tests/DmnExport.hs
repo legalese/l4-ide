@@ -4059,7 +4059,7 @@ spec examplesRoot = describe "DMN 1.3 export (Track D1)" $ do
 
   -- smucclaw/l4-ide#1102. The export writes one file and no DMN import, so a
   -- reference to a value from another module names nothing in the model: KIE
-  -- refuses the file ("Unknown variable") and Camunda answers null. The
+  -- refuses the file ("Unknown variable"); Camunda takes the caller's value. The
   -- engine-relevant property is that every FEEL name a decision reads is an
   -- element of the model, or else the reference is refused (Blocking), never
   -- rendered as a name. The engine legs are in the CLI suite

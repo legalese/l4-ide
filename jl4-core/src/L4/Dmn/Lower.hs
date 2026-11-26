@@ -262,9 +262,9 @@ data NameEnv = MkNameEnv
     -- A bare reference to a value defined in ANOTHER module that is not an
     -- element of this model (not in 'neVars') has no FEEL name behind it:
     -- rendered as one, it is a variable KIE refuses to compile and Camunda
-    -- answers null for. With this set, such a reference refuses instead
-    -- ('verbatim', Blocking). 'Nothing' for 'renderFeel', which holds an
-    -- expression and no module.
+    -- takes the caller's value of that name, null if none is sent. With this
+    -- set, such a reference refuses instead ('verbatim', Blocking). 'Nothing'
+    -- for 'renderFeel', which holds an expression and no module.
   }
 
 -- | One member of a BKM's λ-lifted closure (§6.2): either a module element
@@ -2062,7 +2062,7 @@ renderFeelIn names ctors oracle top = let (_, txt, frag) = go top in MkFeelExpr 
                    maybe (verbatim e) goIn (inlineBody names (getUnique r) [])
                -- #1102, option 2: a value from another module that is not an
                -- element of this model. Its FEEL name would name nothing (KIE
-               -- refuses the file, Camunda answers null), so it refuses. A
+               -- refuses the file, Camunda takes the caller's value), so it refuses. A
                -- CLOSED imported constant never reaches here: 'lowerModule'
                -- emits it as a decision (option 1), so it is in 'neVars'.
                | foreignUnbound r                             -> verbatim e

@@ -1,8 +1,8 @@
 -- A bare name in a rule's own output entry (Blocking D-NONFEELOUTPUT): the
 -- prelude's TBD is not a closed constant, so it is written as the L4 text
 -- `TBD`, beside a decision that is plain FEEL. KIE 8.44 refuses the file
--- (`Unknown variable 'TBD'`). Camunda 8.7.6 parses it, because the text reads
--- as a FEEL name, answers `pay` and answers null for `banded`.
+-- (`Unknown variable 'TBD'`). Camunda 8.7.6 parses it (the text reads as a
+-- FEEL name), answers `pay`, and gives `banded` the caller's `TBD`: null here.
 IMPORT prelude
 
 GIVEN x IS A NUMBER
