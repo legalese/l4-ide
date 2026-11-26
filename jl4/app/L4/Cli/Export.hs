@@ -482,10 +482,14 @@ dmnDrgFor opts tcRes = do
             -- each (the same walk `l4 export catala` takes), so a closed
             -- imported constant can be carried into the model as a decision,
             -- and certified with the checker's facts about its own module.
-            -- 'imChecks' is 'Rules.evaluable', the verdict `l4 check` gives
-            -- that module: it type-checks, and so does every module it
-            -- imports, directly or not. A module with no error of its own
-            -- that imports one with errors is refused too.
+            -- 'imChecks' is 'Rules.evaluable': the module type-checks, and so
+            -- does every module it imports, directly or not, so a module with
+            -- no error of its own that imports one with errors is refused too.
+            -- `l4 check` asks that of the module's result and also refuses on
+            -- any other blocking diagnostic in its closure ("LSP.L4.BlockingErrors");
+            -- the two kinds probed (a type mismatch, check/implicit-crosses-import)
+            -- fail 'Rules.evaluable' too, but the two are not shown to agree
+            -- in every case.
             , dloImportedModules =
                 [ MkImportedModule
                     { imModule             = dep.module'
