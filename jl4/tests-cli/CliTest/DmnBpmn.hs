@@ -865,7 +865,8 @@ spec bin = do
         serr `shouldSatisfy` ("`floor` is emitted as the FEEL name `floor_`, because `floor` is the name of a FEEL function this export calls" `isInfixOf`)
 
       -- `l4 check` refuses the importer of a module with errors, so a constant
-      -- from one is no value L4 has: it is refused, not copied.
+      -- from one is no value L4 has: it is refused, not copied. The export
+      -- still exits 0 on it; that is smucclaw/l4-ide#1110, not fixed here.
       it "refuses a constant from an imported module that does not type-check, rather than copying it" $ do
         Output code sout serr <- runL4 bin ["export", "dmn", exportImportedUncheckedFixture]
         code `shouldBe` ExitSuccess
