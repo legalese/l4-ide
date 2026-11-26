@@ -1,0 +1,37 @@
+-- The definition half of the second cross-IMPORT pair. See
+-- ok/section-given-import-operand-call.l4, which imports this file.
+--
+-- Two section GIVENs, one with a TYPICALLY default and one without, and rules
+-- that read them, in the shapes an importer can use as an operand: a NUMBER, a
+-- BOOLEAN, a rule with an input of its own, a rule that returns a record, and a
+-- rule that returns a function.
+-- Discharge runs per module, so when THIS file is discharged each of them gains
+-- the section GIVEN it reads as a trailing input.
+
+DECLARE Pair HAS a IS A NUMBER
+                 b IS A NUMBER
+
+§ `Rates`
+    GIVEN rate IS A NUMBER TYPICALLY 3
+
+GIVETH A NUMBER
+`the window` MEANS rate TIMES 10
+
+GIVETH A BOOLEAN
+`is big` MEANS rate GREATER THAN 2
+
+GIVEN k IS A NUMBER
+GIVETH A NUMBER
+`scaled` k MEANS k TIMES rate
+
+GIVETH A Pair
+`the pair` MEANS Pair rate 2
+
+GIVETH A FUNCTION FROM NUMBER TO NUMBER
+`adder` MEANS GIVEN x YIELD x PLUS rate
+
+§ `Unset`
+    GIVEN dflt IS A NUMBER
+
+GIVETH A NUMBER
+`the unset window` MEANS dflt TIMES 10

@@ -1,0 +1,96 @@
+-- An imported rule that reads a section GIVEN, in every position an operand can
+-- take (smucclaw/l4-ide#1115).
+--
+-- `the window` and the rest come from ok/section-given-import-operand-def.l4,
+-- where `rate` is 3 by default, so `the window` is 30. Named here, each is a
+-- closure that has to be applied to that module's own cell before it is a
+-- value. Evaluating `the window` on its own always did that. Used as an
+-- operand it did not: arithmetic and comparison failed with an internal error,
+-- equality said one side was a function, and a list or a record that held it
+-- held the function. In a single file, with the section GIVEN beside the rule,
+-- every line below gives the value written next to it.
+--
+-- Supplying `rate` from here is not possible, as in section-given-import-call.l4:
+-- the imported file's own default is what applies. A rule that reads a section
+-- GIVEN with no default is in ok/section-given-import-operand-unset.l4.
+
+IMPORT `section-given-import-operand-def`
+
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+`bump` x MEANS x PLUS 1
+
+GIVETH A NUMBER
+`mine` MEANS `the window`
+
+GIVETH A NUMBER
+`window plus one` MEANS `the window` PLUS 1
+
+GIVEN f IS A FUNCTION FROM NUMBER AND NUMBER TO Pair
+      p IS A NUMBER
+      q IS A NUMBER
+GIVETH A Pair
+`build` f p q MEANS f p q
+
+GIVEN g IS A FUNCTION FROM NUMBER TO NUMBER
+      v IS A NUMBER
+GIVETH A NUMBER
+`apply to` g v MEANS g v
+
+GIVEN h IS A FUNCTION FROM Pair TO NUMBER
+      p IS A Pair
+GIVETH A NUMBER
+`read with` h p MEANS h p
+
+-- On its own, and wrapped in a rule of this file. Both worked before.
+#EVAL `the window`                                  -- 30
+#EVAL `mine` PLUS 1                                 -- 31
+
+-- The operand inside the body of a rule of this file, which is where it is
+-- usually written.
+#EVAL `window plus one`                             -- 31
+
+-- As an operand of arithmetic.
+#EVAL `the window` PLUS 1                           -- 31
+#EVAL 1 PLUS `the window`                           -- 31
+#EVAL `the window` MINUS 1                          -- 29
+#EVAL `the window` TIMES 2                          -- 60
+#EVAL `the window` DIVIDED BY 2                     -- 15
+
+-- As an operand of a comparison, and of equality.
+#EVAL `the window` > 0                              -- TRUE
+#EVAL `the window` AT LEAST 31                      -- FALSE
+#EVAL `the window` EQUALS 30                        -- TRUE
+#EVAL `is big` EQUALS TRUE                          -- TRUE
+#ASSERT `the window` EQUALS 30
+#ASSERT (`the window` PLUS 1) EQUALS 31
+
+-- With the connectives and IF, which worked before.
+#EVAL `is big` AND TRUE                             -- TRUE
+#EVAL NOT `is big`                                  -- FALSE
+#EVAL IF `is big` THEN 1 ELSE 2                     -- 1
+
+-- Held in a list or a record, and passed to a rule of this file.
+#EVAL LIST `the window`, 1                          -- LIST 30, 1
+#EVAL Pair `the window` 2                           -- Pair OF 30, 2
+#EVAL (Pair `the window` 2)'s a PLUS 1              -- 31
+#EVAL `bump` `the window`                           -- 31
+
+-- Projected from, and matched on.
+#EVAL `the pair`'s a                                -- 3
+#EVAL (`the pair`'s a) PLUS 1                       -- 4
+#EVAL CONSIDER `the window`
+  WHEN 30 THEN "thirty"
+  OTHERWISE "other"                                 -- "thirty"
+
+-- A rule with an input of its own, applied: worked before, and the control.
+-- So are such a rule and a record constructor passed on as values: they are
+-- functions, and must stay functions.
+#EVAL `scaled` 2                                    -- 6
+#EVAL `scaled` 2 PLUS 1                             -- 7
+#EVAL `apply to` `scaled` 2                         -- 6
+#EVAL `build` Pair 1 2                              -- Pair OF 1, 2
+#EVAL `read with` a (Pair 7 8)                      -- 7
+
+-- A rule that returns a function, passed on as one.
+#EVAL `apply to` `adder` 5                          -- 8

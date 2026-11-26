@@ -1,0 +1,23 @@
+-- An imported rule that reads a section GIVEN WITH NO DEFAULT, as an operand
+-- (smucclaw/l4-ide#1115).
+--
+-- `the unset window` comes from ok/section-given-import-operand-def.l4, where
+-- `dflt` has no TYPICALLY. Nothing can supply it, so every line below stops, and
+-- the message is the one a single file gives: the evaluation "needed to know the
+-- value of `dflt`, but it is an assumed term". Used as an operand it used to
+-- stop with an internal error instead, which tells the reader to report a bug in
+-- L4 for a program that is only missing an input.
+
+IMPORT `section-given-import-operand-def`
+
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+`bump` x MEANS x PLUS 1
+
+#EVAL `the unset window`
+#EVAL `the unset window` PLUS 1
+#EVAL 1 PLUS `the unset window`
+#EVAL `the unset window` EQUALS 30
+#EVAL `the unset window` > 0
+#EVAL LIST `the unset window`, 1
+#EVAL `bump` `the unset window`
