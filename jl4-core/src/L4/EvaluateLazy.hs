@@ -1535,7 +1535,9 @@ forEachDirectiveFreshHeap prepare runDirective importsEnv baseEnv m n =
 -- what they import ('LSP.L4.Rules.evaluateOn'). A name outside it is looked up
 -- where the rule was allocated, and reaches the original.
 --
--- (decided by Claude 2026-11-26, pending Meng's review)
+-- Ruled by Meng 2026-11-26 (CLEANSLATE): every @#EVAL@, @#TRACE@ and
+-- jl4-service request reads an imported rule afresh, as it reads the file's
+-- own, with no opt-out for the service (smucclaw/l4-ide#1116).
 freshImportsHeap :: Environment -> Eval Environment
 freshImportsHeap imports
   | Map.null imports = pure imports

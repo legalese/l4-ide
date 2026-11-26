@@ -2235,8 +2235,7 @@ spec = describe "integration" do
           -- time. Until #1116 the imports' heap was one for every request, the
           -- value was kept once worked out, and this request answered. This
           -- pins that a request's outcome does not depend on what an earlier
-          -- one worked out (decided by Claude 2026-11-26, pending Meng's
-          -- review: assumed, not ruled).
+          -- one worked out (ruled by Meng 2026-11-26, CLEANSLATE).
           same <- evalFunction baseUrl mgr "heavy-single" "use-heavy" (call tooMuch)
           statusCode' same `shouldBe` 500
           LBS.toStrict (responseBody same) `shouldSatisfy` BS.isInfixOf "Evaluation resource limit exceeded"
@@ -2247,8 +2246,8 @@ spec = describe "integration" do
       -- worked out. The case that does not fit sits on either side of one that
       -- does and works the imported value out: until #1116 the second of them
       -- answered, the value being kept, and now it is stopped as the first was
-      -- (decided by Claude 2026-11-26, pending Meng's review). At one
-      -- capability the cases run in order.
+      -- (ruled by Meng 2026-11-26, CLEANSLATE). At one capability the cases
+      -- run in order.
       it "stops a case again after another case of the batch has worked the value out, at one capability" do
         withCapabilities 1 $
           withServiceFromSourcesOpts stingy "heavy-batch" sources \baseUrl mgr -> do

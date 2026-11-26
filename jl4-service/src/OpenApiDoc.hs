@@ -441,7 +441,7 @@ batchResponseSchema fn =
                     , "@error" .= typed "string" "Why the case has no answer. Counted in casesIgnored"
                     -- The description of a memory stop was rewritten for smucclaw/l4-ide#1116:
                     -- a request no longer keeps what an earlier one worked out
-                    -- (decided by Claude 2026-11-26, pending Meng's review).
+                    -- (ruled by Meng 2026-11-26, CLEANSLATE).
                     , "@limit" .= Aeson.object
                         [ "type" .= ("string" :: Text)
                         , "enum" .= (["time", "memory"] :: [Text])

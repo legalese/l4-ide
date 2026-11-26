@@ -549,7 +549,7 @@ A `"time"` stop can differ from one attempt to the next, because the time limit 
 A `"memory"` stop does not depend on what earlier requests worked out: a request reads the values defined at the top level of an imported module over a copy of its own, so every case works them out again, and identical cases get the same memory verdict.
 Before smucclaw/l4-ide#1116 was fixed, such a value was computed once and kept across requests on the direct path (the wrapper path runs each request in a session of its own, so it kept nothing between requests), so the first case that needed it paid its time and memory and later cases found it ready; a deployment whose `--max-eval-memory-mb` fitted a case only because an earlier case had worked such a value out now needs a higher limit.
 Measured on 2026-11-26: at `+RTS -N1`, under a 64 MB limit, a batch of a case that does not fit, then one that does, then the first case again came back as `"memory"`, an answer and `"memory"`; before the fix it came back as `"memory"`, an answer and an answer.
-(Decided by Claude 2026-11-26, pending Meng's review: that the service no longer keeps imported values between requests; this paragraph changes with the ruling.)
+(Ruled by Meng 2026-11-26, CLEANSLATE: every `#EVAL`, `#TRACE` and service request reads an imported rule afresh, as it reads the file's own, with no opt-out for the service; smucclaw/l4-ide#1116.)
 The recursion-depth limit is the evaluator's own, fixed at 1,000,000 levels, and it arrives as a plain `@error`, a message that begins `Stack overflow:`, with no `@limit`.
 
 #### How the cases share the cores
