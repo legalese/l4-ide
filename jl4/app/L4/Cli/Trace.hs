@@ -105,7 +105,8 @@ traceCmd opts = do
     Just evalResults -> do
       -- An evaluation stopped at a limit may leave no trace to draw, and
       -- drawing nothing would say nothing: name each stop on the error
-      -- output, and fail (ruled by Meng 2026-11-21, extending L2).
+      -- output, and fail (decided by Claude 2026-11-21, pending Meng's
+      -- review: L2 extension, choice 2).
       let stops = [ Text.unwords (prettyEvalException exc)
                   | r <- evalResults
                   , exc <- case r.result of

@@ -197,7 +197,8 @@ data Budget
     -- work number, set only where the directive collected a trace and
     -- stopped at a number of its own that is not the usual one
     -- ('L4.EvaluateLazy.withTracedWorkNumber'); @Just Nothing@ when the
-    -- usual one sets no limit.
+    -- usual one sets no limit. That number of its own is an amendment,
+    -- decided by Claude 2026-11-21, pending Meng's review.
   | TimeLimit Int
     -- ^ the directive ran longer than the opt-in @--eval-timeout@, in
     -- seconds of wall-clock time. Not deterministic: it depends on the
@@ -230,7 +231,7 @@ stopsTheRun = \ case
 -- was not done because the run had stopped at one, rather than in an error
 -- of the program's own. A command that reads an answer off an evaluation
 -- must not read one off this: it says nothing about the program's answer
--- (ruled by Meng 2026-11-21, extending L2).
+-- (decided by Claude 2026-11-21, pending Meng's review: L2 extension, choice 2).
 isLimitStop :: EvalException -> Bool
 isLimitStop = \ case
   UserEvalException (OverBudget _)     -> True

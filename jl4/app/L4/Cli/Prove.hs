@@ -456,7 +456,7 @@ classify entryUri env outcomes safety mr e = case outcome of
   -- whatever the assertion reads (R-V3: every other way of being stuck stays
   -- Errored), so it is not re-proved.
   -- A limit is not the evaluator's answer: it stopped before it had one
-  -- (ruled by Meng 2026-11-21, extending L2).
+  -- (decided by Claude 2026-11-21, pending Meng's review: L2 extension, choice 2).
   Just (Assertion (Errored exc))
     | isLimitStop exc ->
         Left (Unknown ("the evaluator stopped at a limit before it could decide it: "
