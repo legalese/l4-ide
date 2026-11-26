@@ -200,10 +200,12 @@ withEvalLimits lims cfg = withRunStop (applyEvalLimits lims cfg)
 
 -- | Do a command's work under its configuration's run stop, and when a time
 -- or memory limit stopped the run, say so on the error output, naming the
--- limit and where, and fail, whatever the work's own exit. A command that
+-- limit and where (L2, which Meng extended to every command that evaluates
+-- on 2026-11-21), and fail, whatever the work's own exit. A command that
 -- evaluates many inputs or traces reports each one after the stop as not
 -- evaluated; this is what says why, and makes sure the command does not
--- exit 0 on an answer that was cut short (ruled by Meng 2026-11-21, extending L2).
+-- exit 0 on an answer that was cut short (decided by Claude 2026-11-21,
+-- pending Meng's review: L2 extension, choice 2).
 guardRunStop :: Text -> EvalConfig -> IO a -> IO a
 guardRunStop command cfg work = do
   outcome <- try @ExitCode work

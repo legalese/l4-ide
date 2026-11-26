@@ -230,7 +230,7 @@ stopsTheRun = \ case
 -- was not done because the run had stopped at one, rather than in an error
 -- of the program's own. A command that reads an answer off an evaluation
 -- must not read one off this: it says nothing about the program's answer
--- (ruled by Meng 2026-11-21, extending L2).
+-- (decided by Claude 2026-11-21, pending Meng's review: L2 extension, choice 2).
 isLimitStop :: EvalException -> Bool
 isLimitStop = \ case
   UserEvalException (OverBudget _)     -> True

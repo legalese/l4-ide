@@ -257,8 +257,9 @@ spec bin = describe "limits on one directive (smucclaw/l4-ide#1075)" $ do
       (sout <> serr) `shouldNotSatisfy` ("collects a trace" `isInfixOf`)
 
   -- Ruled by Meng 2026-11-21, extending L2: every other command that evaluates
-  -- counts too, by default, with the same flags; and none of them reads an
-  -- answer off an evaluation a limit stopped.
+  -- counts too, by default, with the same flags. That none of them reads an
+  -- answer off an evaluation a limit stopped is decided by Claude 2026-11-21,
+  -- pending Meng's review (L2 extension, choice 2).
   describe "every command that evaluates (ruled by Meng 2026-11-21, extending L2)" $ do
     it "l4 trace names a directive a count stopped, and fails, where it used to draw nothing and exit 0" $ do
       Output code _ serr <- within bin ["trace", "--max-steps", "1000", neverStops]

@@ -1,8 +1,8 @@
 -- Ruled by Meng 2026-11-21, extending L2 (smucclaw/l4-ide#1075): l4 coverage counts. The
 -- decision's condition applies two functions at each input, so under
 -- --max-steps 1 every input it tries stops at the limit, and the decision
--- is not covered, with the stop as the reason; a stopped input is never
--- read as one at which the condition raises.
+-- is not covered, with the stop as the reason, and a stopped input is never
+-- read as one at which the condition raises (both decided by Claude 2026-11-21, pending Meng's review: L2 extension, choice 2).
 GIVEN n IS A NUMBER
 GIVETH A NUMBER
 `double` n MEANS n PLUS n
