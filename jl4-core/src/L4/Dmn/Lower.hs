@@ -2063,7 +2063,7 @@ renderFeelIn names ctors oracle top = let (_, txt, frag) = go top in MkFeelExpr 
                -- A BARE reference to an emitted BKM (§6.3-2): a BKM is an
                -- invocable, not a variable, and its FEEL name no longer names
                -- a decision variable — rendering it bare would be valid-looking
-               -- FEEL that KIE refuses and Camunda nulls. Verbatim, Blocking.
+               -- FEEL that Camunda evaluates as a name (unmeasured). Verbatim, Blocking.
                | Map.member (getUnique r) names.neBkms        -> verbatim e
                -- #936 Gap 2. Under a quantifier binder, a BARE reference to a
                -- decide the binder shadows names a GLOBAL decision computed
