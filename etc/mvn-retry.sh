@@ -21,12 +21,21 @@
 # changed nothing in the engines was ejected from the merge queue.
 #
 # WHAT IT DOES. Up to L4_MVN_ATTEMPTS attempts (default 3). Each attempt has a
-# hard timeout, L4_MVN_ATTEMPT_TIMEOUT seconds (default 180; a normal cold
-# resolve takes about 18 s, so a hung Central costs one timeout and not the
-# job). Between attempts it sleeps for the next number in L4_MVN_BACKOFFS
+# hard timeout, L4_MVN_ATTEMPT_TIMEOUT seconds (default 120). Between attempts
+# it sleeps for the next number in L4_MVN_BACKOFFS
 # (default "10 30"; the last number is reused if there are more retries than
 # numbers). Every failed attempt prints one line on stderr naming the attempt
 # and why, then the last lines of Maven's output.
+#
+# WHY 120 s: decided by Claude 2026-11-27, pending Meng's review. A normal cold
+# resolve is 18-25 s in the merge-group logs of 2026-11-26 (a KIE resolve plus
+# its check), so 120 s is about five times that. A killed attempt keeps what it
+# had downloaded (measured: killed at 3 s, it left 114 files in the local
+# repository and no classpath file), so the next attempt does not start from
+# nothing. An exhausted resolve takes 3 x 120 + 40 = 400 s, about the 6.5
+# minutes the failed resolve of 2026-11-26 took; 180 s would have been 580 s.
+# Raise L4_MVN_ATTEMPT_TIMEOUT on a slow link; a resolve that needs more than
+# 120 s on every attempt will fail where it would have passed with no timeout.
 #
 # HOW IT FAILS, sorted by whether it announces itself.
 #   LOUD:   every attempt failing. The function returns non-zero (124 if the
@@ -109,10 +118,10 @@ mvn_retry() {
   local label="$1" log="$2"
   shift 2
   local attempts="${L4_MVN_ATTEMPTS:-3}"
-  local tmo="${L4_MVN_ATTEMPT_TIMEOUT:-180}"
+  local tmo="${L4_MVN_ATTEMPT_TIMEOUT:-120}"
   local backoffs="${L4_MVN_BACKOFFS:-10 30}"
   case "$attempts" in '' | *[!0-9]* | 0) attempts=3 ;; esac
-  case "$tmo" in '' | *[!0-9]* | 0) tmo=180 ;; esac
+  case "$tmo" in '' | *[!0-9]* | 0) tmo=120 ;; esac
 
   local n=1 rc flag why delay
   while :; do
