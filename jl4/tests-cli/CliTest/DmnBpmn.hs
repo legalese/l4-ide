@@ -5,6 +5,7 @@
 module CliTest.DmnBpmn (spec, fixtures) where
 
 import Control.Monad (forM_, unless, when)
+import qualified Data.ByteString.Char8 as BS8
 import Data.List (isInfixOf, sort)
 import System.Directory
   ( copyFile
@@ -815,6 +816,23 @@ spec bin = do
           createDirectoryIfMissing True libCopy
           files <- filter ((== ".l4") . takeExtension) <$> listDirectory libSrc
           forM_ files \f -> copyFile (libSrc </> f) (libCopy </> f)
+          Output code sout _ <- runL4WithEnv (Just (("JL4_LIBRARY_PATH", libCopy) : env)) bin
+            ["export", "dmn", exportPreludeCallsFixture]
+          code `shouldBe` ExitSuccess
+          forM_ preludeCallForms \form -> sout `shouldSatisfy` (form `isInfixOf`)
+
+        -- A Windows checkout can write the libraries with CRLF line endings.
+        it "lowers them as the library's from a copy of the libraries with CRLF line endings" $ do
+          env <- envWithout
+          tmp <- getTemporaryDirectory
+          let libCopy = tmp </> "l4-dmn-library-crlf"
+              libSrc  = ".." </> "jl4-core" </> "libraries"
+          removePathForcibly libCopy
+          createDirectoryIfMissing True libCopy
+          files <- filter ((== ".l4") . takeExtension) <$> listDirectory libSrc
+          forM_ files \f -> do
+            src <- BS8.readFile (libSrc </> f)
+            BS8.writeFile (libCopy </> f) (BS8.intercalate (BS8.pack "\r\n") (BS8.split '\n' src))
           Output code sout _ <- runL4WithEnv (Just (("JL4_LIBRARY_PATH", libCopy) : env)) bin
             ["export", "dmn", exportPreludeCallsFixture]
           code `shouldBe` ExitSuccess
