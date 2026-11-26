@@ -73,7 +73,7 @@ fixtures =
   <> [ sections </> f | f <- ["sectioned.l4", "two-sections.l4"] ]
   <> [ deadlines </> f | f <- ["shapes.l4", "given.l4", "carried.l4", "armed.l4", "ledger.l4", "called.l4", "section-given.l4", "section-reader.l4", "clock.l4", "locals.l4", "slow.l4", "dated.l4"] ]
   <> [ keptAnswers </> f | f <- ["positional.l4", "named.l4", "genitive.l4", "wrapper.l4"] ]
-  <> [ imported </> f | f <- ["readers.l4", "deadlines.l4", "kept.l4", "property.l4"] ]
+  <> [ imported </> f | f <- ["readers.l4", "deadlines.l4", "kept.l4", "property.l4", "taken.l4", "taken-via.l4", "hop1.l4", "hop2.l4", "section-act.l4", "replay.l4"] ]
   <> [ propertyReaders </> f | f <- ["positional.l4", "with.l4", "genitive.l4"] ]
   <> [ actions </> f | f <- ["section-given.l4", "section-party.l4", "local-function.l4"] ]
 
@@ -1076,6 +1076,18 @@ spec bin = describe "l4 explore" $ do
           Output rcode rout _ <- runL4 bin (["run", imported </> f] <> now)
           rcode `shouldBe` ExitSuccess
           rout `shouldSatisfy` ("PARTY Bob MAY buy PROVIDED (NOT `taken now`) WITHIN 9 HENCE" `isInfixOf`)
+
+    -- the counterexample replay ("L4.Lts.Explore.Check") has its own copy of
+    -- the imported constant too: on one shared copy the second property's
+    -- replay reads the first one's answer, whichever is checked first
+    it "explore-imported/replay.l4: each counterexample replays with its own copy of an imported constant that reads a ledger" $
+      forM_ [("nothing seen", "never seen false"), ("never seen false", "nothing seen")] \ (p1, p2) -> do
+        Output code out _ <- runL4 bin ["explore", imported </> "replay.l4", "--contract", "start", "--always", p1, "--always", p2, "--fixed-now", "2025-01-31T15:45:30Z"]
+        code `shouldBe` ExitFailure 4
+        out `shouldSatisfy` ("Checks (2): 2 violated" `isInfixOf`)
+        out `shouldSatisfy` ("always `nothing seen`: violated after 2 events (state s6)" `isInfixOf`)
+        out `shouldSatisfy` ("always `never seen false`: violated after 2 events (state s4)" `isInfixOf`)
+        out `shouldNotSatisfy` ("did not replay" `isInfixOf`)
 
     forM_
       [ ("ledger duty","the WITHIN reads `recorded period`, which reads a ledger, so it is worked out only in a run and its deadline is not known here")
