@@ -2197,7 +2197,9 @@ spec = describe "integration" do
     -- smucclaw/l4-ide#1020. A limit hit while forcing an imported value left
     -- the forcing thread's mark on the value's thunk, which outlives the
     -- request; the next request on the same thread then met its own mark and
-    -- reported "Infinite loop detected".
+    -- reported "Infinite loop detected". Since #1116 a request forces a copy
+    -- of the imported value, so the mark lands on the copy; the examples stay
+    -- as the guard of the unwinding.
     describe "a limit hit inside an imported value" do
       let stingy = testOptions { maxEvalMemoryMb = 64, evalTimeout = 60 }
           sources = [("heavy_lib.l4", heavyLibJL4), ("heavy_main.l4", heavyMainJL4)]
@@ -2214,10 +2216,18 @@ spec = describe "integration" do
           again <- evalFunction baseUrl mgr "heavy-single" "use-heavy" (call 0)
           LBS.toStrict (responseBody again) `shouldSatisfy` (not . BS.isInfixOf loopMessage)
           assertSuccess again \r -> Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool True)
-          -- the hit above landed inside the imported value: once it is worked
-          -- out and kept, the same 47 MB of the case's own steps fit
-          cached <- evalFunction baseUrl mgr "heavy-single" "use-heavy" (call tooMuch)
-          assertSuccess cached \r -> Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool True)
+          -- the hit above landed inside the imported value, and so did the work
+          -- of `again`: each request reads the imports' rules over a copy of its
+          -- own (smucclaw/l4-ide#1116), so the value is worked out again and the
+          -- same 47 MB of the case's own steps still do not fit, as the first
+          -- time. Until #1116 the imports' heap was one for every request, the
+          -- value was kept once worked out, and this request answered. This
+          -- pins that a request's outcome does not depend on what an earlier
+          -- one worked out (decided by Claude 2026-11-26, pending Meng's
+          -- review: assumed, not ruled).
+          same <- evalFunction baseUrl mgr "heavy-single" "use-heavy" (call tooMuch)
+          statusCode' same `shouldBe` 500
+          LBS.toStrict (responseBody same) `shouldSatisfy` BS.isInfixOf "Evaluation resource limit exceeded"
 
       it "does not spoil the next evaluation on a new connection, or a batch case" do
         withServiceFromSourcesOpts stingy "heavy-new" sources \baseUrl mgr -> do
