@@ -1460,7 +1460,9 @@ evalModuleAndDirectivesWith runDirective env m = do
 --     and forces only that; the originals stay as they were allocated, unforced.
 --   * 'evalModule' forces nothing (it only allocates References and writes
 --     thunks), so re-running it per directive is side-effect-free except for heap
---     allocation and supply/address bumps; pure CAFs simply recompute (cheap).
+--     allocation and supply/address bumps. A constant is worked out again by
+--     each directive that reads it, at whatever it costs, imported or not:
+--     the price of a constant grows with the number of directives that read it.
 --   * 'nfDirective' still wraps each evaluation in 'withFreshLedger', so ledger
 --     isolation is unchanged.
 --
