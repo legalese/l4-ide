@@ -894,7 +894,7 @@ A scan of the first half's Haskell diff for any other literal of nine or more di
 
 ### 6.5 What P2's second half builds: the read as written (N4b, option A as a fallback; decided by Claude 2026-11-24, pending Meng's review)
 
-**Status, 2026-11-24: built on the branch `feat/norm-log-read-syntax` and gated on `lhs` (the figures are under "What the gate measured"); awaiting the independent review; not pushed, not landed.**
+**Status, 2026-11-26: built on the branch `feat/norm-log-read-syntax`; an independent review of it on 2026-11-26 found three blockers, six faults to fix and six nits, and the branch fixes or answers each (see "What the independent review of 2026-11-26 found"); gated on `lhs` before the review and again after it (the figures are under "What the gate measured" and "What the gate measured again"); not landed.**
 Nothing in this section is in `unstable`, and a sentence below that says what the read does describes what that branch does, not what a released `l4` does.
 A claim below is checked by the test or command named beside it, or is listed as not checked.
 
@@ -918,7 +918,10 @@ CURED BY REPARATION  (PARTY _ MUST `pay` _ _ UNDER HENCE)
 2. **A phrase is true when any matching norm is in that state.**
    A pattern may match more than one norm (every `MUST` of a constructor in the module); the read is true if one of them is.
    A pattern that matches no norm site is a check error, because the answer "no" would be a wrong answer with exit 0.
+   A `MUST` pattern matches a norm written with `DO` as well, which the checker took it to do and the reader did not (review, B3, test R17).
    The check is exact only for an action constructor declared in the module being checked (test R9); a pattern that names a constructor declared in an imported module is not checked and answers "no" for every trace if it matches nothing (listed under "Not built").
+   `UNDER LEST` and `UNDER HENCE` are not part of that check (review, S3): the check looks at the modal and the action only, so `UNDER LEST` on an action that no `LEST` of the module arms answers "no" on every trace and passes.
+   The corpus file `jl4/examples/ok/norm-log/read-fates.l4` holds one, `under lest only`: its `deliver` is a root norm, and its golden shows the guard false (`tests/read-fates.golden`, the `FATE armed MUST pay fee` that is never performed).
 3. **A bare pattern matches every branch.**
    `UNDER LEST` narrows it to the norms armed by a `LEST`, `UNDER HENCE` to those armed by a `HENCE`.
 4. **Four phrases, and nothing else.**
@@ -938,8 +941,11 @@ CURED BY REPARATION  (PARTY _ MUST `pay` _ _ UNDER HENCE)
   `CURED BY REPARATION` was never an application, because `BY` is a keyword.
 - Where a read may stand: inside a `PROVIDED` (its instant is then `THE INSTANT`), or anywhere with an explicit `AS OF`.
   A read with neither has no instant, and is a check error saying so.
+- An `AS OF` later than the contract's clock is refused when the read is reached, by name (review, B1; decided by Claude 2026-11-26, pending Meng's review; see below).
+  A read made before any contract has run is refused the same way.
 - A read inside an operand of a `RAND`, `ROR` or `EVERY` is a check error until the sibling check of N10, N19 and N20 is built (P5 and P6): the read could see a sibling's fate written before or after it, which is the order dependence those rulings forbid.
   It is the loud fallback of the P2 design, and it means the how-to's library example, which reads a fate beside `RAND` siblings, cannot be written yet.
+  A read written in a rule that an operand uses is not seen by the checker: it is refused when it is reached, by name (review, S1, test R21).
 - The bearer: `PARTY _` matches every norm; `PARTY name` is compared with the entry's party by the machine's own party key.
   An entry whose party the machine never forced refuses the read by name (N7 rule 4) until rule (3) is built, so `OUTSTANDING (PARTY x ...)` refuses on a norm that is still outstanding and has not been performed by anyone; this is the known cost of leaving rule (3) for its own step.
 - A read is answered from the log as it stands when the read is reached, and two things make that true that were not at first (found by the shared-thunk probe, below): a thunk that holds a read is forced again at each use (`CtxReads` gains `crNormRead`, which vetoes `validFor`), and a read first writes what the writer holds back, forcing the arming clock of any entry still waiting for it (`readNormForcing`, one frame per clock; R14 needs the writing and R16 the forcing).
@@ -948,6 +954,10 @@ CURED BY REPARATION  (PARTY _ MUST `pay` _ _ UNDER HENCE)
 - The writer is switched on when the module being run contains a read.
   A read in an imported module does not switch it on, and a read reached with the writer off is a run-time error that names the phrase ("ran with the norm log switched off"; test R10), never an answer from an empty log.
   The error does not name the site: `finishNormRead` takes the site and does not use it.
+- Each contract run keeps its own record (review, B2, test R19).
+  A run starts where a contract value is applied to its time and its events (`beginNormRun`, in the `App1` arm of the machine), and a read sees only the norms written since the run began; `EndNormRun` closes it.
+  Two `EVALTRACE`s in one `#EVAL` therefore do not read each other's norms, though the directive has one ledger.
+  The run bookkeeping (a frame, `EndNormRun`, and three references in `DeonticLog`: `dlHorizon`, `dlRunDepth`, `dlRunStart`) does nothing unless the writer is on, so a module with no read pays nothing; what it costs a module with a read is under "What the run boundary costs".
 
 **What the shared-thunk probe found: two silent wrong answers, both fixed on this branch.**
 The probe was written as a test of this step, and it was red twice.
@@ -967,6 +977,8 @@ It did not fail where I first expected, and I read the run's own output before s
 
 Each fix is its own commit, with its test red first: R12 expected 2 performed payments and got 1, and R14 expected 1 performed delivery and got 0, at the commit that added them, before either fix.
 R14 was written first and I took it for the test of the forcing; the gate's mutant that removes the forcing survived it, and every other test, so R16 was written for it (below).
+After the review (B1, below) R12 no longer uses a constant `AS OF 20`, which is a later instant than the contract's clock and is refused.
+A rule cannot reach `THE INSTANT` (it is bound in a guard's environment, `Contract9`), so the shared read takes the instant as an input: `pending t MEANS ... AS OF t`, and each guard says `PROVIDED pending (THE INSTANT)`.
 The probe reaches a thunk that a guard names.
 A read reached some other way, such as a function argument forced once and used twice, goes through the same `finishNormRead` and the same veto, and is not tested separately.
 
@@ -1024,18 +1036,131 @@ Its own comment records what was measured when it was written: a walk over every
 A read walks the writer's list of `Armed` entries that still wait for a clock, once; that costs nothing for a module with no read, and its cost for a module with one was not measured.
 
 **What fails loudly, and what could fail silently.**
-Loud: a wildcard outside a read (named, R7), a read with no instant, a read inside a compound's operand, the wrong number of `_` (each named, R5), a pattern that matches no norm of the module (named, R9), an argument pattern other than `_` (a parse error, not named, R13), a bearer never forced, a fate with no instant when the read needs one (each a run-time error naming the refusal), a read with the writer off (a run-time error, R10).
-Silent, and the reason the check for a pattern that matches no site is a rule and not a nicety: a pattern that names a constructor declared in an imported module and matches nothing (answers "no"); a bearer compared by the wrong key; the one text that changes meaning (above); and the limits of the reader already listed in §6.1 N13 and N8 (a miss inside a winning `ROR` alternative, an alternative fulfilled only through its own reparation).
+Loud: a wildcard outside a read (named, R7), a read with no instant, a read inside a compound's operand, the wrong number of `_` (each named, R5), a pattern that matches no norm of the module (named, R9), an argument pattern other than `_` (a parse error, not named, R13), a bearer never forced, a fate with no instant when the read needs one (each a run-time error naming the refusal), a read with the writer off (a run-time error, R10), an `AS OF` later than the contract's clock and a read made before any contract has run (a run-time error naming the clock, R18), a read behind a rule that an operand uses (a run-time error when it is reached, R21).
+Silent, and the reason the check for a pattern that matches no site is a rule and not a nicety: a pattern that names a constructor declared in an imported module and matches nothing (answers "no"); an `UNDER LEST` or `UNDER HENCE` that no norm of the module can satisfy (S3, above); a bearer compared by the wrong key; the one text that changes meaning (above); and the limits of the reader already listed in §6.1 N13 and N8 (a miss inside a winning `ROR` alternative, an alternative fulfilled only through its own reparation).
 
 **Not built in this step, and why.**
 The check for a pattern that matches no site among the norms of an imported module (it needs each checked module to export its norm sites).
 Rule (3), forcing the bearer at the read (it needs the party's thunk in the entry, which `NormBearer` does not hold).
 The sibling check: a read inside an operand is refused instead.
+The check that an `UNDER LEST` or `UNDER HENCE` can be satisfied (S3): it would need, for each action of the module, which `LEST` and `HENCE` arm it, which is a walk over the names a norm refers to and not only over its own text; I judged that too large for a review fix, and did not measure it.
 A read in an imported module switching the writer on.
 A comparison of an action's arguments: a read matches on the constructor and the number of its fields, and `_` stands for each.
 The read through the explorer (`l4 explore`, `l4 lts --steps`), `jl4-service`, `l4 batch` and the REPL: not run with a read in it, so what each does with one is not known; the reference page lists them as not run.
 WASM: not built by me; CI's WASM job is the first test of it (§6.4 records the defect it found in the first half).
 Any claim in this paragraph that a later commit makes false is corrected in that commit.
+
+**What the independent review of 2026-11-26 found, and what the branch did.**
+A reviewer (a fresh agent that read the branch at `6ba1ae809` against `9d264217c`, with no build) reported three blockers, six faults to fix and six nits.
+Its report is not in the repository, so each finding is restated here with what happened to it.
+The instruction was to reproduce each blocker and S2 before fixing.
+The five tests R17 to R21 were written first and ran red against the code under review (`lhs` job 20261126T203527-norm-log-p2b-red-93541: 334 examples, 5 failures, and the five are R17 to R21), then green with the fixes in the working tree (job 20261126T205641-norm-log-p2b-26038: 334 examples, 0 failures).
+
+- **B1, blocker: an `AS OF` later than the contract's clock was answered from the log written so far (R18).**
+  The reference page says `AS OF` asks about the past or now, and §5's sketch says an entry later than the reader's clock is invisible to it; the code did neither.
+  R16 as it stood read `OUTSTANDING (...) AS OF 5` where the delivery was performed at 2, and the final log said the norm was not outstanding as of 5.
+  **Remedy, decided by Claude 2026-11-26, pending Meng's review, in its own commit (`088eea87a`): refuse.**
+  The contract's clock is the later of the greatest observed instant among this run's entries and the stamp of the latest event a guard has been matched at (`dlHorizon`, set at `Contract9` before the guard).
+  A read at a later instant stops with "the contract has only reached N", and with "no contract has run yet" before any run (the review's N6, which used to answer "no" from an empty log with exit 0).
+  I chose refusing over answering at the clock because a refusal says what is wrong, and an answer at the clock would be a different question from the one written, answered with exit 0.
+  The price: a rule cannot reach `THE INSTANT`, so a read shared by two guards takes the instant as an input and a constant `AS OF` in a shared rule is refused (R12, the reference page); R12, R14, R15 and R16 were rewritten to ask at the event's own instant or earlier.
+  The branch as it stood before that commit (`8bff3a319`) builds and passes the two norm-log suites and the `TemporalContext` suite, 333 examples, 0 failures (`lhs` job 20261126T210127-norm-log-p2b-c2-76509).
+  Reverted alone from the branch head (`242cee837`), the commit applies with no conflict, and the three suites pass on the reverted tree: 335 examples, 0 failures, one fewer than the head's 336 because the revert takes R18 out (`lhs` job 20261127T004251-norm-log-p2b-revert-33603).
+  That revert is a local commit that was never pushed; it touches the reference page, three files under `jl4-core/src` and `NormLogSpec.hs`, no corpus file and no golden, and only those three suites were run on it, not `jl4-test` or `l4-cli-test`.
+  Not examined: what the clock is under a `ROR`, whose operands the machine evaluates one after the other; `dlHorizon` is the latest stamp of the run, not one per operand.
+- **B2, blocker: two contract runs in one directive shared one ledger (R19).**
+  `#EVAL LIST (EVALTRACE c 0 ...), (EVALTRACE g 0 ...)`: the `NOT EVER FAILED` guard of `g` saw the failure written by `c`.
+  Fix: a run is bounded (`beginNormRun` and `EndNormRun`, above), and a read sees the norms written since its run began.
+- **B3, blocker: a `DO` norm could not be read although the checker said it could (R17).**
+  `EVER FAILED (PARTY p MUST pay _)` against a norm written with `DO` was false on every trace, with exit 0.
+  Fix: the reader's `modalMatches` takes `MUST` to match `DO`, as the checker did.
+- **S1: the refusal of a read inside an operand was made only for a read written there (R21).**
+  A read behind a rule an operand uses (R12's idiom) was answered by whichever sibling ran first.
+  Fix: `finishNormRead` refuses by name when the sibling check says the evaluation is inside an operand.
+- **S2: a run holding a read was run again at each use (R20).**
+  `crNormRead` spread from the read to the thunk of the enclosing run, so `r MEANS EVALTRACE c 0 evs` used twice wrote every fate twice.
+  Fix: `EndNormRun` puts the force span's `crNormRead` back as it was before the run, because the run's value does not depend on the log it read as it ran.
+- **S3: not fixed.**
+  The check that a pattern matches a norm site ignores `UNDER LEST` and `UNDER HENCE`.
+  The corpus file's own `under lest only` is an instance (above).
+  It is named in the reference page's silent list and in "Not built".
+- **S4: it did not reproduce, and my first answer to it was wrong.**
+  The review said `l4 batch` runs with the record off, citing `execEvalModuleWithJSON`.
+  Nothing calls that function (the comment above `evalModuleAndDirectivesWithJSON` says so, searched 2026-11-26); `l4 batch` evaluates each row through `LSP.L4.Rules.evaluateOn`, which reaches `execEvalModuleWithDefaults`, and that starts the machine with `moduleReadsNormLog`.
+  I wrote the review's sentence onto the reference page without reading that path, and the message of `8bff3a319` repeats it; `d9df7d248` withdraws the sentence.
+  What `l4 batch` does with a read was not run, and the page still lists it among the places not run.
+- **S5: R2 and `holds` could not fail.**
+  R2's `PARTY Alice MAY deliver` line ran a module that fails R9's check and asserted nothing about the result; `holds` passed on an empty result.
+  R2's line now asserts the refusal list, `[ReadMatchesNoSite deliver]`, and `holds` asserts one result.
+  No mutant was run for these two assertions.
+- **S6: the evaluation differential of `CLAUDE.md` §3.2.1 was owed, because `L4/Print.hs` changed.**
+  §6.5 did not record it, and I had not run it.
+  It ran on 2026-11-27, after the fixes, and its result is under "The evaluation differential of `CLAUDE.md` §3.2.1 (S6)" below.
+- **Nits.**
+  N1, the printer left a bearer without brackets, so a bracketed bearer re-parsed wrongly: fixed (`Print.hs`).
+  N2, `OUTSTANDING (...) AS STRING` failed at `OF`: fixed (the parser tries `AS OF` with backtracking).
+  N1 and N2 were fixed with no test, and `242cee837` adds one each, R22 and R23.
+  Against the code under review (`a9da941a7` with the two tests added to the test file) the norm-log and `TemporalContext` suites ran 336 examples with 7 failures, R17 to R23.
+  R22 fails at its `AS STRING` line, and R23 fails because the printed read is `OUTSTANDING (PARTY a PLUS b MUST pay _)`, with no brackets round the bearer (`lhs` job 20261127T004248-norm-log-p2b-red-33065).
+  At `242cee837` the same suites ran 336 examples, 0 failures (job 20261127T004250-norm-log-p2b-33440).
+  N3, a bearer is checked against a fresh type variable, so `PARTY 3` passes: not changed, because any type can be a party and a read is not tied to one contract's party type.
+  N4, the `check/read-refused` row of `jl4-lsp/DIAGNOSTIC-CODES.md` did not say that a pattern matching no site is refused: fixed.
+  N5, the global `HasSrcRange` instances for `Int` and `DeonticModal` return `Nothing`: not changed, because `Syntax.hs` has the same placeholder instances for its other plain fields (`Bool`, `RecallMode`, `LifecyclePoint`).
+  N6, a read outside any run answered "no" from the empty log: resolved by B1, which refuses it (R18).
+
+**What the gate measured again (2026-11-26, on `lhs`, after the review's fixes).**
+The gate is `etc/verify-branch.sh --base 90eed8e85` and the extra runs, at `8d0bf0f49`, the merge of `unstable` (at `90eed8e85`, with #886) into the branch after the fixes (`lhs` job 20261126T210138-norm-log-p2b-78686).
+`lhs` has GHC 9.10.3, and CI uses 9.10.2.
+Build exit 0; the two norm-log suites and `TemporalContext`: 334 examples, 0 failures; `jl4-test`: 5402 examples, 0 failures, and again with the writer forced on (`JL4_TEST_NORM_LOG=1`): 5402, 0; `jl4-core-test`: 2804, 0 failures, 26 pending; `jl4-service-test`: 983, 0 failures, 1 pending; `jl4-lsp-test`: 342, 0 failures; `jl4-mlir-test` and `jl4-websessions-test`: exit 0, the counts were not read; parse-time ratio 4.0 with distinct names and 3.9 with one; `check-corpus-goldens`, `check-canon-citations`, `sync-canon --check` (each with its selftest), `doc/test-docs.sh` and the commit trailers pass.
+Two steps fail, and neither is the branch's.
+`l4-cli-test` ran 1398 examples with 25 failures and 147 pending, and all 25 are in the group "l4 prove, a second solver (smucclaw/l4-ide#1098)": `lhs` has neither `z3` nor `cvc5`.
+Run with that group skipped (`--skip "a second solver"`) at the same head, `l4-cli-test` ran 1362 examples, 0 failures, 141 pending (job 20261126T232339-norm-log-p2b-15720).
+Plain `unstable` at `2d6af6955`, with no part of this branch, ran 1370 examples with the same 25 failures in the same group (job 20261126T191654-l4-ide-97820); CI has the solvers and decides.
+The prettier step of the script fails for the install gap of `CLAUDE.md` §3.0 (`@repo/prettier-config` is not installed on `lhs`); the by-hand check is recorded below.
+I ran prettier 3.4.2 with the options of `ts-shared/prettier-config/index.js` (print width 80, two-space indent, single quotes, no semicolons, trailing commas `es5`; its Svelte plugin does not apply to these files) over the nine `.md` and `.ts` files this branch changes, after the last edit to this file: pass.
+The first attempt matched no file, because a newline-separated list was passed as one argument, and printed "All matched files use Prettier code style!"; the run that counts is fed the names by `xargs`, and a deliberately mis-formatted file fails the same command.
+
+Three commits came after the gated head, and none touches `jl4-core/src` (`git diff --stat 8d0bf0f49 HEAD`, run before this commit): `d9df7d248` deletes one sentence of the reference page, `242cee837` adds R22 and R23 to `NormLogSpec.hs`, and this section is the third.
+The gate was not run again on them; the norm-log and `TemporalContext` suites were, at `242cee837`: 336 examples, 0 failures (job 20261127T004250-norm-log-p2b-33440).
+`doc/test-docs.sh` ran before `d9df7d248`, which deletes a sentence and no link.
+
+**The branch with the `unstable` that came after.**
+`unstable` has moved since the merge that was gated: #889 gives an operand of `RAND` or `ROR` its own frame, `App1Operand`, which `backward` turns into an `App1` before its `case`, and the run boundary hooks into that `App1` arm.
+`git merge-tree` of the head against `unstable` at `1be4053cf` has no conflict, which is a statement about text.
+I merged them in a separate tree (a local commit that was not pushed) and ran what runs fast: it builds, the norm-log and `TemporalContext` suites ran 336 examples, 0 failures, and the whole of `jl4-core-test` 2806 examples, 0 failures, 26 pending (`lhs` job 20261127T022945-norm-log-p2b-merge-20645).
+`jl4-test` and `l4-cli-test` were not run on that merge, and CI runs the merge of the pull request.
+
+**The evaluation differential of `CLAUDE.md` §3.2.1 (S6).**
+Run on `lhs` with the binary of `242cee837` (job 20261127T022629-norm-log-p2b-935): `JL4_EVALDIFF=1` and the round-trip test print every file it covers next to its source, and `l4 run` of each original and of its printed form ran under `JL4_FIXED_NOW=2025-01-31T15:45:30Z`, each in its own directory, on a copy of the binary made first.
+The output of the two runs is compared after the file name, every source position and every "(line N)" are blanked, because the printed module has other positions by construction.
+The first two tries of this differential were wrong, and I record how, because both looked like results: the first compared no file (it looked for `<file>.l4.l4` and the harness writes `<file>.l4.evaldiff.l4`), and the second reported 408 of 529 files different because it left the end column of a position (`:12:3-29`) in the text.
+Positive control: the first printed file against itself with one `#EVAL` added differs, as it must.
+Counts: 529 files printed, 500 identical, 29 different, 0 silent (neither run printed anything), 0 with no original; 35 of the files exit non-zero in at least one of the two runs.
+
+What the 29 are, read from the first twelve lines of each difference (the job kept no more):
+
+- 24 differ only in diagnostics: a lint, parse or lexer warning that the original raises and the printed text does not (`lint/and-or-same-indentation`, `lint/empty-nlg`, the unknown and malformed annotations, the clause warnings, the fixity warnings and others), because the printer keeps neither the layout nor the annotations those depend on; and in `sections.l4` a deprecation warning that the printed text raises and the original does not.
+- 2 differ in how a number is spelled in text the output echoes, `1.0` printed as `1`, `1.50` as `1.5` and `1_000` as `1000` (`consider-numbers-and-text.l4`, `pattern-matching-literal-clauses.l4`); both exit 1 on both sides.
+- 3 exit 0 on the original and 1 on the printed text: `typically-import-use.l4`, `typically-named-site.l4` and `typically-payload-field.l4`.
+  I did not read the error the printed text gives: the job kept ten lines of each difference and deleted the files.
+
+None of the 29 is from this branch.
+The same job at plain `unstable` (`1be4053cf`, job 20261127T025438-norm-log-p2b-62408) printed 534 files, 505 identical, the same 29 different, 0 silent, 0 with no original, the same three exit codes, and its positive control differs; the twelve-line differences it kept are identical, line for line, to this branch's.
+The branch's change to `L4/Print.hs` is one arm, for a read (`git diff origin/unstable...HEAD -- jl4-core/src/L4/Print.hs`), and none of the 29 contains a read.
+What this does not show: that the printed form of a file with a read evaluates as the original does, beyond R23 and the printed-and-parsed-again check of the round-trip test; the list of the files printed was not kept, so I did not see `read-fates.l4` named among the 500, and the rule of §3.2.1 is that the round trip covers every file the golden suite type-checks, which includes it.
+The three `typically-*` files differ in exit code at plain `unstable` too; whether that is a defect of the printer or of how the harness names and places the printed file, I did not establish, and this branch neither causes it nor examined it.
+
+**What the run boundary costs.**
+Measured on `lhs` (job 20261126T233201-norm-log-p2b-85854): `6ba1ae809`, the branch before the review's fixes, against `088eea87a`, which has the run boundary and B1's refusal, both built on the same machine; each module run three times with `l4 run`, one `#EVAL` of one failing run of `c` and then 300 runs of `g`, each of which has a read in its guard (the module with a read) or `NOT FALSE` (the module with none).
+A module with a read: 0.97, 0.95 and 1.01 s before, 0.97, 0.98 and 0.95 s after; the medians are equal, 0.97 s.
+A module with no read: 0.89, 0.90 and 0.92 s before, 0.90, 0.87 and 0.90 s after, within noise, and its output is the same size (5265 bytes) in all six runs and byte-identical between the two builds (`cmp` on the first run of each).
+The output of the module with a read differs between the two builds (77686 bytes before, 77642 after), as B2 predicts.
+Of each output I read the first 600 characters: after the first run's `BREACHED`, the runs of the later build are `FULFILLED`, and the first run after it in the earlier build is a residual obligation with the guard `NOT EVER FAILED (PARTY _ MUST deliver)` still in it, which is what a guard that saw the first run's failure leaves; I did not read the rest of either output.
+What this does not show: about 0.9 s of each run is start-up, so noise is about 0.05 s, and a cost per run below about 0.2 ms would not appear in 300 runs; the ledger was small, and a very large one was not tried; the head is the merge of `unstable` and docs and tests after `088eea87a`, and was not measured itself.
+
+**Mutants after the review.**
+None was run again for the code the review added.
+The evidence that R17 to R23 test what they name is their red runs, above (R17 to R21: 334 examples, 5 failures; R17 to R23: 336 examples, 7 failures), and for B1 the revert above.
 
 ## 7. Probe — what a crude projection shows
 
@@ -1149,3 +1274,10 @@ A third review, on 2026-11-22, brought the spec up to date before the build bega
   The `Assign` constructor, `DeonticStep.hs` and the printer defect are unchanged.
 - Meng's notes on N4, N5, N7, N12 and N16 are answered where the notes are recorded, and §6.2 says what is built, ruling by ruling.
 - Not re-run: the measurements of §7 and of the dated notes, which were made on binaries older than #827 and #640.
+
+An independent review of P2b, on 2026-11-26, read the branch with no build and found three blockers, six faults to fix and six nits; each is restated, with what the branch did about it, in §6.5 under "What the independent review of 2026-11-26 found", and it changed these things.
+
+- §6.5 said an `AS OF` could stand anywhere and was answered from the log as it stood; an `AS OF` later than the contract's clock is now refused, so a read shared between guards takes the instant as an input (B1, decided by Claude 2026-11-26, pending Meng's review).
+- §6.5 did not say which norms a read sees, and the code let it see every norm the directive had written, including another contract run's; it sees the norms written since its own contract run began (B2).
+- §6.5 said the check for a pattern that matches no site made a read exact; it does not look at `UNDER LEST` or `UNDER HENCE` (S3, not fixed), and a `MUST` pattern now matches a `DO` norm, as the checker said it did (B3).
+- A sentence of the reference page said `l4 batch` runs with the record off; I took it from the review without reading the code it cited, it did not reproduce, and `d9df7d248` withdraws it (S4).
