@@ -422,7 +422,7 @@ runConfigStep = \ case
     next <- matchPattern r env pat
     runConfig next
   BackwardMachine whnf -> do
-    traceEval (Exit (Right whnf))
+    traceFrameExit (Exit (Right whnf))
     next <- backward whnf
     runConfig next
   EvalRefMachine r -> do

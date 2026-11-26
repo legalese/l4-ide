@@ -15,6 +15,7 @@ module L4.EvaluateLazy.Machine
 , runEval
 , tryEval
 , traceEval
+, traceFrameExit
 , raiseException
 -- * The step counter and the unknowns a directive reached (UNKNOWN-EVALUATION-SPEC §4.5, build step 3)
 , tickUnknownSteps
@@ -1513,7 +1514,7 @@ raiseException e0 = loop e0
   -- What a frame turns the exception into ('rewriteUnwinding') goes on to the
   -- next frame, so the exception thrown at the bottom is the rewritten one.
   loop e = do
-    traceEval (Exit (Left e))
+    traceFrameExit (Exit (Left e))
     r <- case unwindOne e of MkEval g -> MkEval (uninterruptibleMask_ . g)
     case r of
       Nothing -> liftIO (Control.Exception.throwIO e)
@@ -2116,10 +2117,42 @@ pushFrame frame = do
       traceEval Push
       liftIO (writeIORef stackRef (MkStack (s.size + 1) (frame : s.frames)))
 
+-- | 'pushFrame' for a frame the trace must not see: the run boundary of the
+-- norm log ('EndNormRun'). Review of P2b, second gate: with the writer on, that
+-- frame's 'Push', its 'Exit' and its 'Pop' moved the line a trace shows for an
+-- operand of RAND or ROR that raises (the shapes of
+-- @ok/trace-exception-in-operand.l4@, smucclaw/l4-ide#1118), which the writer
+-- must never do: it is an observer. 'traceFrameExit' is the other half.
+pushFrameUntraced :: Frame -> Eval ()
+pushFrameUntraced frame = do
+  stackRef <- asks (.stack)
+  limit <- asks (.maxFrameDepth)
+  s <- liftIO (readIORef stackRef)
+  if s.size >= limit
+    then userException (StackOverflow limit)
+    else liftIO (writeIORef stackRef (MkStack (s.size + 1) (frame : s.frames)))
+
+-- | 'traceEval' of an action that closes the frame on top of the stack, an
+-- 'Exit' or a 'Pop', except for a frame pushed by 'pushFrameUntraced': the
+-- trace sees the stack as if that frame were not on it. The stack is looked at
+-- only while a trace is being recorded, so a run that records none pays
+-- nothing.
+traceFrameExit :: EvalTraceAction -> Eval ()
+traceFrameExit ta = do
+  mtr <- asks (.evalTrace)
+  case mtr of
+    Nothing -> pure ()
+    Just _  -> do
+      stackRef <- asks (.stack)
+      s <- liftIO (readIORef stackRef)
+      case s.frames of
+        EndNormRun {} : _ -> pure ()
+        _                 -> traceEval ta
+
 -- | Pops a stack frame (if any are left) and calls the continuation on it.
 withPoppedFrame :: (Maybe Frame -> Eval a) -> Eval a
 withPoppedFrame k = do
-  traceEval Pop
+  traceFrameExit Pop
   stackRef <- asks (.stack)
   s <- liftIO (readIORef stackRef)
   case s.frames of
@@ -2138,7 +2171,7 @@ withPoppedFrame k = do
 -- value if it comes after.
 withPoppedFrameKeepingUpdate :: (Maybe Frame -> Eval a) -> Eval a
 withPoppedFrameKeepingUpdate k = do
-  traceEval Pop
+  traceFrameExit Pop
   stackRef <- asks (.stack)
   s <- liftIO (readIORef stackRef)
   case s.frames of
@@ -2328,7 +2361,8 @@ beginNormRun val rs = when (startsRun val) $ whenDeonticLog \ l -> when l.dlWrit
     liftIO (writeIORef l.dlHorizon Nothing)
     accRef <- asks (.ctxReads)
     before <- liftIO ((.crNormRead) <$> readIORef accRef)
-    pushFrame (EndNormRun before)
+    -- not 'pushFrame': the trace does not see this frame ('pushFrameUntraced')
+    pushFrameUntraced (EndNormRun before)
   where
     startsRun = \ case
       ValObligation {} -> twoArgs
