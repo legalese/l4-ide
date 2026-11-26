@@ -1,0 +1,89 @@
+§ `VerifyDefinitionUsedTwiceFixture`
+
+-- A local definition (WHERE or LET) used more than once. Read through, each
+-- use is a copy of the definition, and a condition inside it is judged beside
+-- the other copies. The first decision shows what that costs: nothing in it is
+-- redundant, yet `c` is reported once for each use, because the other use
+-- repeats it. `l4 verify` cannot tell that finding from the true ones
+-- below, and its help and the doc page say so. One way to fix it is for the
+-- drawing to keep one node for each use, and report a repeat at the use.
+
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN, c IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `both qualify` a b c IF
+    `qualifies` a AND `qualifies` b
+  WHERE
+    GIVEN x IS A BOOLEAN
+    GIVETH A BOOLEAN
+    `qualifies` x MEANS x AND c
+
+-- The same, for an alternative: `c` is reported once for each use, though
+-- the rule is `a OR b OR c` and nothing in it is redundant. This one is new
+-- with the check for an alternative the others already cover.
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN, c IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `either qualifies` a b c IF
+    `qualifies` a OR `qualifies` b
+  WHERE
+    GIVEN x IS A BOOLEAN
+    GIVETH A BOOLEAN
+    `qualifies` x MEANS x OR c
+
+-- True findings, which judging the copies as one would lose.
+
+-- A parameter used twice in the definition: `x AND x` asks for `a` twice.
+GIVEN a IS A BOOLEAN, d IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `a parameter twice` a d IF
+    `twice` a AND d
+  WHERE
+    GIVEN x IS A BOOLEAN
+    GIVETH A BOOLEAN
+    `twice` x MEANS x AND x
+
+-- The same call written twice.
+GIVEN a IS A BOOLEAN, c IS A BOOLEAN, d IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `the same call twice` a c d IF
+    `qualifies` a AND `qualifies` a
+  WHERE
+    GIVEN x IS A BOOLEAN
+    GIVETH A BOOLEAN
+    `qualifies` x MEANS (x OR d) AND c
+
+-- The same name written twice, in a WHERE and in a LET.
+GIVEN a IS A BOOLEAN, m IS A BOOLEAN, n IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `a name twice` a m n IF
+    a AND e AND e
+  WHERE
+    e MEANS m AND n
+
+GIVEN a IS A BOOLEAN, m IS A BOOLEAN, n IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `a LET name twice` a m n IF
+  LET e MEANS m AND n
+  IN a AND e AND e
+
+-- The same name twice as alternatives: the second `e` admits nothing the
+-- first does not. This one too is new with the check for an alternative the
+-- others already cover.
+GIVEN a IS A BOOLEAN, m IS A BOOLEAN, n IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `a name twice in an OR` a m n IF
+    a AND (e OR e)
+  WHERE
+    e MEANS m OR n
+
+-- A definition with no parameters, used twice. `p OR c` is redundant, since
+-- `p` is asked for beside it, and is reported where it is written. The
+-- definition's `a` and `b` are reported too, in the copy of it that `p OR c`
+-- holds, because the other use repeats them, although deleting either one
+-- changes the rule: two false findings beside a true one, the same limit as
+-- the first two decisions.
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN, c IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `a definition with no parameters twice` a b c IF
+    p AND (p OR c)
+  WHERE
+    p MEANS a AND b

@@ -1,0 +1,20 @@
+§ `VerifyConstantsFixture`
+
+-- A decision whose body is the literal FALSE or TRUE (smucclaw/l4-ide#1095).
+--
+-- An encoding records "the text says no" this way, or switches a provision
+-- off. There is nothing in such a body to check, so `l4 verify` lists each of
+-- these as a constant, reports no finding, and exits 0 -- in both spellings,
+-- `DECIDE ... IF` and `... MEANS`.
+--
+-- verify-constants-read-through.l4 holds the controls that keep their
+-- findings.
+
+GIVETH A BOOLEAN
+DECIDE `the schedule applies` IF FALSE
+
+GIVETH A BOOLEAN
+`the waiver was signed` MEANS FALSE
+
+GIVETH A BOOLEAN
+DECIDE `the rule is in force` IF TRUE

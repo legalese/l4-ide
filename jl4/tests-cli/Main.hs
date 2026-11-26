@@ -26,7 +26,7 @@ import qualified Data.Aeson as Aeson
 import Data.Aeson (Value(..), eitherDecode, toJSON)
 import Data.Foldable (toList, traverse_)
 import Data.IORef (atomicModifyIORef', newIORef)
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, isJust)
 import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.Aeson.Key as Key
 import System.Directory
@@ -771,12 +771,49 @@ verifyClauseTableFixture = fixtureDir </> "verify-clause-table.l4"
 verifyClauseGroupMaybeFixture = fixtureDir </> "verify-clause-group-maybe.l4"
 verifyClauseTableLargeFixture = fixtureDir </> "verify-clause-table-large.l4"
 
+-- A redundant condition is looked for in the rule as written, not in the
+-- normal form, which manufactures clauses nobody wrote (smucclaw/l4-ide#1093).
+-- The first file is the positive control (nothing redundant, so nothing
+-- reported), the second the negatives (each redundant condition reported once,
+-- where it is written).
+verifyManufacturedClausesFixture, verifyWrittenGuardsFixture :: FilePath
+verifyManufacturedClausesFixture = fixtureDir </> "verify-manufactured-clauses.l4"
+verifyWrittenGuardsFixture       = fixtureDir </> "verify-written-guards.l4"
+
+-- The dual: an alternative the others already cover, reported where it is
+-- written, and the alternatives that must not be.
+verifyCoveredAlternativesFixture :: FilePath
+verifyCoveredAlternativesFixture = fixtureDir </> "verify-covered-alternatives.l4"
+
+-- A local definition used more than once: one finding nothing deserves, the
+-- limit the help states, and the true findings beside it.
+verifyDefinitionUsedTwiceFixture :: FilePath
+verifyDefinitionUsedTwiceFixture = fixtureDir </> "verify-definition-used-twice.l4"
+
+-- A rule whose requirement is unsatisfiable, kept apart from verify-seam.l4,
+-- which the pipeline uses as its control for unreachable-outcome.
+verifyUnsatRequirementFixture :: FilePath
+verifyUnsatRequirementFixture = fixtureDir </> "verify-unsat-requirement.l4"
+
+-- Conditions under a NOT that a dead branch elsewhere in the rule means, read
+-- the other way round, and controls whose dead branch is the condition's own.
+verifyDeadBranchElsewhereFixture :: FilePath
+verifyDeadBranchElsewhereFixture = fixtureDir </> "verify-dead-branch-elsewhere.l4"
+
 -- Referential transparency (specs/todo/WHERE-INLINING-SPEC.md): a zero-arity
 -- WHERE/LET binding is inlined before analysis, so a rule means the same thing
 -- however its limbs are named. The recursive file is the termination control.
 verifyWhereTransparencyFixture, verifyWhereRecursiveFixture :: FilePath
 verifyWhereTransparencyFixture = fixtureDir </> "verify-where-transparency.l4"
 verifyWhereRecursiveFixture    = fixtureDir </> "verify-where-recursive.l4"
+
+-- A decision whose body is the literal FALSE or TRUE is a constant, not a
+-- finding (smucclaw/l4-ide#1095); the second file holds the rules that read
+-- through a constant, and a contradiction written out, which keep their
+-- findings.
+verifyConstantsFixture, verifyConstantsReadThroughFixture :: FilePath
+verifyConstantsFixture            = fixtureDir </> "verify-constants.l4"
+verifyConstantsReadThroughFixture = fixtureDir </> "verify-constants-read-through.l4"
 
 -- Two read-through copies of a recursive WHERE local, one per call, with
 -- different arguments: two atoms, not one (smucclaw/l4-ide#1013).
@@ -1133,8 +1170,12 @@ coreFixtures =
   , verifyCleanFixture, verifyUnsatFixture, verifyDeadBranchFixture, verifyClauseGroupFixture
   , verifyClauseGroupCallFixture, verifyClauseGroupWhereFixture, verifyClauseTableFixture, verifyClauseGroupMaybeFixture
   , verifyClauseTableLargeFixture
+  , verifyManufacturedClausesFixture, verifyWrittenGuardsFixture
+  , verifyCoveredAlternativesFixture, verifyDefinitionUsedTwiceFixture, verifyUnsatRequirementFixture
+  , verifyDeadBranchElsewhereFixture
   , verifyVacuousGuardFixture, verifySeamFixture, verifyNestedFixture
   , verifyWhereTransparencyFixture, verifyWhereRecursiveFixture
+  , verifyConstantsFixture, verifyConstantsReadThroughFixture
   , verifyRecursiveLocalCopiesFixture, verifyLedgerReadsFixture, verifyFieldReadsFixture
   , verifyUnfoldCallsFixture, verifyUnfoldNamedCallsFixture, verifyUnfoldImportsFixture, verifyUnfoldRulesFixture
   , verifyUnfoldRecursiveFixture
@@ -7761,8 +7802,14 @@ spec bin = do
     it "goes RED on a decision no assignment can satisfy" $
       expectVerifyFinding bin verifyUnsatFixture "unsat"
 
-    it "goes RED on an OR limb that cannot hold where it sits" $
+    it "goes RED on an OR limb that cannot hold where it sits" $ do
       expectVerifyFinding bin verifyDeadBranchFixture "dead-branch"
+      -- Exactly one finding, at its place in the normal form. The rule as
+      -- written is walked too, for a redundant condition, and a dead branch is
+      -- not looked for there; reported from both walks, it would be here twice.
+      env <- jsonEnvelope bin ["verify", verifyDeadBranchFixture, "--format", "json"]
+      lookup "`one limb is inoperative`" (findingSitesByDecision env)
+        `shouldBe` Just [("dead-branch", "body.and[1].or[0]")]
 
     it "goes RED on a conjunct its own siblings already entail" $
       expectVerifyFinding bin verifyVacuousGuardFixture "vacuous-guard"
@@ -7788,15 +7835,261 @@ spec bin = do
       code `shouldBe` ExitFailure 1
       sout `shouldSatisfy` ("\"unreachable-outcome\"" `isInfixOf`)
 
-    -- The suppression that keeps the checker usable. `x XOR y` normalises into
-    -- a CNF containing `x OR NOT x`; reporting that clause as a vacuous guard
-    -- would fire on ordinary drafting and teach the reader to ignore the tool.
-    -- verify-clean.l4's first decision IS an xor, so this is measured, not
-    -- asserted.
+    -- The seam's findings are the normal form's, and each is reported once:
+    -- the walk over the rule as written looks only for a redundant condition,
+    -- so a finding that walk repeated would show here as a second copy.
+    it "reports each finding at a rule's seam once, at its place in the normal form" $ do
+      env <- jsonEnvelope bin ["verify", verifySeamFixture, "--format", "json"]
+      let found = findingSitesByDecision env
+      lookup "`a rule that reaches nobody`" found `shouldBe` Just [("vacuous-guard", "body.scope")]
+      lookup "`everyone in scope is in breach`" found `shouldBe` Just [("unreachable-outcome", "body")]
+      lookup "`a requirement that adds nothing`" found `shouldBe` Just [("unreachable-outcome", "body")]
+      -- None of them is placed in the source: the normal form is not in it.
+      [ nm | (nm, f) <- findingObjectsByDecision env, isJust (objField f "writtenAt") ] `shouldBe` []
+      -- An unsatisfiable requirement, in a fixture of its own: the walk over
+      -- the rule as written reaches it too, and would say `unsat` a second
+      -- time if it reported one.
+      nested <- jsonEnvelope bin ["verify", verifyUnsatRequirementFixture, "--format", "json"]
+      lookup "`a requirement nobody can meet`" (findingSitesByDecision nested)
+        `shouldBe` Just [("unreachable-outcome", "body"), ("unsat", "body.requirement")]
+      [ nm | (nm, f) <- findingObjectsByDecision nested, isJust (objField f "writtenAt") ] `shouldBe` []
+
+    -- `x XOR y` normalises into a CNF containing `x OR NOT x`; reporting that
+    -- clause as a vacuous guard would fire on ordinary drafting and teach the
+    -- reader to ignore the tool. verify-clean.l4's first decision IS an xor, so
+    -- this is measured, not asserted. What keeps the clause out now is that
+    -- redundancy is looked for in the rule as written, where the clause does
+    -- not exist (smucclaw/l4-ide#1093). The gate that used to keep it out, that
+    -- a condition true on its own is not reported, is not reached by this
+    -- file; `a condition true on its own` in verify-covered-alternatives.l4
+    -- is what pins it.
     it "does not report the tautological clauses CNF distribution manufactures" $ do
       Output code sout _ <- runL4 bin ["verify", verifyCleanFixture, "--format", "json"]
       code `shouldBe` ExitSuccess
       sout `shouldSatisfy` (not . ("vacuous-guard" `isInfixOf`))
+
+    -- smucclaw/l4-ide#1093. The normal form also manufactures clauses that are
+    -- CONTINGENTLY entailed by their siblings: `(a AND b) OR ((NOT a) AND e)`
+    -- distributes into four clauses, and the last, `b OR e`, follows from the
+    -- two before it. Nothing the drafter wrote is redundant in any rule of this
+    -- file, so nothing may be reported and the run exits 0. Before the fix,
+    -- `eligible` had one finding, `three ways in` nine, and `exclusive rows`
+    -- one, on the negation of the first row that the second row carries;
+    -- `eligible, as a choice` was already clean (an IF is expanded after the
+    -- normal form, so nothing is distributed) and is the control.
+    it "does not report a clause the normal form manufactured, however it is entailed" $ do
+      Output code sout serr <- runL4 bin ["verify", verifyManufacturedClausesFixture, "--format", "json"]
+      unless (code == ExitSuccess) $
+        expectationFailure ("expected exit 0, got " ++ show code ++ "\n" ++ sout ++ serr)
+      env <- jsonEnvelope bin ["verify", verifyManufacturedClausesFixture, "--format", "json"]
+      let found = findingSitesByDecision env
+      lookup "eligible" found `shouldBe` Just []
+      lookup "`eligible, as a choice`" found `shouldBe` Just []
+      lookup "`three ways in`" found `shouldBe` Just []
+      lookup "`exclusive rows`" found `shouldBe` Just []
+      -- Clean because all four were analysed, not because some were skipped.
+      case objField env "summary" of
+        Just summ -> do
+          objField summ "analysed" `shouldBe` Just (Number 4)
+          objField summ "skipped" `shouldBe` Just (Number 0)
+        Nothing -> expectationFailure "expected a summary"
+
+    -- The other half of #1093: a condition the drafter DID write that excludes
+    -- nothing is still reported, once, at the place it sits in the rule as
+    -- written, and the report says where that is in the source. Before the
+    -- fix, `a hurdle in two parts` had two findings, one per clause of the
+    -- condition's normal form, and `a hurdle inside a limb` was reported at
+    -- `body.and[1]`, a conjunction the rule as written does not have. The
+    -- requirement case, the row of a BRANCH and verify-vacuous-guard.l4 read
+    -- the same either way, and are the controls. So are what an ELSE and an
+    -- OTHERWISE say, a call that reads through to a condition already asked
+    -- for, and a redundant condition in a test, which is not checked.
+    it "reports a redundant condition the drafter wrote, once, where it is written" $ do
+      env <- jsonEnvelope bin ["verify", verifyWrittenGuardsFixture, "--format", "json"]
+      let found = findingSitesByDecision env
+      lookup "`a hurdle in two parts`" found `shouldBe` Just [("vacuous-guard", "body.and[1]")]
+      lookup "`a hurdle inside a limb`" found `shouldBe` Just [("vacuous-guard", "body.or[0].and[1]")]
+      lookup "`a hurdle in the requirement`" found `shouldBe` Just [("vacuous-guard", "body.requirement.and[1]")]
+      lookup "`a hurdle in a row`" found `shouldBe` Just [("vacuous-guard", "body.and[1].and[1]")]
+      plain <- jsonEnvelope bin ["verify", verifyVacuousGuardFixture, "--format", "json"]
+      lookup "`the second hurdle is not one`" (findingSitesByDecision plain)
+        `shouldBe` Just [("vacuous-guard", "body.and[1]")]
+      -- Where each is written: the condition's first word, not a bracket
+      -- before it. The type checker hands an operator's brackets to its first
+      -- operand, so before this was fixed the `a` that opens `(a AND b)` was
+      -- placed at the bracket that opens the group around it.
+      lookup "`a hurdle in two brackets`" found `shouldBe` Just [("vacuous-guard", "body.and[1].or[0].and[0]")]
+      lookup "`a hurdle in an ELSE`" found `shouldBe` Just [("vacuous-guard", "body.and[1].and[1]")]
+      lookup "`a hurdle in an OTHERWISE`" found `shouldBe` Just [("vacuous-guard", "body.or[1].and[1].and[1]")]
+      lookup "`a hurdle through a call`" found `shouldBe` Just [("vacuous-guard", "body.and[1]")]
+      lookup "either" found `shouldBe` Just []
+      lookup "`a hurdle in a test`" found `shouldBe` Just []
+      -- Under a NOT, a conjunct the context entails is the normal form's dead
+      -- branch, and is reported as that alone. Before this was fixed each was
+      -- reported twice, also as a redundant condition under the NOT.
+      lookup "`a hurdle under a NOT`" found `shouldBe` Just [("dead-branch", "body.and[1].or[0]")]
+      lookup "`a hurdle in an alternative under a NOT`" found `shouldBe` Just [("dead-branch", "body.and[2].or[0]")]
+      -- A conjunct under a NOT that the normal form reports no dead branch for
+      -- is reported as a redundant condition: one only its sibling entails,
+      -- and one whose NOT sits in an alternative, which the normal form
+      -- distributes away. Skipping every entailed conjunct under a NOT lost
+      -- both, and skipping those the outer context entails lost the second.
+      lookup "`a hurdle inside a NOT`" found `shouldBe` Just [("vacuous-guard", "body.and[1].not.and[1]")]
+      lookup "`a hurdle under a NOT in an alternative`" found `shouldBe` Just [("vacuous-guard", "body.or[0].and[1].not.and[0]")]
+      source <- lines <$> readFile verifyWrittenGuardsFixture
+      let startsWith nm want =
+            case [ (line, col)
+                 | (nm', f) <- findingObjectsByDecision env, nm' == nm
+                 , Just w <- [objField f "writtenAt"]
+                 , Just (Number line) <- [objField w "line"]
+                 , Just (Number col) <- [objField w "column"]
+                 ] of
+              [(line, col)] ->
+                take (length want) (drop (round col - 1) (headOr "" (drop (round line - 1) source)))
+                  `shouldBe` want
+              other -> expectationFailure ("expected one writtenAt for " ++ nm ++ ", got " ++ show other)
+      startsWith "`a hurdle in two parts`" "x OR (q AND r))"
+      startsWith "`a hurdle inside a limb`" "p OR q))"
+      startsWith "`a hurdle in the requirement`" "x OR y))"
+      startsWith "`a hurdle in a row`" "x OR y)"
+      startsWith "`a hurdle in two brackets`" "a AND b) OR c)"
+      startsWith "`a hurdle in an ELSE`" "x OR y)"
+      startsWith "`a hurdle in an OTHERWISE`" "x OR y)"
+      startsWith "`a hurdle through a call`" "`either` a b"
+      -- Before this was fixed, the call was placed at the bracket that opens
+      -- its first argument.
+      lookup "`a hurdle through an infix call`" found `shouldBe` Just [("vacuous-guard", "body.and[2]")]
+      startsWith "`a hurdle through an infix call`" "a AND b) `or else` c)"
+      startsWith "`a hurdle inside a NOT`" "a OR b))"
+      -- A condition whose first word is a parameter is placed in the local
+      -- definition, where it is written, not at the argument of the call.
+      [ round line :: Int
+        | (nm, f) <- findingObjectsByDecision env, nm == "`a hurdle in a definition`"
+        , Just w <- [objField f "writtenAt"], Just (Number line) <- [objField w "line"] ]
+        `shouldBe` [60, 60]
+      Output _ text _ <- runL4 bin ["verify", verifyWrittenGuardsFixture]
+      text `shouldSatisfy` ("[vacuous-guard] at body.or[0].and[1], written at 23:16" `isInfixOf`)
+      -- With --no-coalesce-atoms nothing is read through, so each call is an
+      -- atom of its own and adds a condition; the rest read the same.
+      separate <- jsonEnvelope bin ["verify", verifyWrittenGuardsFixture, "--format", "json", "--no-coalesce-atoms"]
+      let found' = findingSitesByDecision separate
+          throughCalls = ["`a hurdle through a call`", "`a hurdle through an infix call`"]
+      lookup "`a hurdle through a call`" found' `shouldBe` Just []
+      lookup "`a hurdle through an infix call`" found' `shouldBe` Just []
+      filter ((`notElem` throughCalls) . fst) found'
+        `shouldBe` filter ((`notElem` throughCalls) . fst) found
+
+    -- Under a NOT, a conjunct the context entails is left out where the
+    -- normal form reports its negation as a dead branch. That dead branch has
+    -- to be in the same part of the rule, the scope or the requirement, and
+    -- have no atom the NOT does not have. Matched by meaning anywhere in the
+    -- rule, as for a while during the fix of smucclaw/l4-ide#1093, the first,
+    -- third and fourth decisions lost their redundant condition; this test
+    -- failed on that build. unstable reports the first and the third, at the
+    -- normal form's clauses, and not the fourth. The first needs either
+    -- bound, the third the bound on atoms and the fourth the bound on the
+    -- part. The second and the fifth are the controls: the dead branch is the
+    -- condition's own, and is reported alone. The sixth needs the NOTs
+    -- counted: under two, a condition is not read the other way round, and
+    -- leaving it out under any number of NOTs lost its `a`
+    -- (`body.and[2].not.not.and[0]`); this test failed on that build.
+    it "reports a condition under a NOT that a dead branch elsewhere in the rule means" $ do
+      env <- jsonEnvelope bin ["verify", verifyDeadBranchElsewhereFixture, "--format", "json"]
+      let found = findingSitesByDecision env
+          dead site = ("dead-branch", site)
+          guard site = ("vacuous-guard", site)
+      lookup "`the dead branch is in the scope`" found
+        `shouldBe` Just [dead "body.scope.and[1].or[1]", dead "body.requirement.and[1].or[1]", guard "body.requirement.and[1].not.and[1]"]
+      lookup "`no dead branch in the scope`" found
+        `shouldBe` Just [dead "body.requirement.and[1].or[1]", guard "body.requirement.and[1].not.and[1]"]
+      lookup "`the dead branch is a call`" found
+        `shouldBe` Just [dead "body.and[1].or[1]", dead "body.and[4].or[2]", guard "body.and[1].not.and[1]"]
+      lookup "`the dead branch is in the requirement`" found
+        `shouldBe` Just [dead "body.requirement.and[1].or[0]", guard "body.scope.or[0].and[1].not.and[0]"]
+      lookup "`the dead branch is the call under the NOT`" found
+        `shouldBe` Just [dead "body.and[1].or[0]"]
+      lookup "`a condition under two NOTs`" found
+        `shouldBe` Just [dead "body.and[1].or[0]", guard "body.and[0]", guard "body.and[2].not.not.and[0]"]
+      lookup "either" found `shouldBe` Just []
+      [ (round line, round col) :: (Int, Int)
+        | (_, f) <- findingObjectsByDecision env
+        , Just w <- [objField f "writtenAt"]
+        , Just (Number line) <- [objField w "line"]
+        , Just (Number col) <- [objField w "column"] ]
+        `shouldBe` [(20, 66), (26, 42), (33, 24), (43, 18), (60, 5), (60, 42)]
+
+    -- A local definition used more than once. `both qualify` and `either
+    -- qualifies` get a finding nothing in them deserves, at the `c` each use
+    -- repeats: the limit the help and the doc page state, pinned so that its
+    -- fix shows here. The rest are true findings, each placed where the
+    -- definition writes it, or, for a bare parameter (`a parameter twice`),
+    -- at the argument the use passes in. Judging a definition's copies as
+    -- one, tried while smucclaw/l4-ide#1093 was fixed, removed the first two
+    -- and hid every other; this test failed on that build, with no finding on
+    -- any of the seven. The last decision, added since, has both: its
+    -- `p OR c` is redundant and is reported where it is written, at line 87,
+    -- while the definition's `a` and `b`, at line 89, are reported only
+    -- because the other use repeats them, which is the same limit.
+    it "reports a condition in a local definition used twice, once for each use" $ do
+      env <- jsonEnvelope bin ["verify", verifyDefinitionUsedTwiceFixture, "--format", "json"]
+      let found = findingSitesByDecision env
+          guards sites = Just [("vacuous-guard", site) | site <- sites]
+          at i = "body.and[" ++ show (i :: Int) ++ "]"
+          linesOf nm =
+            [ round line :: Int
+            | (nm', f) <- findingObjectsByDecision env, nm' == nm
+            , Just w <- [objField f "writtenAt"], Just (Number line) <- [objField w "line"] ]
+          alt i = "body.and[1].or[" ++ show (i :: Int) ++ "]"
+      lookup "`both qualify`" found `shouldBe` guards (map at [1, 3])
+      lookup "`either qualifies`" found `shouldBe` guards ["body.or[1]", "body.or[3]"]
+      lookup "`a parameter twice`" found `shouldBe` guards (map at [0, 1])
+      lookup "`the same call twice`" found `shouldBe` guards (map at [0 .. 3])
+      lookup "`a name twice`" found `shouldBe` guards (map at [1 .. 4])
+      lookup "`a LET name twice`" found `shouldBe` guards (map at [1 .. 4])
+      lookup "`a name twice in an OR`" found `shouldBe` guards (map alt [0 .. 3])
+      lookup "`a definition with no parameters twice`" found
+        `shouldBe` guards ["body.and[2]", "body.and[2].or[0].and[0]", "body.and[2].or[0].and[1]"]
+      map linesOf
+          [ "`both qualify`", "`either qualifies`", "`a parameter twice`", "`the same call twice`"
+          , "`a name twice`", "`a LET name twice`", "`a name twice in an OR`"
+          , "`a definition with no parameters twice`" ]
+        `shouldBe` [[18, 18], [30, 30], [38, 38], [52, 52, 52, 52], [60, 60, 60, 60], [65, 65, 65, 65], [76, 76, 76, 76], [87, 89, 89]]
+
+    -- An alternative the others already cover adds nothing, and is reported
+    -- where it is written, under a NOT too. Looking in the normal form, as
+    -- l4 verify did before smucclaw/l4-ide#1093 was fixed, finds all three, at
+    -- clauses with no place in the source. Once the normal form was no longer
+    -- looked in for redundancy, none of the three was reported, because the
+    -- rule as written was checked for a redundant condition of a conjunction
+    -- only; this test failed on that build.
+    -- Decisions 4 to 6 are the controls: alternatives that each let a case
+    -- through, one covered only because the condition it sits in is itself
+    -- redundant (reported once, at that condition), and a condition true on
+    -- its own. The seventh, two alternatives that cover each other, is
+    -- reported at both, as the help says.
+    it "reports an alternative the others already cover, once, where it is written" $ do
+      env <- jsonEnvelope bin ["verify", verifyCoveredAlternativesFixture, "--format", "json"]
+      let found = findingSitesByDecision env
+      lookup "absorbed" found `shouldBe` Just [("vacuous-guard", "body.or[0]")]
+      lookup "`absorbed under a NOT`" found `shouldBe` Just [("vacuous-guard", "body.not.or[0]")]
+      lookup "`absorbed inside a condition`" found `shouldBe` Just [("vacuous-guard", "body.and[1].or[2]")]
+      lookup "`two ways in`" found `shouldBe` Just []
+      lookup "`covered by the context`" found `shouldBe` Just [("vacuous-guard", "body.and[1]")]
+      lookup "`a condition true on its own`" found `shouldBe` Just []
+      lookup "`covering each other`" found `shouldBe` Just [("vacuous-guard", "body.or[0]"), ("vacuous-guard", "body.or[1]")]
+      let placed =
+            [ (nm, line, msg)
+            | (nm, f) <- findingObjectsByDecision env
+            , Just w <- [objField f "writtenAt"]
+            , Just (Number line) <- [objField w "line"]
+            , Just (String msg) <- [objField f "message"]
+            ]
+          lineOf nm = [round line :: Int | (nm', line, _) <- placed, nm' == nm]
+      lineOf "absorbed" `shouldBe` [15]
+      lineOf "`absorbed under a NOT`" `shouldBe` [22]
+      lineOf "`absorbed inside a condition`" `shouldBe` [28]
+      [msg | (nm, _, msg) <- placed, nm == "absorbed"]
+        `shouldSatisfy` all ("this alternative is already covered by the ones it is joined with" `T.isPrefixOf`)
 
     -- The weaker mode is documented as weaker; pin that it is not SILENTLY
     -- weaker. `x` here is a nullary reference to a GIVEN binder, so the two
@@ -7806,6 +8099,120 @@ spec bin = do
     it "still finds a binder-level contradiction with --no-coalesce-atoms" $ do
       Output code _ _ <- runL4 bin ["verify", verifyUnsatFixture, "--no-coalesce-atoms"]
       code `shouldBe` ExitFailure 1
+
+    -- smucclaw/l4-ide#1095. A decision whose body IS the literal FALSE is a
+    -- constant the drafter chose ("the text says no", a provision switched
+    -- off), not "a requirement nobody can meet"; one whose body is the literal
+    -- TRUE already got no finding. Both spellings, `DECIDE ... IF` and
+    -- `... MEANS`, are listed as constants, counted in the summary, and the
+    -- run exits 0. Before the fix the two FALSE ones were each reported
+    -- `unsat` and the run exited 1.
+    it "lists a decision whose body is the literal FALSE or TRUE as a constant, not a finding" $ do
+      Output code text serr <- runL4 bin ["verify", verifyConstantsFixture]
+      unless (code == ExitSuccess) $
+        expectationFailure ("expected exit 0, got " ++ show code ++ "\n" ++ text ++ serr)
+      text `shouldSatisfy` ("`the schedule applies`  (0 atoms, 1 ladder nodes) — a constant: its body is the literal FALSE, so there is nothing to check" `isInfixOf`)
+      text `shouldSatisfy` ("`the rule is in force`  (0 atoms, 1 ladder nodes) — a constant: its body is the literal TRUE, so there is nothing to check" `isInfixOf`)
+      text `shouldSatisfy` ("3 of the analysed decision(s) are constants" `isInfixOf`)
+      env <- jsonEnvelope bin ["verify", verifyConstantsFixture, "--format", "json"]
+      [ (nm, c)
+        | Just (Array ds) <- [objField env "decisions"]
+        , d <- toList ds
+        , Just (String nm) <- [objField d "name"]
+        , Just (String c) <- [objField d "constant"]
+        ]
+        `shouldBe` [ ("`the schedule applies`", "FALSE")
+                   , ("`the waiver was signed`", "FALSE")
+                   , ("`the rule is in force`", "TRUE") ]
+      case objField env "summary" of
+        Just summ -> do
+          objField summ "constants" `shouldBe` Just (Number 3)
+          objField summ "analysed" `shouldBe` Just (Number 3)
+          objField summ "skipped" `shouldBe` Just (Number 0)
+          objField summ "findings" `shouldBe` Just (Number 0)
+        Nothing -> expectationFailure "expected a summary"
+
+    -- The controls for #1095: only a body that IS the literal is a constant.
+    -- A contradiction written out is still `unsat`, and a rule that reads
+    -- through a constant keeps the finding the constant gives it. Those four
+    -- findings read the same before the fix and after it; the constant FALSE
+    -- the file also holds was reported `unsat` before.
+    it "keeps the findings of a rule that reads through a constant, or contradicts itself" $ do
+      env <- jsonEnvelope bin ["verify", verifyConstantsReadThroughFixture, "--format", "json"]
+      let found = findingsByDecision env
+      lookup "`false either way`" found `shouldBe` Just ["unsat"]
+      lookup "`nobody can satisfy this`" found `shouldBe` Just ["unsat"]
+      lookup "`needs the waiver`" found `shouldBe` Just ["unsat"]
+      lookup "`x cannot matter`" found `shouldBe` Just ["unreachable-outcome"]
+      lookup "`the waiver was signed`" found `shouldBe` Just []
+      lookup "`the rule is in force`" found `shouldBe` Just []
+      -- Only a constant carries the key: a decision that reads through one is
+      -- not one.
+      [ nm
+        | Just (Array ds) <- [objField env "decisions"]
+        , d <- toList ds
+        , Just (String nm) <- [objField d "name"]
+        , isJust (objField d "constant")
+        ]
+        `shouldBe` ["`the waiver was signed`", "`the rule is in force`"]
+
+    -- #1095's third ask: a finding on a rule that reads through a constant names
+    -- the constant, because the cause is usually intended, and "x cannot
+    -- matter" alone does not say why. A finding that reads through no constant
+    -- says nothing of the kind, and one is named only where it can be why.
+    it "names the constant a finding reads through" $ do
+      env <- jsonEnvelope bin ["verify", verifyConstantsReadThroughFixture, "--format", "json"]
+      let messages nm =
+            [ T.unpack m
+            | (nm', f) <- findingObjectsByDecision env, nm' == nm
+            , Just (String m) <- [objField f "message"]
+            ]
+          names nm want = case messages nm of
+            [m] | want `isInfixOf` m -> pure ()
+            other -> expectationFailure ("expected one finding on " ++ nm ++ " saying " ++ show want ++ ", got " ++ show other)
+          namesNone nm = case messages nm of
+            [m] | not ("constant" `isInfixOf` m) -> pure ()
+            other -> expectationFailure ("expected one finding on " ++ nm ++ " naming no constant, got " ++ show other)
+      names "`needs the waiver`" "It reads through VerifyConstantsReadThroughFixture.`the waiver was signed`, which is the constant FALSE."
+      names "`x cannot matter`" "It reads through VerifyConstantsReadThroughFixture.`the rule is in force`, which is the constant TRUE."
+      namesNone "`nobody can satisfy this`"
+      namesNone "`false either way`"
+      -- A rule whose meaning is FALSE only once read through is not called a
+      -- constant: the listing does not list it as one.
+      names "`needs the recorded waiver`" "It reads through VerifyConstantsReadThroughFixture.`the waiver, as recorded`, whose meaning is FALSE."
+      -- Only a constant of the finding's sign is named: the FALSE one for a
+      -- rule TRUE for no input, the TRUE one for a rule TRUE for every input.
+      -- Before this was fixed, both were named on each.
+      names "`needs the waiver while in force`" "the constant FALSE."
+      messages "`needs the waiver while in force`" `shouldSatisfy` all (not . ("TRUE." `isSuffixOf`))
+      [ m | (nm, f) <- findingObjectsByDecision env, nm == "`x cannot matter, whatever the waiver`"
+          , objField f "kind" == Just (String "unreachable-outcome"), Just (String m) <- [objField f "message"] ]
+        `shouldSatisfy` \ms -> length ms == 1 && all (\m -> "the constant TRUE." `T.isSuffixOf` m && not ("FALSE." `T.isInfixOf` m)) ms
+      -- Under a NOT a constant stands for the other literal. The constant TRUE
+      -- under a NOT can make a rule TRUE for no input, so it is named there;
+      -- inside a condition reported as entailed, which it cannot make hold,
+      -- it is not. Before this was fixed, the sign ignored the NOT: the first
+      -- named nothing and the second named the constant.
+      names "`needs the rule not in force`" "It reads through VerifyConstantsReadThroughFixture.`the rule is in force`, which is the constant TRUE."
+      let messagesAt nm site =
+            [ T.unpack m
+            | (nm', f) <- findingObjectsByDecision env, nm' == nm
+            , objField f "site" == Just (String site)
+            , Just (String m) <- [objField f "message"]
+            ]
+      messagesAt "`a NOT over the constant TRUE`" "body.and[1]"
+        `shouldSatisfy` \ms -> length ms == 1 && not (any ("reads through" `isInfixOf`) ms)
+      messagesAt "`a NOT over the constant TRUE`" "body.and[1].or[1]"
+        `shouldSatisfy` \ms -> length ms == 1 && all ("which is the constant TRUE." `isSuffixOf`) ms
+      -- So does a constant in the scope of an IMPLIES, for a finding that the
+      -- scope entails the requirement. Before this was fixed, that finding
+      -- read the scope and the requirement as if both had to hold: the first
+      -- named the constant TRUE, which the scope entails the requirement
+      -- without, and the second named nothing.
+      messagesAt "`in force, and x, means x`" "body"
+        `shouldSatisfy` \ms -> length ms == 1 && not (any ("reads through" `isInfixOf`) ms)
+      messagesAt "`signed, or x, means x`" "body"
+        `shouldSatisfy` \ms -> length ms == 1 && all ("`the waiver was signed`, which is the constant FALSE." `isSuffixOf`) ms
 
     -- A rule written as DECIDE clauses is analysed as the CONSIDER it stands for.
     -- Before, it was skipped as not boolean; then its generated nesting made
@@ -8155,6 +8562,35 @@ findingsByDecision env =
   | Just (Array ds) <- [objField env "decisions"]
   , d <- toList ds
   , Just (String nm) <- [objField d "name"]
+  ]
+
+-- | Each decision in an @l4 verify@ JSON envelope, with the kind and site of
+-- each of its findings, in report order.
+findingSitesByDecision :: Value -> [(String, [(String, String)])]
+findingSitesByDecision env =
+  [ ( T.unpack nm
+    , [ (T.unpack k, T.unpack s)
+      | Just (Array fs) <- [objField d "findings"]
+      , f <- toList fs
+      , Just (String k) <- [objField f "kind"]
+      , Just (String s) <- [objField f "site"]
+      ]
+    )
+  | Just (Array ds) <- [objField env "decisions"]
+  , d <- toList ds
+  , Just (String nm) <- [objField d "name"]
+  ]
+
+-- | Every finding object in an @l4 verify@ JSON envelope, with the name of its
+-- decision.
+findingObjectsByDecision :: Value -> [(String, Value)]
+findingObjectsByDecision env =
+  [ (T.unpack nm, f)
+  | Just (Array ds) <- [objField env "decisions"]
+  , d <- toList ds
+  , Just (String nm) <- [objField d "name"]
+  , Just (Array fs) <- [objField d "findings"]
+  , f <- toList fs
   ]
 
 -- | The placement table of doc/reference/syntax/nlg.md: each row's number

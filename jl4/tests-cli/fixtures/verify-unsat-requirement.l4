@@ -1,0 +1,12 @@
+§ `VerifyUnsatRequirementFixture`
+
+-- A rule split at its seam (a top-level IMPLIES) whose requirement cannot
+-- hold at all. The requirement is unsatisfiable, and so nothing within scope
+-- meets it. Both are said, once each: `unreachable-outcome` at the rule and
+-- `unsat` at the requirement. The walk over the rule as written reaches the
+-- requirement too, and must not say `unsat` a second time.
+GIVEN s IS A BOOLEAN
+      x IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `a requirement nobody can meet` IS
+  s IMPLIES (x AND (NOT x))
