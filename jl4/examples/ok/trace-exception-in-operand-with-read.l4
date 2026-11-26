@@ -1,0 +1,75 @@
+-- The trace of trace-exception-in-operand.l4, in a module that reads the norm
+-- log, so that the norm log writer is on while it runs: a module that contains
+-- a read switches the writer on, and the last rule below is one.
+--
+-- The writer is an observer, so what a trace shows for an operand of RAND or ROR
+-- that raises, an arrow on the line under the compound and another at the end,
+-- must be what the other file pins. The run boundary that the writer keeps for
+-- each contract run was once a frame the trace could see, and it moved the first
+-- of the two lines for every shape below that raises. The directives are on the
+-- same lines as in the other file, so the two goldens differ in the file name.
+
+DECLARE Person IS ONE OF Alice, Bob
+DECLARE Action IS ONE OF
+  pay HAS amount IS A NUMBER
+  deliver
+
+GIVETH A DEONTIC Person Action
+`plain del` MEANS PARTY Bob MUST deliver WITHIN 6
+
+GIVETH A DEONTIC Person Action
+`div leg` MEANS PARTY Alice MUST pay 1 WITHIN (6 / 0)
+
+GIVETH A DEONTIC Person Action
+`refuse leg` MEANS REFUSE "not modelled"
+
+GIVEN k IS A NUMBER
+GIVETH A DEONTIC Person Action
+`nonex leg` k MEANS
+    CONSIDER k
+    WHEN 1 THEN FULFILLED
+    WHEN 2 THEN FULFILLED
+
+§ `Gates`
+  GIVEN gate IS A BOOLEAN
+
+GIVETH A DEONTIC Person Action
+`stuck leg` MEANS
+    IF gate THEN PARTY Alice MUST pay 1 WITHIN 5 ELSE FULFILLED
+
+GIVETH A DEONTIC Person Action
+`refuse then fulfilled` MEANS `refuse leg` ROR FULFILLED
+
+GIVETH A DEONTIC Person Action
+`fulfilled then refuse` MEANS FULFILLED ROR `refuse leg`
+
+GIVETH A DEONTIC Person Action
+`refuse and del` MEANS `refuse leg` RAND `plain del`
+
+GIVETH A DEONTIC Person Action
+`del and refuse` MEANS `plain del` RAND `refuse leg`
+
+GIVETH A DEONTIC Person Action
+`div then fulfilled` MEANS `div leg` ROR FULFILLED
+
+GIVETH A DEONTIC Person Action
+`nonex then fulfilled` MEANS `nonex leg` 3 ROR FULFILLED
+
+GIVETH A DEONTIC Person Action
+`stuck then fulfilled` MEANS `stuck leg` ROR FULFILLED
+
+GIVETH A DEONTIC Person Action
+`nested` MEANS (`refuse leg` RAND `plain del`) ROR FULFILLED
+
+#EVALTRACE EVALTRACE `refuse then fulfilled` 0 (LIST EVENT Bob deliver 9)
+#EVALTRACE EVALTRACE `fulfilled then refuse` 0 (LIST EVENT Bob deliver 9)
+#EVALTRACE EVALTRACE `refuse and del` 0 (LIST EVENT Bob deliver 9)
+#EVALTRACE EVALTRACE `del and refuse` 0 (LIST EVENT Bob deliver 9)
+#EVALTRACE EVALTRACE `div then fulfilled` 0 (LIST EVENT Bob deliver 9)
+#EVALTRACE EVALTRACE `nonex then fulfilled` 0 (LIST EVENT Bob deliver 9)
+#EVALTRACE EVALTRACE `stuck then fulfilled` 0 (LIST EVENT Bob deliver 9)
+#EVALTRACE EVALTRACE `nested` 0 (LIST EVENT Bob deliver 9)
+
+GIVETH A DEONTIC Person Action
+`guarded by a read` MEANS
+    PARTY Alice MUST pay 1 PROVIDED NOT EVER FAILED (PARTY _ MUST deliver) WITHIN 5
