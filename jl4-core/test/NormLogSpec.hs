@@ -1617,6 +1617,25 @@ spec = describe "the norm log writer (NORM-LOG-SPEC, P1)" do
         length [ () | e <- fatesOf 0 rs, e.neFate == FatePerformed, e.neActionHead == Just "pay" ] `shouldBe` 1
         length [ () | e <- fatesOf 0 rs, e.neFate == FateArmed, e.neActionHead == Just "deliver" ] `shouldBe` 1
 
+      it "R19c: after the last run of a directive, a root norm that saw no event is written by a read outside any run, or by the end of the directive (GM's question on the fix of finding 1)" do
+        -- the fix writes a run's waiting rows at the start of the next run; the
+        -- last run has no next one. A read made after it forces the clock and
+        -- writes the row inside the last run's window, so it answers from it;
+        -- with no read, the end of the directive writes it with no instant
+        let lone read' =
+              [ "c MEANS PARTY Alice MUST deliver WITHIN 10"
+              , "GIVETH A BOOLEAN"
+              , "still MEANS OUTSTANDING (PARTY _ MUST deliver) AS OF 0"
+              , "#EVAL LIST (EVALTRACE c 0 (LIST))" <> read'
+              ]
+            observedOfDeliver rs = [ e.neObserved | e <- fatesOf 0 rs, e.neFate == FateArmed, e.neActionHead == Just "deliver" ]
+        withRead <- run False (src (lone ", (IF still THEN FULFILLED ELSE FULFILLED)"))
+        map (evalDirectiveCode . (.result)) withRead `shouldBe` ["eval/result"]
+        observedOfDeliver withRead `shouldBe` [Just 0]
+        withoutRead <- run False (src (lone ""))
+        map (evalDirectiveCode . (.result)) withoutRead `shouldBe` ["eval/result"]
+        observedOfDeliver withoutRead `shouldBe` [Nothing]
+
       it "R20: a run named once and used twice is run once, though it holds a read (review of P2b, S2)" do
         -- the run's value does not depend on the log it read as it ran; a
         -- force span marked as a read of the log was never cached, so the
