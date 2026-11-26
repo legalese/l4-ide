@@ -545,10 +545,12 @@ No other case has a `@limit` key.
 
 **How to read it.**
 `@limit` marks a case the service stopped before it finished, and sending it again may give an answer: to a service with a higher limit, or, for `"time"`, when the service is less busy, since the time limit is wall-clock (see below).
-Neither `@limit` nor its absence promises what the next attempt will do, because a case's outcome can depend on values the deployment has already worked out.
-A value defined at the top level of an imported module is computed once and then kept, across requests, so the first case that needs it pays its time, memory and recursion depth, and later cases find it ready.
-Measured on 2026-10-03: at `+RTS -N1`, four identical cases under a 64 MB limit came back as `"memory"` and then three answers; and a case stopped by the evaluator's recursion-depth limit answered, unchanged, once another case had worked out the value it needed.
-That recursion-depth limit is the evaluator's own, fixed at 1,000,000 levels, and it arrives as a plain `@error`, a message that begins `Stack overflow:`, with no `@limit`.
+A `"time"` stop can differ from one attempt to the next, because the time limit is wall-clock and depends on how busy the service is.
+A `"memory"` stop does not depend on what earlier requests worked out: a request reads the values defined at the top level of an imported module over a copy of its own, so every case works them out again, and identical cases get the same memory verdict.
+Before smucclaw/l4-ide#1116 was fixed, such a value was computed once and kept across requests on the direct path (the wrapper path runs each request in a session of its own, so it kept nothing between requests), so the first case that needed it paid its time and memory and later cases found it ready; a deployment whose `--max-eval-memory-mb` fitted a case only because an earlier case had worked such a value out now needs a higher limit.
+Measured on 2026-11-26: at `+RTS -N1`, under a 64 MB limit, a batch of a case that does not fit, then one that does, then the first case again came back as `"memory"`, an answer and `"memory"`; before the fix it came back as `"memory"`, an answer and an answer.
+(Decided by Claude 2026-11-26, pending Meng's review: that the service no longer keeps imported values between requests; this paragraph changes with the ruling.)
+The recursion-depth limit is the evaluator's own, fixed at 1,000,000 levels, and it arrives as a plain `@error`, a message that begins `Stack overflow:`, with no `@limit`.
 
 #### How the cases share the cores
 

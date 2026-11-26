@@ -439,10 +439,13 @@ batchResponseSchema fn =
                         [ "description" .= ("The answer, of type " <> fn.fsReturnType <> ". Only on an answered case" :: Text) ]
                     , "@refused" .= typed "string" "The reason the rule gave for refusing to answer. A refused case counts as processed"
                     , "@error" .= typed "string" "Why the case has no answer. Counted in casesIgnored"
+                    -- The description of a memory stop was rewritten for smucclaw/l4-ide#1116:
+                    -- a request no longer keeps what an earlier one worked out
+                    -- (decided by Claude 2026-11-26, pending Meng's review).
                     , "@limit" .= Aeson.object
                         [ "type" .= ("string" :: Text)
                         , "enum" .= (["time", "memory"] :: [Text])
-                        , "description" .= ("Beside @error when the service stopped the case at a limit: time is --eval-timeout, memory is --max-eval-memory-mb. Sending the case again may give an answer, with a higher limit, or for time when the service is less busy. Neither @limit nor its absence promises what a retry will do: values the deployment has already worked out are kept, so a case can fail where a later identical one answers. The evaluator's recursion-depth limit is a plain @error, without @limit" :: Text)
+                        , "description" .= ("Beside @error when the service stopped the case at a limit: time is --eval-timeout, memory is --max-eval-memory-mb. Sending the case again may give an answer, with a higher limit, or for time when the service is less busy. A memory stop does not depend on what earlier requests worked out, so the same case under the same --max-eval-memory-mb is stopped again; a time stop can differ from one attempt to the next, because the limit is wall-clock. The evaluator's recursion-depth limit is a plain @error, without @limit" :: Text)
                         ]
                     , "@graphviz" .= Aeson.object
                         [ "type" .= ("object" :: Text)
