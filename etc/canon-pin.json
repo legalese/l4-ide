@@ -147,13 +147,13 @@
     "tests/*.ep.golden files moved with the modules, line for line; no other",
     "golden moved, and `l4 run` output is byte-identical for all twelve modules",
     "in that directory. It was made in commons on branch",
-    "penal-code-comments-at-pin (b1eedb750), stacked on the previous pin",
+    "penal-code-comments-at-pin (4af67b187), stacked on the previous pin",
     "20d325ff7, so this bump moves those twelve files and nothing else. The same",
     "caveat applies: re-point at a main SHA when the mirror is caught up to",
     "commons main."
   ],
   "repo": "legalese/commons",
-  "sha": "b1eedb750824b535fbb3cba4f51b6f4ea30403bd",
+  "sha": "4af67b1875dc8c1c184b74cf090862f7beadbcbf",
   "ref": "penal-code-comments-at-pin",
   "pinned": "2026-11-26",
   "blessed": [

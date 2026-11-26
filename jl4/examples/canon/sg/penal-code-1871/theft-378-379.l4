@@ -129,8 +129,8 @@
 -- the three places, then ", which building, tent or vessel is used" over the
 -- two uses. Two OR-groups, in series with each other and with the theft. The
 -- connecting words are inert strings in the rule below, quoted from the
--- section, so reading the rule top to bottom gives back the section, and no
--- connective in it comes from anywhere but the Code.
+-- section, so reading the rule top to bottom gives back the section; every
+-- connective in it is a word of the Code.
 --
 -- Writing this as a flat conjunction of five leaves would be a WRONG ANSWER
 -- rather than a difference of style: it would demand a building that was at
@@ -156,7 +156,7 @@
 -- this module and three more in robbery-390-392.l4; extending the record would
 -- have meant editing all six, and nesting edits none.
 --
--- s 380 can be read in two ways, and the choice is recorded rather than hidden
+-- s 380 can be read in two ways, and the choice made here is recorded
 -- (notes/forks.md, PC-1). Its heading, "Theft in dwelling house, etc.", could
 -- be taken to name an offence that s 380 DEFINES, with theft as its first
 -- element. This row goes by the enacting words instead, and treats it as a
