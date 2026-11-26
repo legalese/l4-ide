@@ -294,6 +294,13 @@ deadlineUnitOption = optional
       )
   )
 
+-- | Shared by @export dmn@, @export dmn-md@ and @export bpmn@, so its help
+-- must be true of all three. "Most realistic exports" was measured on each,
+-- over the 1,049 @.l4@ files under @jl4/@ and @doc/@, exported one by one with
+-- @--fidelity-report@ (2026-11-26, on this branch's build): of the files each
+-- one writes, a Blocking note is in 441 of 764 for @dmn@, 764 of 764 for
+-- @dmn-md@, and 49 of 49 for @bpmn@, which writes only a file with exactly
+-- one regulative rule unless @--rule@ names one.
 failOnOption :: Parser FidelityGate
 failOnOption = option fidelityGateReader
   ( long "fail-on"
