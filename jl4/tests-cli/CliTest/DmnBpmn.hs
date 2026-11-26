@@ -4,17 +4,20 @@
 -- backend; 'Main.spec' calls 'spec' where these describes always ran.
 module CliTest.DmnBpmn (spec, fixtures) where
 
-import Control.Monad (unless, when)
+import Control.Monad (forM_, unless, when)
+import qualified Data.ByteString.Char8 as BS8
 import Data.List (isInfixOf, sort)
 import System.Directory
-  ( createDirectoryIfMissing
+  ( copyFile
+  , createDirectoryIfMissing
   , doesFileExist
   , getTemporaryDirectory
+  , listDirectory
   , removePathForcibly
   )
-import System.Environment (lookupEnv)
+import System.Environment (getEnvironment, lookupEnv)
 import System.Exit (ExitCode(..))
-import System.FilePath ((</>))
+import System.FilePath (takeExtension, (</>))
 import Test.Hspec
 
 import CliTest.Common
@@ -141,7 +144,92 @@ exportTwoRulesFixture, exportNothingFixture :: FilePath
 exportBlockingOnlyFixture, exportAdvisoryOnlyFixture :: FilePath
 exportTwoRulesFixture     = fixtureDir </> "export-two-rules.l4"
 exportNothingFixture      = fixtureDir </> "export-nothing.l4"
+-- The two empty-model refusals of smucclaw/l4-ide#1104: every decision left
+-- out as test scaffolding; and scaffolding beside an uncalled regulative rule,
+-- which --include-tests does not bring back.
+exportScaffoldingFixture, exportScaffoldingDutyFixture :: FilePath
+exportScaffoldingFixture     = fixtureDir </> "export-scaffolding-only.l4"
+exportScaffoldingDutyFixture = fixtureDir </> "export-scaffolding-and-duty.l4"
+-- every decision rebinds the rule date, which --include-tests does not cure
+exportRebindOnlyFixture :: FilePath
+exportRebindOnlyFixture = fixtureDir </> "export-rebind-only.l4"
 exportBlockingOnlyFixture = fixtureDir </> "export-blocking-only.l4"
+-- smucclaw/l4-ide#1102: a module reading closed constants from the module
+-- it imports (copied into the model as decisions), and one reading values
+-- from it that are not closed (refused, Blocking). Both import the same file.
+exportImportedConstantFixture, exportImportedOpenFixture :: FilePath
+exportImportedLimitsFixture, exportImportedConstantCases :: FilePath
+exportImportedConstantFixture = fixtureDir </> "export-imported-constant.l4"
+exportImportedOpenFixture     = fixtureDir </> "export-imported-open.l4"
+exportImportedLimitsFixture   = fixtureDir </> "export-imported-limits.l4"
+exportImportedConstantCases   = fixtureDir </> "export-imported-constant.cases.json"
+-- A copied constant whose own module's checker reports its CONSIDER
+-- non-exhaustive: it must be reported exactly as it would be written locally.
+exportImportedPartialFixture :: FilePath
+exportImportedPartialFixture = fixtureDir </> "export-imported-partial.l4"
+-- A constant read from an imported module that does not type-check.
+exportImportedUncheckedFixture :: FilePath
+exportImportedUncheckedFixture = fixtureDir </> "export-imported-unchecked.l4"
+-- An import with no error of its own that imports one with errors.
+exportImportedHopFixture :: FilePath
+exportImportedHopFixture = fixtureDir </> "export-imported-hop.l4"
+-- Inputs spelled like a FEEL function the export calls.
+-- Raw L4 in a boxed literal and in an input column, beside plain FEEL.
+exportRawL4Fixture, exportRawL4Cases :: FilePath
+exportRawL4Fixture = fixtureDir </> "export-raw-l4.l4"
+exportRawL4Cases   = fixtureDir </> "export-raw-l4.cases.json"
+exportRawL4DefaultFixture, exportRawL4DefaultCases :: FilePath
+exportRawL4DefaultFixture = fixtureDir </> "export-raw-l4-default.l4"
+exportRawL4DefaultCases   = fixtureDir </> "export-raw-l4-default.cases.json"
+exportRawL4BareNameFixture, exportRawL4BareNameCases :: FilePath
+exportRawL4BareNameFixture = fixtureDir </> "export-raw-l4-bare-name.l4"
+exportRawL4BareNameCases   = fixtureDir </> "export-raw-l4-bare-name.cases.json"
+-- A rule with the name of a computed field (smucclaw/l4-ide#1038), alone and
+-- beside scaffolding, and a computed field with no rule.
+exportTakenForFieldFixture, exportTakenForFieldMixFixture, exportComputedFieldOnlyFixture :: FilePath
+exportTakenForFieldFixture     = fixtureDir </> "export-taken-for-field.l4"
+exportTakenForFieldMixFixture  = fixtureDir </> "export-taken-for-field-mix.l4"
+exportComputedFieldOnlyFixture = fixtureDir </> "export-computed-field-only.l4"
+-- A prelude.l4 and a daydate.l4 of the author's own, beside the importer,
+-- and the same calls against the real libraries.
+exportShadowPreludeFixture, exportPreludeCallsFixture :: FilePath
+exportShadowPreludeFixture = fixtureDir </> "export-shadow-prelude" </> "uses-shadow.l4"
+exportPreludeCallsFixture  = fixtureDir </> "export-prelude-calls.l4"
+-- A JL4_LIBRARY_PATH directory whose prelude.l4 is not the compiled-in copy.
+exportAlteredPreludeFixture, exportAlteredPreludeLib :: FilePath
+exportAlteredPreludeFixture = fixtureDir </> "export-altered-prelude" </> "uses-altered.l4"
+exportAlteredPreludeLib     = fixtureDir </> "export-altered-prelude" </> "lib"
+-- A date-compat.l4 of the author's own that breaks the compiled-in daydate,
+-- and a module that imports the prelude and calls nothing in it.
+exportBrokenDateCompatFixture, exportImportsPreludeUnusedFixture :: FilePath
+exportBrokenDateCompatFixture     = fixtureDir </> "export-broken-date-compat" </> "uses-daydate.l4"
+exportImportsPreludeUnusedFixture = fixtureDir </> "export-imports-prelude-unused.l4"
+-- A module that calls a function of math.l4, which the export does not lower.
+exportImportsMathFixture :: FilePath
+exportImportsMathFixture = fixtureDir </> "export-imports-math.l4"
+-- What the seven calls in those fixtures become when lowered as the
+-- library's.
+preludeCallForms :: [String]
+preludeCallForms =
+  [ "<text>count(xs)</text>"
+  , "<text>sum(concatenate([0], xs))</text>"
+  , "<text>max(a, b)</text>"
+  , "<text>list contains(xs, x)</text>"
+  , "<text>(every n_elem in xs satisfies n_elem &gt; 0)</text>"
+  , "<text>m != null</text>"
+  , "<text>date(\"2024-01-02\")</text>"
+  ]
+exportShadowedBuiltinsFixture, exportShadowedBuiltinsCases :: FilePath
+exportShadowedBuiltinsFixture = fixtureDir </> "export-shadowed-builtins.l4"
+exportShadowedBuiltinsCases   = fixtureDir </> "export-shadowed-builtins.cases.json"
+-- EMPTY, the empty list, read by count, sum and an equality test.
+exportEmptyListFixture, exportEmptyListCases :: FilePath
+exportEmptyListFixture = fixtureDir </> "export-empty-list.l4"
+exportEmptyListCases   = fixtureDir </> "export-empty-list.cases.json"
+-- EMPTY as a table's output entry, and a list tested against it in a table
+exportEmptyListTableFixture, exportEmptyListTableCases :: FilePath
+exportEmptyListTableFixture = fixtureDir </> "export-empty-list-table.l4"
+exportEmptyListTableCases   = fixtureDir </> "export-empty-list-table.cases.json"
 exportAdvisoryOnlyFixture = fixtureDir </> "export-advisory-only.l4"
 
 -- The FIXTURE(d) backticked-import pair: a HYPHENATED module beside a sibling
@@ -154,6 +242,11 @@ bpmnOfferingSource, bpmnOfferingGolden, bpmnOfferingFidelity :: FilePath
 bpmnOfferingSource   = "examples/bpmn/offering.l4"
 bpmnOfferingGolden   = "examples/bpmn/expected/offering.bpmn"
 bpmnOfferingFidelity = "examples/bpmn/expected/offering.fidelity.txt"
+
+-- A decision and a regulative rule, in a module that imports the prelude and
+-- calls nothing in it: one file for both the DMN and the BPMN report.
+exportImportsPreludeDutyFixture :: FilePath
+exportImportsPreludeDutyFixture = fixtureDir </> "export-imports-prelude-duty.l4"
 
 dmnSource, dmnGolden, dmnMarkdownGolden :: FilePath
 dmnSource         = "examples/dmn/reg-cf.l4"
@@ -404,6 +497,9 @@ dmnNullProbeDir = fixtureDir </> "dmn-null-probe"
 fixtures :: [FilePath]
 fixtures =
   [ exportTwoRulesFixture, exportNothingFixture
+  , exportScaffoldingFixture, exportScaffoldingDutyFixture
+  , exportImportedConstantFixture, exportImportedOpenFixture
+  , exportImportedLimitsFixture, exportImportedConstantCases
   , exportBlockingOnlyFixture, exportAdvisoryOnlyFixture
   , bpmnOfferingSource, bpmnOfferingGolden, bpmnOfferingFidelity
   , dmnSource, dmnGolden, dmnMarkdownGolden, dmnEngineCases
@@ -552,8 +648,386 @@ spec bin = do
       -- exports an empty model, which the CLI refuses loudly rather than
       -- writing a decision-free document. This is the behaviour change that
       -- retired export-two-rules.l4 from the blocking-only role above.
-      it "refuses an all-regulative module as DMN (empty model after the population filter)" $
-        expectFail bin ["export", "dmn", exportTwoRulesFixture]
+      --
+      -- The refusal says WHY (smucclaw/l4-ide#1104): the module has DECIDEs,
+      -- so "no DECIDE or MEANS" would be false, and --include-tests would not
+      -- bring a regulative rule back, so it must not be offered.
+      it "refuses an all-regulative module as DMN (empty model after the population filter)" $ do
+        Output code _ serr <- runL4 bin ["export", "dmn", exportTwoRulesFixture]
+        code `shouldSatisfy` (/= ExitSuccess)
+        serr `shouldSatisfy` ("every decision in this module was left out" `isInfixOf`)
+        serr `shouldSatisfy` ("`the filing`, `the fee`: left out as regulative rules" `isInfixOf`)
+        serr `shouldSatisfy` ("l4 export bpmn" `isInfixOf`)
+        serr `shouldSatisfy` (not . ("--include-tests" `isInfixOf`))
+        serr `shouldSatisfy` (not . ("No decisions found" `isInfixOf`))
+
+      -- smucclaw/l4-ide#1104: a module whose decisions are all test
+      -- scaffolding is refused with the reason, the names, and the flag
+      -- that puts them back, and the flag does put them back.
+      it "refuses an all-scaffolding module by naming the scaffolding and --include-tests" $ do
+        Output code _ serr <- runL4 bin ["export", "dmn", exportScaffoldingFixture]
+        code `shouldSatisfy` (/= ExitSuccess)
+        serr `shouldSatisfy`
+          ("`sample prices`, `price with tax`: left out as test scaffolding" `isInfixOf`)
+        serr `shouldSatisfy` ("Pass --include-tests to export them." `isInfixOf`)
+        serr `shouldSatisfy` (not . ("No decisions found" `isInfixOf`))
+        Output code' sout' _ <- runL4 bin ["export", "dmn", "--include-tests", exportScaffoldingFixture]
+        code' `shouldBe` ExitSuccess
+        sout' `shouldSatisfy` ("id=\"decision_sample_prices\"" `isInfixOf`)
+        sout' `shouldSatisfy` ("id=\"decision_price_with_tax\"" `isInfixOf`)
+
+      it "names each reason separately when scaffolding sits beside an uncalled duty" $ do
+        Output code _ serr <- runL4 bin ["export", "dmn", exportScaffoldingDutyFixture]
+        code `shouldSatisfy` (/= ExitSuccess)
+        serr `shouldSatisfy`
+          ("`sample amounts`: left out as test scaffolding" `isInfixOf`)
+        serr `shouldSatisfy` ("`the payment`: left out as regulative rules" `isInfixOf`)
+        -- the flag is offered on the scaffolding line, and only there
+        let flagLines = [l | l <- lines serr, "--include-tests" `isInfixOf` l]
+        flagLines `shouldSatisfy` all ("`sample amounts`" `isInfixOf`)
+        length flagLines `shouldBe` 1
+
+      -- The third reason, alone: a rule-date rebind stays out with the flag
+      -- set too, so the flag is not offered, and setting it changes nothing.
+      it "refuses a module whose every decision rebinds the rule date, without offering --include-tests" $ do
+        Output code _ serr <- runL4 bin ["export", "dmn", exportRebindOnlyFixture]
+        code `shouldSatisfy` (/= ExitSuccess)
+        serr `shouldSatisfy` ("every decision in this module was left out" `isInfixOf`)
+        serr `shouldSatisfy`
+          ("`the rule date in 2016`, `the rule date in 2021`: left out because each evaluates under its own rule date" `isInfixOf`)
+        serr `shouldSatisfy` (not . ("--include-tests" `isInfixOf`))
+        serr `shouldSatisfy` (not . ("No decisions found" `isInfixOf`))
+        Output code' _ serr' <- runL4 bin ["export", "dmn", "--include-tests", exportRebindOnlyFixture]
+        code' `shouldSatisfy` (/= ExitSuccess)
+        serr' `shouldSatisfy` ("left out because each evaluates under its own rule date" `isInfixOf`)
+
+      -- A raw-L4 note says what it costs: the whole file, on both engines.
+      it "says in each raw-L4 note that both engines refuse the whole file" $ do
+        Output code _ serr <- runL4 bin ["export", "dmn", exportRawL4Fixture, "--fidelity-report"]
+        code `shouldBe` ExitSuccess
+        serr `shouldSatisfy` ("[D-LITERALEXPR] blocking — decision_as_text" `isInfixOf`)
+        serr `shouldSatisfy` ("[D-NONFEELINPUT] blocking — decision_banded" `isInfixOf`)
+        let says = [l | l <- lines serr, "the whole file goes with it: KIE 8.44 refuses to load the file" `isInfixOf` l]
+        length says `shouldBe` 2
+        serr `shouldSatisfy` ("execution of every decision in the file" `isInfixOf`)
+        serr `shouldSatisfy` (not . ("silently treated as non-matching" `isInfixOf`))
+
+      it "says in a raw-L4 output note what each engine does with the file" $ do
+        Output code _ serr <- runL4 bin ["export", "dmn", exportRawL4DefaultFixture, "--fidelity-report"]
+        code `shouldBe` ExitSuccess
+        serr `shouldSatisfy` ("[D-NONFEELOUTPUT] blocking" `isInfixOf`)
+        serr `shouldSatisfy`
+          ("execution of every decision in the file: Camunda 8.7.6 refuses to parse the file" `isInfixOf`)
+        serr `shouldSatisfy` (not . ("loudly when the rule fires" `isInfixOf`))
+        serr `shouldSatisfy`
+          ("Camunda parses a file whose only such text reads as a FEEL name, such as a bare `TBD`" `isInfixOf`)
+
+      -- smucclaw/l4-ide#1038: the checker takes a rule with a computed
+      -- field's name for that field, and the export leaves the rule out.
+      it "names a rule taken for a computed field, rather than saying the module has no DECIDE" $ do
+        Output code _ serr <- runL4 bin ["export", "dmn", exportTakenForFieldFixture]
+        code `shouldSatisfy` (/= ExitSuccess)
+        serr `shouldSatisfy` ("every decision in this module was left out" `isInfixOf`)
+        serr `shouldSatisfy`
+          ("`bonus`: left out because each has the name of a computed field of a record" `isInfixOf`)
+        serr `shouldSatisfy` ("smucclaw/l4-ide#1038" `isInfixOf`)
+        serr `shouldSatisfy` (not . ("No decisions found" `isInfixOf`))
+
+      it "names a rule taken for a computed field beside the scaffolding" $ do
+        Output code _ serr <- runL4 bin ["export", "dmn", exportTakenForFieldMixFixture]
+        code `shouldSatisfy` (/= ExitSuccess)
+        serr `shouldSatisfy` ("`sample prices`: left out as test scaffolding" `isInfixOf`)
+        serr `shouldSatisfy` ("`bonus`: left out because each has the name of a computed field" `isInfixOf`)
+
+      it "keeps the one-line refusal for a module whose only MEANS is a computed field" $ do
+        Output code _ serr <- runL4 bin ["export", "dmn", exportComputedFieldOnlyFixture]
+        code `shouldSatisfy` (/= ExitSuccess)
+        serr `shouldSatisfy` ("No decisions found in module" `isInfixOf`)
+        serr `shouldSatisfy` (not . ("left out" `isInfixOf`))
+
+      -- smucclaw/l4-ide#1102: a closed constant from an imported module is
+      -- carried into the model as a decision; nothing else from it is.
+      it "carries the closed imported constants a module reads into the model, and no others" $ do
+        Output code sout serr <- runL4 bin ["export", "dmn", exportImportedConstantFixture]
+        code `shouldBe` ExitSuccess
+        forM_ ["the_threshold", "the_longest_week", "hours_per_day", "days_per_week"] \nm ->
+          sout `shouldSatisfy` (("id=\"decision_" <> nm <> "\"") `isInfixOf`)
+        sout `shouldSatisfy` (not . ("an_unused_constant" `isInfixOf`))
+        sout `shouldSatisfy` (not . ("weekly_hours_at" `isInfixOf`))
+        serr `shouldSatisfy` (not . ("blocking" `isInfixOf`))
+
+      it "refuses an imported value that is not a closed constant, rather than naming it" $ do
+        Output code sout serr <- runL4 bin ["export", "dmn", exportImportedOpenFixture]
+        code `shouldBe` ExitSuccess
+        serr `shouldSatisfy` ("2 blocking" `isInfixOf`)
+        -- the name with nothing behind it that the export used to write
+        sout `shouldSatisfy` (not . ("default_colour = " `isInfixOf`))
+        sout `shouldSatisfy` (not . ("id=\"decision_default_colour\"" `isInfixOf`))
+
+      -- A copy is certified with its own module's checker warnings, so a
+      -- constant whose CONSIDER the checker reports non-exhaustive is Blocking
+      -- here exactly as it is when written in the importing file, and so is
+      -- the decision that reads it.
+      it "reports a copied constant that is not total as Blocking, as it would a local one" $ do
+        Output code _ serr <- runL4 bin ["export", "dmn", "--fidelity-report", exportImportedPartialFixture]
+        code `shouldBe` ExitSuccess
+        serr `shouldSatisfy` ("2 blocking" `isInfixOf`)
+        serr `shouldSatisfy` ("[D-PARTIAL] blocking — decision_first_of_nothing" `isInfixOf`)
+        serr `shouldSatisfy` ("[D-PARTIAL] blocking — decision_g2" `isInfixOf`)
+        serr `shouldSatisfy` ("the checker reports this CONSIDER non-exhaustive" `isInfixOf`)
+
+      -- EMPTY is FEEL's empty list. It used to be written as the string
+      -- "EMPTY", which FEEL reads as a list of one under count, and which no
+      -- list equals.
+      it "writes EMPTY as FEEL's empty list, never the string \"EMPTY\"" $ do
+        Output code sout _ <- runL4 bin ["export", "dmn", exportEmptyListFixture]
+        code `shouldBe` ExitSuccess
+        sout `shouldSatisfy` (not . ("\"EMPTY\"" `isInfixOf`))
+        sout `shouldSatisfy` ("h + count([])" `isInfixOf`)
+        sout `shouldSatisfy` ("xs = []" `isInfixOf`)
+
+      it "writes EMPTY in a table as an output entry [] and a boolean column xs = []" $ do
+        Output code sout _ <- runL4 bin ["export", "dmn", exportEmptyListTableFixture]
+        code `shouldBe` ExitSuccess
+        sout `shouldSatisfy` (not . ("\"EMPTY\"" `isInfixOf`))
+        sout `shouldSatisfy` ("<text>[]</text>" `isInfixOf`)
+        sout `shouldSatisfy` ("<text>xs = []</text>" `isInfixOf`)
+
+      -- An input spelled like a FEEL function the export calls hides that
+      -- function, so it is renamed as a keyword would be; its label keeps
+      -- the L4 name.
+      -- Which module is the library is asked of the module, not of its file
+      -- name. JL4_LIBRARY_PATH outranks a file beside the importer, so each
+      -- test sets the variable as it needs, whatever the suite was given.
+      describe "the prelude and daydate, recognised as the library only when they are" $ do
+        let envWithout = filter ((/= "JL4_LIBRARY_PATH") . fst) <$> getEnvironment
+            -- A copy of the checkout's libraries under the temporary
+            -- directory, with one file of it appended to.
+            editedLibraryCopy name file edit = do
+              tmp <- getTemporaryDirectory
+              let libCopy = tmp </> name
+                  libSrc  = ".." </> "jl4-core" </> "libraries"
+              removePathForcibly libCopy
+              createDirectoryIfMissing True libCopy
+              files <- filter ((== ".l4") . takeExtension) <$> listDirectory libSrc
+              forM_ files \f -> copyFile (libSrc </> f) (libCopy </> f)
+              appendFile (libCopy </> file) edit
+              pure libCopy
+            notLibrary = "[D-NOT-LIBRARY] advisory — definitions"
+        it "lowers no call into a prelude.l4 or daydate.l4 of the author's own as the library's" $ do
+          env <- envWithout
+          Output code sout serr <- runL4WithEnv (Just env) bin
+            ["export", "dmn", exportShadowPreludeFixture, "--fidelity-report"]
+          code `shouldBe` ExitSuccess
+          -- the author's copies won resolution (`shadow marker` is theirs alone)
+          serr `shouldSatisfy` ("[chosen]   project root:" `isInfixOf`)
+          sout `shouldSatisfy` ("h + shadow_marker" `isInfixOf`)
+          forM_ preludeCallForms \form -> sout `shouldNotSatisfy` (form `isInfixOf`)
+          serr `shouldSatisfy` ("7 blocking" `isInfixOf`)
+          forM_ ["how_many", "how_much", "the_bigger", "is_listed", "all_positive", "is_given", "the_start"] \d ->
+            serr `shouldSatisfy` (("[D-LITERALEXPR] blocking — decision_" <> d) `isInfixOf`)
+
+        it "lowers the same calls as the library's from the copy compiled into l4" $ do
+          env <- envWithout
+          Output code sout serr <- runL4WithEnv (Just env) bin
+            ["export", "dmn", exportPreludeCallsFixture, "--fidelity-report"]
+          code `shouldBe` ExitSuccess
+          forM_ preludeCallForms \form -> sout `shouldSatisfy` (form `isInfixOf`)
+          serr `shouldNotSatisfy` ("D-NOT-LIBRARY" `isInfixOf`)
+
+        it "lowers them as the library's from a copy of the libraries that JL4_LIBRARY_PATH names" $ do
+          env <- envWithout
+          tmp <- getTemporaryDirectory
+          let libCopy = tmp </> "l4-dmn-library-copy"
+              libSrc  = ".." </> "jl4-core" </> "libraries"
+          removePathForcibly libCopy
+          createDirectoryIfMissing True libCopy
+          files <- filter ((== ".l4") . takeExtension) <$> listDirectory libSrc
+          forM_ files \f -> copyFile (libSrc </> f) (libCopy </> f)
+          Output code sout serr <- runL4WithEnv (Just (("JL4_LIBRARY_PATH", libCopy) : env)) bin
+            ["export", "dmn", exportPreludeCallsFixture, "--fidelity-report"]
+          code `shouldBe` ExitSuccess
+          forM_ preludeCallForms \form -> sout `shouldSatisfy` (form `isInfixOf`)
+          serr `shouldNotSatisfy` ("D-NOT-LIBRARY" `isInfixOf`)
+
+        -- A Windows checkout can write the libraries with CRLF line endings.
+        it "lowers them as the library's from a copy of the libraries with CRLF line endings" $ do
+          env <- envWithout
+          tmp <- getTemporaryDirectory
+          let libCopy = tmp </> "l4-dmn-library-crlf"
+              libSrc  = ".." </> "jl4-core" </> "libraries"
+          removePathForcibly libCopy
+          createDirectoryIfMissing True libCopy
+          files <- filter ((== ".l4") . takeExtension) <$> listDirectory libSrc
+          forM_ files \f -> do
+            src <- BS8.readFile (libSrc </> f)
+            BS8.writeFile (libCopy </> f) (BS8.intercalate (BS8.pack "\r\n") (BS8.split '\n' src))
+          Output code sout serr <- runL4WithEnv (Just (("JL4_LIBRARY_PATH", libCopy) : env)) bin
+            ["export", "dmn", exportPreludeCallsFixture, "--fidelity-report"]
+          code `shouldBe` ExitSuccess
+          forM_ preludeCallForms \form -> sout `shouldSatisfy` (form `isInfixOf`)
+          serr `shouldNotSatisfy` ("D-NOT-LIBRARY" `isInfixOf`)
+
+        -- The directory is not enough: the text must be the compiled-in copy's.
+        it "lowers no call into a JL4_LIBRARY_PATH prelude.l4 whose sum and count are not the library's" $ do
+          env <- envWithout
+          Output code sout serr <- runL4WithEnv (Just (("JL4_LIBRARY_PATH", exportAlteredPreludeLib) : env)) bin
+            ["export", "dmn", exportAlteredPreludeFixture, "--fidelity-report"]
+          code `shouldBe` ExitSuccess
+          sout `shouldSatisfy` (not . ("sum(concatenate([0], xs))" `isInfixOf`))
+          sout `shouldSatisfy` (not . ("count(xs)" `isInfixOf`))
+          serr `shouldSatisfy` ("[D-LITERALEXPR] blocking — decision_total" `isInfixOf`)
+
+        it "lowers no prelude call from a JL4_LIBRARY_PATH copy that differs from the compiled-in one by a comment" $ do
+          env <- envWithout
+          libCopy <- editedLibraryCopy "l4-dmn-library-edited" "prelude.l4" "\n-- edited\n"
+          Output code sout serr <- runL4WithEnv (Just (("JL4_LIBRARY_PATH", libCopy) : env)) bin
+            ["export", "dmn", exportPreludeCallsFixture, "--fidelity-report"]
+          code `shouldBe` ExitSuccess
+          forM_ (filter (not . ("date(" `isInfixOf`)) preludeCallForms) \form ->
+            sout `shouldNotSatisfy` (form `isInfixOf`)
+          -- daydate.l4 and the date-compat.l4 it imports are unedited, so they
+          -- are still the library
+          sout `shouldSatisfy` ("<text>date(\"2024-01-02\")</text>" `isInfixOf`)
+          -- and the report names the file that is not, once, and says why
+          serr `shouldSatisfy` (notLibrary `isInfixOf`)
+          serr `shouldSatisfy` ("`prelude.l4` in the JL4_LIBRARY_PATH folder is not the copy compiled into this `l4`: its text differs" `isInfixOf`)
+          serr `shouldNotSatisfy` ("`daydate.l4` in the JL4_LIBRARY_PATH folder" `isInfixOf`)
+
+        -- The case the stale-embed trap produces most: an edit to one file
+        -- that another library file imports.
+        it "lowers no daydate call from a JL4_LIBRARY_PATH copy whose date-compat.l4 alone differs, and says which file and why" $ do
+          env <- envWithout
+          libCopy <- editedLibraryCopy "l4-dmn-library-date-compat" "date-compat.l4" "\n-- edited\n"
+          Output code sout serr <- runL4WithEnv (Just (("JL4_LIBRARY_PATH", libCopy) : env)) bin
+            ["export", "dmn", exportPreludeCallsFixture, "--fidelity-report"]
+          code `shouldBe` ExitSuccess
+          sout `shouldNotSatisfy` ("date(" `isInfixOf`)
+          -- the prelude is unedited, so it is still the library
+          forM_ (filter (not . ("date(" `isInfixOf`)) preludeCallForms) \form ->
+            sout `shouldSatisfy` (form `isInfixOf`)
+          -- One note, on daydate.l4, whose calls are the ones refused; it names
+          -- date-compat.l4 and says why that file is not the library's.
+          -- date-compat.l4 gets none of its own: nothing in it is lowered.
+          length (filter (notLibrary `isInfixOf`) (lines serr)) `shouldBe` 1
+          serr `shouldSatisfy` ("`daydate.l4` in the JL4_LIBRARY_PATH folder has the text of the copy compiled into this `l4`, but it imports `date-compat.l4`, whose text there differs from its compiled-in copy (line endings aside)" `isInfixOf`)
+          serr `shouldSatisfy` ("a plain `cabal build` does not embed the edited text" `isInfixOf`)
+
+        -- The lowering asks of a module only whether it is prelude.l4 or
+        -- daydate.l4 ('L4.Dmn.Lower.loweredLibraryFiles'), so whether any
+        -- other library file is taken for the library changes nothing.
+        it "gives no D-NOT-LIBRARY note for a library file none of whose functions is lowered by name" $ do
+          env <- envWithout
+          plain  <- editedLibraryCopy "l4-dmn-library-math-plain" "math.l4" ""
+          edited <- editedLibraryCopy "l4-dmn-library-math" "math.l4" "\n-- edited\n"
+          let over lib = runL4WithEnv (Just (("JL4_LIBRARY_PATH", lib) : env)) bin
+                           ["export", "dmn", exportImportsMathFixture, "--fidelity-report"]
+          Output codePlain soutPlain _ <- over plain
+          Output code sout serr <- over edited
+          codePlain `shouldBe` ExitSuccess
+          code `shouldBe` ExitSuccess
+          -- the call into math.l4 is refused either way, and the DMN is the same
+          serr `shouldSatisfy` ("[D-LITERALEXPR] blocking — decision_magnitude" `isInfixOf`)
+          map (filter (/= '\r')) (lines sout) `shouldBe` map (filter (/= '\r')) (lines soutPlain)
+          serr `shouldNotSatisfy` ("D-NOT-LIBRARY" `isInfixOf`)
+          -- With prelude.l4 edited instead, the one note is on prelude.l4, and
+          -- none is on the math.l4 that imports it.
+          editedPrelude <- editedLibraryCopy "l4-dmn-library-math-prelude" "prelude.l4" "\n-- edited\n"
+          Output codePrelude _ serrPrelude <- over editedPrelude
+          codePrelude `shouldBe` ExitSuccess
+          length (filter (notLibrary `isInfixOf`) (lines serrPrelude)) `shouldBe` 1
+          serrPrelude `shouldSatisfy` ("`prelude.l4` in the JL4_LIBRARY_PATH folder is not the copy compiled into this `l4`" `isInfixOf`)
+          serrPrelude `shouldNotSatisfy` ("`math.l4` in the JL4_LIBRARY_PATH folder" `isInfixOf`)
+
+        -- The note is Advisory: each refused call carries its own Blocking
+        -- note, and a module that calls nothing in the file loses nothing.
+        it "reports a library file that is not the compiled-in copy in an Advisory note, which --fail-on blocking passes when nothing calls into it" $ do
+          env <- envWithout
+          libCopy <- editedLibraryCopy "l4-dmn-library-unused" "prelude.l4" "\n-- edited\n"
+          let withLib = Just (("JL4_LIBRARY_PATH", libCopy) : env)
+          Output code _ serr <- runL4WithEnv withLib bin
+            ["export", "dmn", exportImportsPreludeUnusedFixture, "--fidelity-report", "--fail-on", "blocking"]
+          code `shouldBe` ExitSuccess
+          serr `shouldSatisfy` (notLibrary `isInfixOf`)
+          serr `shouldNotSatisfy` ("] blocking —" `isInfixOf`)
+          -- dmn-md's report carries it too
+          Output codeMd _ serrMd <- runL4WithEnv withLib bin
+            ["export", "dmn-md", exportImportsPreludeUnusedFixture, "--fidelity-report"]
+          codeMd `shouldBe` ExitSuccess
+          serrMd `shouldSatisfy` ("[D-NOT-LIBRARY] advisory" `isInfixOf`)
+
+        -- The note is the DMN reports': the BPMN report leaves it out.
+        it "leaves the D-NOT-LIBRARY note out of the BPMN report" $ do
+          env <- envWithout
+          libCopy <- editedLibraryCopy "l4-dmn-library-bpmn" "prelude.l4" "\n-- edited\n"
+          let withLib = Just (("JL4_LIBRARY_PATH", libCopy) : env)
+          Output code sout serr <- runL4WithEnv withLib bin
+            ["export", "bpmn", exportImportsPreludeDutyFixture, "--fidelity-report"]
+          code `shouldBe` ExitSuccess
+          -- the process was written, and its report printed
+          sout `shouldSatisfy` ("Process_the_payment" `isInfixOf`)
+          serr `shouldSatisfy` ("— Process_the_payment" `isInfixOf`)
+          serr `shouldNotSatisfy` ("D-NOT-LIBRARY" `isInfixOf`)
+          -- the same file over the same folder, exported to DMN, gets the note
+          Output codeDmn _ serrDmn <- runL4WithEnv withLib bin
+            ["export", "dmn", exportImportsPreludeDutyFixture, "--fidelity-report"]
+          codeDmn `shouldBe` ExitSuccess
+          serrDmn `shouldSatisfy` (notLibrary `isInfixOf`)
+
+        -- The compiled-in copy is the library only when it type-checks.
+        -- The export still exits 0 on a file `l4 check` refuses; that is
+        -- smucclaw/l4-ide#1110, not fixed here.
+        it "lowers no Date or YMD from the compiled-in daydate when the date-compat.l4 beside the file breaks it" $ do
+          env <- envWithout
+          Output code sout serr <- runL4WithEnv (Just env) bin
+            ["export", "dmn", exportBrokenDateCompatFixture, "--fidelity-report"]
+          code `shouldBe` ExitSuccess
+          -- the author's date-compat.l4 won resolution
+          serr `shouldSatisfy` ("[chosen]   project root:" `isInfixOf`)
+          sout `shouldNotSatisfy` ("date(" `isInfixOf`)
+          forM_ ["the_day", "the_ymd"] \d ->
+            serr `shouldSatisfy` (("[D-LITERALEXPR] blocking — decision_" <> d) `isInfixOf`)
+          -- in a table, too: the guard and both output entries
+          serr `shouldSatisfy` ("[D-NONFEELINPUT] blocking — decision_the_deadline" `isInfixOf`)
+          length (filter ("[D-NONFEELOUTPUT] blocking — decision_the_deadline" `isInfixOf`) (lines serr))
+            `shouldBe` 2
+          serr `shouldSatisfy` (notLibrary `isInfixOf`)
+          serr `shouldSatisfy` ("`daydate.l4`, a library file, does not type-check here with the modules it imports, among them `date-compat.l4`" `isInfixOf`)
+
+      it "renames an input spelled like a FEEL function the export calls" $ do
+        Output code sout _ <- runL4 bin ["export", "dmn", exportShadowedBuiltinsFixture]
+        code `shouldBe` ExitSuccess
+        forM_ ["floor", "decimal", "concatenate"] \w ->
+          sout `shouldSatisfy` (("<inputData id=\"input_" <> w <> "\" name=\"" <> w <> "_\"") `isInfixOf`)
+        sout `shouldSatisfy` ("max(floor(x), floor_)" `isInfixOf`)
+
+      -- A caller sending `floor` reaches nothing (null on Camunda, a skipped
+      -- decision on KIE), so the rename is reported.
+      it "reports each input renamed for a FEEL function's name with a Lossy D-RENAME note" $ do
+        Output code _ serr <- runL4 bin ["export", "dmn", exportShadowedBuiltinsFixture, "--fidelity-report"]
+        code `shouldBe` ExitSuccess
+        forM_ ["floor", "decimal", "concatenate"] \w ->
+          serr `shouldSatisfy` (("[D-RENAME] lossy — input_" <> w) `isInfixOf`)
+        serr `shouldSatisfy` ("`floor` is emitted as the FEEL name `floor_`, because `floor` is the name of a FEEL function this export calls" `isInfixOf`)
+
+      -- `l4 check` refuses the importer of a module with errors, so a constant
+      -- from one is no value L4 has: it is refused, not copied. The export
+      -- still exits 0 on it; that is smucclaw/l4-ide#1110, not fixed here.
+      it "refuses a constant from an imported module that does not type-check, rather than copying it" $ do
+        Output code sout serr <- runL4 bin ["export", "dmn", exportImportedUncheckedFixture]
+        code `shouldBe` ExitSuccess
+        serr `shouldSatisfy` ("1 blocking" `isInfixOf`)
+        sout `shouldSatisfy` (not . ("id=\"decision_the_rate\"" `isInfixOf`))
+        sout `shouldSatisfy` (not . ("\"three\"" `isInfixOf`))
+
+      -- One import further on, the module `l4 check` refuses has no error of
+      -- its own. The exit code (0) is smucclaw/l4-ide#1110, not fixed here.
+      it "refuses a constant from an imported module whose own import does not type-check" $ do
+        Output code sout serr <- runL4 bin ["export", "dmn", exportImportedHopFixture, "--fidelity-report"]
+        code `shouldBe` ExitSuccess
+        serr `shouldSatisfy` ("[D-LITERALEXPR] blocking — decision_pay2" `isInfixOf`)
+        serr `shouldSatisfy` (not . ("D-IMPORTED" `isInfixOf`))
+        sout `shouldSatisfy` (not . ("id=\"decision_clean\"" `isInfixOf`))
 
     -- FIXTURE(d)'s importer view must see a BACKTICKED import. A hyphenated
     -- module name can only be imported as IMPORT `interp-common`, and the
@@ -608,6 +1082,9 @@ spec bin = do
       Output code _ serr <- runL4 bin ["export", "dmn", exportNothingFixture]
       code `shouldSatisfy` (/= ExitSuccess)
       serr `shouldSatisfy` ("No decisions found" `isInfixOf`)
+      -- the wording for a module that really has no DECIDE or MEANS is
+      -- unchanged, and says nothing about a filter that did not run
+      serr `shouldSatisfy` (not . ("--include-tests" `isInfixOf`))
 
     it "refuses to guess which process to draw, and names the candidates" $ do
       -- renderBpmn writes its own XML prolog, so two processes concatenated is
@@ -1024,18 +1501,18 @@ spec bin = do
           out `shouldSatisfy` ("decision_stated_term_literal" `isInfixOf`)
           out `shouldSatisfy` ("Unknown variable 'disposal.term_in_years'" `isInfixOf`)
           out `shouldSatisfy` ("<<< FAILED" `isInfixOf`)
-          -- A SECOND, independent error, measured 2026-07-31 and recorded here
-          -- rather than tidied away: KIE resolves itemDefinition typeRefs in
-          -- DOCUMENT ORDER, and `itemdef_claim`'s `assessed grade` component
-          -- points at `Grade_optional`, which this emitter appends AFTER the
-          -- definitions that reference it. Pre-existing (HEAD's sumtype.dmn has
-          -- the same ordering) and previously unmeasured, because no engine had
-          -- ever looked at this file. It is confined to the `_optional` alias
-          -- machinery and `sumtype.dmn` is the only DMN golden that uses it, so
-          -- it changes no MustPass leg -- but it is a real portability defect
-          -- and pinning it here is what stops it being lost. See §11-R8-a.
-          out `shouldSatisfy` ("TYPE_DEF_NOT_FOUND" `isInfixOf`)
-          out `shouldSatisfy` ("Grade_optional" `isInfixOf`)
+          -- A SECOND, independent error was measured here on 2026-07-31 and
+          -- pinned until it was fixed: KIE resolves an itemDefinition typeRef
+          -- to an alias only when the alias comes EARLIER in the document, and
+          -- `itemdef_claim`'s `assessed grade` component points at
+          -- `Grade_optional`, which the emitter used to append after every base
+          -- definition. Fixed by smucclaw/l4-ide#1101's change: definitions
+          -- are now emitted in dependency order, and this leg asserts the
+          -- error is GONE, so the refusal above is the only thing KIE rejects.
+          -- The exhibit that pins the order on both engines as a MustPass is
+          -- `itemdef-order`, through its engine baseline.
+          out `shouldSatisfy` (not . ("TYPE_DEF_NOT_FOUND" `isInfixOf`))
+          out `shouldSatisfy` (not . ("Grade_optional" `isInfixOf`))
 
   -- Tier 1 of the Phase 5 evidence: the 23 hand-written BKM/service probes,
   -- exactly per DMN-PHASE5-BUILD-PLAN.md §1's matrix. See 'bkmProbeMatrix'
@@ -1158,6 +1635,205 @@ spec bin = do
           -- perfectly valid and KIE builds it without complaint.
           out `shouldSatisfy` ("XSD    valid" `isInfixOf`)
           out `shouldSatisfy` ("BUILD  clean" `isInfixOf`)
+
+  -- smucclaw/l4-ide#1102. Exported fresh (there is no committed golden: the
+  -- golden harness resolves only the embedded libraries, and this subject
+  -- imports a sibling file), then run on both engines. Before #1102, KIE
+  -- refused the file with "Unknown variable 'the_longest_week'" and
+  -- "Unknown variable 'the_threshold'", and Camunda answered null for every
+  -- decision that read one, the cases supplying nothing under those names.
+  describe "imported constants (opt-in: L4_DMN_ENGINE_CHECK=1)" $ do
+    let exported = do
+          tmp <- getTemporaryDirectory
+          let outDir  = tmp </> "l4-export-imported-constant"
+              outFile = outDir </> "export-imported-constant.dmn"
+          removePathForcibly outDir
+          createDirectoryIfMissing True outDir
+          Output code _ serr <- runL4 bin ["export", "dmn", exportImportedConstantFixture, "-o", outFile]
+          unless (code == ExitSuccess) $
+            expectationFailure ("l4 export dmn failed:\n" ++ serr)
+          pure outFile
+    it "KIE builds the model and answers every decision that reads an imported constant" $ do
+      dmn <- exported
+      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustPass
+        dmn [dmn, "--cases", exportImportedConstantCases] \out -> do
+          out `shouldSatisfy` ("BUILD  clean" `isInfixOf`)
+          out `shouldSatisfy` ("3 case(s), 0 error(s), 0 warning(s)" `isInfixOf`)
+          out `shouldSatisfy` ("21/21 value(s) as expected" `isInfixOf`)
+
+    it "Camunda answers every decision that reads an imported constant" $ do
+      dmn <- exported
+      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustPass
+        dmn [dmn, "--cases", exportImportedConstantCases] \out -> do
+          out `shouldSatisfy` ("1 parsed, 0 error(s)" `isInfixOf`)
+          out `shouldSatisfy` ("21/21 value(s) as expected" `isInfixOf`)
+
+  -- What the raw-L4 notes claim: neither engine runs any decision of the
+  -- file, the plain-FEEL `pay` included.
+  describe "raw L4 costs the whole file (opt-in: L4_DMN_ENGINE_CHECK=1)" $ do
+    let exported = do
+          tmp <- getTemporaryDirectory
+          let outDir  = tmp </> "l4-export-raw-l4"
+              outFile = outDir </> "export-raw-l4.dmn"
+          removePathForcibly outDir
+          createDirectoryIfMissing True outDir
+          Output code _ serr <- runL4 bin ["export", "dmn", exportRawL4Fixture, "-o", outFile]
+          unless (code == ExitSuccess) $
+            expectationFailure ("l4 export dmn failed:\n" ++ serr)
+          pure outFile
+    it "KIE refuses to load the file" $ do
+      dmn <- exported
+      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustFail
+        dmn [dmn, "--cases", exportRawL4Cases] \out -> do
+          out `shouldSatisfy` ("0 case(s)" `isInfixOf`)
+          out `shouldSatisfy` ("ERR_COMPILING_FEEL" `isInfixOf`)
+
+    it "Camunda refuses to parse the file" $ do
+      dmn <- exported
+      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustFail
+        dmn [dmn, "--cases", exportRawL4Cases] \out ->
+          out `shouldSatisfy` ("0 parsed" `isInfixOf`)
+
+  -- What the D-NONFEELOUTPUT note claims for a default output entry.
+  describe "raw L4 in a default output entry (opt-in: L4_DMN_ENGINE_CHECK=1)" $ do
+    let exported = do
+          tmp <- getTemporaryDirectory
+          let outDir  = tmp </> "l4-export-raw-l4-default"
+              outFile = outDir </> "export-raw-l4-default.dmn"
+          removePathForcibly outDir
+          createDirectoryIfMissing True outDir
+          Output code _ serr <- runL4 bin ["export", "dmn", exportRawL4DefaultFixture, "-o", outFile]
+          unless (code == ExitSuccess) $
+            expectationFailure ("l4 export dmn failed:\n" ++ serr)
+          pure outFile
+    it "KIE loads the file and answers null for the decision, reported as success" $ do
+      dmn <- exported
+      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustFail
+        dmn [dmn, "--cases", exportRawL4DefaultCases] \out -> do
+          out `shouldSatisfy` ("1 case(s), 0 error(s)" `isInfixOf`)
+          out `shouldSatisfy` ("SUCCEEDED-BUT-NULL" `isInfixOf`)
+
+    it "Camunda refuses to parse the file" $ do
+      dmn <- exported
+      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustFail
+        dmn [dmn, "--cases", exportRawL4DefaultCases] \out ->
+          out `shouldSatisfy` ("0 parsed" `isInfixOf`)
+
+  -- The other way round: a bare name in a rule's own output entry.
+  describe "a bare name in a rule's output entry (opt-in: L4_DMN_ENGINE_CHECK=1)" $ do
+    let exported = do
+          tmp <- getTemporaryDirectory
+          let outDir  = tmp </> "l4-export-raw-l4-bare-name"
+              outFile = outDir </> "export-raw-l4-bare-name.dmn"
+          removePathForcibly outDir
+          createDirectoryIfMissing True outDir
+          Output code _ serr <- runL4 bin ["export", "dmn", exportRawL4BareNameFixture, "-o", outFile]
+          unless (code == ExitSuccess) $
+            expectationFailure ("l4 export dmn failed:\n" ++ serr)
+          pure outFile
+    -- Whether or not the case sends a `TBD`: KIE runs no case at all.
+    it "KIE refuses to load the file" $ do
+      dmn <- exported
+      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustFail
+        dmn [dmn, "--cases", exportRawL4BareNameCases] \out -> do
+          out `shouldSatisfy` ("0 case(s)" `isInfixOf`)
+          out `shouldSatisfy` ("Unknown variable 'TBD'" `isInfixOf`)
+
+    -- The model declares no input `TBD`, and Camunda reads the name from the
+    -- caller's context all the same: the second case sends "oops".
+    it "Camunda parses the file, answers the plain decision, and for the one with the bare name the caller's TBD, null when it sends none" $ do
+      dmn <- exported
+      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustFail
+        dmn [dmn, "--cases", exportRawL4BareNameCases] \out -> do
+          out `shouldSatisfy` ("1 parsed" `isInfixOf`)
+          out `shouldSatisfy` ("3/3 value(s) as expected" `isInfixOf`)
+          -- the first case, which sends no TBD
+          out `shouldSatisfy` ("EVALUATED-TO-NULL" `isInfixOf`)
+          -- the second, which sends "oops"
+          lines out `shouldSatisfy` any (\l -> "banded" `isInfixOf` l && "= oops" `isInfixOf` l)
+
+  -- Before these names were reserved, KIE refused all three decisions
+  -- ("Not an invocable"); Camunda answered them.
+  describe "inputs spelled like FEEL functions (opt-in: L4_DMN_ENGINE_CHECK=1)" $ do
+    let exported = do
+          tmp <- getTemporaryDirectory
+          let outDir  = tmp </> "l4-export-shadowed-builtins"
+              outFile = outDir </> "export-shadowed-builtins.dmn"
+          removePathForcibly outDir
+          createDirectoryIfMissing True outDir
+          Output code _ serr <- runL4 bin ["export", "dmn", exportShadowedBuiltinsFixture, "-o", outFile]
+          unless (code == ExitSuccess) $
+            expectationFailure ("l4 export dmn failed:\n" ++ serr)
+          pure outFile
+    it "KIE calls the function, not the input spelled like it" $ do
+      dmn <- exported
+      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustPass
+        dmn [dmn, "--cases", exportShadowedBuiltinsCases] \out -> do
+          out `shouldSatisfy` ("1 case(s), 0 error(s), 0 warning(s)" `isInfixOf`)
+          out `shouldSatisfy` ("3/3 value(s) as expected" `isInfixOf`)
+
+    it "Camunda calls the function, not the input spelled like it" $ do
+      dmn <- exported
+      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustPass
+        dmn [dmn, "--cases", exportShadowedBuiltinsCases] \out -> do
+          out `shouldSatisfy` ("1 parsed, 0 error(s)" `isInfixOf`)
+          out `shouldSatisfy` ("3/3 value(s) as expected" `isInfixOf`)
+
+  -- EMPTY, the empty list. Before it was FEEL's [], KIE answered 0 of these
+  -- 10 values as expected (count("EMPTY") is 1, the prelude's sum of it fails, and
+  -- xs = "EMPTY" is null), and Camunda answered null for every decision but
+  -- `no amounts`, which it answered with the string.
+  describe "EMPTY as the empty list (opt-in: L4_DMN_ENGINE_CHECK=1)" $ do
+    let exported = do
+          tmp <- getTemporaryDirectory
+          let outDir  = tmp </> "l4-export-empty-list"
+              outFile = outDir </> "export-empty-list.dmn"
+          removePathForcibly outDir
+          createDirectoryIfMissing True outDir
+          Output code _ serr <- runL4 bin ["export", "dmn", exportEmptyListFixture, "-o", outFile]
+          unless (code == ExitSuccess) $
+            expectationFailure ("l4 export dmn failed:\n" ++ serr)
+          pure outFile
+    it "KIE answers count, sum and an equality test over EMPTY as L4 does" $ do
+      dmn <- exported
+      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustPass
+        dmn [dmn, "--cases", exportEmptyListCases] \out -> do
+          out `shouldSatisfy` ("2 case(s), 0 error(s), 0 warning(s)" `isInfixOf`)
+          out `shouldSatisfy` ("10/10 value(s) as expected" `isInfixOf`)
+
+    it "Camunda answers count, sum and an equality test over EMPTY as L4 does" $ do
+      dmn <- exported
+      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustPass
+        dmn [dmn, "--cases", exportEmptyListCases] \out -> do
+          out `shouldSatisfy` ("1 parsed, 0 error(s)" `isInfixOf`)
+          out `shouldSatisfy` ("10/10 value(s) as expected" `isInfixOf`)
+
+  -- The same, in a decision table: `[]` as an output entry, and a list tested
+  -- against EMPTY as a boolean column.
+  describe "EMPTY in a decision table (opt-in: L4_DMN_ENGINE_CHECK=1)" $ do
+    let exported = do
+          tmp <- getTemporaryDirectory
+          let outDir  = tmp </> "l4-export-empty-list-table"
+              outFile = outDir </> "export-empty-list-table.dmn"
+          removePathForcibly outDir
+          createDirectoryIfMissing True outDir
+          Output code _ serr <- runL4 bin ["export", "dmn", exportEmptyListTableFixture, "-o", outFile]
+          unless (code == ExitSuccess) $
+            expectationFailure ("l4 export dmn failed:\n" ++ serr)
+          pure outFile
+    it "KIE answers an output entry [] and a test against EMPTY as L4 does" $ do
+      dmn <- exported
+      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustPass
+        dmn [dmn, "--cases", exportEmptyListTableCases] \out -> do
+          out `shouldSatisfy` ("2 case(s), 0 error(s), 0 warning(s)" `isInfixOf`)
+          out `shouldSatisfy` ("4/4 value(s) as expected" `isInfixOf`)
+
+    it "Camunda answers an output entry [] and a test against EMPTY as L4 does" $ do
+      dmn <- exported
+      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustPass
+        dmn [dmn, "--cases", exportEmptyListTableCases] \out -> do
+          out `shouldSatisfy` ("1 parsed, 0 error(s)" `isInfixOf`)
+          out `shouldSatisfy` ("4/4 value(s) as expected" `isInfixOf`)
 
   -- The placement rule's NEGATIVE control (spec §4.3, §9). Everything else in
   -- this file asserts that a gate stays green, which on its own says nothing

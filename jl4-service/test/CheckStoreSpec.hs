@@ -20,13 +20,14 @@ import Compiler (computeVersion)
 import DeploymentLoader (loadAllAndRegister)
 import IntegrationSpec (testOptions)
 import Logging (Logger, newLoggerTo)
-import Options (Options (..), buildOpts, parseOptionsPure)
+import Options (Options (..), buildOpts, hostFromEnv, parseOptionsPure)
 import qualified BundleStore
 import TestData (nameClashJL4, qualifiesJL4)
 import TestStoreDir (withStoreDir)
 import Types (DeploymentId (..), DeploymentState (..))
 
 import Control.Concurrent.STM (newTVarIO, readTVarIO)
+import Control.Exception (bracket)
 import Control.Monad (forM, forM_)
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as Key
@@ -41,6 +42,7 @@ import System.Directory
   , doesDirectoryExist
   , listDirectory
   )
+import System.Environment (lookupEnv, setEnv, unsetEnv)
 import System.Exit (ExitCode (..))
 import System.FilePath ((</>), makeRelative)
 import System.IO (IOMode (WriteMode), withFile)
@@ -276,3 +278,45 @@ spec = describe "jl4-service --check-store" do
       -- --json is a way of printing the check, and means nothing without it
       status ["--json"] `shouldBe` Just (ExitFailure 2)
       status ["--check-store", "d", "--json"] `shouldBe` Nothing
+
+    describe "--host" do
+      -- What the service listens on, as the options read it, with JL4_HOST set
+      -- to the given value (or unset) for the parse and put back afterwards.
+      let hostFor env args = withEnvVar "JL4_HOST" env do
+            info <- buildOpts
+            pure case parseOptionsPure "jl4-service" info args of
+              Right opts -> Just opts.host
+              Left _ -> Nothing
+
+      it "listens on every interface unless told otherwise, as the service did before the option" do
+        hostFor Nothing [] `shouldReturn` Just "*"
+
+      it "takes the address to listen on" do
+        hostFor Nothing ["--host", "127.0.0.1"] `shouldReturn` Just "127.0.0.1"
+
+      it "refuses an empty --host, which listened on every interface on macOS" do
+        info <- buildOpts
+        let refused = case parseOptionsPure "jl4-service" info ["--host", ""] of
+              Left (Right (message, code)) ->
+                Just (code, "needs an address" `Text.isInfixOf` Text.pack message)
+              _ -> Nothing
+        refused `shouldBe` Just (ExitFailure 1, True)
+
+      it "reads JL4_HOST, and the command line wins over it" do
+        hostFor (Just "127.0.0.1") [] `shouldReturn` Just "127.0.0.1"
+        hostFor (Just "127.0.0.1") ["--host", "*"] `shouldReturn` Just "*"
+
+      -- Not through the environment: base's setEnv with an empty value removes
+      -- the variable, so a test that set JL4_HOST to "" would read the unset case.
+      it "counts an empty JL4_HOST as unset" do
+        hostFromEnv (Just "") `shouldBe` "*"
+        hostFromEnv Nothing `shouldBe` "*"
+        hostFromEnv (Just "127.0.0.1") `shouldBe` "127.0.0.1"
+
+-- | Run an action with an environment variable set to a value, or unset, and
+-- put it back as it was.
+withEnvVar :: String -> Maybe String -> IO a -> IO a
+withEnvVar name value act = bracket (lookupEnv name) restore \_ -> set value >> act
+  where
+    set = maybe (unsetEnv name) (setEnv name)
+    restore = set

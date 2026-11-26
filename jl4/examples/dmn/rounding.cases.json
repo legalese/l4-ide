@@ -1,0 +1,193 @@
+{
+  "note": [
+    "Engine cases for rounding.l4 (smucclaw/l4-ide#1103). Every expected value",
+    "is what `l4 run` prints for the #EVAL lines at the end of that file, in",
+    "order. The x values are the edges where FEEL could differ from L4: halves",
+    "on both sides of zero for ROUND (which rounds a half to the even",
+    "neighbour), negatives for FLOOR and CEILING, and an empty list for sum",
+    "and count (L4 answers 0 for both; FEEL's own sum([]) answers null, which",
+    "is why the export adds a leading 0)."
+  ],
+  "cases": [
+    {
+      "name": "A. x = 2.5, cap = 1, amounts = []",
+      "context": {
+        "x": 2.5,
+        "cap": 1,
+        "amounts": []
+      },
+      "expect": {
+        "rounded_down": 2,
+        "rounded_up": 3,
+        "rounded": 2,
+        "band": "low",
+        "capped": 1,
+        "at_least_the_cap": 2.5,
+        "total": 0,
+        "how_many": 0
+      }
+    },
+    {
+      "name": "B. x = 3.5, cap = 4, amounts = [3, 1, 2]",
+      "context": {
+        "x": 3.5,
+        "cap": 4,
+        "amounts": [
+          3,
+          1,
+          2
+        ]
+      },
+      "expect": {
+        "rounded_down": 3,
+        "rounded_up": 4,
+        "rounded": 4,
+        "band": "high",
+        "capped": 3.5,
+        "at_least_the_cap": 4,
+        "total": 6,
+        "how_many": 3
+      }
+    },
+    {
+      "name": "C. x = -2.5, cap = 0, amounts = [0.1, 0.2]",
+      "context": {
+        "x": -2.5,
+        "cap": 0,
+        "amounts": [
+          0.1,
+          0.2
+        ]
+      },
+      "expect": {
+        "rounded_down": -3,
+        "rounded_up": -2,
+        "rounded": -2,
+        "band": "low",
+        "capped": -2.5,
+        "at_least_the_cap": 0,
+        "total": 0.3,
+        "how_many": 2
+      }
+    },
+    {
+      "name": "D. x = 0.5, cap = 0.5, amounts = []",
+      "context": {
+        "x": 0.5,
+        "cap": 0.5,
+        "amounts": []
+      },
+      "expect": {
+        "rounded_down": 0,
+        "rounded_up": 1,
+        "rounded": 0,
+        "band": "low",
+        "capped": 0.5,
+        "at_least_the_cap": 0.5,
+        "total": 0,
+        "how_many": 0
+      }
+    },
+    {
+      "name": "E. x = -0.5, cap = -1, amounts = [3, 1, 2]",
+      "context": {
+        "x": -0.5,
+        "cap": -1,
+        "amounts": [
+          3,
+          1,
+          2
+        ]
+      },
+      "expect": {
+        "rounded_down": -1,
+        "rounded_up": 0,
+        "rounded": 0,
+        "band": "low",
+        "capped": -1,
+        "at_least_the_cap": -0.5,
+        "total": 6,
+        "how_many": 3
+      }
+    },
+    {
+      "name": "F. x = 1.5, cap = 2, amounts = []",
+      "context": {
+        "x": 1.5,
+        "cap": 2,
+        "amounts": []
+      },
+      "expect": {
+        "rounded_down": 1,
+        "rounded_up": 2,
+        "rounded": 2,
+        "band": "low",
+        "capped": 1.5,
+        "at_least_the_cap": 2,
+        "total": 0,
+        "how_many": 0
+      }
+    },
+    {
+      "name": "G. x = -1.5, cap = -1.5, amounts = [0.1, 0.2]",
+      "context": {
+        "x": -1.5,
+        "cap": -1.5,
+        "amounts": [
+          0.1,
+          0.2
+        ]
+      },
+      "expect": {
+        "rounded_down": -2,
+        "rounded_up": -1,
+        "rounded": -2,
+        "band": "low",
+        "capped": -1.5,
+        "at_least_the_cap": -1.5,
+        "total": 0.3,
+        "how_many": 2
+      }
+    },
+    {
+      "name": "H. x = 2.7, cap = 10, amounts = []",
+      "context": {
+        "x": 2.7,
+        "cap": 10,
+        "amounts": []
+      },
+      "expect": {
+        "rounded_down": 2,
+        "rounded_up": 3,
+        "rounded": 3,
+        "band": "high",
+        "capped": 2.7,
+        "at_least_the_cap": 10,
+        "total": 0,
+        "how_many": 0
+      }
+    },
+    {
+      "name": "I. x = -3, cap = -4, amounts = [3, 1, 2]",
+      "context": {
+        "x": -3,
+        "cap": -4,
+        "amounts": [
+          3,
+          1,
+          2
+        ]
+      },
+      "expect": {
+        "rounded_down": -3,
+        "rounded_up": -3,
+        "rounded": -3,
+        "band": "low",
+        "capped": -4,
+        "at_least_the_cap": -3,
+        "total": 6,
+        "how_many": 3
+      }
+    }
+  ]
+}

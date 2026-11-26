@@ -171,7 +171,7 @@ hasUndecided :: Cover ans -> Bool
 hasUndecided c = or [ True | Bucket _ (Undecided _) <- c.cvBuckets ]
 
 -- | Cover one decision. 'Left' says why not even the rungs could be covered.
--- An evaluation stopped at a limit (ruled by Meng 2026-11-21, extending L2) is one such reason:
+-- An evaluation stopped at a limit (decided by Claude 2026-11-21, pending Meng's review: L2 extension, choice 2) is one such reason:
 -- read as "raises", it would drop that input or blame a condition for it.
 coverTarget :: CoverEnv ans -> CoverTarget -> IO (Either Text (Cover ans))
 coverTarget ce t =

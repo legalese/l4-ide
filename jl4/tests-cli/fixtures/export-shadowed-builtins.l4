@@ -1,0 +1,22 @@
+-- Inputs spelled like a FEEL function the export calls. FEEL looks up a
+-- call's name among the variables first, so before these names were reserved
+-- an input named `floor` made `floor(x)` a call of the number the input
+-- holds, and KIE refused all three decisions at run time ("Not an
+-- invocable"). Each input is now emitted with a suffix (`floor_`), and its
+-- label keeps the L4 name.
+IMPORT prelude
+
+GIVEN x IS A NUMBER
+      floor IS A NUMBER
+GIVETH A NUMBER
+DECIDE `f` x floor IS max (FLOOR x) floor
+
+GIVEN y IS A NUMBER
+      decimal IS A NUMBER
+GIVETH A NUMBER
+DECIDE `g` y decimal IS ROUND y PLUS decimal
+
+GIVEN items IS A LIST OF NUMBER
+      concatenate IS A NUMBER
+GIVETH A NUMBER
+DECIDE `h` items concatenate IS sum items PLUS concatenate

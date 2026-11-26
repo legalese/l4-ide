@@ -63,32 +63,38 @@ module L4.Cli.Export
   ) where
 
 import Base
+import qualified Base.Map as Map
 import qualified Base.Text as Text
 import Control.Exception (SomeException, try)
 import qualified Base.Set as Set
+import qualified Data.ByteString as ByteString
+import qualified Data.Text.Encoding as Text (decodeUtf8')
 import Options.Applicative
-import System.Directory (doesDirectoryExist, listDirectory)
+import System.Directory (canonicalizePath, doesDirectoryExist, listDirectory)
+import System.Environment (lookupEnv)
 import System.Exit (exitFailure, exitSuccess)
-import System.FilePath (replaceExtension, takeBaseName, takeDirectory, takeExtension, (</>))
+import System.FilePath (replaceExtension, takeBaseName, takeDirectory, takeExtension, takeFileName, (</>))
 
 import qualified LSP.Core.Shake as Shake
 import qualified LSP.L4.Rules as Rules
-import Language.LSP.Protocol.Types (normalizedFilePathToUri)
+import Language.LSP.Protocol.Types (normalizedFilePathToUri, uriToFilePath)
 
+import qualified L4.API.EmbeddedLibraries as EmbeddedLibraries
 import L4.Bpmn.Emit (renderBpmn)
 import L4.Bpmn.IR (BpmnExport (..), BpmnOptions (..), DeadlineUnitPolicy (..))
 import L4.Bpmn.Lower (stateGraphToBpmn)
 import L4.Bpmn.Wiring (wiringFromDrg)
 import L4.Dmn.Emit (emitDrg)
-import L4.Dmn.IR (Drg, DmnFlavor (..), defaultDmnFlavor, dmnReport, drgDecisions)
-import L4.Dmn.Lower (DmnLowerOptions (..), lowerModule, moduleTitle, resolveMaybePredicates)
+import L4.Dmn.IR (Drg (..), DmnFlavor (..), DropReason (..), defaultDmnFlavor, dmnReport, drgDecisions)
+import L4.Dmn.Lower
+  ( DmnLowerOptions (..), ImportedModule (..), checkerClauseMatrixRanges
+  , checkerMissingMatchRanges, embeddedLibraryModule, loweredLibraryFiles, lowerModule, moduleTitle
+  , resolveMaybePredicates )
 import L4.Dmn.Markdown (emitMarkdown, markdownReport)
-import L4.Annotation (rangeOf)
 import L4.Interchange.Fidelity
-  (FidelityNote (..), FidelityReport (..), FidelitySeverity (..), renderReport)
+  (FidelityNote (..), FidelityReport (..), FidelitySeverity (..), addNote, emptyReport, renderReport)
 import L4.StateGraph (StateGraph (..), extractStateGraphs)
 import L4.Syntax
-import qualified L4.TypeCheck as TC
 
 import L4.Cli.Common
 
@@ -289,6 +295,13 @@ deadlineUnitOption = optional
       )
   )
 
+-- | Shared by @export dmn@, @export dmn-md@ and @export bpmn@, so its help
+-- must be true of all three. "Most realistic exports" was measured on each,
+-- over the 1,049 tracked @.l4@ files under @jl4/examples/@ and @doc/@, exported
+-- one by one with @--fidelity-report@ (2026-11-26, on this branch's build): of the files each
+-- one writes, a Blocking note is in 441 of 764 for @dmn@, 764 of 764 for
+-- @dmn-md@, and 49 of 49 for @bpmn@, which writes only a file with exactly
+-- one regulative rule unless @--rule@ names one.
 failOnOption :: Parser FidelityGate
 failOnOption = option fidelityGateReader
   ( long "fail-on"
@@ -297,8 +310,9 @@ failOnOption = option fidelityGateReader
  <> showDefaultWith (const "none")
  <> help
       "Exit non-zero when the fidelity report holds a note this severe or worse: \
-      \none|blocking|lossy|advisory. Default none, because Blocking describes the \
-      \target notation's limits and fires on every realistic export."
+      \none|blocking|lossy|advisory. Default none, because Blocking usually describes \
+      \the target notation's limits rather than a defect in your file, and fires on \
+      \most realistic exports."
   )
 
 includeTestsSwitch :: Parser Bool
@@ -422,8 +436,19 @@ moduleDecideNames (MkModule _ _ sec) = goSec sec
 -- It does not decide whether the result is worth emitting: a module with no
 -- decisions is an error for @l4 export dmn@ and a non-event for @l4 export bpmn@, so that
 -- judgement stays with the callers.
-dmnDrgFor :: ExportOptions -> Rules.TypeCheckResult -> IO Drg
+--
+-- With the DRG it returns the notes 'dmnLibraryModule' gives, one for each of
+-- @prelude.l4@ and @daydate.l4@ that this run loaded and does not take for the
+-- library. The DMN and dmn-md callers put them at the head of their reports,
+-- so that a reader meets the cause before the refusals it explains, and
+-- @l4 export bpmn@ leaves them out: its report carries none of the DMN model's
+-- notes, so it has no refused call for them to explain. Both placements are
+-- decided by Claude 2026-11-26, pending Meng's review.
+dmnDrgFor :: ExportOptions -> Rules.TypeCheckResult -> IO (Drg, [FidelityNote])
 dmnDrgFor opts tcRes = do
+  -- Which loaded modules are the standard library, for the lowering's
+  -- provenance tests (`sum`, `all`, `YMD`, `isJust` and the rest).
+  (library, libraryNotes) <- dmnLibraryModule (Rules.transitiveDependencies tcRes)
   -- FIXTURE(d)'s importer view (§2.5.7, OPEN-5): a sibling-directory scan.
   -- Textual and conservative-keep: an occurrence of a decide's name anywhere
   -- in an importing sibling counts as an external reference, so over-matching
@@ -452,46 +477,323 @@ dmnDrgFor opts tcRes = do
             -- L4.Dmn.Lower beside its only consumer, so this call site and the
             -- golden harness's cannot drift apart on how recognition is done.
             , dloMaybePredicates =
-                resolveMaybePredicates tcRes.module' tcRes.environment tcRes.entityInfo
+                resolveMaybePredicates library tcRes.module' tcRes.environment tcRes.entityInfo
             , dloIncludeTests = opts.exportIncludeTests
             -- DMN-SAFE's L1: the checker's own exhaustiveness warnings, from
             -- the same check result the module came from (the golden harness
-            -- extracts them identically, so the two cannot drift).
-            , dloMissingMatchRanges =
-                [ r
-                | e@(TC.MkCheckErrorWithContext (TC.CheckWarning (TC.PatternMatchesMissing _ _)) _) <- tcRes.infos
-                , Just r <- [rangeOf e]
-                ]
+            -- extracts them with the same function, so the two cannot drift).
+            , dloMissingMatchRanges = checkerMissingMatchRanges tcRes.infos
             -- L1's Decide-level channel: the clause-matrix warnings for
-            -- multi-clause pattern-matching groups, extracted by the same
-            -- comprehension as above (the golden harness matches this
-            -- exactly, so the two cannot drift).
-            , dloClauseMatrixRanges =
-                [ r
-                | e@(TC.MkCheckErrorWithContext (TC.CheckWarning (TC.PatternClausesMissing {})) _) <- tcRes.infos
-                , Just r <- [rangeOf e]
-                ]
+            -- multi-clause pattern-matching groups.
+            , dloClauseMatrixRanges = checkerClauseMatrixRanges tcRes.infos
             , dloExternalRefNames = externalRefs
+            -- #1102: every module this one imports, transitively and once
+            -- each (the same walk `l4 export catala` takes), so a closed
+            -- imported constant can be carried into the model as a decision,
+            -- and certified with the checker's facts about its own module.
+            -- 'imChecks' is 'Rules.evaluable', `l4 run`'s test: the module
+            -- type-checks, and so does every module it imports, directly or
+            -- not, so a module with no error of its own that imports one with
+            -- errors is refused too. `l4 check` asks something else: only that
+            -- the module's own check succeeded, and that no blocking diagnostic
+            -- is in its closure ("LSP.L4.BlockingErrors"), which is how an
+            -- import's errors reach it. The two kinds probed (a type mismatch,
+            -- check/implicit-crosses-import) fail 'Rules.evaluable' too, but
+            -- the two tests do not agree in every case: an IMPORT that resolves
+            -- to nothing is dropped before 'Rules.evaluable' looks, so a module
+            -- with one is copied from, while `l4 check` refuses it
+            -- (import/module-not-found). The copy's value is the one `l4 run`
+            -- prints, though `l4 run` exits 1 on the missing module (found by
+            -- the review of this branch, 2026-11-26).
+            , dloImportedModules =
+                [ MkImportedModule
+                    { imModule             = dep.module'
+                    , imSubstitution       = dep.substitution
+                    , imMissingMatchRanges = checkerMissingMatchRanges dep.infos
+                    , imClauseMatrixRanges = checkerClauseMatrixRanges dep.infos
+                    , imChecks             = Rules.evaluable dep
+                    }
+                | dep <- Rules.transitiveDependencies tcRes
+                ]
+            , dloLibraryModule = library
             }
           tcRes.module'
-  pure drg
+  pure (drg, libraryNotes)
+
+-- | The standard-library file a loaded module is, for 'dloLibraryModule': the
+-- copy compiled into this binary, or a file in the @$JL4_LIBRARY_PATH@
+-- directory, which outranks every other place the resolver looks (CLAUDE.md
+-- §5), __whose text is the compiled-in copy of the same name__ (line endings
+-- aside), and every module it imports is one of these too; and in either case
+-- only a module that type-checks with every module it imports
+-- ('Rules.evaluable'). Nothing else is the
+-- library, whatever it is called: a @prelude.l4@ beside the exported file
+-- outranks the compiled-in copy when that variable is unset, and is the
+-- author's own module. Nor is a library found in the per-user store or the
+-- editor bundle, which the resolver reaches only when @$JL4_LIBRARY_PATH@
+-- names a directory without it. Each of these fails closed: its calls are
+-- refused (Blocking) rather than lowered as the library's.
+--
+-- Why the text, and not the directory alone: the lowering writes the
+-- library's calls as the FEEL the compiled-in copy's bodies mean
+-- (@sum(concatenate([0], xs))@ for @sum@), so a directory whose @prelude.l4@
+-- defines @sum@ differently was exported as the built-in @sum@ while @l4 run@
+-- evaluated its own: @sum xs PLUS count xs@ over a @prelude.l4@ defining them
+-- as 42 and 7 answered 5 on both engines against L4's 49, with Advisory notes
+-- only (found by the review of this branch, 2026-11-26). Comparing the text
+-- with the copy this binary carries is the one check that cannot be fooled by
+-- a body, and it costs a library file that differs from the binary's copy in
+-- any character, a comment included, the lowering of the calls into it and
+-- into every library file that imports it: a binary built from other
+-- @jl4-core/libraries@ than the ones its @$JL4_LIBRARY_PATH@ names gets a
+-- Blocking note on each such call, where it used to lower them. Requiring the
+-- text and not the meaning is decided by Claude 2026-11-26, pending Meng's
+-- review.
+--
+-- Line endings are not compared: @\r\n@ is read as @\n@ on both sides. A
+-- Windows checkout can write the libraries with CRLF, while the copy compiled
+-- in was read in text mode, so a byte comparison would refuse the very tree
+-- the binary was built from (found by the review of this branch, 2026-11-26;
+-- the release workflow runs @l4-cli-test@ on Windows).
+--
+-- The compiled-in copy, too, is the library only when it type-checks with
+-- every module it imports. Its imports are not otherwise looked at: of the
+-- libraries whose calls are lowered by name, the prelude imports nothing, and
+-- @daydate@ imports @date-compat@, which the embedded @daydate@ resolves to an
+-- author's @date-compat.l4@ in the project root. Such a file broke @daydate@
+-- by defining a name @daydate@ defines too (@check/ambiguous-identifier@), so
+-- @l4 check@ and @l4 run@ refused the importer, while the export, which then
+-- trusted the compiled-in copy whatever it checked to, wrote
+-- @date("2024-03-02")@ for @Date 2 3 2024@ and @YMD 2024 3 2@ with Advisory
+-- notes only (@jl4/tests-cli/fixtures/export-broken-date-compat/@; found by
+-- the review of this branch, 2026-11-26). One that leaves @daydate@ checking
+-- has not been seen to change what @Date@ or @YMD@ mean (measured 2026-11-26:
+-- with one defining @DATE@ as 1 January 1999 beside the file, @l4 run@ and the
+-- export both give 2 January 2024 for @Date 2 1 2024@ and @YMD 2024 1 2@; the
+-- review's attempts to shadow the builtins @daydate@ calls each broke its
+-- check instead). A library lowered by name that called into its imports
+-- would need the import rule above extended to the compiled-in copy. Leaving
+-- it so is decided by Claude 2026-11-26, pending Meng's review.
+--
+-- The import rule for a @$JL4_LIBRARY_PATH@ file looks only at the imports
+-- that resolved: an IMPORT that resolves to nothing is dropped before
+-- 'Rules.transitiveDependencies' or 'Rules.evaluable' sees it, so it passes
+-- both (with only @prelude.l4@ and @daydate.l4@ in that directory,
+-- @date-compat@ resolves nowhere, and @YMD@ is still lowered, to the value
+-- @l4 run@ prints, while @l4 check@ refuses the file with
+-- @import/module-not-found@).
+--
+-- Paths are compared canonically (symbolic links and @..@ resolved) because
+-- the variable may be spelled relative or through a link.
+--
+-- __Each of the library files whose functions the lowering recognises by name
+-- ('loweredLibraryFiles': @prelude.l4@ and @daydate.l4@) gets one note when
+-- this run loaded it and does not take it for the library__ (@D-NOT-LIBRARY@),
+-- saying why. Any other library file gets none, whatever its verdict: the
+-- lowering asks of no other file whether it is the library, so the model is
+-- the same either way, and a note would report a loss that is not there (found
+-- by the review of this branch, 2026-11-26: an edited @math.l4@ got a note
+-- though the DMN was byte-identical, and an edited @prelude.l4@ with
+-- @IMPORT actus@ got seven more, one per @actus@ file). When the cause is such
+-- a file, the note on the importer names it, and says when its text is what
+-- differs: @daydate.l4@'s, for an edited @date-compat.l4@. Limiting the notes
+-- to these files is decided by Claude 2026-11-26, pending Meng's review.
+-- Without the note, the only sign is a
+-- Blocking note on each refused call that says its body "could not be
+-- rendered as FEEL", which sends the reader to the call, not to the file; and
+-- the likeliest cause is easy to miss, an @l4@ built from other libraries than
+-- the @$JL4_LIBRARY_PATH@ folder holds, which includes one built after an edit
+-- to @jl4-core/libraries@ alone, since a plain @cabal build@ does not re-embed
+-- them (see "L4.API.EmbeddedLibraries.TH" and @jl4-core/libraries/README.md@).
+-- A library file means a module this run took from the compiled-in copies or
+-- from that folder under the name of a compiled-in file; an author's own
+-- @prelude.l4@ elsewhere is the author's module and gets none: its calls are
+-- refused as any module's are, each with its own Blocking note. The note is
+-- __Advisory__: the loss is reported where it happens, on each refused call,
+-- as a Blocking note of its own, and a module that calls nothing in the file
+-- loses nothing, so a Blocking note here would fail @--fail-on blocking@ on
+-- an export that is whole. Its element is @definitions@, and it has no range,
+-- because it is about a file the run loaded, not an element of the model or a
+-- place in the exported file. The note, its severity, the author's own
+-- @prelude.l4@ getting none, and its element and range are each decided by
+-- Claude 2026-11-26, pending Meng's review.
+dmnLibraryModule :: [Rules.TypeCheckResult] -> IO (NormalizedUri -> Maybe Text, [FidelityNote])
+dmnLibraryModule deps = do
+  mLibDir <- traverse canonical =<< lookupEnv "JL4_LIBRARY_PATH"
+  -- Every library file this run loaded: the compiled-in copies, and each
+  -- file in the $JL4_LIBRARY_PATH directory named like one, with whether its
+  -- text is that copy's.
+  located <- fmap catMaybes $ for deps \dep -> do
+    let u = Rules.moduleUriOf dep
+    case (embeddedLibraryModule u, mLibDir, uriToFilePath (fromNormalizedUri u)) of
+      (Just f, _, _) -> pure (Just (dep, u, f, LibCompiledIn))
+      (Nothing, Just libDir, Just p)
+        | isJust (EmbeddedLibraries.lookupEmbeddedLibrary (Text.pack (takeBaseName p))) -> do
+            dir <- canonical (takeDirectory p)
+            same <- isCompiledInCopy p
+            pure
+              if dir /= libDir
+                then Nothing
+                else Just (dep, u, Text.pack (takeFileName p), if same then LibSameText else LibOtherText)
+      _ -> pure Nothing
+  let -- what a file with the compiled-in text is, before its imports are asked
+      byText = Map.fromList [(u, f) | (_, u, f, k) <- located, k /= LibOtherText]
+      otherText = [f | (_, _, f, LibOtherText) <- located]
+      verdict (dep, u, f, k) = case k of
+        LibOtherText -> Left (f, textDiffers f)
+        -- `daydate.l4` imports `date-compat.l4`: a file whose own text is the
+        -- compiled-in copy's is the library only when what it imports is too.
+        LibSameText
+          | (g : _) <- foreignImports dep -> Left (f, importsForeign f g (g `elem` otherText))
+        _ | not (Rules.evaluable dep) -> Left (f, doesNotCheck f (foreignImports dep))
+          | otherwise -> Right (u, f)
+      foreignImports dep =
+        [ moduleFileName v
+        | d <- Rules.transitiveDependencies dep
+        , let v = Rules.moduleUriOf d
+        , isNothing (Map.lookup v byText)
+        ]
+      verdicts = map verdict located
+      trusted = Map.fromList [uf | Right uf <- verdicts]
+  pure
+    ( \u -> Map.lookup u trusted
+    , [libraryNote f why | Left (f, why) <- verdicts, f `elem` loweredLibraryFiles]
+    )
+ where
+  canonical p = either (\(_ :: SomeException) -> p) id <$> try (canonicalizePath p)
+  lf = Text.replace "\r\n" "\n"
+  isCompiledInCopy p = do
+    r <- try (ByteString.readFile p)
+    pure case (r, EmbeddedLibraries.lookupEmbeddedLibrary (Text.pack (takeBaseName p))) of
+      (Right bytes, Just src) -> either (const False) (\t -> lf t == lf src) (Text.decodeUtf8' bytes)
+      (Left (_ :: SomeException), _) -> False
+      (_, Nothing) -> False
+  moduleFileName v =
+    fromMaybe (fromNormalizedUri v).getUri
+      (embeddedLibraryModule v <|> (Text.pack . takeFileName <$> uriToFilePath (fromNormalizedUri v)))
+  tick t = "`" <> t <> "`"
+  refused f =
+    "so no call into " <> tick f <> " is lowered as the library's: each is written as L4, \
+    \with a Blocking note"
+  staleEmbed =
+    "This happens when the `l4` was built from other libraries than this folder holds, \
+    \which includes one built after an edit to `jl4-core/libraries` alone: a plain \
+    \`cabal build` does not embed the edited text (see `jl4-core/libraries/README.md`)"
+  textDiffers f =
+    tick f <> " in the JL4_LIBRARY_PATH folder is not the copy compiled into this `l4`: its text \
+              \differs (line endings aside), " <> refused f <> ". " <> staleEmbed
+  -- The import is named, and when its own text is what differs the note says
+  -- so: the import gets no note of its own unless it is one of
+  -- 'loweredLibraryFiles' too.
+  importsForeign f g gDiffers =
+    tick f <> " in the JL4_LIBRARY_PATH folder has the text of the copy compiled into this \
+              \`l4`, but it imports " <> tick g
+      <> if gDiffers
+           then ", whose text there differs from its compiled-in copy (line endings aside), "
+                  <> refused f <> ". " <> staleEmbed
+           else ", which is not the library's copy, " <> refused f
+  doesNotCheck f gs =
+    tick f <> ", a library file, does not type-check here with the modules it imports"
+      <> (case gs of
+            [] -> ""
+            _  -> ", among them " <> Text.intercalate ", " (map tick gs)
+                    <> ", which this run did not take from the library")
+      <> ", " <> refused f <> " (`l4 check` names the error)"
+  libraryNote f why =
+    MkFidelityNote
+      { code     = "D-NOT-LIBRARY"
+      , severity = Advisory
+      , element  = "definitions"
+      , range    = Nothing
+      , message  = why
+      , lost     = "the lowering of " <> tick f <> "'s functions as the library's; each call \
+                   \that is refused for it carries its own Blocking note"
+      }
+
+-- | Where 'dmnLibraryModule' found a library file.
+data LibraryCopy
+  = LibCompiledIn   -- ^ the copy compiled into this binary
+  | LibSameText   -- ^ a @$JL4_LIBRARY_PATH@ file with that copy's text
+  | LibOtherText  -- ^ a @$JL4_LIBRARY_PATH@ file with other text
+  deriving stock Eq
+
+-- | A report with these notes put at its head, so that a reader meets the
+-- cause before the refusals it explains.
+withNotesFirst :: [FidelityNote] -> FidelityReport -> FidelityReport
+withNotesFirst ns r = foldl' (flip addNote) (emptyReport r.target) (ns <> r.notes)
 
 exportDmn :: ExportOptions -> Rules.TypeCheckResult -> IO FidelityReport
 exportDmn opts tcRes = do
-  drg <- dmnDrgFor opts tcRes
+  (drg, libraryNotes) <- dmnDrgFor opts tcRes
   when (null (drgDecisions drg)) do
-    hPutStrLn stderr
-      "No decisions found in module — nothing to export as DMN \
-      \(a DMN decision comes from a DECIDE / MEANS definition; a module of bare \
-      \DECLAREs and IMPORTs has none)"
+    hPutStr stderr (Text.unpack (noDecisionsMessage drg))
     exitFailure
   case opts.exportTarget of
     TargetDmnMarkdown -> do
       emitArtifact opts (emitMarkdown drg)
-      pure (markdownReport drg)
+      pure (withNotesFirst libraryNotes (markdownReport drg))
     _ -> do
       emitArtifact opts (emitDrg drg)
-      pure (dmnReport drg)
+      pure (withNotesFirst libraryNotes (dmnReport drg))
+
+-- | Why the model has no decisions, in the reader's words.
+--
+-- A module with no @DECIDE@ or @MEANS@ at all gets the old one-line refusal.
+-- But the model can also be empty because the population filter (spec §2.5.6)
+-- left out every decision the module has, and saying "no DECIDE or MEANS" to
+-- that module is false (smucclaw/l4-ide#1104). So the refusal names what was
+-- left out and why, grouped by reason, and points at @--include-tests@ only
+-- for the reason it cures: a regulative rule or a rule-date rebind stays out
+-- with the flag set too.
+--
+-- Read from 'drgOmitted', never from the notes: one form of @D-FIXTURE@
+-- reports a decision that was KEPT. A rule the checker took for a computed
+-- field (smucclaw/l4-ide#1038) is not a population drop and comes from
+-- 'drgTakenForFields'; before it was listed, a module whose only rule was
+-- such a one was told it had no DECIDE or MEANS, and one that also had
+-- scaffolding was given a list without it.
+--
+-- The wording is decided by Claude 2026-11-25, pending Meng's review; the
+-- #1038 line is decided by Claude 2026-11-26, pending Meng's review.
+noDecisionsMessage :: Drg -> Text
+noDecisionsMessage drg
+  | null drg.drgOmitted && null drg.drgTakenForFields =
+      "No decisions found in module — nothing to export as DMN \
+      \(a DMN decision comes from a DECIDE / MEANS definition; a module of bare \
+      \DECLAREs and IMPORTs has none)\n"
+  | otherwise =
+      Text.unlines $
+        "No decisions to export: every decision in this module was left out of the DMN model."
+          : concat
+              [ reasonLine scaffolding
+                  "as test scaffolding, because each is used only by directives such as \
+                  \#EVAL and #ASSERT, or by other test scaffolding"
+                  " Pass --include-tests to export them."
+              , reasonLine regulative
+                  "as regulative rules (MUST, MAY, SHANT) that no decision calls"
+                  " DMN describes decisions, not obligations: export these with \
+                  \`l4 export bpmn` instead."
+              , reasonLine rebinding
+                  "because each evaluates under its own rule date (EVAL UNDER RULES \
+                  \EFFECTIVE AT), and a DMN model has one rule-date input and no way to \
+                  \rebind it"
+                  ""
+              , reasonLine drg.drgTakenForFields
+                  "because each has the name of a computed field of a record (a field \
+                  \with a MEANS in a DECLARE), and the checker takes each for that field \
+                  \(smucclaw/l4-ide#1038, not yet fixed)"
+                  " Rename them to export them."
+              ]
+ where
+  scaffolding = [n | (n, r) <- drg.drgOmitted, r `elem` [DroppedFixture, DroppedFixtureHelper]]
+  regulative  = [n | (n, DroppedRegulative) <- drg.drgOmitted]
+  rebinding   = [n | (n, DroppedRuleDateRebind) <- drg.drgOmitted]
+  reasonLine names why after
+    | null names = []
+    | otherwise =
+        [ "  - " <> Text.intercalate ", " ["`" <> n <> "`" | n <- names]
+            <> ": left out " <> why <> "." <> after
+        ]
 
 ----------------------------------------------------------------------------
 -- The process side
@@ -504,7 +806,10 @@ exportBpmn opts tcRes = do
   -- its XML: a gateway is wired only to a decision this graph actually contains
   -- (PROCESS-TRACK.md §8.3). Unconditional — a module with no decisions yields
   -- an empty table, which wires nothing and reports nothing, which is right.
-  drg <- dmnDrgFor opts tcRes
+  -- The library notes are the DMN report's, not this one's: a BPMN file
+  -- carries no decision logic (decided by Claude 2026-11-26, pending Meng's
+  -- review; see 'dmnDrgFor').
+  (drg, _) <- dmnDrgFor opts tcRes
   let policy = fromMaybe AssumeDays opts.exportDeadlineUnit
       bx =
         stateGraphToBpmn

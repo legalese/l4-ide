@@ -1,0 +1,17 @@
+-- Fixture for `l4 export dmn`'s empty-model refusal (smucclaw/l4-ide#1104).
+--
+-- Both decisions evaluate under a rule date of their own (EVAL UNDER RULES
+-- EFFECTIVE AT), and a DMN model has one rule-date input and no way to rebind
+-- it, so the population filter (spec §2.5.6) leaves both out. The refusal
+-- must name both under that reason, and must not offer --include-tests,
+-- which does not bring a rebinding decision back.
+
+IMPORT daydate
+
+GIVETH A DATE
+`the rule date in 2016` MEANS
+    `EVAL UNDER RULES EFFECTIVE AT` (Date 1 9 2016) `RULES EFFECTIVE DATE`
+
+GIVETH A DATE
+`the rule date in 2021` MEANS
+    `EVAL UNDER RULES EFFECTIVE AT` (Date 1 6 2021) `RULES EFFECTIVE DATE`

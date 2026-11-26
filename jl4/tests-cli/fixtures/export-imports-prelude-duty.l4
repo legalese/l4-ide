@@ -1,0 +1,17 @@
+-- Imports the prelude and calls nothing in it, with a decision for the DMN
+-- export and a regulative rule for the BPMN export. Exported against a copy of
+-- the libraries whose `prelude.l4` is not the compiled-in copy, the DMN report
+-- carries an Advisory D-NOT-LIBRARY note and the BPMN report does not.
+IMPORT prelude
+
+DECLARE Party IS ONE OF Payer
+DECLARE Act IS ONE OF `pay`
+
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+DECIDE `doubled` x IS x TIMES 2
+
+`the payment` MEANS
+  PARTY Payer
+  MUST `pay`
+  WITHIN 30

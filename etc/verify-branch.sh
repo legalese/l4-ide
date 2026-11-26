@@ -32,8 +32,13 @@
 # (specs/todo/MAIN-PRE-REVIEW.md):
 #   (a) jl4-core/src/L4/Parser*: `l4 check` CPU time at 1,000 and 4,000 lines
 #       (etc/probe-parse-scaling.mjs). FAIL above a ratio of 8.
-#   (b) jl4-service/: the same calls before and after a restart
-#       (etc/probe-service-restart.mjs). FAIL on any difference.
+#   (b) jl4-service/: the same calls before and after a restart, with the
+#       service started on 127.0.0.1 only, when it has --host
+#       (etc/probe-service-restart.mjs).
+#       FAIL on any difference, or if the service answers outside loopback.
+#       A `WARN:` line from the probe (a binary without --host, or a machine
+#       with no non-loopback IPv4 address: the listener was not checked) does
+#       not fail the step, and is copied into the summary.
 #   (c) jl4/tests-cli/: new assertions comparing output without dropping '\r'
 #       (etc/probe-cli-crlf.mjs). WARN only: it reads text, not behaviour.
 #
@@ -228,8 +233,15 @@ else NOT_PROBED+=("(a) parse time"); fi
 
 if echo "$DIFF_FILES" | grep -q '^jl4-service/'; then
   if SVC_COPY=$(snapshot jl4-service); then
+    PROBE_B_OUT="$PROBEDIR/probe-b.out"
     step "probe (b): jl4-service answers the same after a restart" \
-      bash -c "cd '$WT' && node etc/probe-service-restart.mjs '$SVC_COPY'"
+      bash -c "cd '$WT' && node etc/probe-service-restart.mjs '$SVC_COPY' | tee '$PROBE_B_OUT'; exit \${PIPESTATUS[0]}"
+    # The probe can pass without having checked the listener (a machine with no
+    # non-loopback IPv4 address; a jl4-service without --host) and says so on a
+    # line that starts with WARN:. The summary must not read as if it had.
+    while IFS= read -r warn_line; do
+      note "probe (b) $warn_line"
+    done < <(grep '^WARN: ' "$PROBE_B_OUT" 2>/dev/null)
   else RESULTS+=("FAIL  probe (b): no built jl4-service to start"); FAILED=1; fi
 else NOT_PROBED+=("(b) service restart"); fi
 

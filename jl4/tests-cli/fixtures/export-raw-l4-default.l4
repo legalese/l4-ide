@@ -1,0 +1,14 @@
+-- Raw L4 in a table's default output entry (Blocking D-NONFEELOUTPUT), beside
+-- a decision that is plain FEEL. Camunda 8.7.6 refuses to parse the file, as
+-- it does over any raw L4 that is not a FEEL name. KIE 8.44 loads it, and
+-- answers null for `banded` and reports success, which is the case the note
+-- singles out; raw L4 in a rule's own output entry makes KIE refuse the file.
+GIVEN x IS A NUMBER
+GIVETH A STRING
+DECIDE `banded` x IS
+  IF x > 5 THEN "big"
+  ELSE x AS STRING
+
+GIVEN h IS A NUMBER
+GIVETH A NUMBER
+DECIDE `pay` h IS h PLUS 1

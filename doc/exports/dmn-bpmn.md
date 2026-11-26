@@ -85,12 +85,98 @@ By default DMN's population filter omits decisions that are only test scaffoldin
 directive arguments with no real callers. Emitting a fixture as a `<decision>` would misdescribe
 the rule set, so you must ask for it with `--include-tests`.
 
+The filter also leaves out a regulative rule that no decision calls, which belongs to the BPMN export, and a rule that evaluates under its own rule date (`EVAL UNDER RULES EFFECTIVE AT`), which a DMN model cannot express.
+When it leaves out every decision in the file, `l4 export dmn` exits 1 and lists what it left out under each reason:
+
+```
+No decisions to export: every decision in this module was left out of the DMN model.
+  - `sample prices`, `price with tax`: left out as test scaffolding, because each is used only by directives such as #EVAL and #ASSERT, or by other test scaffolding. Pass --include-tests to export them.
+```
+
+`--include-tests` is offered only for the scaffolding; it does not bring back the other kinds.
+A rule with the same name as a computed field of a record (a field with a `MEANS` in a `DECLARE`) is left out too, because the checker takes it for that field, a known defect ([smucclaw/l4-ide#1038](https://github.com/smucclaw/l4-ide/issues/1038)); the list names it, and giving the rule a name of its own brings it back.
+Beside other decisions such a rule is left out with no note, so do not give a rule a computed field's name.
+A file with no `DECIDE` or `MEANS` at all gets a one-line refusal saying so.
+
+**Types.** Each record (`DECLARE … HAS`) and each `IS ONE OF` becomes a DMN `<itemDefinition>`.
+L4 lets you use a type before you declare it, but KIE does not load a model in which a record's field points at an `IS ONE OF` written further down the file (it reports `TYPE_DEF_NOT_FOUND`), so the export writes every type before the types that use it, and keeps your order everywhere else.
+A record that refers to itself, or two records that refer to each other, is written in your order: KIE 8.44 and Camunda 8.7.6 both load and run such a model, measured on `jl4/examples/dmn/itemdef-order.l4`.
+No other engine has been checked.
+
+**Names.** Each element's `name`, the one FEEL uses and the one an engine's input keys must match, is written in ASCII letters, digits and underscores: every other character, a space or an accented letter alike, becomes an underscore, and a run of them becomes one, dropped at either end, with one put in front of a name that starts with a digit; so `two words` is `two_words` and `Größe` is `Gr_e`.
+An element whose `name` had to change keeps your L4 name in its `label`; one whose L4 name needed no change, such as `plain`, has no `label`.
+A name that is a FEEL keyword, such as `in` or `for`, the name of a FEEL type or built-in function, such as `date` or `list`, or the name of a FEEL function the export calls (`floor`, `ceiling`, `decimal`, `sum`, `count`, `min`, `max`, `concatenate`, `modulo`), gets an underscore at the end, so an input `GIVEN floor IS A NUMBER` is the input `floor_`, and a case must supply `floor_`.
+On an input, a decision or a record field, the report gives that rename a Lossy `D-RENAME` note, because a caller that uses the L4 name reaches nothing and must use `floor_`: for an input sent as `floor`, Camunda 8.7.6 answers null and KIE 8.44 skips each decision that needs it (`Required dependency 'floor_' not found`).
+A type so named is renamed the same way, with no note, because no caller sends a type's name.
+Two names that come out the same get a number on the second, `amount_2`, with the same note.
+A name changed only by the folding above, such as `two words`, gets no note, although a caller that sends `two words` reaches nothing in the same way (measured on both engines).
+The functions are reserved because FEEL looks a function's name up among the variables first: left as `floor`, the input hid the function, and KIE 8.44 failed each decision that called a function hidden this way (Camunda 8.7.6 did not), measured on `jl4/tests-cli/fixtures/export-shadowed-builtins.l4`.
+
+**Values from a file you import.** `l4 export dmn` writes one DMN file and no DMN `<import>`, so a decision can read only what is in that file.
+A constant defined in a module you `IMPORT` is copied into the model as a decision of its own when nothing can change its value: a `MEANS` with no `GIVEN` whose body uses only fixed values, L4's built-in operators, functions of the prelude and `daydate` libraries, and other such constants.
+Each copy carries an advisory `D-IMPORTED` note, because the model now holds the value rather than a link to it: if the imported file changes, export again.
+Everything else read from an imported module is written as L4 text with a Blocking note, which, as the next section says, costs the whole file on both engines (with one exception given there):
+
+- a constant that reads an `ASSUME`, `RULES EFFECTIVE DATE`, or an `IS ONE OF` value the imported module declares, and an imported `ASSUME` read directly;
+- any constant from an imported file that has errors of its own or imports a file that has (`l4 check` on your file then reports `import/module-has-errors`), even a constant that reads nothing from the part with the error; the export still exits 0 on such a file, which is [smucclaw/l4-ide#1110](https://github.com/smucclaw/l4-ide/issues/1110);
+- any function of your own imported module, called or passed.
+
+The test for errors is the one `l4 run` makes: the imported file, and every file it imports, type-checks.
+It is not shown to agree with `l4 check` in every case, and it does not in one: an `IMPORT` that finds no file is refused by `l4 check` (`import/module-not-found`) and not by this test, so a constant from a file with such an import is still copied, with the value `l4 run` prints.
+
+A copied constant is lowered exactly as it would be in your own file, so one that has no FEEL form there has none here either: a `Date 2024 1 15` constant is written as L4 text with a Blocking note, in your file or in an imported one.
+It is checked the same way too: a copied constant whose `CONSIDER` misses a case, which L4's checker warns about in the imported file, gets the same Blocking `D-PARTIAL` note it would get in yours, and so does every decision that reads it.
+Before the fix for smucclaw/l4-ide#1102, a constant or `ASSUME` from an imported module, whether or not it could have been copied, was written as a FEEL name with nothing behind it and no note about it: KIE refused the file (`Unknown variable`) and Camunda answered null when the case supplied nothing under that name.
+A call to an imported function was already written as L4 text.
+Measured on KIE 8.44 and Camunda 8.7.6 with `jl4/tests-cli/fixtures/export-imported-constant.l4`.
+
 ## What doesn't survive
 
 Both emit a **fidelity report**, and reading it is not optional. `Blocking` notes here usually
 describe the target notation's limits rather than a defect in your file — DMN and BPMN are
 substantially less expressive than L4 — which is why `--fail-on` defaults to `none`. A clean exit
 means the export ran, not that everything made it across.
+
+**One kind of Blocking note costs more than the rest.** When a DMN expression has no FEEL form, the export writes the L4 text in its place and reports `D-LITERALEXPR` (or `D-NONFEELINPUT` in a table's input).
+FEEL cannot parse L4, so KIE 8.44 and Camunda 8.7.6 both refuse the whole file, not only that one decision: every other decision in it is lost too.
+The note says so.
+The one exception is raw L4 that happens to read as a FEEL name, such as a bare `TBD`: Camunda parses it and runs the rest, while KIE still refuses the file.
+For that decision Camunda answers whatever the caller supplies under that name: null when it supplies nothing, and the caller's own value when it supplies one, whether or not the model has an input of that name.
+Measured on Camunda 8.7.6, with KIE 8.44 refusing each file: with an input `TBD` given the value "oops", a decision that `MEANS TBD` answered "oops"; and on `jl4/tests-cli/fixtures/export-raw-l4-bare-name.l4`, which has no input `TBD`, a case sending `TBD` as "oops" got "oops" for the rule whose output is a bare `TBD`.
+`D-NONFEELOUTPUT`, raw L4 in a table's output entry or in a record's computed field, costs the whole file in the same way, with two exceptions, one each way:
+when the only raw L4 in the file reads as a FEEL name, such as a rule whose output is a bare `TBD`, Camunda parses the file and runs the rest, answering for that decision what the caller supplies under that name, as above, while KIE refuses the file (measured on `jl4/tests-cli/fixtures/export-raw-l4-bare-name.l4`).
+When the only raw L4 in the file is a table's last-resort (default) output, KIE loads the file and answers null for that decision as though it had succeeded, while Camunda refuses the file.
+Measured on `jl4/examples/dmn/rounding.l4` before its functions were lowered: eight such notes, and neither engine ran a single case.
+`--fail-on blocking` catches it before an engine does.
+
+**Rounding and the prelude's aggregates.** These lower to FEEL's own functions, each checked on both engines against `l4 run`:
+
+| L4                     | FEEL                        | why this form                                                       |
+| ---------------------- | --------------------------- | ------------------------------------------------------------------- |
+| `FLOOR x`, `CEILING x` | `floor(x)`, `ceiling(x)`    | agrees on negatives                                                 |
+| `ROUND x`              | `decimal(x, 0)`             | both round a half to the even neighbour: 2.5 gives 2, -2.5 gives -2 |
+| `sum xs`               | `sum(concatenate([0], xs))` | FEEL's `sum([])` is null; L4's `sum` of an empty list is 0          |
+| `count xs`             | `count(xs)`                 | both give 0 on an empty list                                        |
+| `min a b`, `max a b`   | `min(a, b)`, `max(a, b)`    | on plain numbers only                                               |
+
+They are recognised as the prelude's, so a `sum` or `min` you define yourself is not touched.
+That includes a file of your own called `prelude.l4` or `daydate.l4`: the export treats a module as the library only when it is the copy built into `l4`, or a file in the folder `JL4_LIBRARY_PATH` names whose text is that copy's, line endings aside, so a `prelude.l4` beside your file, which `l4` loads in place of the built-in one, has its calls written as L4 with a Blocking note, as a call into any other file you import is.
+Either way, the library must also type-check with the files it imports: the built-in `daydate` imports a `date-compat.l4` of yours when one is beside your file, and if that file breaks it (`l4 check` then reports that `daydate` has errors), `Date` and `YMD` are written as L4 too.
+The same goes for a library folder that differs from the copy built into your `l4` in any character, a comment included, though not in its line endings: if `JL4_LIBRARY_PATH` names a checkout's `jl4-core/libraries` whose files are not the ones your `l4` was built with, every call into a changed file, or into a library file that imports one, gets a Blocking note, so export with the `l4` built from that checkout, or leave `JL4_LIBRARY_PATH` unset.
+An `l4` built after an edit to `jl4-core/libraries` alone is not one built from those files: a plain `cabal build` does not re-embed them (see `jl4-core/libraries/README.md`).
+When the export does not take `prelude.l4` or `daydate.l4` for the library, the report names that file once, in an advisory `D-NOT-LIBRARY` note that says why; the Blocking notes are on the calls.
+It asks this of these two files only, because only their functions are written as FEEL by name, so no other library file gets a note: whether or not an edited `math.l4` is taken for the library, the model is the same.
+One known case passes this test that `l4 check` refuses: a library file whose own `IMPORT` finds no file at all is still taken for the library (with only `prelude.l4` and `daydate.l4` in the folder, `daydate`'s import of `date-compat` finds nothing, and `YMD` is still lowered, to the value `l4 run` prints), although `l4 check` refuses your file.
+Still written as L4, with a Blocking note, and so still fatal to the whole file on both engines: `SQRT` (undefined below zero), `TRUNC` (no single FEEL function), `minimum` and `maximum` (L4 gives no answer on an empty list, while FEEL's `min` and `max` of an empty list answer null on Camunda 8.7.6 and fail the decision on KIE 8.44), and `min` and `max` over `MAYBE NUMBER`, which skip a `NOTHING`.
+
+**The empty list.** `EMPTY` is written as FEEL's empty list, `[]`, so `count EMPTY` is `count([])` and `xs EQUALS EMPTY` is `xs = []`.
+In a decision table, a rule that tests a list against `EMPTY`, such as a `WHEN EMPTY` clause of a `CONSIDER` or a guard `IF xs EQUALS EMPTY`, gets a column of its own that holds the whole test, `xs = []` (or `list_ = []` for an input called `list`, the name of a FEEL type), with the entry `true`, because the simple tests a table cell holds have no form for a list: their values are numbers, strings, booleans and dates.
+Older versions of `l4` wrote `EMPTY` as the text `"EMPTY"`, which gave a wrong answer wherever it was read: no list equals `"EMPTY"`, so a test against it never held and an empty list fell to the wrong rule, and a decision that `MEANS EMPTY` answered the text.
+Measured on KIE 8.44 and Camunda 8.7.6 with `jl4/tests-cli/fixtures/export-empty-list-table.l4`: 2 of 4 answers right before the change, 4 of 4 after it, on each engine.
+
+**Numbers are not exact in DMN.** An L4 `NUMBER` is an exact fraction; a FEEL number keeps 34 significant digits.
+Usually the difference is far below anything a rule cares about, but a rounding function can turn it into a whole unit: `FLOOR (x DIVIDED BY 3 TIMES 3)` is 1 in L4 at x = 1, and 0 on both engines, because one third is stored as 0.333…3.
+The fidelity report does not flag this. If a rule rounds the result of a division, check the boundary cases on the engine you deploy to.
 
 The recurring case for BPMN is the unitless deadline: L4 permits a `WITHIN` with no unit, and BPMN
 timers require one. `--deadline-unit days` assumes days and records a note saying it did; `refuse`

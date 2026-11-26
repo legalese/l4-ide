@@ -1,0 +1,24 @@
+-- EMPTY, the empty list, in the expression positions a decision reads it.
+-- Before, each became the string "EMPTY": `count EMPTY` exported as
+-- count("EMPTY"), which FEEL reads as a list of one, and `xs EQUALS EMPTY`
+-- as xs = "EMPTY", which no list equals. It is FEEL's [] now.
+IMPORT prelude
+
+GIVETH A LIST OF NUMBER
+`no amounts` MEANS EMPTY
+
+GIVEN h IS A NUMBER
+GIVETH A NUMBER
+DECIDE `h plus how many` h IS h PLUS count `no amounts`
+
+GIVEN h IS A NUMBER
+GIVETH A NUMBER
+DECIDE `h plus how much` h IS h PLUS sum `no amounts`
+
+GIVEN h IS A NUMBER
+GIVETH A NUMBER
+DECIDE `h plus none` h IS h PLUS count EMPTY
+
+GIVEN xs IS A LIST OF NUMBER
+GIVETH A BOOLEAN
+DECIDE `is empty` xs IS xs EQUALS EMPTY

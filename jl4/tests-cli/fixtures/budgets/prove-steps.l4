@@ -1,8 +1,8 @@
 -- Ruled by Meng 2026-11-21, extending L2 (smucclaw/l4-ide#1075): l4 prove counts. Each #ASSERT
 -- below applies three functions when the evaluator checks it at a point, so
--- under --max-steps 1 that check stops at the limit, and the answer is
--- unknown: not proved, which the first would be, and not refuted, which the
--- second would be.
+-- under --max-steps 1 that check stops at the limit. That the answer is then
+-- unknown, not proved, which the first would be, and not refuted, which the
+-- second would be, is decided by Claude 2026-11-21, pending Meng's review (L2 extension, choice 2).
 § `Arithmetic`
     GIVEN x IS A NUMBER
 

@@ -1,0 +1,7 @@
+-- The author's own `date-compat.l4`, which the compiled-in `daydate` imports
+-- when it sits beside the exported file. It defines a name that `daydate`
+-- defines too, so `daydate`'s uses of that name are ambiguous.
+GIVEN month IS A NUMBER
+      year  IS A NUMBER
+GIVETH A NUMBER
+`Months since year start to days` MEANS 100

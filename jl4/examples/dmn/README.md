@@ -3,9 +3,11 @@
 The exhibit and golden for the DMN exporter — Track **D1** of the Lexipedia-superset
 programme (`specs/todo/lexipedia-superset/SPEC.md`).
 
-There are **four** subjects here — `reg-cf.l4` (shape), `gst-rate.l4` (dated regime),
-`../canon/us/regcf/regcf.l4` (the real corpus) and `sumtype.l4` (data model) — and the
-difference between them is the deliverable.
+There are **13** subjects with goldens here (`goldenSubjects` in `jl4/tests/DmnExport.hs`).
+The first four are `reg-cf.l4` (shape), `gst-rate.l4` (dated regime),
+`../canon/us/regcf/regcf.l4` (the real corpus) and `sumtype.l4` (data model), and the
+difference between them is the deliverable; the table below lists the files of these and of
+some of the others.
 
 | File                              | What it is                                                                                   |
 | --------------------------------- | -------------------------------------------------------------------------------------------- |
@@ -20,8 +22,10 @@ difference between them is the deliverable.
 | `expected/gst-rate.*`             | its four artifacts — two `UNIQUE` date-interval tables, one `D-RULEDATE`, zero blocking on them |
 | `not-ok/dated-chain-*.l4`         | six negative fixtures: mis-ordered arms, duplicate dates, a rolling `Date 32 1 2024`, a mixed chain (all `D-DATEDCHAIN`), a law-time-guarded obligation, and a nested `OTHERWISE` (the last two must stay off the dated path entirely) |
 | `expected/regcf-corpus.*`         | the same four artifacts cut from the **real** 1,241-line corpus at `../canon/us/regcf/regcf.l4`  |
+| `itemdef-order.l4`                | the **itemDefinition-order** exhibit (smucclaw/l4-ide#1101): every type is declared after a type that uses it, plus a self- and a mutually recursive record; `itemdef-order.cases.json` and `expected/itemdef-order.engine-baseline.txt` run it on both engines in CI |
+| `rounding.l4`                     | the **rounding-and-aggregates** exhibit (smucclaw/l4-ide#1103): FLOOR, CEILING, ROUND and the prelude's sum, count, min and max, with cases at the edges where FEEL could differ from L4 (halves, negatives, an empty list); `rounding.cases.json` and `expected/rounding.engine-baseline.txt` run it on both engines in CI |
 
-All four sets are produced by `jl4/tests/DmnExport.hs` (`goldenSubjects`); regenerate by
+Every subject's set is produced by `jl4/tests/DmnExport.hs` (`goldenSubjects`); regenerate by
 deleting a golden and re-running `cabal test jl4:jl4-test` twice.
 
 `reg-cf.l4` is written in module-level-scalar (`ASSUME`) style, which is the program

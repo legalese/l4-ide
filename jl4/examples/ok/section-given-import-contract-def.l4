@@ -1,0 +1,54 @@
+-- The definition half of a cross-IMPORT pair about contracts
+-- (smucclaw/l4-ide#1118). ok/section-given-import-contract-call.l4 imports it.
+--
+-- `pay leg` reads the section GIVEN `dl`, which has a default of 5, so Alice
+-- has until 5 to pay. `pay then deliver` reads two, `dl` and `rate`. `plain leg`
+-- reads nothing. `unset leg` reads a section GIVEN with no default, so nothing
+-- can say which branch it takes.
+-- Discharge runs per module, so when THIS file is discharged `pay leg` and
+-- `unset leg` each gain the section GIVEN they read as a trailing input. An
+-- importer's call site is not rewritten, so an importer that names one of them
+-- is naming a closure that must be applied to this module's own cell before it
+-- is a contract.
+
+DECLARE Person IS ONE OF Alice, Bob
+DECLARE Action IS ONE OF
+  pay HAS amount IS A NUMBER
+  deliver
+
+§ `Terms`
+    GIVEN dl IS A NUMBER TYPICALLY 5
+
+GIVETH A DEONTIC Person Action
+`pay leg` MEANS
+    PARTY Alice MUST pay 1 WITHIN dl
+    HENCE FULFILLED
+    LEST BREACH BY Alice BECAUSE "late"
+
+§§ `Rate`
+    GIVEN rate IS A NUMBER TYPICALLY 2
+
+GIVETH A DEONTIC Person Action
+`pay then deliver` MEANS
+    PARTY Alice MUST pay 1 WITHIN dl
+    HENCE (PARTY Bob MUST deliver WITHIN rate
+           HENCE FULFILLED
+           LEST BREACH BY Bob BECAUSE "bob late")
+    LEST BREACH BY Alice BECAUSE "late"
+
+GIVETH A DEONTIC Person Action
+`plain leg` MEANS
+    PARTY Alice MUST pay 1 WITHIN 5
+    HENCE FULFILLED
+    LEST BREACH BY Alice BECAUSE "late"
+
+§ `Unset`
+    GIVEN gate IS A BOOLEAN
+
+GIVETH A DEONTIC Person Action
+`unset leg` MEANS
+    IF gate
+    THEN PARTY Alice MUST pay 1 WITHIN 5
+         HENCE FULFILLED
+         LEST BREACH BY Alice BECAUSE "late"
+    ELSE FULFILLED

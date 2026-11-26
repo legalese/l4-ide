@@ -12,6 +12,9 @@
       <text>"sell","lease","assign"</text>
     </allowedValues>
   </itemDefinition>
+  <itemDefinition id="itemdef_grade_optional" name="Grade_optional" label="Grade">
+    <typeRef>string</typeRef>
+  </itemDefinition>
   <itemDefinition id="itemdef_claim" name="Claim">
     <itemComponent id="itemdef_claim_c1" name="amount">
       <typeRef>number</typeRef>
@@ -31,9 +34,6 @@
     <allowedValues>
       <text>"alpha","beta"</text>
     </allowedValues>
-  </itemDefinition>
-  <itemDefinition id="itemdef_grade_optional" name="Grade_optional" label="Grade">
-    <typeRef>string</typeRef>
   </itemDefinition>
   <itemDefinition id="itemdef_claim_hydrated" name="Claim_hydrated" label="Claim">
     <itemComponent id="itemdef_claim_hydrated_c1" name="amount">

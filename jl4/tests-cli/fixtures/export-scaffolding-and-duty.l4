@@ -1,0 +1,23 @@
+-- Fixture for `l4 export dmn`'s empty-model refusal (smucclaw/l4-ide#1104),
+-- with two reasons at once.
+--
+-- `sample amounts` is test scaffolding: it is referenced only as an argument
+-- inside the #ASSERT, and --include-tests puts it back. `the payment` is a
+-- regulative rule nothing calls, which the DMN export leaves out with or
+-- without the flag. The refusal must name each under its own reason, and
+-- offer --include-tests only for the first.
+
+IMPORT prelude
+
+DECLARE Party IS ONE OF Payer, Payee
+
+DECLARE Act IS ONE OF `pay the amount`
+
+`sample amounts` MEANS LIST 100, 200
+
+`the payment` MEANS
+  PARTY Payer
+  MUST `pay the amount`
+  WITHIN 30
+
+#ASSERT count `sample amounts` EQUALS 2

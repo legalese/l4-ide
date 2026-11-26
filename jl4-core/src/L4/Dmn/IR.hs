@@ -47,6 +47,7 @@ module L4.Dmn.IR
   , dmnTypeBase
     -- * The data model
   , ItemDefinition (..)
+  , itemDefsInDependencyOrder
   , ItemComponent (..)
     -- * FEEL surface syntax
   , renderUnaryTest
@@ -56,7 +57,11 @@ module L4.Dmn.IR
   , feelIdentText
   , feelTypeNameText
   , reservedFeelWords
+  , feelKeywords
+  , feelTypeAndFunctionWords
+  , reservedFeelFunctions
   , reservedFeelTypeNames
+  , foldFeelName
   , uniquifyIn
   , oneLine
     -- * Engine flavors
@@ -65,6 +70,7 @@ module L4.Dmn.IR
   , dmnFlavorName
     -- * The decision requirements graph
   , Drg (..)
+  , DropReason (..)
   , DrgNode (..)
   , Decision (..)
   , DecisionLogic (..)
@@ -100,6 +106,7 @@ module L4.Dmn.IR
 import Base
 import qualified Base.Text as Text
 import qualified Data.Graph as Graph
+import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import Data.Char (isAlphaNum, isAscii, isDigit)
 import Data.Ratio (denominator, numerator)
@@ -204,6 +211,73 @@ data ItemDefinition = MkItemDefinition
   , idfComponents :: ![ItemComponent]
   }
   deriving stock (Eq, Show, Generic)
+
+-- | The order to emit @\<itemDefinition\>@s in: every definition before any
+-- definition whose @\<typeRef\>@s refer to it, and otherwise the order given
+-- (smucclaw/l4-ide#1101).
+--
+-- __Why an order at all.__ The DMN XSD puts no order on @itemDefinition*@, but
+-- KIE 8.44.0.Final resolves a component's @typeRef@ to a SIMPLE definition (an
+-- enum's string domain, or a @_optional@ alias) only when that definition comes
+-- earlier in the document: a record whose field is typed by an enum declared
+-- further down fails with @TYPE_DEF_NOT_FOUND@ and KIE builds nothing, while
+-- Camunda 8.7.6 loads the same file. L4 does not require a type to be declared
+-- before it is used, so source order is not a safe emission order.
+--
+-- __What KIE does accept, measured 2026-11-25 on both engines__: a record whose
+-- field refers forward to another RECORD (@fwdrecord@), a record that refers to
+-- itself through a @MAYBE@ (@selfref@), and two records that refer to each
+-- other, written in either order (@mutual@, @mutual-rev@); each answered 2/2 or
+-- 1/1 on KIE and Camunda. A cycle can only pass through records, since an enum
+-- or an alias has no components, so a reference INSIDE a cycle (a record's to
+-- itself, or between the records of one cycle) imposes no order and is
+-- ignored: no order of a cycle puts every member first, and none is needed.
+--
+-- __The order given is kept wherever nothing forces otherwise__, so a file that
+-- was already in dependency order comes out byte-identical. That is why this
+-- is a depth-first walk in the order given, which before emitting a definition
+-- emits any definition it refers to that is not out yet, rather than any
+-- topological sort: 'Data.Graph.stronglyConnComp' is used only to tell which
+-- references lie inside a cycle, never for the order, because it promises
+-- none for definitions with no edge between them (the same lesson as the
+-- computed-field walk of spec §4.4.2).
+--
+-- __Wider than KIE needs__: a record is also put before a record whose field
+-- it types, which KIE accepts in either order (@fwdrecord@ above). Ordering
+-- every reference, rather than only those to an enum or an alias, is decided
+-- by Claude 2026-11-25, pending Meng's review.
+itemDefsInDependencyOrder :: [ItemDefinition] -> [ItemDefinition]
+itemDefsInDependencyOrder defs =
+  [d | i <- reverse (snd (foldl' visit (Set.empty, []) (Map.keys byIndex))), Just d <- [Map.lookup i byIndex]]
+ where
+  byIndex = Map.fromList (zip [0 :: Int ..] defs)
+  indexOfName = Map.fromList [(d.idfName, i) | (i, d) <- Map.toList byIndex]
+  -- The definitions this one names in a typeRef: its base, then its
+  -- components'. A builtin, or a name no definition here carries, is no edge.
+  refsOf d =
+    nubOrd
+      [ j
+      | DmnNamed nm _ <- maybeToList d.idfBase <> map (.icmType) d.idfComponents
+      , Just j <- [Map.lookup nm indexOfName]
+      ]
+  refs = Map.map refsOf byIndex
+  cycleOf =
+    Map.fromList
+      [ (i, k)
+      | (k, c) <- zip [0 :: Int ..] (Graph.stronglyConnComp [(i, i, js) | (i, js) <- Map.toList refs])
+      , i <- Graph.flattenSCC c
+      ]
+  -- What must be out before i: what it names outside its own cycle, in the
+  -- order given.
+  before i =
+    sort [j | j <- Map.findWithDefault [] i refs, Map.lookup j cycleOf /= Map.lookup i cycleOf]
+  -- The accumulator is the emission in reverse. Marking a definition before
+  -- walking what it needs would also stop a cycle, but 'before' has none.
+  visit (seen, acc) i
+    | Set.member i seen = (seen, acc)
+    | otherwise =
+        let (seen', acc') = foldl' visit (Set.insert i seen, acc) (before i)
+        in (seen', i : acc')
 
 -- | A /constant/ FEEL value: the only thing this exporter will ever put on the
 -- endpoint of a 'UnaryTest'.
@@ -443,12 +517,66 @@ feelTypeNameText = suffixReservedIn reservedFeelTypeNames . foldFeelName
 -- no engine objects to. (A name /part/ may be a keyword in any case, which is
 -- why the test is against the whole folded name and not against a part: after
 -- folding, @annual income@ is @annual_income@, not @in@.)
+--
+-- __Plus the FEEL built-in functions this exporter calls__ (the second
+-- group). They are not keywords, but FEEL resolves a call's name in the same
+-- scope as its variables, so a variable spelled like one hides it: an
+-- @inputData@ named @floor@ made @floor(x)@ a call of the number the input
+-- holds, which KIE 8.44.0.Final refuses at run time (@Not an invocable: '1'@,
+-- measured with parameters named @floor@, @decimal@ and @concatenate@;
+-- Camunda 8.7.6 answered those three correctly). @floor@, @ceiling@,
+-- @decimal@, @sum@, @count@ and @concatenate@ came with the rounding and
+-- aggregate lowering (smucclaw/l4-ide#1103); @min@ and @max@ with it and with
+-- the select idiom before it; @modulo@ with @MODULO@ before both. @not@ was
+-- already reserved above. The rename is stage 1's suffix (@floor_@), the same
+-- one a keyword gets. It reaches every name in this namespace, so a record
+-- field or a type spelled like one of these is renamed too.
+--
+-- __Either rename carries a Lossy @D-RENAME@ note__ on an input, a decision or
+-- a record field ("L4.Dmn.Lower" @renameNotes@), as a collision rename does:
+-- the L4 name is itself a FEEL name a caller would send or read as it stands,
+-- so a caller that sends @floor@ for an input emitted as @floor_@ reaches
+-- nothing (measured on that input: Camunda 8.7.6 answered null for each
+-- decision that reads it, and KIE 8.44 skipped each one, @Required dependency
+-- 'floor_' not found@), and the @label@ that keeps the L4 name is not a key
+-- any engine reads. Until the review of this branch (2026-11-26) this comment
+-- said the rename "carries no note"; a note on it, at the collision arm's
+-- severity, is decided by Claude 2026-11-26, pending Meng's review.
+--
+-- The words of the first group are of two kinds, which the note tells apart
+-- ('feelKeywords' and 'feelTypeAndFunctionWords'), decided by Claude
+-- 2026-11-26, pending Meng's review.
 reservedFeelWords :: Set Text
-reservedFeelWords = Set.fromList
-  [ "true", "false", "null", "and", "or", "not", "if", "then", "else", "for", "in", "return"
+reservedFeelWords = feelKeywords <> feelTypeAndFunctionWords <> reservedFeelFunctions
+
+-- | FEEL's keywords and literal words (@true@, @null@, @in@, @for@ and the
+-- rest): the first kind of 'reservedFeelWords'.
+feelKeywords :: Set Text
+feelKeywords = Set.fromList
+  [ "true", "false", "null", "and", "or", "if", "then", "else", "for", "in", "return"
   , "some", "every", "satisfies", "instance", "of", "between", "function", "external"
-  , "date", "time", "duration", "list", "context"
   ]
+
+-- | The second kind of 'reservedFeelWords': not keywords, but the names of
+-- FEEL types or built-in functions (@date@, @time@, @duration@ and @not@ are
+-- functions, and @list@ and @context@ types).
+--
+-- @not@ is FEEL's boolean function, which this export itself calls (an L4
+-- @NOT@ is written @not(…)@, and so is a negated unary test), and it was filed
+-- as a keyword until the review of this branch (2026-11-26). It is filed here,
+-- with @date@, which the export also calls, and not in
+-- 'reservedFeelFunctions', whose note says a variable of that name would hide
+-- the function: that was measured for @floor@, @decimal@ and @concatenate@,
+-- and not for @not@. Decided by Claude 2026-11-26, pending Meng's review.
+feelTypeAndFunctionWords :: Set Text
+feelTypeAndFunctionWords = Set.fromList ["date", "time", "duration", "not", "list", "context"]
+
+-- | The second group of 'reservedFeelWords': the FEEL built-in functions this
+-- exporter calls, which a variable of the same name would hide. Kept apart so
+-- that @D-RENAME@ can say which of the reasons renamed a name.
+reservedFeelFunctions :: Set Text
+reservedFeelFunctions = Set.fromList
+  ["floor", "ceiling", "decimal", "sum", "count", "min", "max", "concatenate", "modulo"]
 
 -- | 'reservedFeelWords' __plus FEEL's built-in type spellings__, which is the
 -- set a /type/ name is checked against ('feelTypeNameText').
@@ -998,18 +1126,50 @@ data Drg = MkDrg
     -- 'L4.Dmn.Markdown.markdownReport' all stay one-argument functions over one
     -- IR, and so that the fidelity report can name the artifact it describes.
   , drgItemDefs  :: ![ItemDefinition]
-    -- ^ one per module-local record and @IS ONE OF@, in source order, referenced
-    -- or not. Reachability-gating would make the artifact depend on which
-    -- decisions happened to survive lowering — a moving target — and an
-    -- unreferenced itemDefinition is inert. They are the __first children__ of
+    -- ^ one per module-local record and @IS ONE OF@, referenced or not.
+    -- Reachability-gating would make the artifact depend on which decisions
+    -- happened to survive lowering — a moving target — and an unreferenced
+    -- itemDefinition is inert. They are the __first children__ of
     -- @\<definitions\>@ (§4.3).
     --
-    -- The __domain-free aliases__ follow them, and those /are/ gated on being
+    -- The __domain-free aliases__ join them, and those /are/ gated on being
     -- pointed at: an alias exists only to be some @MAYBE@ site's @typeRef@, so
     -- unlike a base definition one with no referrer says nothing.
+    --
+    -- __In dependency order__, not source order, since smucclaw/l4-ide#1101:
+    -- each definition before any that refers to it, and source order (bases,
+    -- then aliases, then hydrated records) wherever nothing forces otherwise.
+    -- 'itemDefsInDependencyOrder' says why KIE needs it.
   , drgNodes     :: ![DrgNode]
   , drgNotes     :: ![FidelityNote]  -- ^ module-level notes; per-table ones live on the table
+  , drgOmitted   :: ![(Text, DropReason)]
+    -- ^ the L4 name of every decide the population filter (§2.5.6) left out
+    -- of the model, in source order, with the reason. These are the facts the
+    -- population notes (@D-FIXTURE@, @D-REGULATIVE@, @D-RULEDATE-UNBOUND@)
+    -- report, kept as data so that a caller that finds 'drgDecisions' empty
+    -- can say WHY without reading a note's message (smucclaw/l4-ide#1104).
+    -- Matching note text would be wrong as well as fragile: one form of
+    -- @D-FIXTURE@ reports a decision that was KEPT.
+  , drgTakenForFields :: ![Text]
+    -- ^ the L4 name of every rule the author wrote that left the model
+    -- because the checker took it for a computed record field of the same
+    -- name (smucclaw/l4-ide#1038, open), in source order. Not a population
+    -- drop, so not in 'drgOmitted': the rule leaves with the computed-field
+    -- functions the desugaring makes, which become hydrators (§4.4). Read by
+    -- the refusal for an empty model, so that it names these rules too.
   }
+  deriving stock (Eq, Show, Generic)
+
+-- | Why the population filter (spec §2.5.6) left a decide out of the model.
+--
+-- Computed by "L4.Dmn.Analysis" ('L4.Dmn.Analysis.classifyPopulation', which
+-- re-exports it) and defined here because the 'Drg' carries it in
+-- 'drgOmitted'.
+data DropReason
+  = DroppedFixture        -- ^ satisfied @FIXTURE(a)–(d)@
+  | DroppedFixtureHelper  -- ^ in the fixture-side transitive closure
+  | DroppedRegulative     -- ^ uncalled regulative body
+  | DroppedRuleDateRebind -- ^ rebinds law time (@EVAL UNDER RULES EFFECTIVE AT@), §15.12
   deriving stock (Eq, Show, Generic)
 
 drgDecisions :: Drg -> [Decision]

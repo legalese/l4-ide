@@ -1,0 +1,10 @@
+-- A rule with the name of a computed field of a record. The checker takes it
+-- for that field (smucclaw/l4-ide#1038, not yet fixed), so `l4 export dmn`
+-- leaves it out, and with nothing else to export it refuses. The refusal
+-- names the rule; before, it said the module had no DECIDE or MEANS.
+DECLARE Employee HAS salary IS A NUMBER
+                     bonus IS A NUMBER MEANS salary * 0.1
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE bonus n IS n * 2

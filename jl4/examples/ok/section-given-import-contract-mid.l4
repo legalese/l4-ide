@@ -1,0 +1,45 @@
+-- The middle file of a chain of three: it imports
+-- ok/section-given-import-contract-def.l4, has a section GIVEN of its own, and
+-- has three contracts that use the imported one: `both sides` names it as an
+-- operand of RAND, `bob first` has it as a HENCE, and `plain mid` names it as
+-- an operand of RAND and reads no section GIVEN of its own, so it is not a
+-- closure for an importer, and is evaluated only where it is traced.
+-- Each stops, in this file and in whatever imports it, in whatever position it
+-- is used, if the operand is not applied (smucclaw/l4-ide#1118).
+-- ok/section-given-import-contract-chain.l4 imports this one.
+
+IMPORT `section-given-import-contract-def`
+
+§ `Bob's side`
+    GIVEN bobdl IS A NUMBER TYPICALLY 10
+
+GIVETH A DEONTIC Person Action
+`both sides` MEANS
+    `pay leg`
+    RAND
+    (PARTY Bob MUST deliver WITHIN bobdl)
+
+#TRACE `both sides` AT 0 WITH
+  PARTY Alice DOES pay 1 AT 7
+  WAITUNTIL 30
+
+GIVETH A DEONTIC Person Action
+`bob first` MEANS
+    PARTY Bob MUST deliver WITHIN bobdl
+    HENCE `pay leg`
+    LEST BREACH BY Bob BECAUSE "late"
+
+#TRACE `bob first` AT 0 WITH
+  PARTY Bob DOES deliver AT 3
+  PARTY Alice DOES pay 1 AT 9
+  WAITUNTIL 30
+
+GIVETH A DEONTIC Person Action
+`plain mid` MEANS
+    `pay leg`
+    RAND
+    (PARTY Bob MUST deliver WITHIN 12)
+
+#TRACE `plain mid` AT 0 WITH
+  PARTY Alice DOES pay 1 AT 7
+  WAITUNTIL 30

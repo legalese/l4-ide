@@ -1,0 +1,14 @@
+-- smucclaw/l4-ide#1102: values read from an imported module that are NOT
+-- closed constants. Neither can be carried into the model, so each reference
+-- is written as L4 text and reported Blocking.
+IMPORT prelude
+IMPORT `export-imported-limits`
+
+-- `default colour` reads a constructor of a type the imported module declares
+GIVETH A BOOLEAN
+DECIDE `is red` IS `default colour` EQUALS red
+
+-- an imported function
+GIVEN h IS A NUMBER
+GIVETH A NUMBER
+DECIDE `monthly hours at` h IS `weekly hours at` h TIMES 52 DIVIDED BY 12

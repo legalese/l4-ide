@@ -1,0 +1,20 @@
+-- smucclaw/l4-ide#1102: the module `export-imported-constant.l4` imports.
+-- The first four are CLOSED constants (they read nothing but numbers and each
+-- other), which `l4 export dmn` copies into the importing model as decisions.
+-- The last two are not: `default colour` reads a constructor of a type this
+-- module declares, and `weekly hours at` takes an input.
+
+`hours per day` MEANS 8
+`days per week` MEANS 5
+`the longest week` MEANS `hours per day` TIMES `days per week` PLUS 2
+`the threshold` MEANS 100
+
+-- never read by the importer, so never copied
+`an unused constant` MEANS 7
+
+DECLARE Colour IS ONE OF red, green
+`default colour` MEANS red
+
+GIVEN f IS A NUMBER
+GIVETH A NUMBER
+DECIDE `weekly hours at` f IS 42 TIMES f

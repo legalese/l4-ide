@@ -20,16 +20,42 @@
 //   the same calls. Any answer that differs is a FAIL. The service is stopped
 //   by PID.
 //
+//   A jl4-service that has `--host` is started with `--host 127.0.0.1`, so it
+//   listens on 127.0.0.1 only. Without the option it listens on every
+//   interface, so each gate run that touched jl4-service/ put the service's
+//   whole HTTP API, deploy included, on the network for as long as the probe
+//   ran. Every request here goes to 127.0.0.1. (A binary that lacks `--host`
+//   cannot be kept on loopback: see the second case below.)
+//
+//   The probe also asks for /health on this machine's own non-loopback IPv4
+//   address, on the same port, and FAILS if the service answers there. That is
+//   the check that keeps the option from being parsed and then ignored, which
+//   no answer-comparison would notice.
+//
+//   Two cases cannot make that check, and each prints a line that starts with
+//   `WARN:` and still exits 0 or 1 by the answers alone; etc/verify-branch.sh
+//   copies every such line into its summary:
+//   - a jl4-service without `--host` (a base binary, for a review that probes
+//     it too): `--help` is asked first, and the service is started without the
+//     option, so it listens on every interface while the probe runs;
+//   - a machine with no non-loopback IPv4 address.
+//
 //   A build without multi-clause rules (main before #545) rejects the clause
 //   module; that half is then reported as not probed, and the rest still runs.
 //
 // USAGE
-//   node etc/probe-service-restart.mjs [--perturb] <jl4-service binary>
+//   node etc/probe-service-restart.mjs [--perturb] [--perturb-host] <jl4-service binary>
 //
-//     --perturb   positive control: after the restart, ask for `price` of
-//                 Green instead of Red, so a working probe must FAIL.
+//     --perturb        positive control: after the restart, ask for `price` of
+//                      Green instead of Red, so a working probe must FAIL.
+//     --perturb-host   positive control for the listener: start the service
+//                      with `--host '*'`, so a working probe must FAIL. Exit 2
+//                      on a machine with no address to try, or on a binary
+//                      without `--host`.
 //
-//   Exit 0: same answers. 1: an answer differs. 2: the probe could not run.
+//   Exit 0: same answers, and either no answer from outside loopback or a
+//   `WARN:` line saying the listener was not checked. 1: an answer differs, or
+//   the service answered outside loopback. 2: the probe could not run.
 //   Needs `zip` on PATH.
 
 import { spawn, spawnSync } from "node:child_process";
@@ -42,7 +68,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { createServer } from "node:net";
-import { tmpdir } from "node:os";
+import { networkInterfaces, tmpdir } from "node:os";
 import { join } from "node:path";
 
 const PLAIN = `@export default Whether a number is large
@@ -61,20 +87,42 @@ DECIDE price Green IS 2
 `;
 
 const args = process.argv.slice(2);
+const FLAGS = ["--perturb", "--perturb-host"];
 const perturb = args.includes("--perturb");
-const bin = args.filter((a) => a !== "--perturb")[0];
-if (!bin || args.filter((a) => a !== "--perturb").length !== 1) {
+const perturbHost = args.includes("--perturb-host");
+const operands = args.filter((a) => !FLAGS.includes(a));
+const bin = operands[0];
+if (!bin || operands.length !== 1 || bin.startsWith("--")) {
   console.error(
-    "usage: node etc/probe-service-restart.mjs [--perturb] <jl4-service binary>",
+    "usage: node etc/probe-service-restart.mjs [--perturb] [--perturb-host] <jl4-service binary>",
   );
   process.exit(2);
 }
+// What the service is told to listen on; `*` only for the positive control.
+const HOST = perturbHost ? "*" : "127.0.0.1";
 let dir = null;
 let child = null;
 if (!existsSync(bin)) die(`no such binary: ${bin}`);
 dir = mkdtempSync(join(tmpdir(), "probe-service-restart."));
 const store = join(dir, "store");
 const log = join(dir, "service.log");
+
+// Does this binary have --host? One built before the option exits on it.
+function knowsHost() {
+  const r = spawnSync(bin, ["--help"], { encoding: "utf8", timeout: 30000 });
+  if (r.error || r.status !== 0) {
+    const why = r.error
+      ? String(r.error)
+      : r.signal
+        ? `killed by ${r.signal}`
+        : `exit ${r.status}`;
+    const said = `${r.stderr ?? ""}`.trim().split("\n").slice(-3).join(" | ");
+    die(
+      `could not run \`${bin} --help\` to see whether it has --host: ${why}${said ? ` (${said})` : ""}`,
+    );
+  }
+  return /--host(?![-\w])/.test(`${r.stdout}${r.stderr}`);
+}
 
 function die(msg) {
   console.error(`probe-service-restart: ${msg}`);
@@ -106,6 +154,29 @@ function freePort() {
   });
 }
 
+// This machine's first IPv4 address that is not loopback, with the name of its
+// interface (the report names the interface, not the address), or undefined.
+function ownOutsideAddress() {
+  for (const [name, addrs] of Object.entries(networkInterfaces()))
+    for (const a of addrs ?? [])
+      if (a.family === "IPv4" && !a.internal)
+        return { name, address: a.address };
+  return undefined;
+}
+
+// Does the service answer /health at this address? Any answer counts, whatever
+// its status; a refusal, a reset or silence for 3 s does not.
+async function answersAt(address, port) {
+  try {
+    await fetch(`http://${address}:${port}/health`, {
+      signal: AbortSignal.timeout(3000),
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function zipOf(name, text) {
   const src = join(dir, name);
   writeFileSync(src, text);
@@ -118,9 +189,11 @@ function zipOf(name, text) {
 
 async function start(port) {
   const fd = openSync(log, "a");
-  child = spawn(bin, ["--port", String(port), "--store-path", store], {
-    stdio: ["ignore", fd, fd],
-  });
+  child = spawn(
+    bin,
+    [...hostArgs, "--port", String(port), "--store-path", store],
+    { stdio: ["ignore", fd, fd] },
+  );
   const exited = new Promise((r) => child.once("exit", (code) => r(code)));
   for (let i = 0; i < WAIT_SECONDS * 5; i++) {
     const code = await Promise.race([exited, sleep(200).then(() => undefined)]);
@@ -236,8 +309,22 @@ async function ask(port, list) {
   return out;
 }
 
+const hostKnown = knowsHost();
+const hostArgs = hostKnown ? ["--host", HOST] : [];
+if (!hostKnown) {
+  if (perturbHost) die("--perturb-host needs a jl4-service that has --host");
+  console.log(
+    "NOTE: this jl4-service has no --host, so it listens on every interface while the probe runs",
+  );
+}
 const port = await freePort();
 await start(port);
+const outside = hostKnown ? ownOutsideAddress() : undefined;
+if (perturbHost && !outside)
+  die(
+    "--perturb-host needs a non-loopback IPv4 address on this machine to try",
+  );
+const outsideAnswered = outside ? await answersAt(outside.address, port) : null;
 await deploy(port, "probe-plain", "plain.l4", PLAIN).then(
   (err) => err && die(`the ordinary rule did not compile: ${err}`),
 );
@@ -269,6 +356,17 @@ rmSync(dir, { recursive: true, force: true });
 console.log(
   differs
     ? `FAIL: ${differs} of ${list.length} answers differ after a restart${perturb ? " (--perturb: expected)" : ""}`
-    : `PASS: ${list.length} answers identical before and after a restart`,
+    : `ok    ${list.length} answers identical before and after a restart`,
 );
-process.exit(differs ? 1 : 0);
+console.log(
+  !hostKnown
+    ? "WARN: this jl4-service has no --host: it listened on every interface while the probe ran, and the listener was not checked"
+    : outsideAnswered === null
+      ? "WARN: this machine has no non-loopback IPv4 address, so the check that the service listens on loopback only was not made"
+      : outsideAnswered
+        ? `FAIL: the service answered /health on ${outside.name}, outside loopback${perturbHost ? " (--perturb-host: expected)" : ""}`
+        : `ok    no answer on ${outside.name}, outside loopback`,
+);
+const failed = differs > 0 || outsideAnswered === true;
+console.log(failed ? "FAIL" : "PASS");
+process.exit(failed ? 1 : 0);

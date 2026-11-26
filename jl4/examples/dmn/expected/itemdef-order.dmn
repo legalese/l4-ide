@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/" xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/" xmlns:di="http://www.omg.org/spec/DMN/20180521/DI/" id="definitions_itemdef_order" name="itemdef-order" namespace="https://legalese.com/l4/dmn/itemdef_order" exporter="jl4">
+  <itemDefinition id="itemdef_grade_optional" name="grade_optional" label="grade">
+    <typeRef>string</typeRef>
+  </itemDefinition>
+  <itemDefinition id="itemdef_pupil" name="pupil">
+    <itemComponent id="itemdef_pupil_c1" name="age">
+      <typeRef>number</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_pupil_c2" name="grade">
+      <typeRef>grade_optional</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_pupil_c3" name="buddy">
+      <typeRef>pupil</typeRef>
+    </itemComponent>
+  </itemDefinition>
+  <itemDefinition id="itemdef_kind_of_group" name="kind_of_group" label="kind of group">
+    <typeRef>string</typeRef>
+    <allowedValues>
+      <text>"whole class","crafts group"</text>
+    </allowedValues>
+  </itemDefinition>
+  <itemDefinition id="itemdef_group" name="group">
+    <itemComponent id="itemdef_group_c1" name="kind">
+      <typeRef>kind_of_group</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_group_c2" name="leader">
+      <typeRef>pupil</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_group_c3" name="pupils">
+      <typeRef>number</typeRef>
+    </itemComponent>
+  </itemDefinition>
+  <itemDefinition id="itemdef_crafts_club" name="crafts_club" label="crafts club">
+    <itemComponent id="itemdef_crafts_club_c1" name="founder">
+      <typeRef>club_member</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_crafts_club_c2" name="fee">
+      <typeRef>number</typeRef>
+    </itemComponent>
+  </itemDefinition>
+  <itemDefinition id="itemdef_club_member" name="club_member" label="club member">
+    <itemComponent id="itemdef_club_member_c1" name="club">
+      <typeRef>crafts_club</typeRef>
+    </itemComponent>
+    <itemComponent id="itemdef_club_member_c2" name="years">
+      <typeRef>number</typeRef>
+    </itemComponent>
+  </itemDefinition>
+  <itemDefinition id="itemdef_grade" name="grade">
+    <typeRef>string</typeRef>
+    <allowedValues>
+      <text>"junior","senior"</text>
+    </allowedValues>
+  </itemDefinition>
+  <inputData id="input_g" name="g">
+    <variable id="input_g_var" name="g" typeRef="group"/>
+  </inputData>
+  <inputData id="input_c" name="c">
+    <variable id="input_c_var" name="c" typeRef="crafts_club"/>
+  </inputData>
+  <decision id="decision_allowance_for" name="allowance_for" label="allowance for">
+    <variable id="decision_allowance_for_var" name="allowance_for" label="allowance for" typeRef="number"/>
+    <informationRequirement id="decision_allowance_for_ir1">
+      <requiredInput href="#input_g"/>
+    </informationRequirement>
+    <decisionTable id="decision_allowance_for_table" hitPolicy="UNIQUE" preferredOrientation="Rule-as-Row" outputLabel="allowance for">
+      <input id="decision_allowance_for_i1" label="g&apos;s kind">
+        <inputExpression id="decision_allowance_for_i1_expr" typeRef="kind_of_group">
+          <text>g.kind</text>
+        </inputExpression>
+        <inputValues>
+          <text>"whole class","crafts group"</text>
+        </inputValues>
+      </input>
+      <output id="decision_allowance_for_o1">
+        <defaultOutputEntry id="decision_allowance_for_o1_default">
+          <text>5</text>
+        </defaultOutputEntry>
+      </output>
+      <rule id="decision_allowance_for_r1">
+        <description>(g's kind) EQUALS `whole class`</description>
+        <inputEntry id="decision_allowance_for_r1_i1">
+          <text>"whole class"</text>
+        </inputEntry>
+        <outputEntry id="decision_allowance_for_r1_o1">
+          <text>10</text>
+        </outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <decision id="decision_leader_age" name="leader_age" label="leader age">
+    <variable id="decision_leader_age_var" name="leader_age" label="leader age" typeRef="number"/>
+    <informationRequirement id="decision_leader_age_ir1">
+      <requiredInput href="#input_g"/>
+    </informationRequirement>
+    <literalExpression id="decision_leader_age_literal">
+      <text>g.leader.age</text>
+    </literalExpression>
+  </decision>
+  <decision id="decision_fee_with_levy" name="fee_with_levy" label="fee with levy">
+    <variable id="decision_fee_with_levy_var" name="fee_with_levy" label="fee with levy" typeRef="number"/>
+    <informationRequirement id="decision_fee_with_levy_ir1">
+      <requiredInput href="#input_c"/>
+    </informationRequirement>
+    <literalExpression id="decision_fee_with_levy_literal">
+      <text>c.fee + 2</text>
+    </literalExpression>
+  </decision>
+  <dmndi:DMNDI>
+    <dmndi:DMNDiagram id="definitions_itemdef_order_diagram" name="itemdef-order">
+      <dmndi:DMNShape id="input_g_shape" dmnElementRef="input_g">
+        <dc:Bounds x="60" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="input_c_shape" dmnElementRef="input_c">
+        <dc:Bounds x="280" y="220" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_allowance_for_shape" dmnElementRef="decision_allowance_for">
+        <dc:Bounds x="60" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_leader_age_shape" dmnElementRef="decision_leader_age">
+        <dc:Bounds x="280" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="decision_fee_with_levy_shape" dmnElementRef="decision_fee_with_levy">
+        <dc:Bounds x="500" y="60" width="180" height="80"/>
+      </dmndi:DMNShape>
+      <dmndi:DMNEdge id="decision_allowance_for_ir1_edge" dmnElementRef="decision_allowance_for_ir1">
+        <di:waypoint x="150" y="220"/>
+        <di:waypoint x="150" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_leader_age_ir1_edge" dmnElementRef="decision_leader_age_ir1">
+        <di:waypoint x="150" y="220"/>
+        <di:waypoint x="370" y="140"/>
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="decision_fee_with_levy_ir1_edge" dmnElementRef="decision_fee_with_levy_ir1">
+        <di:waypoint x="370" y="220"/>
+        <di:waypoint x="590" y="140"/>
+      </dmndi:DMNEdge>
+    </dmndi:DMNDiagram>
+  </dmndi:DMNDI>
+</definitions>

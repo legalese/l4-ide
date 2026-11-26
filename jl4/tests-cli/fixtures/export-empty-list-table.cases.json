@@ -1,0 +1,14 @@
+{
+  "cases": [
+    {
+      "name": "an empty list",
+      "context": { "h": 1, "xs": [] },
+      "expect": { "up_to": [], "size_of": "none" }
+    },
+    {
+      "name": "a list of one",
+      "context": { "h": 2, "xs": [3] },
+      "expect": { "up_to": [2], "size_of": "some" }
+    }
+  ]
+}

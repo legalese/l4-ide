@@ -82,9 +82,11 @@ optionsParser = Options
 -- @L4.Cli.Common.evalLimitsParser@, kept in step with it by hand: the REPL
 -- cannot import the @l4@ executable's modules, and the parser is kept out
 -- of the libraries so that no library takes on optparse-applicative.
--- Here a time or memory stop ends the line that went over, not the session.
+-- Here a time or memory stop ends the line that went over, not the session
+-- (decided by Claude 2026-11-21, pending Meng's review: L2 extension, choice 1).
 -- A @:trace@ or @:traceascii@ line has the lower work number of every
--- evaluation that collects a trace ('maximumTracedClosureApplications').
+-- evaluation that collects a trace ('maximumTracedClosureApplications'; an
+-- amendment, decided by Claude 2026-11-21, pending Meng's review).
 limitsParser :: Parser EvalLimits
 limitsParser = EvalLimits
   <$> optional (option countReader
