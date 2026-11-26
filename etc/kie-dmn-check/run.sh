@@ -70,7 +70,10 @@ mkdir -p "$out"
 cp="$out/cp.txt"
 if [ ! -s "$cp" ]; then
   echo "# resolving KIE 8.44.0.Final into $out (first run only)" >&2
-  mvn -q -B -f "$here/pom.xml" -Dmdep.outputFile="$cp" dependency:build-classpath >&2 \
+  # shellcheck source=../mvn-retry.sh
+  . "$here/../mvn-retry.sh"
+  mvn_retry "KIE 8.44.0.Final" "$out/mvn.log" \
+    mvn -q -B -f "$here/pom.xml" -Dmdep.outputFile="$cp" dependency:build-classpath \
     || skip "could not resolve KIE 8.44.0.Final from Maven (offline?)"
 fi
 [ -s "$cp" ] || skip "empty classpath after dependency:build-classpath"

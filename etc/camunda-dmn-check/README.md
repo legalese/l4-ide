@@ -2,7 +2,7 @@
 
 `run.sh` drives an emitted DMN file through Camunda 8 (`io.camunda:zeebe-dmn`), as the header of `run.sh` explains.
 This note was moved here from `CLAUDE.md` §3.1 on 2026-10-27.
-The line numbers below were checked against `run.sh` on that date.
+The line numbers below were checked against `run.sh` on that date, and again on 2026-11-27 after the Maven retry (`etc/mvn-retry.sh`) added three lines above them.
 
 ## The JDK it picks is the newest one it finds, and CI runs 21
 
@@ -15,12 +15,12 @@ So pin `CAMUNDA_CHECK_JAVA_HOME` to a JDK 21 if you want your result to mean wha
 
 ## The compiled-class cache is keyed on the source, not on the JDK
 
-`run.sh:103` recompiles `CamundaDmnCheck.java` only when the class is missing or the source is newer.
+`run.sh:106` recompiles `CamundaDmnCheck.java` only when the class is missing or the source is newer.
 It does not look at which JDK compiled the class, so a class built by an earlier run under a different JDK is reused.
 The two directions fail differently:
 
 - **Loud.** A class compiled on JDK 26 (class file version 70) and then run on JDK 21 dies with `UnsupportedClassVersionError: CamundaDmnCheck …` before it reaches any DMN.
-  That reads as a broken harness rather than a stale cache, because the class named is the harness's own (`run.sh:84-95`).
+  That reads as a broken harness rather than a stale cache, because the class named is the harness's own (`run.sh:87-98`).
 - **Silent.** A class compiled on 21 and run on 26 loads without complaint, and a class compiled on 26 and run on 26 does too.
   Either is a local green on a different JVM, or on different bytecode, from CI's, and nothing says so.
 
@@ -35,6 +35,6 @@ rm -rf "$CAMUNDA_WORK/classes"                                                  
 
 ## The fix that is deliberately not applied
 
-The `kie-dmn-check` leg is immune because it compiles with `--release 11` (`etc/kie-dmn-check/run.sh:81`).
+The `kie-dmn-check` leg is immune because it compiles with `--release 11` (`etc/kie-dmn-check/run.sh:84`).
 `--release 21` on the Camunda leg would fix it the same way, and 21 is already this script's floor.
-It is not applied because it changes what every CI run of this checker compiles, which is not a corpus or exporter branch's call (`run.sh:97-102`).
+It is not applied because it changes what every CI run of this checker compiles, which is not a corpus or exporter branch's call (`run.sh:100-105`).
