@@ -85,7 +85,8 @@ optionsParser = Options
 -- Here a time or memory stop ends the line that went over, not the session
 -- (decided by Claude 2026-11-21, pending Meng's review: L2 extension, choice 1).
 -- A @:trace@ or @:traceascii@ line has the lower work number of every
--- evaluation that collects a trace ('maximumTracedClosureApplications').
+-- evaluation that collects a trace ('maximumTracedClosureApplications'; an
+-- amendment, decided by Claude 2026-11-21, pending Meng's review).
 limitsParser :: Parser EvalLimits
 limitsParser = EvalLimits
   <$> optional (option countReader

@@ -197,7 +197,8 @@ data Budget
     -- work number, set only where the directive collected a trace and
     -- stopped at a number of its own that is not the usual one
     -- ('L4.EvaluateLazy.withTracedWorkNumber'); @Just Nothing@ when the
-    -- usual one sets no limit.
+    -- usual one sets no limit. That number of its own is an amendment,
+    -- decided by Claude 2026-11-21, pending Meng's review.
   | TimeLimit Int
     -- ^ the directive ran longer than the opt-in @--eval-timeout@, in
     -- seconds of wall-clock time. Not deterministic: it depends on the
