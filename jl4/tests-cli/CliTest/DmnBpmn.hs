@@ -199,9 +199,11 @@ exportPreludeCallsFixture  = fixtureDir </> "export-prelude-calls.l4"
 exportAlteredPreludeFixture, exportAlteredPreludeLib :: FilePath
 exportAlteredPreludeFixture = fixtureDir </> "export-altered-prelude" </> "uses-altered.l4"
 exportAlteredPreludeLib     = fixtureDir </> "export-altered-prelude" </> "lib"
--- A date-compat.l4 of the author's own that breaks the compiled-in daydate.
-exportBrokenDateCompatFixture :: FilePath
-exportBrokenDateCompatFixture = fixtureDir </> "export-broken-date-compat" </> "uses-daydate.l4"
+-- A date-compat.l4 of the author's own that breaks the compiled-in daydate,
+-- and a module that imports the prelude and calls nothing in it.
+exportBrokenDateCompatFixture, exportImportsPreludeUnusedFixture :: FilePath
+exportBrokenDateCompatFixture     = fixtureDir </> "export-broken-date-compat" </> "uses-daydate.l4"
+exportImportsPreludeUnusedFixture = fixtureDir </> "export-imports-prelude-unused.l4"
 -- What the seven calls in those fixtures become when lowered as the
 -- library's.
 preludeCallForms :: [String]
@@ -791,6 +793,19 @@ spec bin = do
       -- test sets the variable as it needs, whatever the suite was given.
       describe "the prelude and daydate, recognised as the library only when they are" $ do
         let envWithout = filter ((/= "JL4_LIBRARY_PATH") . fst) <$> getEnvironment
+            -- A copy of the checkout's libraries under the temporary
+            -- directory, with one file of it appended to.
+            editedLibraryCopy name file edit = do
+              tmp <- getTemporaryDirectory
+              let libCopy = tmp </> name
+                  libSrc  = ".." </> "jl4-core" </> "libraries"
+              removePathForcibly libCopy
+              createDirectoryIfMissing True libCopy
+              files <- filter ((== ".l4") . takeExtension) <$> listDirectory libSrc
+              forM_ files \f -> copyFile (libSrc </> f) (libCopy </> f)
+              appendFile (libCopy </> file) edit
+              pure libCopy
+            notLibrary = "[D-NOT-LIBRARY] advisory — definitions"
         it "lowers no call into a prelude.l4 or daydate.l4 of the author's own as the library's" $ do
           env <- envWithout
           Output code sout serr <- runL4WithEnv (Just env) bin
@@ -806,9 +821,11 @@ spec bin = do
 
         it "lowers the same calls as the library's from the copy compiled into l4" $ do
           env <- envWithout
-          Output code sout _ <- runL4WithEnv (Just env) bin ["export", "dmn", exportPreludeCallsFixture]
+          Output code sout serr <- runL4WithEnv (Just env) bin
+            ["export", "dmn", exportPreludeCallsFixture, "--fidelity-report"]
           code `shouldBe` ExitSuccess
           forM_ preludeCallForms \form -> sout `shouldSatisfy` (form `isInfixOf`)
+          serr `shouldNotSatisfy` ("D-NOT-LIBRARY" `isInfixOf`)
 
         it "lowers them as the library's from a copy of the libraries that JL4_LIBRARY_PATH names" $ do
           env <- envWithout
@@ -819,10 +836,11 @@ spec bin = do
           createDirectoryIfMissing True libCopy
           files <- filter ((== ".l4") . takeExtension) <$> listDirectory libSrc
           forM_ files \f -> copyFile (libSrc </> f) (libCopy </> f)
-          Output code sout _ <- runL4WithEnv (Just (("JL4_LIBRARY_PATH", libCopy) : env)) bin
-            ["export", "dmn", exportPreludeCallsFixture]
+          Output code sout serr <- runL4WithEnv (Just (("JL4_LIBRARY_PATH", libCopy) : env)) bin
+            ["export", "dmn", exportPreludeCallsFixture, "--fidelity-report"]
           code `shouldBe` ExitSuccess
           forM_ preludeCallForms \form -> sout `shouldSatisfy` (form `isInfixOf`)
+          serr `shouldNotSatisfy` ("D-NOT-LIBRARY" `isInfixOf`)
 
         -- A Windows checkout can write the libraries with CRLF line endings.
         it "lowers them as the library's from a copy of the libraries with CRLF line endings" $ do
@@ -836,10 +854,11 @@ spec bin = do
           forM_ files \f -> do
             src <- BS8.readFile (libSrc </> f)
             BS8.writeFile (libCopy </> f) (BS8.intercalate (BS8.pack "\r\n") (BS8.split '\n' src))
-          Output code sout _ <- runL4WithEnv (Just (("JL4_LIBRARY_PATH", libCopy) : env)) bin
-            ["export", "dmn", exportPreludeCallsFixture]
+          Output code sout serr <- runL4WithEnv (Just (("JL4_LIBRARY_PATH", libCopy) : env)) bin
+            ["export", "dmn", exportPreludeCallsFixture, "--fidelity-report"]
           code `shouldBe` ExitSuccess
           forM_ preludeCallForms \form -> sout `shouldSatisfy` (form `isInfixOf`)
+          serr `shouldNotSatisfy` ("D-NOT-LIBRARY" `isInfixOf`)
 
         -- The directory is not enough: the text must be the compiled-in copy's.
         it "lowers no call into a JL4_LIBRARY_PATH prelude.l4 whose sum and count are not the library's" $ do
@@ -853,22 +872,51 @@ spec bin = do
 
         it "lowers no prelude call from a JL4_LIBRARY_PATH copy that differs from the compiled-in one by a comment" $ do
           env <- envWithout
-          tmp <- getTemporaryDirectory
-          let libCopy = tmp </> "l4-dmn-library-edited"
-              libSrc  = ".." </> "jl4-core" </> "libraries"
-          removePathForcibly libCopy
-          createDirectoryIfMissing True libCopy
-          files <- filter ((== ".l4") . takeExtension) <$> listDirectory libSrc
-          forM_ files \f -> copyFile (libSrc </> f) (libCopy </> f)
-          appendFile (libCopy </> "prelude.l4") "\n-- edited\n"
-          Output code sout _ <- runL4WithEnv (Just (("JL4_LIBRARY_PATH", libCopy) : env)) bin
-            ["export", "dmn", exportPreludeCallsFixture]
+          libCopy <- editedLibraryCopy "l4-dmn-library-edited" "prelude.l4" "\n-- edited\n"
+          Output code sout serr <- runL4WithEnv (Just (("JL4_LIBRARY_PATH", libCopy) : env)) bin
+            ["export", "dmn", exportPreludeCallsFixture, "--fidelity-report"]
           code `shouldBe` ExitSuccess
           forM_ (filter (not . ("date(" `isInfixOf`)) preludeCallForms) \form ->
             sout `shouldNotSatisfy` (form `isInfixOf`)
           -- daydate.l4 and the date-compat.l4 it imports are unedited, so they
           -- are still the library
           sout `shouldSatisfy` ("<text>date(\"2024-01-02\")</text>" `isInfixOf`)
+          -- and the report names the file that is not, once, and says why
+          serr `shouldSatisfy` (notLibrary `isInfixOf`)
+          serr `shouldSatisfy` ("`prelude.l4` in the JL4_LIBRARY_PATH folder is not the copy compiled into this `l4`: its text differs" `isInfixOf`)
+          serr `shouldNotSatisfy` ("`daydate.l4` in the JL4_LIBRARY_PATH folder" `isInfixOf`)
+
+        -- The case the stale-embed trap produces most: an edit to one file
+        -- that another library file imports.
+        it "lowers no daydate call from a JL4_LIBRARY_PATH copy whose date-compat.l4 alone differs, and says which file and why" $ do
+          env <- envWithout
+          libCopy <- editedLibraryCopy "l4-dmn-library-date-compat" "date-compat.l4" "\n-- edited\n"
+          Output code sout serr <- runL4WithEnv (Just (("JL4_LIBRARY_PATH", libCopy) : env)) bin
+            ["export", "dmn", exportPreludeCallsFixture, "--fidelity-report"]
+          code `shouldBe` ExitSuccess
+          sout `shouldNotSatisfy` ("date(" `isInfixOf`)
+          -- the prelude is unedited, so it is still the library
+          forM_ (filter (not . ("date(" `isInfixOf`)) preludeCallForms) \form ->
+            sout `shouldSatisfy` (form `isInfixOf`)
+          serr `shouldSatisfy` ("`date-compat.l4` in the JL4_LIBRARY_PATH folder is not the copy compiled into this `l4`: its text differs" `isInfixOf`)
+          serr `shouldSatisfy` ("`daydate.l4` in the JL4_LIBRARY_PATH folder has the text of the copy compiled into this `l4`, but it imports `date-compat.l4`, which is not the library's copy" `isInfixOf`)
+
+        -- The note is Advisory: each refused call carries its own Blocking
+        -- note, and a module that calls nothing in the file loses nothing.
+        it "reports a library file that is not the compiled-in copy in an Advisory note, which --fail-on blocking passes when nothing calls into it" $ do
+          env <- envWithout
+          libCopy <- editedLibraryCopy "l4-dmn-library-unused" "prelude.l4" "\n-- edited\n"
+          let withLib = Just (("JL4_LIBRARY_PATH", libCopy) : env)
+          Output code _ serr <- runL4WithEnv withLib bin
+            ["export", "dmn", exportImportsPreludeUnusedFixture, "--fidelity-report", "--fail-on", "blocking"]
+          code `shouldBe` ExitSuccess
+          serr `shouldSatisfy` (notLibrary `isInfixOf`)
+          serr `shouldNotSatisfy` ("] blocking —" `isInfixOf`)
+          -- dmn-md's report carries it too
+          Output codeMd _ serrMd <- runL4WithEnv withLib bin
+            ["export", "dmn-md", exportImportsPreludeUnusedFixture, "--fidelity-report"]
+          codeMd `shouldBe` ExitSuccess
+          serrMd `shouldSatisfy` ("[D-NOT-LIBRARY] advisory" `isInfixOf`)
 
         -- The compiled-in copy is the library only when it type-checks.
         -- The export still exits 0 on a file `l4 check` refuses; that is
@@ -883,6 +931,8 @@ spec bin = do
           sout `shouldNotSatisfy` ("date(" `isInfixOf`)
           forM_ ["the_day", "the_ymd"] \d ->
             serr `shouldSatisfy` (("[D-LITERALEXPR] blocking — decision_" <> d) `isInfixOf`)
+          serr `shouldSatisfy` (notLibrary `isInfixOf`)
+          serr `shouldSatisfy` ("`daydate.l4`, a library file, does not type-check here with the modules it imports, among them `date-compat.l4`" `isInfixOf`)
 
       it "renames an input spelled like a FEEL function the export calls" $ do
         Output code sout _ <- runL4 bin ["export", "dmn", exportShadowedBuiltinsFixture]

@@ -1,0 +1,9 @@
+-- Imports the prelude and calls nothing in it. Exported against a copy of
+-- the libraries whose `prelude.l4` is not the compiled-in copy, the report
+-- says so in an Advisory D-NOT-LIBRARY note, and nothing in the model is
+-- refused, so `--fail-on blocking` passes.
+IMPORT prelude
+
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+DECIDE `doubled` x IS x TIMES 2

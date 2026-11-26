@@ -91,7 +91,7 @@ import L4.Dmn.Lower
   , checkerMissingMatchRanges, embeddedLibraryModule, lowerModule, moduleTitle, resolveMaybePredicates )
 import L4.Dmn.Markdown (emitMarkdown, markdownReport)
 import L4.Interchange.Fidelity
-  (FidelityNote (..), FidelityReport (..), FidelitySeverity (..), renderReport)
+  (FidelityNote (..), FidelityReport (..), FidelitySeverity (..), addNote, emptyReport, renderReport)
 import L4.StateGraph (StateGraph (..), extractStateGraphs)
 import L4.Syntax
 
@@ -435,11 +435,15 @@ moduleDecideNames (MkModule _ _ sec) = goSec sec
 -- It does not decide whether the result is worth emitting: a module with no
 -- decisions is an error for @l4 export dmn@ and a non-event for @l4 export bpmn@, so that
 -- judgement stays with the callers.
-dmnDrgFor :: ExportOptions -> Rules.TypeCheckResult -> IO Drg
+--
+-- With the DRG it returns the notes 'dmnLibraryModule' gives, one for each
+-- library file this run loaded and does not take for the library, which the
+-- callers put at the head of their reports.
+dmnDrgFor :: ExportOptions -> Rules.TypeCheckResult -> IO (Drg, [FidelityNote])
 dmnDrgFor opts tcRes = do
   -- Which loaded modules are the standard library, for the lowering's
   -- provenance tests (`sum`, `all`, `YMD`, `isJust` and the rest).
-  library <- dmnLibraryModule (Rules.transitiveDependencies tcRes)
+  (library, libraryNotes) <- dmnLibraryModule (Rules.transitiveDependencies tcRes)
   -- FIXTURE(d)'s importer view (§2.5.7, OPEN-5): a sibling-directory scan.
   -- Textual and conservative-keep: an occurrence of a decide's name anywhere
   -- in an importing sibling counts as an external reference, so over-matching
@@ -503,7 +507,7 @@ dmnDrgFor opts tcRes = do
             , dloLibraryModule = library
             }
           tcRes.module'
-  pure drg
+  pure (drg, libraryNotes)
 
 -- | The standard-library file a loaded module is, for 'dloLibraryModule': the
 -- copy compiled into this binary, or a file in the @$JL4_LIBRARY_PATH@
@@ -562,34 +566,61 @@ dmnDrgFor opts tcRes = do
 --
 -- Paths are compared canonically (symbolic links and @..@ resolved) because
 -- the variable may be spelled relative or through a link.
-dmnLibraryModule :: [Rules.TypeCheckResult] -> IO (NormalizedUri -> Maybe Text)
+--
+-- __Each library file this run loaded and does not take for the library gets
+-- one note__ (@D-NOT-LIBRARY@), saying why. Without it, the only sign is a
+-- Blocking note on each refused call that says its body "could not be
+-- rendered as FEEL", which sends the reader to the call, not to the file; and
+-- the likeliest cause is easy to miss, an @l4@ built from other libraries than
+-- the @$JL4_LIBRARY_PATH@ folder holds, which includes one built after an edit
+-- to @jl4-core/libraries@ alone, since a plain @cabal build@ does not re-embed
+-- them (see "L4.API.EmbeddedLibraries.TH" and @jl4-core/libraries/README.md@).
+-- A library file means a module this run took from the compiled-in copies or
+-- from that folder under the name of a compiled-in file; an author's own
+-- @prelude.l4@ elsewhere is the author's module and gets none. The note is
+-- __Advisory__: the loss is reported where it happens, on each refused call,
+-- as a Blocking note of its own, and a module that calls nothing in the file
+-- loses nothing, so a Blocking note here would fail @--fail-on blocking@ on
+-- an export that is whole. Both are decided by Claude 2026-11-26, pending
+-- Meng's review.
+dmnLibraryModule :: [Rules.TypeCheckResult] -> IO (NormalizedUri -> Maybe Text, [FidelityNote])
 dmnLibraryModule deps = do
   mLibDir <- traverse canonical =<< lookupEnv "JL4_LIBRARY_PATH"
-  sameText <- case mLibDir of
-    Nothing -> pure []
-    Just libDir -> fmap catMaybes $ for deps \dep -> do
-      let u = Rules.moduleUriOf dep
-      case uriToFilePath (fromNormalizedUri u) of
-        Nothing -> pure Nothing
-        Just p -> do
-          dir <- canonical (takeDirectory p)
-          same <- isCompiledInCopy p
-          pure (if dir == libDir && same then Just (u, Text.pack (takeFileName p)) else Nothing)
-  let byText = Map.fromList sameText
-      library u = embeddedLibraryModule u <|> Map.lookup u byText
-      -- `daydate.l4` imports `date-compat.l4`: a file whose own text is the
-      -- compiled-in copy's is the library only when what it imports is too.
-      -- Either kind is the library only when it type-checks with its imports.
-      trusted = Map.fromList
-        [ (u, f)
-        | dep <- deps
-        , let u = Rules.moduleUriOf dep
-        , Just f <- [library u]
-        , Rules.evaluable dep
-        , isJust (embeddedLibraryModule u)
-            || all (isJust . library . Rules.moduleUriOf) (Rules.transitiveDependencies dep)
+  -- Every library file this run loaded: the compiled-in copies, and each
+  -- file in the $JL4_LIBRARY_PATH directory named like one, with whether its
+  -- text is that copy's.
+  located <- fmap catMaybes $ for deps \dep -> do
+    let u = Rules.moduleUriOf dep
+    case (embeddedLibraryModule u, mLibDir, uriToFilePath (fromNormalizedUri u)) of
+      (Just f, _, _) -> pure (Just (dep, u, f, LibCompiledIn))
+      (Nothing, Just libDir, Just p)
+        | isJust (EmbeddedLibraries.lookupEmbeddedLibrary (Text.pack (takeBaseName p))) -> do
+            dir <- canonical (takeDirectory p)
+            same <- isCompiledInCopy p
+            pure
+              if dir /= libDir
+                then Nothing
+                else Just (dep, u, Text.pack (takeFileName p), if same then LibSameText else LibOtherText)
+      _ -> pure Nothing
+  let -- what a file with the compiled-in text is, before its imports are asked
+      byText = Map.fromList [(u, f) | (_, u, f, k) <- located, k /= LibOtherText]
+      verdict (dep, u, f, k) = case k of
+        LibOtherText -> Left (f, textDiffers f)
+        -- `daydate.l4` imports `date-compat.l4`: a file whose own text is the
+        -- compiled-in copy's is the library only when what it imports is too.
+        LibSameText
+          | (g : _) <- foreignImports dep -> Left (f, importsForeign f g)
+        _ | not (Rules.evaluable dep) -> Left (f, doesNotCheck f (foreignImports dep))
+          | otherwise -> Right (u, f)
+      foreignImports dep =
+        [ moduleFileName v
+        | d <- Rules.transitiveDependencies dep
+        , let v = Rules.moduleUriOf d
+        , isNothing (Map.lookup v byText)
         ]
-  pure \u -> Map.lookup u trusted
+      verdicts = map verdict located
+      trusted = Map.fromList [uf | Right uf <- verdicts]
+  pure (\u -> Map.lookup u trusted, [libraryNote f why | Left (f, why) <- verdicts])
  where
   canonical p = either (\(_ :: SomeException) -> p) id <$> try (canonicalizePath p)
   lf = Text.replace "\r\n" "\n"
@@ -599,20 +630,66 @@ dmnLibraryModule deps = do
       (Right bytes, Just src) -> either (const False) (\t -> lf t == lf src) (Text.decodeUtf8' bytes)
       (Left (_ :: SomeException), _) -> False
       (_, Nothing) -> False
+  moduleFileName v =
+    fromMaybe (fromNormalizedUri v).getUri
+      (embeddedLibraryModule v <|> (Text.pack . takeFileName <$> uriToFilePath (fromNormalizedUri v)))
+  tick t = "`" <> t <> "`"
+  refused =
+    "so no call into it is lowered as the library's: each is written as L4, with a Blocking note"
+  textDiffers f =
+    tick f <> " in the JL4_LIBRARY_PATH folder is not the copy compiled into this `l4`: its text \
+              \differs (line endings aside), " <> refused <> ", and so is each call into a library \
+              \file that imports it. This happens when the `l4` was built from other libraries \
+              \than this folder holds, which includes one built after an edit to \
+              \`jl4-core/libraries` alone: a plain `cabal build` does not embed the edited \
+              \text (see `jl4-core/libraries/README.md`)"
+  importsForeign f g =
+    tick f <> " in the JL4_LIBRARY_PATH folder has the text of the copy compiled into this \
+              \`l4`, but it imports " <> tick g <> ", which is not the library's copy, "
+      <> refused
+  doesNotCheck f gs =
+    tick f <> ", a library file, does not type-check here with the modules it imports"
+      <> (case gs of
+            [] -> ""
+            _  -> ", among them " <> Text.intercalate ", " (map tick gs)
+                    <> ", which this run did not take from the library")
+      <> ", " <> refused <> " (`l4 check` names the error)"
+  libraryNote f why =
+    MkFidelityNote
+      { code     = "D-NOT-LIBRARY"
+      , severity = Advisory
+      , element  = "definitions"
+      , range    = Nothing
+      , message  = why
+      , lost     = "the lowering of " <> tick f <> "'s functions as the library's; each call \
+                   \that is refused for it carries its own Blocking note"
+      }
+
+-- | Where 'dmnLibraryModule' found a library file.
+data LibraryCopy
+  = LibCompiledIn   -- ^ the copy compiled into this binary
+  | LibSameText   -- ^ a @$JL4_LIBRARY_PATH@ file with that copy's text
+  | LibOtherText  -- ^ a @$JL4_LIBRARY_PATH@ file with other text
+  deriving stock Eq
+
+-- | A report with these notes put at its head, so that a reader meets the
+-- cause before the refusals it explains.
+withNotesFirst :: [FidelityNote] -> FidelityReport -> FidelityReport
+withNotesFirst ns r = foldl' (flip addNote) (emptyReport r.target) (ns <> r.notes)
 
 exportDmn :: ExportOptions -> Rules.TypeCheckResult -> IO FidelityReport
 exportDmn opts tcRes = do
-  drg <- dmnDrgFor opts tcRes
+  (drg, libraryNotes) <- dmnDrgFor opts tcRes
   when (null (drgDecisions drg)) do
     hPutStr stderr (Text.unpack (noDecisionsMessage drg))
     exitFailure
   case opts.exportTarget of
     TargetDmnMarkdown -> do
       emitArtifact opts (emitMarkdown drg)
-      pure (markdownReport drg)
+      pure (withNotesFirst libraryNotes (markdownReport drg))
     _ -> do
       emitArtifact opts (emitDrg drg)
-      pure (dmnReport drg)
+      pure (withNotesFirst libraryNotes (dmnReport drg))
 
 -- | Why the model has no decisions, in the reader's words.
 --
@@ -684,7 +761,9 @@ exportBpmn opts tcRes = do
   -- its XML: a gateway is wired only to a decision this graph actually contains
   -- (PROCESS-TRACK.md §8.3). Unconditional — a module with no decisions yields
   -- an empty table, which wires nothing and reports nothing, which is right.
-  drg <- dmnDrgFor opts tcRes
+  -- The library notes are the DMN report's, not this one's: a BPMN file
+  -- carries no decision logic.
+  (drg, _) <- dmnDrgFor opts tcRes
   let policy = fromMaybe AssumeDays opts.exportDeadlineUnit
       bx =
         stateGraphToBpmn
