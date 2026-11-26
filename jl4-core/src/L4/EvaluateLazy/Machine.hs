@@ -2393,7 +2393,7 @@ finishNormRead word d who modal con branch _site = do
       sref <- asks (.siblings)
       sibs <- liftIO (readIORef sref)
       when (inCompound sibs) $ userException $ UserError $
-        "a norm-log read (" <> readWordText word <> ") ran inside an operand of RAND, ROR or EVERY (through a rule the operand uses): the operands run side by side, so what it saw would depend on which sibling ran first"
+        "a norm-log read (" <> readWordText word <> ") ran inside an operand of RAND, ROR or EVERY (reached from an operand, not written in one: through a rule it uses or the time of an event it takes): the operands run side by side, so what it saw would depend on which sibling ran first"
       store <- readEvalRef (.envLedger)
       -- review of P2b, B2: the entries of this run only; a second run in one
       -- directive (EVALTRACE twice) has its own norms

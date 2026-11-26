@@ -1625,7 +1625,9 @@ execEvalModuleWithJSON evalConfig entityInfo json m0@(MkModule _ moduleUri _) = 
   -- definition reads its binder through its own parameter, and the value that
   -- parameter is handed at the root is the one the request supplied.
   let m = dischargeModuleWith evalConfig.presumeDefaults m0
-  st0 <- mkInitialEvalState evalConfig entityInfo moduleUri
+  -- the writer is on when the module reads the norm log, as in 'execEvalModuleWithDefaults'
+  -- (review of P2b, second review: this had the writer off, and nothing calls it)
+  st0 <- mkInitialEvalStateWith (moduleReadsNormLog m0) evalConfig entityInfo moduleUri
   let st = (withDefaultsKnown evalConfig noRootFills m0 [] st0) {budgetRules = moduleRules m0}
   r <- try (runEval st (evalModuleAndDirectivesWithJSON json emptyEnvironment m))
   case r of
