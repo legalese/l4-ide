@@ -1,0 +1,9 @@
+{
+  "cases": [
+    {
+      "name": "the rule with the bare name fires",
+      "context": { "h": 1, "x": 7 },
+      "expect": { "pay": 2 }
+    }
+  ]
+}

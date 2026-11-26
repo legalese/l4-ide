@@ -135,7 +135,9 @@ means the export ran, not that everything made it across.
 FEEL cannot parse L4, so KIE 8.44 and Camunda 8.7.6 both refuse the whole file, not only that one decision: every other decision in it is lost too.
 The note says so.
 The one exception is raw L4 that happens to read as a FEEL name, such as a bare `TBD`: Camunda parses it, answers null for that decision and runs the rest, while KIE still refuses the file.
-`D-NONFEELOUTPUT`, raw L4 in a table's output entry or in a record's computed field, costs the whole file in the same way, with one exception the other way round: when the only raw L4 in the file is a table's last-resort (default) output, KIE loads the file and answers null for that decision as though it had succeeded, while Camunda refuses the file.
+`D-NONFEELOUTPUT`, raw L4 in a table's output entry or in a record's computed field, costs the whole file in the same way, with the same exception and one the other way round.
+When the only raw L4 in the file reads as a FEEL name, such as a rule whose output is a bare `TBD`, Camunda parses the file, answers null for that decision and runs the rest, while KIE refuses the file (measured on `jl4/tests-cli/fixtures/export-raw-l4-bare-name.l4`).
+When the only raw L4 in the file is a table's last-resort (default) output, KIE loads the file and answers null for that decision as though it had succeeded, while Camunda refuses the file.
 Measured on `jl4/examples/dmn/rounding.l4` before its functions were lowered: eight such notes, and neither engine ran a single case.
 `--fail-on blocking` catches it before an engine does.
 

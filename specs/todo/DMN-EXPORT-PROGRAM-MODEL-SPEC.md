@@ -3456,7 +3456,8 @@ the census showed 0 cyclic files. The census is blind to suppressed self-edges b
 > Both notes now say this, and `D-NONFEELINPUT`'s consequence no longer claims that every rule testing the column is silently treated as non-matching, which neither engine does; the wording is decided by Claude 2026-11-26, pending Meng's review.
 > `D-NONFEELOUTPUT` (raw L4 in an output entry, or in a hydrated record's derived field) said the same of its entry, and gave consequences measured on neither engine: a failure "loudly when the rule fires", or only in "every decision that reads a component through" the record.
 > Measured the same day: raw L4 in a rule's output entry, or in a derived field, made KIE refuse to load the file and Camunda refuse to parse it; raw L4 in a table's defaultOutputEntry alone (`jl4/tests-cli/fixtures/export-raw-l4-default.l4`) made Camunda refuse to parse the file, while KIE loaded it, answered null for that decision and reported it `SUCCEEDED`, beside the correct answer for the plain-FEEL `pay`.
-> Its two consequences now say so; the wording is decided by Claude 2026-11-26, pending Meng's review.
+> The review of this branch then found the other exception missing from this note (2026-11-26): a bare `TBD` in a rule's own output entry (`jl4/tests-cli/fixtures/export-raw-l4-bare-name.l4`) made KIE refuse the file (`Unknown variable 'TBD'`), while Camunda parsed it, answered 2 for `pay` and null for `banded`, as the `D-LITERALEXPR` and `D-NONFEELINPUT` notes already said of their own text.
+> Its two consequences now say so, both exceptions included; the wording is decided by Claude 2026-11-26, pending Meng's review.
 > `--fail-on`'s help said Blocking "fires on every realistic export"; in the same corpus exports 441 of the 764 that exited 0 carry a Blocking note and 323 carry none, so it now says "most", as `doc/exports/README.md` does (DMN measured; BPMN not).
 
 ---

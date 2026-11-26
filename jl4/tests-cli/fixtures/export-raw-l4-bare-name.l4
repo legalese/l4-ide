@@ -1,0 +1,16 @@
+-- A bare name in a rule's own output entry (Blocking D-NONFEELOUTPUT): the
+-- prelude's TBD is not a closed constant, so it is written as the L4 text
+-- `TBD`, beside a decision that is plain FEEL. KIE 8.44 refuses the file
+-- (`Unknown variable 'TBD'`). Camunda 8.7.6 parses it, because the text reads
+-- as a FEEL name, answers `pay` and answers null for `banded`.
+IMPORT prelude
+
+GIVEN x IS A NUMBER
+GIVETH A STRING
+DECIDE `banded` x IS
+  IF x > 5 THEN TBD
+  ELSE "small"
+
+GIVEN h IS A NUMBER
+GIVETH A NUMBER
+DECIDE `pay` h IS h PLUS 1

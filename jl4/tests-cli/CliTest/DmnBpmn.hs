@@ -177,6 +177,9 @@ exportRawL4Cases   = fixtureDir </> "export-raw-l4.cases.json"
 exportRawL4DefaultFixture, exportRawL4DefaultCases :: FilePath
 exportRawL4DefaultFixture = fixtureDir </> "export-raw-l4-default.l4"
 exportRawL4DefaultCases   = fixtureDir </> "export-raw-l4-default.cases.json"
+exportRawL4BareNameFixture, exportRawL4BareNameCases :: FilePath
+exportRawL4BareNameFixture = fixtureDir </> "export-raw-l4-bare-name.l4"
+exportRawL4BareNameCases   = fixtureDir </> "export-raw-l4-bare-name.cases.json"
 -- A rule with the name of a computed field (smucclaw/l4-ide#1038), alone and
 -- beside scaffolding, and a computed field with no rule.
 exportTakenForFieldFixture, exportTakenForFieldMixFixture, exportComputedFieldOnlyFixture :: FilePath
@@ -699,6 +702,8 @@ spec bin = do
         serr `shouldSatisfy`
           ("execution of every decision in the file: Camunda 8.7.6 refuses to parse the file" `isInfixOf`)
         serr `shouldSatisfy` (not . ("loudly when the rule fires" `isInfixOf`))
+        serr `shouldSatisfy`
+          ("Camunda parses a file whose only such text reads as a FEEL name, such as a bare `TBD`" `isInfixOf`)
 
       -- smucclaw/l4-ide#1038: the checker takes a rule with a computed
       -- field's name for that field, and the export leaves the rule out.
@@ -1546,6 +1551,33 @@ spec bin = do
       dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustFail
         dmn [dmn, "--cases", exportRawL4DefaultCases] \out ->
           out `shouldSatisfy` ("0 parsed" `isInfixOf`)
+
+  -- The other way round: a bare name in a rule's own output entry.
+  describe "a bare name in a rule's output entry (opt-in: L4_DMN_ENGINE_CHECK=1)" $ do
+    let exported = do
+          tmp <- getTemporaryDirectory
+          let outDir  = tmp </> "l4-export-raw-l4-bare-name"
+              outFile = outDir </> "export-raw-l4-bare-name.dmn"
+          removePathForcibly outDir
+          createDirectoryIfMissing True outDir
+          Output code _ serr <- runL4 bin ["export", "dmn", exportRawL4BareNameFixture, "-o", outFile]
+          unless (code == ExitSuccess) $
+            expectationFailure ("l4 export dmn failed:\n" ++ serr)
+          pure outFile
+    it "KIE refuses to load the file" $ do
+      dmn <- exported
+      dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustFail
+        dmn [dmn, "--cases", exportRawL4BareNameCases] \out -> do
+          out `shouldSatisfy` ("0 case(s)" `isInfixOf`)
+          out `shouldSatisfy` ("Unknown variable 'TBD'" `isInfixOf`)
+
+    it "Camunda parses the file, answers the plain decision, and null for the one with the bare name" $ do
+      dmn <- exported
+      dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustFail
+        dmn [dmn, "--cases", exportRawL4BareNameCases] \out -> do
+          out `shouldSatisfy` ("1 parsed" `isInfixOf`)
+          out `shouldSatisfy` ("1/1 value(s) as expected" `isInfixOf`)
+          out `shouldSatisfy` ("EVALUATED-TO-NULL" `isInfixOf`)
 
   -- Before these names were reserved, KIE refused all three decisions
   -- ("Not an invocable"); Camunda answered them.

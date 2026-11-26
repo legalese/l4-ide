@@ -3518,8 +3518,14 @@ dmnNote c sev el rng msg lostWhat =
 --
 -- What it costs, measured 2026-11-26 on KIE 8.44.0.Final and Camunda 8.7.6
 -- (spec §7): Camunda refuses to parse the whole file, and so does KIE to load
--- it, except a file whose only such text is a table's defaultOutputEntry,
--- which KIE loads and answers null for, reported as success. The consequence
+-- it, with two exceptions, one each way. KIE loads a file whose only such
+-- text is a table's defaultOutputEntry and answers null for it, reported as
+-- success. Camunda parses a file whose only such text reads as a FEEL name (a
+-- bare `TBD`, the prelude's refusal, which is not a closed constant and so is
+-- not copied), answers the other decisions and null for that one, while KIE
+-- refuses the file (`Unknown variable 'TBD'`); that second exception is the
+-- one the D-LITERALEXPR and D-NONFEELINPUT notes already give, and was found
+-- missing here by the review of this branch (2026-11-26). The consequence
 -- this note used to give, a failure "loudly when the rule fires", was not
 -- what KIE does: it refuses the file before any rule fires.
 nonFeelOutput :: Text -> Maybe SrcRange -> FeelExpr -> FidelityNote
@@ -3529,8 +3535,10 @@ nonFeelOutput el rng fe =
        <> "` is L4 source, not FEEL: this backend has no FEEL rendering for it, so the text \
           \was emitted verbatim and NO DMN engine can evaluate it")
     "execution of every decision in the file: Camunda 8.7.6 refuses to parse the file, and \
-    \KIE 8.44 to load it, except that KIE loads a file whose only such text is a table's \
-    \defaultOutputEntry and SILENTLY answers null for that decision, reported as success"
+    \KIE 8.44 to load it, with two exceptions: KIE loads a file whose only such text is a \
+    \table's defaultOutputEntry and SILENTLY answers null for that decision, reported as \
+    \success, and Camunda parses a file whose only such text reads as a FEEL name, such as \
+    \a bare `TBD`, and answers null for that decision, while KIE still refuses the file"
 
 -- | @D-MAYBE-NULL@ (R8-a, R8-b): a @MAYBE τ@ was lowered to τ's own @typeRef@.
 --
