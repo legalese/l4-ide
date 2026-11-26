@@ -1,6 +1,7 @@
 module Options (
   Options (..),
   buildOpts,
+  hostFromEnv,
   parseOptions,
   parseOptionsPure,
 ) where
@@ -20,6 +21,12 @@ import Ledger.Store.Config (LedgerStoreConfig (..), StoreChoice (..), parseStore
 
 data Options = Options
   { port                  :: !Int
+  , host                  :: !Text
+  -- ^ Which address to listen on, in the notation Warp's @HostPreference@
+  -- reads: @*@ for every interface, which is what the service did before this
+  -- option existed and so the default, or an address such as @127.0.0.1@ to
+  -- accept connections from this machine only. It reaches Warp's @setHost@
+  -- unchanged, so a value Warp cannot bind stops the service at start.
   , storePath             :: !FilePath
   , serverName            :: !(Maybe Text)
   , instanceToken         :: !(Maybe Text)
@@ -82,6 +89,7 @@ data Options = Options
 buildOpts :: IO (ParserInfo Options)
 buildOpts = do
   envPort       <- readEnvInt "JL4_PORT"
+  envHost       <- lookupEnv "JL4_HOST"
   envStorePath  <- lookupEnv "JL4_STORE_PATH"
   envServerName <- lookupEnv "JL4_SERVER_NAME"
   envInstToken  <- lookupEnv "JL4_INSTANCE_TOKEN"
@@ -111,6 +119,16 @@ buildOpts = do
                   <> value (maybe 8080 id envPort)
                   <> showDefault
                   <> help "HTTP port to listen on (env: JL4_PORT)"
+              )
+        <*> strOption
+              ( long "host"
+                  <> metavar "HOST"
+                  <> value (hostFromEnv envHost)
+                  <> showDefaultWith Text.unpack
+                  <> help
+                       "Address to listen on: * for every interface, or an address such as \
+                       \127.0.0.1 to accept connections from this machine only \
+                       \(env: JL4_HOST)"
               )
         <*> strOption
               ( long "store-path"
@@ -324,6 +342,15 @@ parseOptionsPure progName parserInfo args = case execParserPure defaultPrefs par
           ExitFailure 1 | any ("--check-store" `isPrefixOf`) args -> ExitFailure 2
           _ -> code
     in Left (Right (message, code'))
+
+-- | The default for @--host@, from the value of @JL4_HOST@: that value, or @*@,
+-- every interface, when it is unset or empty. An empty value counts as unset,
+-- so a deployment file that says @JL4_HOST=@ gets the default and not a host
+-- named by the empty string.
+hostFromEnv :: Maybe String -> Text
+hostFromEnv = \case
+  Just host | not (null host) -> Text.pack host
+  _ -> "*"
 
 -- | Read an optional integer from an environment variable.
 readEnvInt :: String -> IO (Maybe Int)
