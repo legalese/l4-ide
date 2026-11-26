@@ -279,13 +279,24 @@ l4Golden memo evalConfig isOk examplesRoot dir inputFile = do
 -- (NORM-LOG-SPEC N5): the header line, its rows, and the blank line before
 -- it. Used only when the norm log writer is forced on, so a golden recorded
 -- with the writer off still matches.
+--
+-- Except where a trace's separator follows the block, after an error's text:
+-- there the output without the block has a blank line, and removing the blank
+-- line before the header lost it. ok/trace-exception-in-operand.l4 has two
+-- (lines 43 and 54 of its golden, found at the third gate of P2b, 2026-11-27,
+-- by a diff of the golden against the output of a forced run).
 stripNormLogBlock :: String -> String
 stripNormLogBlock = unlines . go . lines
   where
     -- the listing is indented when it prints inside a directive's output
     isHeader l = dropWhile (== ' ') l == "Norm log:"
     isRow l = "FATE " `List.isPrefixOf` dropWhile (== ' ') l
-    go (blank : h : rest) | all (== ' ') blank, isHeader h = go (dropWhile isRow rest)
+    isSeparator l = "─────" `List.isPrefixOf` dropWhile (== ' ') l
+    go (blank : h : rest)
+      | all (== ' ') blank, isHeader h =
+          case dropWhile isRow rest of
+            remaining@(sep : _) | isSeparator sep -> blank : go remaining
+            remaining -> go remaining
     go (h : rest) | isHeader h = go (dropWhile isRow rest)
     go (l : rest) = l : go rest
     go [] = []
