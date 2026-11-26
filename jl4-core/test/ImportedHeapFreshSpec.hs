@@ -12,9 +12,10 @@
 -- cache is such a host: 'LSP.L4.Rules.evaluateOn' builds the environment as the
 -- union of one cached 'GetLazyEvaluationDependenciesFile' result per import, and
 -- evaluates the file on it with 'execEvalModuleWithEnvAndImports'
--- (jl4-lsp/src/LSP/L4/Rules.hs:1455). (Whether jl4-service's direct path does
--- the same was not read for this test; the issue measured its decision routes
--- unaffected.)
+-- (jl4-lsp/src/LSP/L4/Rules.hs:1455). jl4-service's direct path hands its
+-- import environment, built once and kept for every request, to
+-- 'execEvalExprInContextOfModuleWith', which reaches the same code
+-- (jl4-service/src/Backend/Jl4.hs:1297).
 --
 -- The module under test has two directives. One evaluates the imported rule
 -- against an empty ledger. The other is a @#TRACE@ that commits @taken@ and
@@ -41,11 +42,23 @@
 -- 'execEvalModuleWithEnvAndImports', the calls that take the imports' environment
 -- ('evaluateOn' passes the one it keeps): each directive of the module sees the
 -- imports' rules afresh, whatever has been forced in the environment it is
--- given. A repair that leaves those calls as they are, and gives each
--- directive its own imports some other way, would not satisfy it.
+-- given, and leaves that environment as it found it. A repair that leaves those
+-- calls as they are, and gives each directive its own imports some other way,
+-- would not satisfy it.
+--
+-- Two further examples pin the other half of the contract. The first reads the
+-- imports' environment before and after the evaluations and requires that no
+-- Reference that was unforced has been forced: the originals are only ever
+-- copied, because a host keeps them for the next evaluation. The second forces
+-- the imported rule in the environment by another route (the evaluator's
+-- test seam for ledger reads, 'evalExprForLedgerWithEnv') before any
+-- directive runs, as a host that evaluated on the environment without copying
+-- it would have left it, and requires the same answers: a copy starts as the
+-- rule was before anything forced it, whatever answer its original holds.
 module ImportedHeapFreshSpec (spec) where
 
 import Control.Monad (foldM, forM, forM_)
+import Data.IORef (readIORef)
 import Data.List (mapAccumL)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (catMaybes)
@@ -54,18 +67,20 @@ import Data.Time (UTCTime (..), fromGregorian, secondsToDiffTime)
 import Test.Hspec
 
 import L4.API.VirtualFS (checkWithImports, vfsFromList)
-import L4.Evaluate.ValueLazy (Environment)
+import L4.Evaluate.ValueLazy (Environment, Reference (..), Thunk (..), Value (..))
 import L4.EvaluateLazy
   ( EvalConfig
   , EvalDirectiveResult (..)
   , EvalDirectiveValue (..)
   , ReductionOutcome (..)
+  , evalExprForLedgerWithEnv
   , execEvalModuleWithEnv
   , resolveEvalConfig
+  , runEvalAction
   )
 import L4.Import.Resolution (ResolvedImport (..), TypeCheckWithDepsResult (..), extractImportNames)
 import L4.Print (prettyLayout)
-import L4.Syntax (Module (..), Resolved, Section (..), TopDecl (..))
+import L4.Syntax (Directive (..), Expr, Module (..), Resolved, Section (..), TopDecl (..))
 import L4.TracePolicy (apiDefaultPolicy)
 import L4.TypeCheck.Types (CheckResult (..))
 
@@ -162,6 +177,40 @@ render res = case res.result of
   Reduction (Reduced nf) -> prettyLayout nf
   other                  -> Text.pack (show other)
 
+-- | What a directive of the module answers, each on its own module (one
+-- directive) cut from the type check.
+evaluateOn :: EvalConfig -> TypeCheckWithDepsResult -> Environment -> Int -> IO [Text.Text]
+evaluateOn cfg r env i = do
+  (_, results) <- execEvalModuleWithEnv cfg r.tcdEntityInfo env (onlyDirective i r.tcdModule)
+  pure (map render results)
+
+-- | Each directive on an environment of its own: the answer to ask for.
+answersAlone :: EvalConfig -> TypeCheckWithDepsResult -> IO [(Int, [Text.Text])]
+answersAlone cfg r = forM [0, 1] \ i -> do
+  env <- importsEnv cfg r.tcdResolvedImports
+  (,) i <$> evaluateOn cfg r env i
+
+typeChecked :: IO TypeCheckWithDepsResult
+typeChecked = case checkWithImports (vfsFromList [("taken.l4", takenSrc)]) mainSrc of
+  Left errs -> fail ("typecheck failed: " <> show errs)
+  Right ok  -> pure ok
+
+-- | The kind of thunk each Reference of an environment holds now.
+thunkKinds :: Environment -> IO (Map.Map String String)
+thunkKinds env = fmap Map.fromList $ forM (Map.toList env) \ (u, rf) -> do
+  t <- readIORef rf.pointer
+  pure . (show u,) $ case t of
+    Unevaluated{}             -> "unevaluated"
+    WHNFWhen{}                -> "forced, cached for a temporal context"
+    WHNF (ValClosure{})       -> "closure"
+    WHNF _                    -> "value"
+
+-- | The expression of the nth directive of the module, an @#EVAL@.
+evalExprOf :: Int -> TypeCheckWithDepsResult -> IO (Expr Resolved)
+evalExprOf n r = case [ e | MkModule _ _ (MkSection _ _ _ _ ds) <- [onlyDirective n r.tcdModule], Directive _ (LazyEval _ e) <- ds ] of
+  [e] -> pure e
+  other -> fail ("directive " <> show n <> " was to be one #EVAL, and there are " <> show (length other))
+
 spec :: Spec
 spec = describe "an imported rule that reads a ledger, evaluated again on the imports' one environment (#1116)" do
   forM_
@@ -170,16 +219,9 @@ spec = describe "an imported rule that reads a ledger, evaluated again on the im
     ] \ (order, directives) ->
     it ("answers each evaluation from its own ledger: " <> order) do
       cfg <- resolveEvalConfig (Just fixedNow) apiDefaultPolicy
-      r <- case checkWithImports (vfsFromList [("taken.l4", takenSrc)]) mainSrc of
-        Left errs -> fail ("typecheck failed: " <> show errs)
-        Right ok  -> pure ok
-      let evaluate env i = do
-            (_, results) <- execEvalModuleWithEnv cfg r.tcdEntityInfo env (onlyDirective i r.tcdModule)
-            pure (map render results)
+      r <- typeChecked
       -- each directive on an environment of its own: the answer to ask for
-      alone <- forM [0, 1] \ i -> do
-        env <- importsEnv cfg r.tcdResolvedImports
-        (,) i <$> evaluate env i
+      alone <- answersAlone cfg r
       case alone of
         [(_, [eval]), (_, [skip])] -> do
           eval `shouldBe` "FALSE"
@@ -188,5 +230,31 @@ spec = describe "an imported rule that reads a ledger, evaluated again on the im
       -- the two, one after the other, on one environment
       shared <- do
         env <- importsEnv cfg r.tcdResolvedImports
-        forM directives \ i -> (,) i <$> evaluate env i
+        forM directives \ i -> (,) i <$> evaluateOn cfg r env i
       Map.fromList shared `shouldBe` Map.fromList alone
+
+  it "leaves the imports' environment as it found it: nothing unforced is forced" do
+    cfg <- resolveEvalConfig (Just fixedNow) apiDefaultPolicy
+    r <- typeChecked
+    env <- importsEnv cfg r.tcdResolvedImports
+    kindsBefore <- thunkKinds env
+    -- the control: the environment has unforced rules in it to be forced
+    Map.size (Map.filter (== "unevaluated") kindsBefore) `shouldSatisfy` (> 0)
+    forM_ [0, 1, 0, 1] (evaluateOn cfg r env)
+    kindsAfter <- thunkKinds env
+    kindsAfter `shouldBe` kindsBefore
+
+  it "answers each evaluation from its own ledger when the rule was forced in the environment beforehand" do
+    cfg <- resolveEvalConfig (Just fixedNow) apiDefaultPolicy
+    r <- typeChecked
+    alone <- answersAlone cfg r
+    env <- importsEnv cfg r.tcdResolvedImports
+    -- force `taken now` on the shared environment, against an empty ledger,
+    -- by a route that does not copy it
+    eval <- evalExprOf 0 r
+    forced <- runEvalAction cfg (evalExprForLedgerWithEnv env eval)
+    either (\ e -> expectationFailure ("the rule was to be forced: " <> show e)) (const (pure ())) forced
+    kinds <- thunkKinds env
+    Map.size (Map.filter (== "forced, cached for a temporal context") kinds) `shouldSatisfy` (> 0)
+    shared <- forM [1, 0] \ i -> (,) i <$> evaluateOn cfg r env i
+    Map.fromList shared `shouldBe` Map.fromList alone

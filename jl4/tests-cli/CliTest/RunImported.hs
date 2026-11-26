@@ -1,29 +1,34 @@
 -- | Black-box tests for smucclaw/l4-ide#1116: a rule of an imported file with no
--- inputs that reads a ledger keeps, across directives, the answer it gave the
+-- inputs that reads a ledger kept, across directives, the answer it gave the
 -- first directive that forced it.
 --
--- @l4 run@ gives each directive (@#TRACE@, @#EVAL@) a fresh copy of the file's
--- own rules, so a rule written in the file reads the directive's own ledger.
--- The rules of an imported file are evaluated once for the whole run, and every
--- directive shares them. A rule with no inputs, imported, that reads a ledger
--- (@RECALL@) then answers every later directive with what it answered the first
--- one that forced it; the same rule written in the file does not.
+-- @l4 run@ gave each directive (@#TRACE@, @#EVAL@) a fresh copy of the file's
+-- own rules, so a rule written in the file read the directive's own ledger.
+-- The rules of an imported file were evaluated once for the whole run, and every
+-- directive shared them. A rule with no inputs, imported, that reads a ledger
+-- (@RECALL@) then answered every later directive with what it answered the first
+-- one that forced it; the same rule written in the file did not. Now each
+-- directive takes its own copy of the imports' rules
+-- ('L4.EvaluateLazy.forEachDirectiveFreshHeap'), and these examples say so.
 --
--- THE EXAMPLES WHOSE NAMES DO NOT BEGIN "guard:" ARE EXPECTED RED until each
--- directive reads an imported rule afresh: this module is committed before the
--- fix, so that the fix is the commit that turns them green. Measured on an
--- unfixed build (@l4@ built from d34c995ef, 2026-11-26), 16 of its 26 examples
--- fail and the 10 "guard:" examples pass. The guards are:
+-- THE EXAMPLES WHOSE NAMES DO NOT BEGIN "guard:" WERE RED on the build the tests
+-- were written against (@l4@ built from d34c995ef, 2026-11-26), and the fix is
+-- the commit that turned them green: 16 of its 26 examples failed and the 10
+-- "guard:" examples passed. The guards are:
 --
 -- * the controls: the same two traces with the rules written in the file, and
 --   the skip trace alone, which give the numbers the imported case must give;
 -- * the clock-free legs of @l4 lts@ and of @own-eval.l4@. The issue says of
---   @l4 lts@ that it shows the fault only with @JL4_FIXED_NOW@ pinned, and
---   @own-eval.l4@ measured the same; their pinned legs are red;
+--   @l4 lts@ that it showed the fault only with @JL4_FIXED_NOW@ pinned, and
+--   @own-eval.l4@ measured the same; their pinned legs were red;
 -- * @own-eval-self.l4@, an imported file with an @#EVAL@ of a rule it defines;
 -- * the two rows of @l4 batch@ over a file with no @#TRACE@, which pin each
 --   row's own answer and cannot show rows sharing a rule (see the comment at
---   the @l4 batch@ examples).
+--   the @l4 batch@ examples);
+-- * @ctors.l4@, added with the fix: it guards the repair, not the fault. The
+--   copy of the imports' rules closes over the other copies, and each rule of a
+--   file must still find the constructors the file declares for itself. It
+--   passes on the unfixed build too.
 --
 -- The fixtures are in @fixtures/run-imported/@. The expected numbers are what
 -- the same program gives with every rule in one file (@two-traces-local.l4@ is
@@ -61,6 +66,7 @@ fixtures =
       , "own-eval-b.l4", "own-eval.l4", "own-eval-self-b.l4", "own-eval-self.l4"
       , "trace-alone.l4", "trace-after-skip.l4"
       , "batch-alone.l4", "batch-after-trace.l4", "batch-rows.json", "batch-rows-two.json"
+      , "ctor-a.l4", "ctor-b.l4", "ctors.l4"
       ]
   ]
 
@@ -264,3 +270,15 @@ spec bin = describe "smucclaw/l4-ide#1116: a directive reads an imported rule af
         out <- succeeded =<< runAt bin clock ["batch", dir </> "batch-after-trace.l4", "-i", dir </> "batch-rows.json"]
         -- the file's #TRACE answers with an obligation, the row's #EVAL last
         batchResults out `shouldBe` Right [[String "<obligation>", Bool False]]
+
+  -- 9. the constructors a file declares for itself, in the rules of an import
+  --
+  -- Not the fault: a guard on the repair. Each copy of an imported rule closes
+  -- over the copies of the others laid over the environment it had, and a
+  -- constructor is not copied, so it must still be found in that environment.
+  -- Two files each declare an enum and use it in a rule that reads `taken now`.
+  describe "constructors an imported file declares for itself (ctors.l4)" $
+    forM_ clocks \ clock ->
+      it ("guard: " <> describeClock clock <> ": each imported rule finds the constructors of its own file, under each directive") $ do
+        out <- succeeded =<< runAt bin clock ["run", dir </> "ctors.l4"]
+        summaries out `shouldBe` ["ajar", "raised", "ajar", "raised"]
