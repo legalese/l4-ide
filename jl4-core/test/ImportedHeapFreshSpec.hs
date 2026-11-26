@@ -41,10 +41,12 @@
 -- What this pins is the contract of 'execEvalModuleWithEnv' and
 -- 'execEvalModuleWithEnvAndImports', the calls that take the imports' environment
 -- ('evaluateOn' passes the one it keeps): each directive of the module sees the
--- imports' rules afresh, whatever has been forced in the environment it is
--- given, and leaves that environment as it found it. A repair that leaves those
--- calls as they are, and gives each directive its own imports some other way,
--- would not satisfy it.
+-- imports' rules afresh, and leaves that environment as it found it. Afresh
+-- holds whether the environment was left unforced or a rule in it was forced to
+-- a context-dependent answer (a 'WHNFWhen', which every ledger read is); a rule
+-- forced to a plain value (a constructor, a list, an obligation) is left
+-- shared, and is not pinned here. A repair that leaves those calls as they are,
+-- and gives each directive its own imports some other way, would not satisfy it.
 --
 -- Two further examples pin the other half of the contract. The first reads the
 -- imports' environment before and after the evaluations and requires that no
@@ -54,7 +56,8 @@
 -- test seam for ledger reads, 'evalExprForLedgerWithEnv') before any
 -- directive runs, as a host that evaluated on the environment without copying
 -- it would have left it, and requires the same answers: a copy starts as the
--- rule was before anything forced it, whatever answer its original holds.
+-- rule was before anything forced it, whatever context-dependent answer its
+-- original holds.
 module ImportedHeapFreshSpec (spec) where
 
 import Control.Monad (foldM, forM, forM_)

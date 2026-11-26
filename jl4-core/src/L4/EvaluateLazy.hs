@@ -1506,9 +1506,11 @@ forEachDirectiveFreshHeap prepare runDirective importsEnv baseEnv m n =
 --   * a 'WHNF' closure: a new closure of the same code. One over an empty
 --     environment is left as it is: it reaches no Reference but its arguments,
 --     so it has no state to be isolated from (a record's selectors);
---   * any other 'WHNF' (a constructor, a builtin, a value the evaluator has
---     already finished with) is left shared: it is final and holds no thunk
---     that can be overwritten.
+--   * any other 'WHNF' (a constructor, a builtin) is left shared. A value the
+--     evaluator has finished, such as a list or an obligation, can name
+--     References that a later force would overwrite; leaving it shared is safe
+--     only because nothing forces the originals, so none of them is one unless
+--     a host forced the environment by another route ('evalExprForLedgerWithEnv').
 --
 -- Each copy closes over the copies, not over the originals: its environment is
 -- the copies laid over the one it had. All of one file's top-level thunks close
