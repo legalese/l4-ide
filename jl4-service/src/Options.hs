@@ -120,7 +120,7 @@ buildOpts = do
                   <> showDefault
                   <> help "HTTP port to listen on (env: JL4_PORT)"
               )
-        <*> strOption
+        <*> option (eitherReader hostArgument)
               ( long "host"
                   <> metavar "HOST"
                   <> value (hostFromEnv envHost)
@@ -351,6 +351,17 @@ hostFromEnv :: Maybe String -> Text
 hostFromEnv = \case
   Just host | not (null host) -> Text.pack host
   _ -> "*"
+
+-- | The value of @--host@ on the command line. An empty one is refused: on
+-- macOS (measured with @lsof@, 2026-11-26; not measured elsewhere) it listened
+-- on every interface, where @getaddrinfo@ with an empty host name and
+-- @AI_PASSIVE@ returns @::@ and @0.0.0.0@ (Python's @socket.getaddrinfo@,
+-- 2026-11-27). A script that meant @--host "$ADDRESS"@ to keep the service on
+-- one address would, with @ADDRESS@ unset, expose it on all of them without a
+-- word.
+hostArgument :: String -> Either String Text
+hostArgument "" = Left "needs an address; write * for every interface"
+hostArgument host = Right (Text.pack host)
 
 -- | Read an optional integer from an environment variable.
 readEnvInt :: String -> IO (Maybe Int)

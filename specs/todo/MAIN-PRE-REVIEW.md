@@ -129,7 +129,7 @@ Main has none of these scripts, so take each from `{UNSTABLE}` (`git -C $R show 
 
 - `jl4-core/src/L4/Parser*`: `node $S/probe-parse-scaling.mjs <copy of $H's l4>`. It FAILs above a ratio of 8 between 4,000 and 1,000 lines.
 - `jl4-service/`: `node $S/probe-service-restart.mjs <copy of $H's jl4-service>`, and again with `$B`'s. A difference `$B` shows too is not introduced by the PR; report it as pre-existing.
-  The probe starts the service with `--host 127.0.0.1`, so a `$B` binary built before that option existed exits 2 with `Invalid option` and cannot be compared this way: say the comparison was not made.
+  A `$B` binary built before `--host` existed is started without it, so it listens on every interface while the probe runs, and the probe prints a `WARN:` line saying so; the answers are still compared.
 - `jl4/tests-cli/`: `node $S/probe-cli-crlf.mjs --base $MB $H`, and read every line it names: it is a heuristic.
 
 ### 9. Earlier review points
@@ -222,11 +222,11 @@ A build from the round-3 fix branch, `fix/clause-group-round3`, passes on both s
 ### (b) A restart from the store, when `jl4-service/` changes
 
 `node etc/probe-service-restart.mjs <jl4-service>` starts the service on a fresh store and a free port, deploys an ordinary boolean rule and a rule written as clauses, and makes five calls: the boolean rule twice, its query plan, a matching clause, and an input no clause matches.
-It stops the service by PID, checks that `bundle.cbor` was written, restarts it on the same store, waits for both deployments, and makes the same calls; any difference FAILs.
+It stops the service by PID, restarts it on the same store, waits for both deployments, and makes the same calls; any difference FAILs.
 On a build without clause groups it says so and probes the ordinary rule alone.
 `--perturb` asks for a different colour after the restart, so a working probe FAILs.
 It starts the service with `--host 127.0.0.1`, and FAILs if the service answers `/health` on the machine's own non-loopback IPv4 address; `--perturb-host` starts it on `*` instead, so a working probe FAILs.
-A machine with no such address prints a NOTE that the listener was not checked, and the probe still exits 0.
+A machine with no such address, or a binary without `--host`, prints a `WARN:` line that the listener was not checked, and the probe still exits 0 or 1 by the answers alone.
 On `6d0146f27`, two of the five answers changed after a restart: the no-match error lost its clause wording, and the query plan of the ordinary rule turned into a 400 ("Can only visualize, as a ladder diagram, a DECIDE that returns a boolean").
 Unstable re-checks sources on a restart since `d2dd71f94`, which is not on `main`.
 

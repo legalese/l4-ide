@@ -867,13 +867,14 @@ Each capability also costs memory: measured on 2026-10-02, the idle service used
 By default the service accepts connections on every network interface of the machine, as it did before `--host` existed.
 That is what a deployment that other machines call wants, and it is the default so that no deployment changes.
 A service that only this machine should reach, such as a test, a probe or a local demo, should say so with `--host 127.0.0.1`: other machines then cannot connect to it.
-The repository's own gate starts the service this way in `etc/probe-service-restart.mjs`.
+The repository's own gate starts the service this way in `etc/probe-service-restart.mjs`, and starts a binary that has no `--host` without it, with a warning.
 
 The value is handed to Warp's `setHost` as written, so `*` means every interface and anything else is an address or a host name to bind.
 Prefer the literal address to a name.
 Measured on macOS on 2026-11-26, `--host localhost` bound `[::1]`, the IPv6 loopback, and a request to `127.0.0.1` on that port got no answer.
 A value that cannot be bound stops the service at start with the resolver's error.
-`JL4_HOST=` with nothing after it counts as unset.
+`JL4_HOST=` with nothing after it counts as unset, so `JL4_HOST="$ADDRESS"` with `ADDRESS` unset leaves the service on every interface, as `--host "$ADDRESS"` did before it was refused.
+`--host ""` is refused with a usage error, because an empty host reached Warp as every interface (measured with `lsof` on macOS on 2026-11-26), and a script that meant one address with `--host "$ADDRESS"` would have exposed the service on all of them when `ADDRESS` was unset.
 
 In a container, leave the default.
 A port published by the container runtime arrives on the container's own network interface and not on its loopback address, so `--host 127.0.0.1` there would make the service unreachable from outside; this is reasoned, not measured.
