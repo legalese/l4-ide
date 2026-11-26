@@ -987,6 +987,10 @@ spec bin = do
           sout `shouldNotSatisfy` ("date(" `isInfixOf`)
           forM_ ["the_day", "the_ymd"] \d ->
             serr `shouldSatisfy` (("[D-LITERALEXPR] blocking — decision_" <> d) `isInfixOf`)
+          -- in a table, too: the guard and both output entries
+          serr `shouldSatisfy` ("[D-NONFEELINPUT] blocking — decision_the_deadline" `isInfixOf`)
+          length (filter ("[D-NONFEELOUTPUT] blocking — decision_the_deadline" `isInfixOf`) (lines serr))
+            `shouldBe` 2
           serr `shouldSatisfy` (notLibrary `isInfixOf`)
           serr `shouldSatisfy` ("`daydate.l4`, a library file, does not type-check here with the modules it imports, among them `date-compat.l4`" `isInfixOf`)
 

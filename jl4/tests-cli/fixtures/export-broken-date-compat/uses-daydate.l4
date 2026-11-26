@@ -3,7 +3,7 @@
 -- `IMPORT date-compat` to it, so `daydate` does not type-check here
 -- (check/ambiguous-identifier), and `l4 check` and `l4 run` both refuse this
 -- file ("The imported module daydate has errors"). Its `Date` and `YMD` are
--- refused too, not lowered as the library's.
+-- refused too, not lowered as the library's: boxed, in a guard, in an output.
 IMPORT daydate
 
 GIVETH A DATE
@@ -11,3 +11,9 @@ DECIDE `the day` IS Date 2 3 2024
 
 GIVETH A DATE
 DECIDE `the ymd` IS YMD 2024 3 2
+
+GIVEN d IS A DATE
+GIVETH A DATE
+DECIDE `the deadline` d IS
+  IF d AT LEAST Date 1 7 2024 THEN Date 31 12 2024
+  ELSE YMD 2024 6 30
