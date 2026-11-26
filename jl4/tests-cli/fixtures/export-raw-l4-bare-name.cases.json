@@ -4,6 +4,11 @@
       "name": "the rule with the bare name fires",
       "context": { "h": 1, "x": 7 },
       "expect": { "pay": 2 }
+    },
+    {
+      "name": "the caller sends a TBD the model does not declare: Camunda answers it for the bare-name rule (L4 has no answer: TBD refuses)",
+      "context": { "h": 1, "x": 7, "TBD": "oops" },
+      "expect": { "pay": 2, "banded": "oops" }
     }
   ]
 }

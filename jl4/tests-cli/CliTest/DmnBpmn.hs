@@ -1731,6 +1731,7 @@ spec bin = do
           unless (code == ExitSuccess) $
             expectationFailure ("l4 export dmn failed:\n" ++ serr)
           pure outFile
+    -- Whether or not the case sends a `TBD`: KIE runs no case at all.
     it "KIE refuses to load the file" $ do
       dmn <- exported
       dmnEngineCheckOn "KIE" kieCheckScript "KIE_CHECK_REQUIRED" HarnessMustFail
@@ -1738,13 +1739,18 @@ spec bin = do
           out `shouldSatisfy` ("0 case(s)" `isInfixOf`)
           out `shouldSatisfy` ("Unknown variable 'TBD'" `isInfixOf`)
 
-    it "Camunda parses the file, answers the plain decision, and null for the one with the bare name" $ do
+    -- The model declares no input `TBD`, and Camunda reads the name from the
+    -- caller's context all the same: the second case sends "oops".
+    it "Camunda parses the file, answers the plain decision, and for the one with the bare name the caller's TBD, null when it sends none" $ do
       dmn <- exported
       dmnEngineCheckOn "Camunda" camundaCheckScript "CAMUNDA_CHECK_REQUIRED" HarnessMustFail
         dmn [dmn, "--cases", exportRawL4BareNameCases] \out -> do
           out `shouldSatisfy` ("1 parsed" `isInfixOf`)
-          out `shouldSatisfy` ("1/1 value(s) as expected" `isInfixOf`)
+          out `shouldSatisfy` ("3/3 value(s) as expected" `isInfixOf`)
+          -- the first case, which sends no TBD
           out `shouldSatisfy` ("EVALUATED-TO-NULL" `isInfixOf`)
+          -- the second, which sends "oops"
+          lines out `shouldSatisfy` any (\l -> "banded" `isInfixOf` l && "= oops" `isInfixOf` l)
 
   -- Before these names were reserved, KIE refused all three decisions
   -- ("Not an invocable"); Camunda answered them.
