@@ -1,0 +1,11 @@
+-- Calls `absNumber` from math.l4. The export lowers by name only the
+-- functions of prelude.l4 and daydate.l4, so this call is written as L4 with a
+-- Blocking note whatever math.l4 holds. Exported against a copy of the
+-- libraries whose math.l4 is not the compiled-in copy, the DMN is the same as
+-- against an unedited copy, and the report has no D-NOT-LIBRARY note: the file
+-- changes nothing in the model, so nothing is lost.
+IMPORT math
+
+GIVEN v IS A NUMBER
+GIVETH A NUMBER
+DECIDE `magnitude` v IS absNumber v

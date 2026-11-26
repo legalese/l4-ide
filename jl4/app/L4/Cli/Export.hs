@@ -88,7 +88,8 @@ import L4.Dmn.Emit (emitDrg)
 import L4.Dmn.IR (Drg (..), DmnFlavor (..), DropReason (..), defaultDmnFlavor, dmnReport, drgDecisions)
 import L4.Dmn.Lower
   ( DmnLowerOptions (..), ImportedModule (..), checkerClauseMatrixRanges
-  , checkerMissingMatchRanges, embeddedLibraryModule, lowerModule, moduleTitle, resolveMaybePredicates )
+  , checkerMissingMatchRanges, embeddedLibraryModule, loweredLibraryFiles, lowerModule, moduleTitle
+  , resolveMaybePredicates )
 import L4.Dmn.Markdown (emitMarkdown, markdownReport)
 import L4.Interchange.Fidelity
   (FidelityNote (..), FidelityReport (..), FidelitySeverity (..), addNote, emptyReport, renderReport)
@@ -436,9 +437,9 @@ moduleDecideNames (MkModule _ _ sec) = goSec sec
 -- decisions is an error for @l4 export dmn@ and a non-event for @l4 export bpmn@, so that
 -- judgement stays with the callers.
 --
--- With the DRG it returns the notes 'dmnLibraryModule' gives, one for each
--- library file this run loaded and does not take for the library, which the
--- callers put at the head of their reports.
+-- With the DRG it returns the notes 'dmnLibraryModule' gives, one for each of
+-- @prelude.l4@ and @daydate.l4@ that this run loaded and does not take for the
+-- library, which the callers put at the head of their reports.
 dmnDrgFor :: ExportOptions -> Rules.TypeCheckResult -> IO (Drg, [FidelityNote])
 dmnDrgFor opts tcRes = do
   -- Which loaded modules are the standard library, for the lowering's
@@ -581,8 +582,19 @@ dmnDrgFor opts tcRes = do
 -- Paths are compared canonically (symbolic links and @..@ resolved) because
 -- the variable may be spelled relative or through a link.
 --
--- __Each library file this run loaded and does not take for the library gets
--- one note__ (@D-NOT-LIBRARY@), saying why. Without it, the only sign is a
+-- __Each of the library files whose functions the lowering recognises by name
+-- ('loweredLibraryFiles': @prelude.l4@ and @daydate.l4@) gets one note when
+-- this run loaded it and does not take it for the library__ (@D-NOT-LIBRARY@),
+-- saying why. Any other library file gets none, whatever its verdict: the
+-- lowering asks of no other file whether it is the library, so the model is
+-- the same either way, and a note would report a loss that is not there (found
+-- by the review of this branch, 2026-11-26: an edited @math.l4@ got a note
+-- though the DMN was byte-identical, and an edited @prelude.l4@ with
+-- @IMPORT actus@ got seven more, one per @actus@ file). When the cause is such
+-- a file, the note on the importer names it, and says when its text is what
+-- differs: @daydate.l4@'s, for an edited @date-compat.l4@. Limiting the notes
+-- to these files is decided by Claude 2026-11-26, pending Meng's review.
+-- Without the note, the only sign is a
 -- Blocking note on each refused call that says its body "could not be
 -- rendered as FEEL", which sends the reader to the call, not to the file; and
 -- the likeliest cause is easy to miss, an @l4@ built from other libraries than
@@ -618,12 +630,13 @@ dmnLibraryModule deps = do
       _ -> pure Nothing
   let -- what a file with the compiled-in text is, before its imports are asked
       byText = Map.fromList [(u, f) | (_, u, f, k) <- located, k /= LibOtherText]
+      otherText = [f | (_, _, f, LibOtherText) <- located]
       verdict (dep, u, f, k) = case k of
         LibOtherText -> Left (f, textDiffers f)
         -- `daydate.l4` imports `date-compat.l4`: a file whose own text is the
         -- compiled-in copy's is the library only when what it imports is too.
         LibSameText
-          | (g : _) <- foreignImports dep -> Left (f, importsForeign f g)
+          | (g : _) <- foreignImports dep -> Left (f, importsForeign f g (g `elem` otherText))
         _ | not (Rules.evaluable dep) -> Left (f, doesNotCheck f (foreignImports dep))
           | otherwise -> Right (u, f)
       foreignImports dep =
@@ -634,7 +647,10 @@ dmnLibraryModule deps = do
         ]
       verdicts = map verdict located
       trusted = Map.fromList [uf | Right uf <- verdicts]
-  pure (\u -> Map.lookup u trusted, [libraryNote f why | Left (f, why) <- verdicts])
+  pure
+    ( \u -> Map.lookup u trusted
+    , [libraryNote f why | Left (f, why) <- verdicts, f `elem` loweredLibraryFiles]
+    )
  where
   canonical p = either (\(_ :: SomeException) -> p) id <$> try (canonicalizePath p)
   lf = Text.replace "\r\n" "\n"
@@ -648,26 +664,33 @@ dmnLibraryModule deps = do
     fromMaybe (fromNormalizedUri v).getUri
       (embeddedLibraryModule v <|> (Text.pack . takeFileName <$> uriToFilePath (fromNormalizedUri v)))
   tick t = "`" <> t <> "`"
-  refused =
-    "so no call into it is lowered as the library's: each is written as L4, with a Blocking note"
+  refused f =
+    "so no call into " <> tick f <> " is lowered as the library's: each is written as L4, \
+    \with a Blocking note"
+  staleEmbed =
+    "This happens when the `l4` was built from other libraries than this folder holds, \
+    \which includes one built after an edit to `jl4-core/libraries` alone: a plain \
+    \`cabal build` does not embed the edited text (see `jl4-core/libraries/README.md`)"
   textDiffers f =
     tick f <> " in the JL4_LIBRARY_PATH folder is not the copy compiled into this `l4`: its text \
-              \differs (line endings aside), " <> refused <> ", and so is each call into a library \
-              \file that imports it. This happens when the `l4` was built from other libraries \
-              \than this folder holds, which includes one built after an edit to \
-              \`jl4-core/libraries` alone: a plain `cabal build` does not embed the edited \
-              \text (see `jl4-core/libraries/README.md`)"
-  importsForeign f g =
+              \differs (line endings aside), " <> refused f <> ". " <> staleEmbed
+  -- The import is named, and when its own text is what differs the note says
+  -- so: the import gets no note of its own unless it is one of
+  -- 'loweredLibraryFiles' too.
+  importsForeign f g gDiffers =
     tick f <> " in the JL4_LIBRARY_PATH folder has the text of the copy compiled into this \
-              \`l4`, but it imports " <> tick g <> ", which is not the library's copy, "
-      <> refused
+              \`l4`, but it imports " <> tick g
+      <> if gDiffers
+           then ", whose text there differs from its compiled-in copy (line endings aside), "
+                  <> refused f <> ". " <> staleEmbed
+           else ", which is not the library's copy, " <> refused f
   doesNotCheck f gs =
     tick f <> ", a library file, does not type-check here with the modules it imports"
       <> (case gs of
             [] -> ""
             _  -> ", among them " <> Text.intercalate ", " (map tick gs)
                     <> ", which this run did not take from the library")
-      <> ", " <> refused <> " (`l4 check` names the error)"
+      <> ", " <> refused f <> " (`l4 check` names the error)"
   libraryNote f why =
     MkFidelityNote
       { code     = "D-NOT-LIBRARY"

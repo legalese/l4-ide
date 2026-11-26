@@ -85,6 +85,7 @@ module L4.Dmn.Lower
   , DmnLowerOptions (..)
   , defaultDmnLowerOptions
   , embeddedLibraryModule
+  , loweredLibraryFiles
   , ImportedModule (..)
   , checkerMissingMatchRanges
   , checkerClauseMatrixRanges
@@ -682,7 +683,7 @@ resolveMaybePredicates library (MkModule _ selfUri _) env info = do
   n <- soleMatch "isNothing"
   guard (j.moduleUri == n.moduleUri)
   guard (j.moduleUri /= selfUri)
-  guard (library j.moduleUri == Just "prelude.l4")
+  guard (library j.moduleUri == Just preludeLibraryFile)
   pure (MkMaybePredicates { mpIsJust = j, mpIsNothing = n })
  where
   soleMatch nm = case filter shaped (Map.findWithDefault [] (NormalName nm) env) of
@@ -1157,7 +1158,7 @@ foldDateLiteral oracle e = case e of
 -- (#936): they are ordinary prelude @DECIDE@s, so the same reasoning as
 -- 'fromDaydate' applies unchanged.
 fromPrelude :: (NormalizedUri -> Maybe Text) -> Resolved -> Bool
-fromPrelude library = definedIn library "prelude.l4"
+fromPrelude library = definedIn library preludeLibraryFile
 
 -- | Provenance: does this reference resolve to a definition in the @daydate@
 -- library?
@@ -1184,7 +1185,22 @@ fromPrelude library = definedIn library "prelude.l4"
 -- lowered as the library's while @l4 run@ evaluated the author's body
 -- (found by the review of smucclaw/l4-ide#1103, 2026-11-26).
 fromDaydate :: (NormalizedUri -> Maybe Text) -> Resolved -> Bool
-fromDaydate library = definedIn library "daydate.l4"
+fromDaydate library = definedIn library daydateLibraryFile
+
+-- | The library files whose functions the lowering recognises by where they
+-- are defined ('fromPrelude', 'fromDaydate', and 'resolveMaybePredicates' for
+-- the prelude): the only files for which it matters to the model whether the
+-- caller's 'dloLibraryModule' takes a module for the library. The CLI reports
+-- a library file it does not take only when it is one of these
+-- (@D-NOT-LIBRARY@, "L4.Cli.Export"), because any other file changes nothing
+-- in the model either way. A provenance test for another file adds its name
+-- here.
+loweredLibraryFiles :: [Text]
+loweredLibraryFiles = [preludeLibraryFile, daydateLibraryFile]
+
+preludeLibraryFile, daydateLibraryFile :: Text
+preludeLibraryFile = "prelude.l4"
+daydateLibraryFile = "daydate.l4"
 
 -- | The URI every builtin 'Unique' carries (@jl4:builtin@), read off one of
 -- them rather than spelled again here.

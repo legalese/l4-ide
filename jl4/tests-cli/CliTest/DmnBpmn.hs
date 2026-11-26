@@ -204,6 +204,9 @@ exportAlteredPreludeLib     = fixtureDir </> "export-altered-prelude" </> "lib"
 exportBrokenDateCompatFixture, exportImportsPreludeUnusedFixture :: FilePath
 exportBrokenDateCompatFixture     = fixtureDir </> "export-broken-date-compat" </> "uses-daydate.l4"
 exportImportsPreludeUnusedFixture = fixtureDir </> "export-imports-prelude-unused.l4"
+-- A module that calls a function of math.l4, which the export does not lower.
+exportImportsMathFixture :: FilePath
+exportImportsMathFixture = fixtureDir </> "export-imports-math.l4"
 -- What the seven calls in those fixtures become when lowered as the
 -- library's.
 preludeCallForms :: [String]
@@ -898,8 +901,38 @@ spec bin = do
           -- the prelude is unedited, so it is still the library
           forM_ (filter (not . ("date(" `isInfixOf`)) preludeCallForms) \form ->
             sout `shouldSatisfy` (form `isInfixOf`)
-          serr `shouldSatisfy` ("`date-compat.l4` in the JL4_LIBRARY_PATH folder is not the copy compiled into this `l4`: its text differs" `isInfixOf`)
-          serr `shouldSatisfy` ("`daydate.l4` in the JL4_LIBRARY_PATH folder has the text of the copy compiled into this `l4`, but it imports `date-compat.l4`, which is not the library's copy" `isInfixOf`)
+          -- One note, on daydate.l4, whose calls are the ones refused; it names
+          -- date-compat.l4 and says why that file is not the library's.
+          -- date-compat.l4 gets none of its own: nothing in it is lowered.
+          length (filter (notLibrary `isInfixOf`) (lines serr)) `shouldBe` 1
+          serr `shouldSatisfy` ("`daydate.l4` in the JL4_LIBRARY_PATH folder has the text of the copy compiled into this `l4`, but it imports `date-compat.l4`, whose text there differs from its compiled-in copy (line endings aside)" `isInfixOf`)
+          serr `shouldSatisfy` ("a plain `cabal build` does not embed the edited text" `isInfixOf`)
+
+        -- The lowering asks of a module only whether it is prelude.l4 or
+        -- daydate.l4 ('L4.Dmn.Lower.loweredLibraryFiles'), so whether any
+        -- other library file is taken for the library changes nothing.
+        it "gives no D-NOT-LIBRARY note for a library file none of whose functions is lowered by name" $ do
+          env <- envWithout
+          plain  <- editedLibraryCopy "l4-dmn-library-math-plain" "math.l4" ""
+          edited <- editedLibraryCopy "l4-dmn-library-math" "math.l4" "\n-- edited\n"
+          let over lib = runL4WithEnv (Just (("JL4_LIBRARY_PATH", lib) : env)) bin
+                           ["export", "dmn", exportImportsMathFixture, "--fidelity-report"]
+          Output codePlain soutPlain _ <- over plain
+          Output code sout serr <- over edited
+          codePlain `shouldBe` ExitSuccess
+          code `shouldBe` ExitSuccess
+          -- the call into math.l4 is refused either way, and the DMN is the same
+          serr `shouldSatisfy` ("[D-LITERALEXPR] blocking — decision_magnitude" `isInfixOf`)
+          sout `shouldBe` soutPlain
+          serr `shouldNotSatisfy` ("D-NOT-LIBRARY" `isInfixOf`)
+          -- With prelude.l4 edited instead, the one note is on prelude.l4, and
+          -- none is on the math.l4 that imports it.
+          editedPrelude <- editedLibraryCopy "l4-dmn-library-math-prelude" "prelude.l4" "\n-- edited\n"
+          Output codePrelude _ serrPrelude <- over editedPrelude
+          codePrelude `shouldBe` ExitSuccess
+          length (filter (notLibrary `isInfixOf`) (lines serrPrelude)) `shouldBe` 1
+          serrPrelude `shouldSatisfy` ("`prelude.l4` in the JL4_LIBRARY_PATH folder is not the copy compiled into this `l4`" `isInfixOf`)
+          serrPrelude `shouldNotSatisfy` ("`math.l4` in the JL4_LIBRARY_PATH folder" `isInfixOf`)
 
         -- The note is Advisory: each refused call carries its own Blocking
         -- note, and a module that calls nothing in the file loses nothing.
