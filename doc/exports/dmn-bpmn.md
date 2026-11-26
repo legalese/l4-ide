@@ -154,9 +154,9 @@ That includes a file of your own called `prelude.l4` or `daydate.l4`: the export
 Still written as L4, with a Blocking note, and so still fatal to the whole file on both engines: `SQRT` (undefined below zero), `TRUNC` (no single FEEL function), `minimum` and `maximum` (L4 gives no answer on an empty list, while FEEL's `min` and `max` of an empty list answer null on Camunda 8.7.6 and fail the decision on KIE 8.44), and `min` and `max` over `MAYBE NUMBER`, which skip a `NOTHING`.
 
 **The empty list.** `EMPTY` is written as FEEL's empty list, `[]`, so `count EMPTY` is `count([])` and `xs EQUALS EMPTY` is `xs = []`.
-A rule that tests a list against `EMPTY`, such as a `DECIDE` clause on `EMPTY`, gets a column of its own that holds the whole test, `list = []`, because the simple tests a table cell holds have no form for a list: their values are numbers, strings, booleans and dates.
-Older versions of `l4` wrote `EMPTY` as the text `"EMPTY"`, which gave a wrong answer wherever it was read: FEEL treats a single value as a list of one, so `count("EMPTY")` is 1, the prelude's `sum` of it fails on KIE, and no list equals `"EMPTY"`.
-Measured on KIE 8.44 and Camunda 8.7.6 with `jl4/tests-cli/fixtures/export-empty-list.l4`.
+In a decision table, a rule that tests a list against `EMPTY`, such as a `WHEN EMPTY` clause of a `CONSIDER` or a guard `IF xs EQUALS EMPTY`, gets a column of its own that holds the whole test, `xs = []` (or `list_ = []` for an input called `list`, a name FEEL reserves), with the entry `true`, because the simple tests a table cell holds have no form for a list: their values are numbers, strings, booleans and dates.
+Older versions of `l4` wrote `EMPTY` as the text `"EMPTY"`, which gave a wrong answer wherever it was read: no list equals `"EMPTY"`, so a test against it never held and an empty list fell to the wrong rule, and a decision that `MEANS EMPTY` answered the text.
+Measured on KIE 8.44 and Camunda 8.7.6 with `jl4/tests-cli/fixtures/export-empty-list-table.l4`: 2 of 4 answers right before the change, 4 of 4 after it, on each engine.
 
 **Numbers are not exact in DMN.** An L4 `NUMBER` is an exact fraction; a FEEL number keeps 34 significant digits.
 Usually the difference is far below anything a rule cares about, but a rounding function can turn it into a whole unit: `FLOOR (x DIVIDED BY 3 TIMES 3)` is 1 in L4 at x = 1, and 0 on both engines, because one third is stored as 0.333…3.
