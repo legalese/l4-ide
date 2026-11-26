@@ -126,7 +126,7 @@ It is not shown to agree with `l4 check` in every case, and it does not in one: 
 
 A copied constant is lowered exactly as it would be in your own file, so one that has no FEEL form there has none here either: a `Date 2024 1 15` constant is written as L4 text with a Blocking note, in your file or in an imported one.
 It is checked the same way too: a copied constant whose `CONSIDER` misses a case, which L4's checker warns about in the imported file, gets the same Blocking `D-PARTIAL` note it would get in yours, and so does every decision that reads it.
-Before the fix for smucclaw/l4-ide#1102, a constant or `ASSUME` from an imported module, whether or not it could have been copied, was written as a FEEL name with nothing behind it and no note about it: KIE refused the file (`Unknown variable`) and Camunda answered null.
+Before the fix for smucclaw/l4-ide#1102, a constant or `ASSUME` from an imported module, whether or not it could have been copied, was written as a FEEL name with nothing behind it and no note about it: KIE refused the file (`Unknown variable`) and Camunda answered null when the case supplied nothing under that name.
 A call to an imported function was already written as L4 text.
 Measured on KIE 8.44 and Camunda 8.7.6 with `jl4/tests-cli/fixtures/export-imported-constant.l4`.
 

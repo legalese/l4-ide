@@ -6413,7 +6413,7 @@ A test against `EMPTY` in a table therefore falls to `fallbackCell`, a boolean c
 
 The exporter writes one `<definitions>` per module and emits no DMN `<import>` (§5.1, the status note of 2026-07-29: "this exporter emits no imports").
 Before #1102 a nullary reference to a value defined in another module rendered as its FEEL name, with no element behind it and no note: `decideFreeTerms` and `classifyRef` drop cross-module names (§2.4.5), so neither an `inputData` nor a requirement edge was minted.
-Measured on the issue's repro (`monthly.l4` importing `` `the longest week` MEANS 42 ``): KIE 8.44.0.Final refused the file (`ERR_COMPILING_FEEL … Unknown variable 'the_longest_week'`), and Camunda 8.7.6 parsed it and answered null.
+Measured on the issue's repro (`monthly.l4` importing `` `the longest week` MEANS 42 ``): KIE 8.44.0.Final refused the file (`ERR_COMPILING_FEEL … Unknown variable 'the_longest_week'`), and Camunda 8.7.6 parsed it and answered null, the case supplying nothing under that name.
 No ruling in this spec covers imported values; the issue offered two options, and both are taken, each for its own population, decided by Claude 2026-11-25, pending Meng's review.
 
 **What #1102 changes.**
@@ -6443,7 +6443,7 @@ No ruling in this spec covers imported values; the issue offered two options, an
 
 **Measured, 2026-11-25, before (the `unstable` build this branch started from) and after:**
 
-- The issue's repro, with its one case plus an expectation for the copy: KIE `1 case(s), 0 error(s)`, `2/2 value(s) as expected`, and Camunda `2/2 value(s) as expected`, where before KIE built nothing and Camunda answered null.
+- The issue's repro, with its one case plus an expectation for the copy: KIE `1 case(s), 0 error(s)`, `2/2 value(s) as expected`, and Camunda `2/2 value(s) as expected`, where before KIE built nothing and Camunda answered null, the case supplying nothing under that name.
 - `jl4/tests-cli/fixtures/export-imported-constant.l4` (a guard read through a chain of copies, a BKM whose closure lifts a copy, a list quantifier): KIE and Camunda `21/21 value(s) as expected` over three cases, at both the default and the `kie` flavor; before, at the default flavor, KIE `0 case(s), 4 error(s)` and Camunda `17 error(s)`.
 - No DMN golden moved for this change; across the branch, only `sumtype.dmn` moves, for #1101.
 - Every `.l4` tracked under `jl4/examples/` and `doc/` (1,049 files) exported with `unstable`'s build and with this branch's final build (re-measured 2026-11-26, after the review's fixes): no exit code changed, and eight files carry a copy or a new refusal.

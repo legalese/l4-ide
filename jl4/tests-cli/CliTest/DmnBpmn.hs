@@ -1641,7 +1641,7 @@ spec bin = do
   -- imports a sibling file), then run on both engines. Before #1102, KIE
   -- refused the file with "Unknown variable 'the_longest_week'" and
   -- "Unknown variable 'the_threshold'", and Camunda answered null for every
-  -- decision that read one.
+  -- decision that read one, the cases supplying nothing under those names.
   describe "imported constants (opt-in: L4_DMN_ENGINE_CHECK=1)" $ do
     let exported = do
           tmp <- getTemporaryDirectory

@@ -1,7 +1,7 @@
 -- smucclaw/l4-ide#1102: closed constants read from an imported module.
 -- `l4 export dmn` writes one file and no DMN import, so before #1102 each
 -- reference below was a FEEL name with nothing behind it: KIE refused the
--- whole file (Unknown variable) and Camunda answered null.
+-- whole file (Unknown variable), and Camunda answered null to cases sending none.
 IMPORT prelude
 IMPORT `export-imported-limits`
 
