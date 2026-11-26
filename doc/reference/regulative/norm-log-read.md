@@ -47,6 +47,7 @@ EVER FAILED (PARTY _ MUST pay _ UNDER LEST)
 - `UNDER LEST` or `UNDER HENCE` at the end narrows the pattern to norms that a `LEST` (or a `HENCE`) armed.
   A pattern with neither matches the norm wherever it was armed.
 - `AS OF <instant>` after the closing bracket asks as at that instant, in the past or now.
+  An instant after the contract's clock is refused (below).
 - `MUST` also matches a norm written with `DO`, which fails on the same terms.
 
 ## Where a read may be written
@@ -55,8 +56,12 @@ A read is true or false as at an instant, so it needs one.
 Inside a `PROVIDED` guard its instant is the event the guard is checking, `THE INSTANT` (see [the time of the event](consequences.md#the-time-of-the-event-the-instant)); anywhere else it needs an explicit `AS OF`.
 Written with neither, it is a check error that says so.
 
-A read is answered from the record as it stands when the read is reached.
-A rule that holds a read, such as `pending MEANS OUTSTANDING (PARTY _ MUST deliver) AS OF 20`, is asked again every time something uses it, so its answer in one guard is never kept for the next.
+A read is answered from the record as it stands when the read is reached, and only as at an instant the contract has reached.
+The contract's clock is the latest instant the run has been at: the event a guard is being checked against, or the latest instant in a norm already recorded.
+An `AS OF` after it asks about what has not happened yet, so it is refused by name and not answered from the part of the record written so far.
+A read written with no `AS OF` in a guard asks at the event's own instant, which is never in the future.
+A rule that holds a read is asked again every time something uses it, so its answer in one guard is never kept for the next.
+To share a read between guards, give the rule the instant it asks at, and pass `THE INSTANT` from each guard, as `pending (THE INSTANT)` below does: a rule cannot reach `THE INSTANT` itself.
 A norm may read itself in its own guard with `PARTY _` and sees itself as outstanding; with a named party the read stops, as described below, because the norm has not met its party yet.
 
 ```l4
@@ -73,6 +78,16 @@ The fee counts only from 5 up, so a payment of 1 at 5 is skipped and a payment o
 The second example of the file asks as of an earlier instant: a delivery made at 4 was still outstanding as of 2.
 **Example file:** [norm-log-read-example.l4](norm-log-read-example.l4)
 
+A read shared by two guards takes the instant as an input:
+
+```text
+GIVEN t IS A NUMBER
+GIVETH A BOOLEAN
+pending t MEANS OUTSTANDING (PARTY _ MUST deliver) AS OF t
+```
+
+and each guard says `PROVIDED pending (THE INSTANT)`.
+
 ## What happens when a read cannot be answered
 
 Loud, each a named error and never a quiet "no":
@@ -82,6 +97,7 @@ Loud, each a named error and never a quiet "no":
 - A read inside an operand of `RAND`, `ROR` or `EVERY`.
   The operands run side by side, so what the read saw would depend on which sibling ran first; the check that makes this safe is not built.
   A read written in the operand itself is a check error; one written in a rule the operand uses stops the run when it is reached.
+- An `AS OF` later than the contract's clock, and any read made before a contract has run (a plain `#EVAL` of a read).
 - The wrong number of `_` for the action's fields.
 - Anything but `_` in an argument place, such as `pay 3`: a parse error at that argument, which does not say that only `_` is allowed.
 - A pattern that names an action declared in this module with a modal no norm of the module has: it could never match.

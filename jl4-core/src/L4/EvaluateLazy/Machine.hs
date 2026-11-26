@@ -2248,6 +2248,15 @@ tellEventRouted route ev = do
     RouteNotify recipientKey ->
       liftIO (modifyIORef' store (storeAppendOwn recipientKey ev))
 
+-- | Review of P2b, B1: note the event stamp a guard is about to be matched
+-- at, so the horizon of a read reaches it (the entry for the event is not
+-- written until the event is decided).
+noteHorizon :: WHNF -> Eval ()
+noteHorizon = \ case
+  ValNumber t -> whenDeonticLog \ l -> when l.dlWriteFates $
+    liftIO (modifyIORef' l.dlHorizon (Just . maybe t (max t)))
+  _ -> pure ()
+
 -- | Review of P2b, B2 and S2: a contract value applied to its time and events
 -- while no run is on the stack starts a run. The run's reads see the norms
 -- the run writes from here on (not those of an earlier run in the same
@@ -2260,6 +2269,7 @@ beginNormRun val rs = when (startsRun val) $ whenDeonticLog \ l -> when l.dlWrit
     liftIO (writeIORef l.dlRunDepth 1)
     store <- readEvalRef (.envLedger)
     liftIO (writeIORef l.dlRunStart (length (toList store.normLedger)))
+    liftIO (writeIORef l.dlHorizon Nothing)
     accRef <- asks (.ctxReads)
     before <- liftIO ((.crNormRead) <$> readIORef accRef)
     pushFrame (EndNormRun before)
@@ -2342,6 +2352,15 @@ finishNormRead word d who modal con branch _site = do
       start <- liftIO (readIORef l.dlRunStart)
       let entries = [ e | Fate e <- drop start (toList store.normLedger) ]
           pat = readPattern who modal (nameToText (getOriginal con)) branch
+      -- review of P2b, B1: an instant the run has not reached is not in the
+      -- log yet. The latest instant the run has been at is the later of the
+      -- entries' and the event a guard is being matched at
+      stamp <- liftIO (readIORef l.dlHorizon)
+      let horizon = case catMaybes [stamp, NormRead.readHorizon entries] of
+            [] -> Nothing
+            ts -> Just (maximum ts)
+      when (maybe True (d >) horizon) $ userException $ UserError $
+        "a norm-log read (" <> readWordText word <> ") cannot be answered: " <> NormRead.prettyRefusal (NormRead.FutureInstant d horizon)
       case answerRead word d pat entries of
         Left r  -> userException (UserError ("a norm-log read (" <> readWordText word <> ") cannot be answered: " <> NormRead.prettyRefusal r))
         Right b -> continueBackward (ValBool b)
@@ -4241,6 +4260,7 @@ backwardContractFrame val = \ case
         -- smucclaw/l4-ide#1069: a RECALL in the PROVIDED is read at the
         -- event's stamp
         noteClockWHNF time
+        noteHorizon time
         pushCFrame $ Contract10 ScrutinizeActions {..}
         -- N4 (P2): THE INSTANT in the guard is the stamp of this event
         guardEnv <- case act.provided of

@@ -1383,18 +1383,22 @@ spec = describe "the norm log writer (NORM-LOG-SPEC, P1)" do
         parses [ "x MEANS OUTSTANDING (PARTY Tenant MUST pay 3)" ] `shouldBe` False
 
       it "R12: a read named once and used in two guards is read again at the second, not served from the first" do
-        -- the shared-thunk probe (NORM-LOG-SPEC N4): `pending` has no inputs, so
-        -- its value could be kept from the first guard, where deliver is
-        -- outstanding, and served again at the second, where it is not
+        -- the shared-thunk probe (NORM-LOG-SPEC N4): `pending` is one rule
+        -- used in two guards, and its answer at the first, where deliver is
+        -- outstanding, must not be the answer at the second, where it is not
         -- (Carol's payment arms Alice's delivery, so Alice's norm is armed at a
-        -- forced clock when her own guard reads it; R14 is the root case)
+        -- forced clock when her own guard reads it; R14 is the root case). The
+        -- rule takes the instant as an input and each guard passes THE INSTANT:
+        -- a rule cannot reach THE INSTANT itself, and an AS OF later than the
+        -- clock is refused (R18)
         let shared =
               [ "c MEANS"
               , "  PARTY Carol MUST pay m WITHIN 10"
-              , "  HENCE (PARTY Alice MUST deliver PROVIDED pending WITHIN 10"
-              , "         HENCE (PARTY Bob MUST pay n PROVIDED NOT pending WITHIN 10))"
+              , "  HENCE (PARTY Alice MUST deliver PROVIDED pending (THE INSTANT) WITHIN 10"
+              , "         HENCE (PARTY Bob MUST pay n PROVIDED NOT pending (THE INSTANT) WITHIN 10))"
+              , "GIVEN t IS A NUMBER"
               , "GIVETH A BOOLEAN"
-              , "pending MEANS OUTSTANDING (PARTY _ MUST deliver) AS OF 20"
+              , "pending t MEANS OUTSTANDING (PARTY _ MUST deliver) AS OF t"
               , "#TRACE c AT 0 WITH"
               , "  PARTY Carol DOES pay 1 AT 1"
               , "  PARTY Alice DOES deliver AT 2"
@@ -1410,7 +1414,7 @@ spec = describe "the norm log writer (NORM-LOG-SPEC, P1)" do
         -- writer waits for it (tellArmed); the read must not see the log without it
         let own =
               [ "c MEANS"
-              , "  PARTY Alice MUST deliver PROVIDED OUTSTANDING (PARTY _ MUST deliver) AS OF 10 WITHIN 10"
+              , "  PARTY Alice MUST deliver PROVIDED OUTSTANDING (PARTY _ MUST deliver) WITHIN 10"
               , "#TRACE c AT 0 WITH"
               , "  PARTY Alice DOES deliver AT 2"
               ]
@@ -1430,7 +1434,7 @@ spec = describe "the norm log writer (NORM-LOG-SPEC, P1)" do
               , "GIVETH A NUMBER"
               , "start MEANS 1 - 1"
               , "GIVETH A NUMBER"
-              , "arrival MEANS IF OUTSTANDING (PARTY _ MUST deliver) AS OF 5 THEN 2 ELSE 70"
+              , "arrival MEANS IF OUTSTANDING (PARTY _ MUST deliver) AS OF 0 THEN 2 ELSE 70"
               , "#TRACE c AT start WITH"
               , "  PARTY Alice DOES deliver AT arrival"
               ]
@@ -1443,7 +1447,7 @@ spec = describe "the norm log writer (NORM-LOG-SPEC, P1)" do
         -- the norm has not met its party yet: the log knows the bearer only as written (N7 rule 4, rule 3 not built)
         let own =
               [ "c MEANS"
-              , "  PARTY Alice MUST deliver PROVIDED OUTSTANDING (PARTY Alice MUST deliver) AS OF 10 WITHIN 10"
+              , "  PARTY Alice MUST deliver PROVIDED OUTSTANDING (PARTY Alice MUST deliver) WITHIN 10"
               , "#TRACE c AT 0 WITH"
               , "  PARTY Alice DOES deliver AT 2"
               ]
@@ -1466,6 +1470,43 @@ spec = describe "the norm log writer (NORM-LOG-SPEC, P1)" do
         checked (doSite "EVER FAILED (PARTY _ MUST deliver)") `shouldBe` True
         holds (doSite "EVER FAILED (PARTY _ MUST deliver)") `shouldReturn` True
         holds (doSite "NOT EVER FAILED (PARTY _ MUST deliver)") `shouldReturn` False
+
+      it "R18: an AS OF later than the clock is refused by name, not answered from the log written so far (review of P2b, B1; decided by Claude 2026-11-26, pending Meng's review)" do
+        let refusedWith needle body = do
+              rs <- run False (src body)
+              Text.pack (show (map (.result) rs)) `shouldSatisfy` Text.isInfixOf needle
+            -- in the event's own time, before any event: the run is at 0
+            inTime t =
+              [ "c MEANS"
+              , "  PARTY Alice MUST deliver WITHIN 10"
+              , "GIVETH A NUMBER"
+              , "start MEANS 1 - 1"
+              , "GIVETH A NUMBER"
+              , "arrival MEANS IF OUTSTANDING (PARTY _ MUST deliver) AS OF " <> t <> " THEN 2 ELSE 70"
+              , "#TRACE c AT start WITH"
+              , "  PARTY Alice DOES deliver AT arrival"
+              ]
+            -- in a guard at the event at 2
+            inGuard t =
+              [ "c MEANS"
+              , "  PARTY Alice MUST deliver PROVIDED OUTSTANDING (PARTY _ MUST deliver) AS OF " <> t <> " WITHIN 10"
+              , "#TRACE c AT 0 WITH"
+              , "  PARTY Alice DOES deliver AT 2"
+              ]
+        refusedWith "has only reached 0" (inTime "5")
+        refusedWith "has only reached 2" (inGuard "10")
+        -- the clock itself and the past are answered
+        checked (inGuard "2") `shouldBe` True
+        rsNow <- run False (src (inGuard "2"))
+        length [ () | e <- fatesOf 0 rsNow, e.neFate == FatePerformed, e.neActionHead == Just "deliver" ] `shouldBe` 1
+        -- with nothing run yet there is no clock: a read outside a contract run is refused,
+        -- not answered "no" from an empty log
+        refusedWith "no contract has run yet"
+          [ "c MEANS PARTY Alice MUST deliver WITHIN 10"
+          , "GIVETH A BOOLEAN"
+          , "x MEANS OUTSTANDING (PARTY _ MUST deliver) AS OF 0"
+          , "#EVAL x"
+          ]
 
       it "R19: a second contract run in one directive does not read the first's norms (review of P2b, B2)" do
         -- c's delivery fails in the first run; g's guard asks whether any

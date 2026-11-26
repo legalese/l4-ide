@@ -591,6 +591,11 @@ data DeonticLog = MkDeonticLog
     -- too, since a barrier nested under another's @LEST@ is handed cells
     -- the outer members had looked at. Empty outside any such hand-off, so
     -- members' own parallel looks at one stream are never marked.
+  , dlHorizon     :: !(IORef (Maybe Rational))
+    -- ^ the latest event stamp a guard has been matched at (N4b, review of
+    -- P2b B1): with the entries' observed instants it is how far the run has
+    -- got, and a read asks at no later an instant. Written only when
+    -- 'dlWriteFates' is on
   , dlRunDepth    :: !(IORef Int)
     -- ^ 1 while a contract run that started at the top is on the stack, else
     -- 0: a contract value applied to its time and events at depth 0 starts a
@@ -613,4 +618,4 @@ newDeonticLogWith keep write =
   MkDeonticLog <$> newIORef mempty <*> newIORef Map.empty <*> newIORef Map.empty <*> newIORef Map.empty
     <*> newIORef Set.empty <*> pure keep <*> pure write <*> newIORef Map.empty
     <*> (hashUnique <$> newUnique) <*> newIORef Map.empty <*> newIORef []
-    <*> newIORef Nothing <*> newIORef [] <*> newIORef 0 <*> newIORef 0
+    <*> newIORef Nothing <*> newIORef [] <*> newIORef Nothing <*> newIORef 0 <*> newIORef 0
