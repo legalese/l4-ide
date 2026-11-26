@@ -1,0 +1,31 @@
+-- smucclaw/l4-ide#1116. batch-after-trace.l4 without its #TRACE: the row's
+-- answer, `taken now` read against an empty ledger, is FALSE.
+
+IMPORT prelude
+IMPORT taken
+
+DECLARE Actor IS ONE OF Bob
+DECLARE Mode IS ONE OF peek, skip
+DECLARE Act IS ONE OF
+    go HAS mode IS A Mode
+    buy
+
+GIVETH A DEONTIC Actor Act
+`shop` MEANS
+    PARTY Bob
+    MAY buy PROVIDED NOT `taken now`
+    WITHIN 10
+    HENCE COMMIT `taken` IS TRUE HENCE `shop`
+    LEST FULFILLED
+
+GIVETH A DEONTIC Actor Act
+`start` MEANS
+    PARTY Bob
+    MAY go m
+    WITHIN 10
+    HENCE COMMIT `taken` IS (IF m EQUALS peek THEN NOT `taken now` ELSE TRUE) HENCE `shop`
+    LEST FULFILLED
+
+@export default
+GIVETH A BOOLEAN
+`closed now` MEANS `taken now`

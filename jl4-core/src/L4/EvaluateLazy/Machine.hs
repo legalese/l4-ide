@@ -816,9 +816,12 @@ type Machine = Eval
 -- allocation limit, a cancelled thread, a Haskell crash) leaves the frame
 -- stack as it was, because only 'raiseException' unwinds it; so the frames
 -- still on it are unwound here, and a thunk whose force was interrupted gets
--- its blackhole mark back ('unwindFrame'). Thunks of imported modules outlive
+-- its blackhole mark back ('unwindFrame'). Thunks of imported modules outlived
 -- the run, and a mark left on one made the next run on the same thread report
--- an infinite loop (smucclaw/l4-ide#1020).
+-- an infinite loop (smucclaw/l4-ide#1020). A directive now forces a copy of
+-- them ('L4.EvaluateLazy.forEachDirectiveFreshHeap', smucclaw/l4-ide#1116), so
+-- the mark lands on a copy; the unwinding stays for a force that reaches a heap
+-- some other way, such as 'L4.EvaluateLazy.evalExprForLedgerWithEnv'.
 --
 -- The unwinding is uninterruptible, so a second exception cannot cut it
 -- short, and it is cheap for the same reason: one walk over the frame list,
@@ -1469,7 +1472,9 @@ plainStep clock ev scrutiny norm outcome = MkDeonticStep
 -- An allocation limit or a timeout that landed between the pop and
 -- 'unwindFrame' lost the frame: 'runEval' only unwinds the frames still on the
 -- stack, so an 'UpdateThunk' popped but not yet unwound left its thunk
--- blackholed, which for an imported thunk is smucclaw/l4-ide#1020 again.
+-- blackholed, which for an imported thunk was smucclaw/l4-ide#1020 again (a
+-- directive now forces a copy of one, smucclaw/l4-ide#1116, and the same holds
+-- of a heap a host forces directly).
 -- Between frames the mask is off, so a limit landing there finds the next
 -- frame still on the stack, and 'runEval' unwinds it. The mask is only on this
 -- exception path, so evaluation that raises nothing pays nothing.

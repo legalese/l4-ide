@@ -3,7 +3,7 @@
 
 -- | The helpers are exported for "StdlibResolutionSpec", which needs the same
 -- in-process service but must control the environment around it.
-module IntegrationSpec (spec, withServiceFromSources, evalFunction, assertSuccess, testOptions) where
+module IntegrationSpec (spec, withServiceFromSources, evalFunction, assertSuccess, testOptions, withFixedNow) where
 
 import Test.Hspec
 
@@ -64,9 +64,10 @@ import System.IO.Error (isPermissionError)
 import System.Timeout (timeout)
 import TestData (maybeSynonymJL4, synonymWrapperJL4)
 
-import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticDeadlineJL4, deonticShapesJL4, deonticLineBreakJL4, deonticRecordPartyJL4, deonticSpacedPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, considerPlanJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, refusingConditionJL4, refusingDeepJL4, refusingOrJL4, refusingFirstJL4, refusingArmJL4, answeredConditionJL4, refusingDistributedJL4, refusingNotJL4, refusingImpliesJL4, refusingImpliesNestedJL4, refusingSeamOpenJL4, refusingBothArmsJL4, conditionalRefuserJL4, clauseGroupSingleJL4, clauseGroupEnumJL4, handEnumJL4, clauseGroupMixedJL4, handMixedJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, letEnumJL4, rowsClauseGroupJL4, letChainJL4, clauseGroupLetResultJL4, lineBreakJL4, partialClausesJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4, inputThenInputJL4, longClausesJL4, longNumberClausesJL4, catchAllHugeJL4, handCatchAllHugeJL4, newNameHugeJL4, newNameDnfJL4, maybeTableJL4, exactlyNameDnfJL4, exactlyHugeJL4, dnfClauseJL4, handDnfJL4, headingDecodeJL4, withalJL4, refuseNamedDefaultJL4, namedSiteDefaultJL4, constructorNamedDefaultJL4, collideSectionsJL4, collideSpacedJL4, deonticFieldDefaultJL4, deonticNestedFieldDefaultJL4)
+import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticDeadlineJL4, deonticShapesJL4, deonticLineBreakJL4, deonticRecordPartyJL4, deonticSpacedPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, considerPlanJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, heavyLocalJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, refusingConditionJL4, refusingDeepJL4, refusingOrJL4, refusingFirstJL4, refusingArmJL4, answeredConditionJL4, refusingDistributedJL4, refusingNotJL4, refusingImpliesJL4, refusingImpliesNestedJL4, refusingSeamOpenJL4, refusingBothArmsJL4, conditionalRefuserJL4, clauseGroupSingleJL4, clauseGroupEnumJL4, handEnumJL4, clauseGroupMixedJL4, handMixedJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, letEnumJL4, rowsClauseGroupJL4, letChainJL4, clauseGroupLetResultJL4, lineBreakJL4, partialClausesJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4, inputThenInputJL4, longClausesJL4, longNumberClausesJL4, catchAllHugeJL4, handCatchAllHugeJL4, newNameHugeJL4, newNameDnfJL4, maybeTableJL4, exactlyNameDnfJL4, exactlyHugeJL4, dnfClauseJL4, handDnfJL4, headingDecodeJL4, withalJL4, refuseNamedDefaultJL4, namedSiteDefaultJL4, constructorNamedDefaultJL4, collideSectionsJL4, collideSpacedJL4, deonticFieldDefaultJL4, deonticNestedFieldDefaultJL4)
 import TestStoreDir (withStoreDir)
 import TestData (deonticEventRecordsJL4, deonticListPartyJL4, deonticMaybeFieldsJL4)
+import TestData (takenLibJL4, takenMainJL4, takenMainAloneJL4, takenLocalJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -2197,7 +2198,9 @@ spec = describe "integration" do
     -- smucclaw/l4-ide#1020. A limit hit while forcing an imported value left
     -- the forcing thread's mark on the value's thunk, which outlives the
     -- request; the next request on the same thread then met its own mark and
-    -- reported "Infinite loop detected".
+    -- reported "Infinite loop detected". Since #1116 a request forces a copy
+    -- of the imported value, so the mark lands on the copy; the examples stay
+    -- as the guard of the unwinding.
     describe "a limit hit inside an imported value" do
       let stingy = testOptions { maxEvalMemoryMb = 64, evalTimeout = 60 }
           sources = [("heavy_lib.l4", heavyLibJL4), ("heavy_main.l4", heavyMainJL4)]
@@ -2207,6 +2210,17 @@ spec = describe "integration" do
           loopMessage = "Infinite loop detected"
 
       it "does not spoil the next single evaluation on the same connection" do
+        -- the oracle comes first: the same three requests of the same rules
+        -- written in one file, where the value is worked out afresh by every
+        -- request as a matter of course
+        let heavyOutcome r
+              | statusCode' r == 500, BS.isInfixOf "Evaluation resource limit exceeded" (LBS.toStrict (responseBody r)) = "limit"
+              | statusCode' r == 200, Just (SimpleResponse x) <- Aeson.decode (responseBody r) = maybe "no value" show (Map.lookup "value" x.fnResult)
+              | otherwise = "status " <> show (statusCode' r) <> ": " <> show (responseBody r)
+        twin <- withServiceFromSourcesOpts stingy "heavy-twin" [("heavy_local.l4", heavyLocalJL4)] \twinUrl twinMgr ->
+          forM [call tooMuch, call 0, call tooMuch] \body ->
+            heavyOutcome <$> evalFunction twinUrl twinMgr "heavy-twin" "use-heavy" body
+        twin `shouldBe` ["limit", "FnLitBool True", "limit"]
         withServiceFromSourcesOpts stingy "heavy-single" sources \baseUrl mgr -> do
           hit <- evalFunction baseUrl mgr "heavy-single" "use-heavy" (call tooMuch)
           statusCode' hit `shouldBe` 500
@@ -2214,10 +2228,33 @@ spec = describe "integration" do
           again <- evalFunction baseUrl mgr "heavy-single" "use-heavy" (call 0)
           LBS.toStrict (responseBody again) `shouldSatisfy` (not . BS.isInfixOf loopMessage)
           assertSuccess again \r -> Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool True)
-          -- the hit above landed inside the imported value: once it is worked
-          -- out and kept, the same 47 MB of the case's own steps fit
-          cached <- evalFunction baseUrl mgr "heavy-single" "use-heavy" (call tooMuch)
-          assertSuccess cached \r -> Map.lookup "value" r.fnResult `shouldBe` Just (FnLitBool True)
+          -- the hit above landed inside the imported value, and so did the work
+          -- of `again`: each request reads the imports' rules over a copy of its
+          -- own (smucclaw/l4-ide#1116), so the value is worked out again and the
+          -- same 47 MB of the case's own steps still do not fit, as the first
+          -- time. Until #1116 the imports' heap was one for every request, the
+          -- value was kept once worked out, and this request answered. This
+          -- pins that a request's outcome does not depend on what an earlier
+          -- one worked out (ruled by Meng 2026-11-26, CLEANSLATE).
+          same <- evalFunction baseUrl mgr "heavy-single" "use-heavy" (call tooMuch)
+          statusCode' same `shouldBe` 500
+          LBS.toStrict (responseBody same) `shouldSatisfy` BS.isInfixOf "Evaluation resource limit exceeded"
+          -- and the three answers are the file's own, written in one file
+          map heavyOutcome [hit, again, same] `shouldBe` twin
+
+      -- A batch case is stopped alike whatever another case of its batch
+      -- worked out. The case that does not fit sits on either side of one that
+      -- does and works the imported value out: until #1116 the second of them
+      -- answered, the value being kept, and now it is stopped as the first was
+      -- (ruled by Meng 2026-11-26, CLEANSLATE). At one capability the cases
+      -- run in order.
+      it "stops a case again after another case of the batch has worked the value out, at one capability" do
+        withCapabilities 1 $
+          withServiceFromSourcesOpts stingy "heavy-batch" sources \baseUrl mgr -> do
+            resp <- postBatchTo baseUrl mgr "heavy-batch" "use-heavy" [tooMuch, 0, tooMuch]
+            let stopped = CaseLimited AllocationLimitHit
+                  "Evaluation resource limit exceeded: this case allocated more than the memory limit of 64 MB (--max-eval-memory-mb)"
+            expectBatchOutcomes resp [stopped, CaseAnswered, stopped]
 
       it "does not spoil the next evaluation on a new connection, or a batch case" do
         withServiceFromSourcesOpts stingy "heavy-new" sources \baseUrl mgr -> do
@@ -2255,6 +2292,41 @@ spec = describe "integration" do
           again <- callTool 3 0
           LBS.toStrict again `shouldSatisfy` (not . BS.isInfixOf loopMessage)
           LBS.toStrict again `shouldSatisfy` BS.isInfixOf "true"
+
+  -- smucclaw/l4-ide#1116, on the service's direct path. A deployment evaluates
+  -- the directives of its own files when it is compiled, on the evaluator
+  -- environment its imports gave it, and then hands that same environment to
+  -- every request ('Backend.Jl4.evaluateDirectAST'). The file here keeps a
+  -- #TRACE that commits `taken` and then reads the imported `taken now`; a
+  -- request for `closed now`, which is `taken now`, reads an empty ledger and
+  -- must answer FALSE, as it does when the rules are written in the file.
+  -- Three deployments of it, each under the clock free and under the clock
+  -- pinned (the unfixed evaluator showed the fault on `l4 run` only with the
+  -- clock pinned in some shapes): the imported rule beside the #TRACE, the
+  -- same without the #TRACE, and the rules written in one file. The answers
+  -- are compared as the service gives them.
+  describe "an imported rule that reads a ledger, beside the deployed file's own #TRACE" do
+    let askClosed deployId sources = withServiceFromSources deployId sources \baseUrl mgr -> do
+          resp <- evalFunction baseUrl mgr deployId "closed-now"
+            (Aeson.object ["arguments" Aeson..= Aeson.object []])
+          pure case (statusCode' resp, Aeson.decode (responseBody resp)) of
+            (200, Just (SimpleResponse r)) -> maybe "no value" show (Map.lookup "value" r.fnResult)
+            _ -> "status " <> show (statusCode' resp) <> ": " <> show (responseBody resp)
+        clocks = [("the clock free", Nothing), ("the clock pinned", Just "2025-01-31T15:45:30Z")]
+
+    for_ clocks \(clockName, clock) ->
+      it ("answers as the same rules written in the file do, " <> clockName) do
+        withFixedNow clock do
+          imported <- askClosed "taken-imported" [("taken.l4", takenLibJL4), ("closed.l4", takenMainJL4)]
+          alone <- askClosed "taken-alone" [("taken.l4", takenLibJL4), ("closed.l4", takenMainAloneJL4)]
+          local <- askClosed "taken-local" [("closed.l4", takenLocalJL4)]
+          [ ("imported, with the file's #TRACE", imported)
+            , ("imported, without it", alone)
+            , ("written in the file", local) ]
+            `shouldBe`
+            ([ ("imported, with the file's #TRACE", "FnLitBool False")
+             , ("imported, without it", "FnLitBool False")
+             , ("written in the file", "FnLitBool False") ] :: [(String, String)])
 
   -- U7b: the report a response carries is never left to be guessed. Until
   -- build step 6 adds the others it is always the default one.
@@ -7494,6 +7566,16 @@ withEmptyService' act = withStoreDir "empty" \tmpPath -> do
     let baseUrl = "http://localhost:" <> show port
     result <- act baseUrl mgr
     pure result
+
+-- | Run an action with @JL4_FIXED_NOW@ set to the given instant, or unset, and
+-- put back as it was. The deployment and the requests of a service in this
+-- process read it, whenever they build an evaluator configuration.
+withFixedNow :: Maybe String -> IO a -> IO a
+withFixedNow clock act = bracket (lookupEnv name) restore \_ -> set clock >> act
+  where
+    name = "JL4_FIXED_NOW"
+    set = maybe (unsetEnv name) (setEnv name)
+    restore = set
 
 -- | Evaluate a function via the API.
 evalFunction :: String -> Manager -> Text -> Text -> Aeson.Value -> IO (Response LBS.ByteString)

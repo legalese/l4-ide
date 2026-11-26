@@ -1,0 +1,39 @@
+-- smucclaw/l4-ide#1116. hop-via.l4 with this file importing taken.l4 as well as
+-- hop-b.l4, and naming `taken now` where it commits and `shop is closed` (which
+-- is `taken now`) where it allows the buy: one rule reached by two import
+-- paths. With every rule in one file the first trace gives two COMMITs and
+-- WITHIN 10 and the second one COMMIT and WITHIN 9, and so must this.
+
+IMPORT prelude
+IMPORT taken
+IMPORT `hop-b`
+
+DECLARE Actor IS ONE OF Bob
+DECLARE Mode IS ONE OF peek, skip
+DECLARE Act IS ONE OF
+    go HAS mode IS A Mode
+    buy
+
+GIVETH A DEONTIC Actor Act
+`shop` MEANS
+    PARTY Bob
+    MAY buy PROVIDED NOT `shop is closed`
+    WITHIN 10
+    HENCE COMMIT `taken` IS TRUE HENCE `shop`
+    LEST FULFILLED
+
+GIVETH A DEONTIC Actor Act
+`start` MEANS
+    PARTY Bob
+    MAY go m
+    WITHIN 10
+    HENCE COMMIT `taken` IS (IF m EQUALS peek THEN NOT `taken now` ELSE TRUE) HENCE `shop`
+    LEST FULFILLED
+
+#TRACE `start` AT 0 WITH
+    PARTY Bob DOES go peek AT 1
+    PARTY Bob DOES buy AT 2
+
+#TRACE `start` AT 0 WITH
+    PARTY Bob DOES go skip AT 1
+    PARTY Bob DOES buy AT 2

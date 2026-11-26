@@ -77,6 +77,7 @@ import qualified CliTest.Coverage as Coverage
 import qualified CliTest.DmnBpmn as DmnBpmn
 import qualified CliTest.Ledger as Ledger
 import qualified CliTest.Explore as Explore
+import qualified CliTest.RunImported as RunImported
 import qualified CliTest.Budgets as Budgets
 import qualified CliTest.Deploy as Deploy
 import qualified CliTest.JsonDecode as JsonDecode
@@ -1115,6 +1116,7 @@ main = do
          , Catala.fixtures
          , Coverage.fixtures
          , Explore.fixtures
+         , RunImported.fixtures
          , SiblingReads.fixtures
          , WithOverride.fixtures
          , Budgets.fixtures
@@ -8552,6 +8554,7 @@ spec bin = do
   Catala.spec bin
   Coverage.spec bin
   Explore.spec bin
+  RunImported.spec bin
   SiblingReads.spec bin
   WithOverride.spec bin
   Deploy.spec bin
