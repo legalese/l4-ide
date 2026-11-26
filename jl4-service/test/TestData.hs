@@ -123,6 +123,11 @@ module TestData (
   lineBreakJL4,
   deonticFieldDefaultJL4,
   deonticNestedFieldDefaultJL4,
+  takenLibJL4,
+  takenMainJL4,
+  takenMainAloneJL4,
+  takenLocalJL4,
+  takenLocalAloneJL4,
 ) where
 
 import Backend.Jl4 as Jl4
@@ -2636,3 +2641,79 @@ GIVETH A PROVISION OF Driver, `Driver Action`
         PARTY driver
         MAY `drive`
 |]
+
+-- | smucclaw/l4-ide#1116. A rule with no inputs that reads a ledger, `taken now`,
+-- beside the reader it calls, in a file of its own. Read against an empty
+-- ledger, as a request is, it is FALSE.
+takenRulesJL4 :: Text
+takenRulesJL4 =
+  [i|
+GIVEN dflt IS A BOOLEAN
+GIVETH A BOOLEAN
+`is taken` dflt MEANS fromMaybe dflt (RECALL OFFICIAL's `taken`)
+
+GIVETH A BOOLEAN
+`taken now` MEANS `is taken` WITH dflt IS FALSE
+|]
+
+-- | 'takenRulesJL4' as a file of a bundle, for 'takenMainJL4' to import.
+takenLibJL4 :: Text
+takenLibJL4 = "IMPORT prelude\n" <> takenRulesJL4
+
+-- | A contract that reads `taken now`, and an export that is `taken now`.
+takenContractJL4 :: Text
+takenContractJL4 =
+  [i|
+DECLARE Actor IS ONE OF Bob
+DECLARE Mode IS ONE OF peek, skip
+DECLARE Act IS ONE OF
+    go HAS mode IS A Mode
+    buy
+
+GIVETH A DEONTIC Actor Act
+`shop` MEANS
+    PARTY Bob
+    MAY buy PROVIDED NOT `taken now`
+    WITHIN 10
+    HENCE COMMIT `taken` IS TRUE HENCE `shop`
+    LEST FULFILLED
+
+GIVETH A DEONTIC Actor Act
+`start` MEANS
+    PARTY Bob
+    MAY go m
+    WITHIN 10
+    HENCE COMMIT `taken` IS (IF m EQUALS peek THEN NOT `taken now` ELSE TRUE) HENCE `shop`
+    LEST FULFILLED
+
+@export default
+GIVETH A BOOLEAN
+`closed now` MEANS `taken now`
+|]
+
+-- | A trace that commits `taken`, and then reads `taken now` when it tries the
+-- buy. A deployment evaluates a file's own directives when it is compiled.
+takenTraceJL4 :: Text
+takenTraceJL4 =
+  [i|
+\#TRACE `start` AT 0 WITH
+    PARTY Bob DOES go skip AT 1
+    PARTY Bob DOES buy AT 2
+|]
+
+-- | The deployed file: it imports `taken now` and keeps the #TRACE above.
+takenMainJL4 :: Text
+takenMainJL4 = "IMPORT prelude\nIMPORT taken\n" <> takenContractJL4 <> takenTraceJL4
+
+-- | 'takenMainJL4' without its #TRACE.
+takenMainAloneJL4 :: Text
+takenMainAloneJL4 = "IMPORT prelude\nIMPORT taken\n" <> takenContractJL4
+
+-- | 'takenMainJL4' with the rules of 'takenLibJL4' written in the file: the
+-- oracle for what an imported rule must answer.
+takenLocalJL4 :: Text
+takenLocalJL4 = "IMPORT prelude\n" <> takenRulesJL4 <> takenContractJL4 <> takenTraceJL4
+
+-- | 'takenMainAloneJL4' with the rules of 'takenLibJL4' written in the file.
+takenLocalAloneJL4 :: Text
+takenLocalAloneJL4 = "IMPORT prelude\n" <> takenRulesJL4 <> takenContractJL4

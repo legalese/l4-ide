@@ -3,7 +3,7 @@
 
 -- | The helpers are exported for "StdlibResolutionSpec", which needs the same
 -- in-process service but must control the environment around it.
-module IntegrationSpec (spec, withServiceFromSources, evalFunction, assertSuccess, testOptions) where
+module IntegrationSpec (spec, withServiceFromSources, evalFunction, assertSuccess, testOptions, withFixedNow) where
 
 import Test.Hspec
 
@@ -67,6 +67,7 @@ import TestData (maybeSynonymJL4, synonymWrapperJL4)
 import TestData (qualifiesJL4, recordJL4, maybeParamJL4, saleContractJL4, deonticExportJL4, deonticDeadlineJL4, deonticShapesJL4, deonticLineBreakJL4, deonticRecordPartyJL4, deonticSpacedPartyJL4, spacedFieldsJL4, assumeParamJL4, assumeHelperJL4, refuseJL4, importedRecordDeclJL4, importedRecordMainJL4, dnfBlowupJL4, considerPlanJL4, twinLeavesJL4, missingBooleanJL4, sectionBooleanJL4, deonticBooleanJL4, considerBooleanJL4, decidedAnywayJL4, deonticConsiderJL4, maybeInputsJL4, timeInputsJL4, ruleDefaultJL4, recordDefaultJL4, maybeHardJL4, sectionSecondJL4, twoDefaultsJL4, refuseDefaultJL4, exactDecimalJL4, enumSchemaJL4, wrapperNullJL4, enumNullJL4, recordWrapJL4, ownDecodeJL4, deonticDefaultJL4, spinJL4, spinOrRefuseJL4, spinWrapperJL4, powerJL4, heavyLibJL4, heavyMainJL4, heavyLocalJL4, deepJL4, wireProbeJL4, declineLabelsJL4, twoDatesJL4, bareInputJL4, refusingConditionJL4, refusingDeepJL4, refusingOrJL4, refusingFirstJL4, refusingArmJL4, answeredConditionJL4, refusingDistributedJL4, refusingNotJL4, refusingImpliesJL4, refusingImpliesNestedJL4, refusingSeamOpenJL4, refusingBothArmsJL4, conditionalRefuserJL4, clauseGroupSingleJL4, clauseGroupEnumJL4, handEnumJL4, clauseGroupMixedJL4, handMixedJL4, handSingleJL4, clauseGroupCallJL4, handCallJL4, clauseTableJL4, handTableJL4, clauseTable2JL4, handTable2JL4, clauseNewNameJL4, handNewNameJL4, clauseGroupNoGivethJL4, letEnumJL4, rowsClauseGroupJL4, letChainJL4, clauseGroupLetResultJL4, lineBreakJL4, partialClausesJL4, jsonDecodePersonJL4, taxpayerJL4, implicitFlagJL4, nameClashJL4, inputThenInputJL4, longClausesJL4, longNumberClausesJL4, catchAllHugeJL4, handCatchAllHugeJL4, newNameHugeJL4, newNameDnfJL4, maybeTableJL4, exactlyNameDnfJL4, exactlyHugeJL4, dnfClauseJL4, handDnfJL4, headingDecodeJL4, withalJL4, refuseNamedDefaultJL4, namedSiteDefaultJL4, constructorNamedDefaultJL4, collideSectionsJL4, collideSpacedJL4, deonticFieldDefaultJL4, deonticNestedFieldDefaultJL4)
 import TestStoreDir (withStoreDir)
 import TestData (deonticEventRecordsJL4, deonticListPartyJL4, deonticMaybeFieldsJL4)
+import TestData (takenLibJL4, takenMainJL4, takenMainAloneJL4, takenLocalJL4)
 
 spec :: SpecWith ()
 spec = describe "integration" do
@@ -2292,6 +2293,41 @@ spec = describe "integration" do
           again <- callTool 3 0
           LBS.toStrict again `shouldSatisfy` (not . BS.isInfixOf loopMessage)
           LBS.toStrict again `shouldSatisfy` BS.isInfixOf "true"
+
+  -- smucclaw/l4-ide#1116, on the service's direct path. A deployment evaluates
+  -- the directives of its own files when it is compiled, on the evaluator
+  -- environment its imports gave it, and then hands that same environment to
+  -- every request ('Backend.Jl4.evaluateDirectAST'). The file here keeps a
+  -- #TRACE that commits `taken` and then reads the imported `taken now`; a
+  -- request for `closed now`, which is `taken now`, reads an empty ledger and
+  -- must answer FALSE, as it does when the rules are written in the file.
+  -- Three deployments of it, each under the clock free and under the clock
+  -- pinned (the unfixed evaluator showed the fault on `l4 run` only with the
+  -- clock pinned in some shapes): the imported rule beside the #TRACE, the
+  -- same without the #TRACE, and the rules written in one file. The answers
+  -- are compared as the service gives them.
+  describe "an imported rule that reads a ledger, beside the deployed file's own #TRACE" do
+    let askClosed deployId sources = withServiceFromSources deployId sources \baseUrl mgr -> do
+          resp <- evalFunction baseUrl mgr deployId "closed-now"
+            (Aeson.object ["arguments" Aeson..= Aeson.object []])
+          pure case (statusCode' resp, Aeson.decode (responseBody resp)) of
+            (200, Just (SimpleResponse r)) -> maybe "no value" show (Map.lookup "value" r.fnResult)
+            _ -> "status " <> show (statusCode' resp) <> ": " <> show (responseBody resp)
+        clocks = [("the clock free", Nothing), ("the clock pinned", Just "2025-01-31T15:45:30Z")]
+
+    for_ clocks \(clockName, clock) ->
+      it ("answers as the same rules written in the file do, " <> clockName) do
+        withFixedNow clock do
+          imported <- askClosed "taken-imported" [("taken.l4", takenLibJL4), ("closed.l4", takenMainJL4)]
+          alone <- askClosed "taken-alone" [("taken.l4", takenLibJL4), ("closed.l4", takenMainAloneJL4)]
+          local <- askClosed "taken-local" [("closed.l4", takenLocalJL4)]
+          [ ("imported, with the file's #TRACE", imported)
+            , ("imported, without it", alone)
+            , ("written in the file", local) ]
+            `shouldBe`
+            ([ ("imported, with the file's #TRACE", "FnLitBool False")
+             , ("imported, without it", "FnLitBool False")
+             , ("written in the file", "FnLitBool False") ] :: [(String, String)])
 
   -- U7b: the report a response carries is never left to be guessed. Until
   -- build step 6 adds the others it is always the default one.
@@ -7531,6 +7567,16 @@ withEmptyService' act = withStoreDir "empty" \tmpPath -> do
     let baseUrl = "http://localhost:" <> show port
     result <- act baseUrl mgr
     pure result
+
+-- | Run an action with @JL4_FIXED_NOW@ set to the given instant, or unset, and
+-- put back as it was. The deployment and the requests of a service in this
+-- process read it, whenever they build an evaluator configuration.
+withFixedNow :: Maybe String -> IO a -> IO a
+withFixedNow clock act = bracket (lookupEnv name) restore \_ -> set clock >> act
+  where
+    name = "JL4_FIXED_NOW"
+    set = maybe (unsetEnv name) (setEnv name)
+    restore = set
 
 -- | Evaluate a function via the API.
 evalFunction :: String -> Manager -> Text -> Text -> Aeson.Value -> IO (Response LBS.ByteString)
