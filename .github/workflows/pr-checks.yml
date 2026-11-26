@@ -1302,7 +1302,15 @@ jobs:
       # that shows the retry passes a transient failure and never turns a
       # persistent one into a pass, since neither can be made to happen on
       # demand against the real Central.
+      #
+      # `timeout-minutes` is on this step because the selftest kills hung stubs,
+      # and a regression in that very code (the KILL escalation) would leave it
+      # waiting on one. This workflow sets no `timeout-minutes` anywhere, so the
+      # step would otherwise run until GitHub's default job limit of 360 minutes.
+      # Five minutes is about ten times its normal run, and makes that failure
+      # loud and short.
       - name: Selftest, the Maven resolution retry
+        timeout-minutes: 5
         run: etc/mvn-retry.selftest.sh
 
       - name: Drools/KIE 8.44.0.Final
