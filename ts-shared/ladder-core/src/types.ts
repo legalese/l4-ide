@@ -292,8 +292,7 @@ export interface ViewSpec {
   /**
    * Draw the decision's own NAME as a terminal box immediately before the sink,
    * so the diagram reads the way a Layman Allen normalised diagram does: leftmost
-   * node the subject, rightmost node the consequent (Woon, *Essential Criminal
-   * Law* ch 8 — "Offender" at the left margin, "Commits Robbery" at the right).
+   * node the subject, rightmost node the consequent.
    *
    * Default **false**, and that is the whole reason this is a knob rather than a
    * change: every existing figure, golden and test keeps its current geometry.

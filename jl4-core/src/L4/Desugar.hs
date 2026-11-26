@@ -7,6 +7,8 @@ module L4.Desugar (
   --
   desugarComputedFields,
   detectComputedFieldCycles,
+  detectTypicallyOnComputedFields,
+  detectMeansOnAlternativeFields,
   extractComputedFieldNames,
   -- * Field opening (R5)
   --
@@ -851,6 +853,48 @@ detectCFCDeclare (MkDeclare _ _ appForm (RecordDecl _ _ tns))
         ]
     in [ (recordName, cyc) | CyclicSCC cyc <- stronglyConnComp graphData ]
 detectCFCDeclare _ = []
+
+-- | A computed field (one with a @MEANS@ clause) that also declares a
+-- @TYPICALLY@. Returns each such field, in source order.
+--
+-- A computed field is derived from the other fields, so a default for it could
+-- never be used: construction does not accept it (it is not supplied), the JSON
+-- boundary does not decode it, and the value always comes from the @MEANS@
+-- expression. TYPICALLY-ONE-BEHAVIOUR-SPEC.md T1 makes the pair a check error
+-- rather than metadata that does nothing, now that a @TYPICALLY@ on any other
+-- field is a default a construction takes.
+--
+-- Read off the parsed module, because 'desugarComputedFields' moves the
+-- computed field out of its record, taking its @TYPICALLY@ with it.
+detectTypicallyOnComputedFields :: Module Name -> [Name]
+detectTypicallyOnComputedFields (MkModule _ _ section) = go section
+ where
+  go (MkSection _ _ _ _ topDecls) = concatMap top topDecls
+  top (Declare _ (MkDeclare _ _ _ (RecordDecl _ _ tns))) =
+    [ fn | MkTypedName _ fn _ (Just _) (Just _) <- tns ]
+  top (Section _ s) = go s
+  top _ = []
+
+-- | Find every payload field of an enum constructor that has a @MEANS@ clause.
+-- Returns each as its constructor and its field, in source order.
+--
+-- Only a record's field can be computed ('desugarComputedFields' moves it out of
+-- the record and defines it from the record's other fields). A constructor's
+-- payload is supplied when the constructor is applied, so a @MEANS@ there was
+-- accepted and never evaluated: @Rect OF 2, 5@ kept the 5 whatever the clause
+-- said. Lane C L7 (ruled 2026-10-12) makes it an error rather than
+-- metadata that does nothing, now that a @TYPICALLY@ on the same field is a
+-- default a construction takes.
+--
+-- Read off the parsed module, as 'detectTypicallyOnComputedFields' is.
+detectMeansOnAlternativeFields :: Module Name -> [(Name, Name)]
+detectMeansOnAlternativeFields (MkModule _ _ section) = go section
+ where
+  go (MkSection _ _ _ _ topDecls) = concatMap top topDecls
+  top (Declare _ (MkDeclare _ _ _ (EnumDecl _ cds))) =
+    [ (con, fn) | MkConDecl _ con tns <- cds, MkTypedName _ fn _ _ (Just _) <- tns ]
+  top (Section _ s) = go s
+  top _ = []
 
 -- | Extract field name references from a MEANS expression.
 -- Uses the 'Foldable' instance on 'Expr' to collect all names, then

@@ -1,0 +1,5 @@
+IMPORT rb
+
+foo MEANS 1
+
+#EVAL foo

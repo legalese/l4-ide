@@ -146,9 +146,9 @@ const sceneCourtBelow = layout(
 const sceneAppl = layout(fn, defaultViewSpec({ states: applicantStates }), tm);
 // HEAD-AS-SINK (opt-in). `LADDER_HEAD_AS_SINK=1 npx tsx demo/s415.ts` also writes the
 // `-head` variant: the same scene with the decision's own name — "is said to cheat
-// (second limb)" — boxed as the rightmost node, the way Woon's normalised diagrams name
-// their consequent. Off by default, so the eight figures above are byte-identical to
-// what this demo has always written.
+// (second limb)" — boxed as the rightmost node, the way a Layman Allen normalised
+// diagram names its consequent. Off by default, so the eight figures above are
+// byte-identical to what this demo has always written.
 const HEAD_AS_SINK = process.env.LADDER_HEAD_AS_SINK === "1";
 const sceneCourtHead = layout(
   fn,

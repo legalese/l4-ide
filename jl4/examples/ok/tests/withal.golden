@@ -1,0 +1,43 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+withal.l4:24:1-20:
+  Paint OF Red, NOTHING, "plain", FALSE, 2
+withal.l4:25:1-29:
+  Red
+withal.l4:26:1-27:
+  NOTHING
+withal.l4:27:1-28:
+  "plain"
+withal.l4:28:1-27:
+  FALSE
+withal.l4:29:1-28:
+  2
+withal.l4:33:1-118:
+  assertion satisfied
+withal.l4:34:1-53:
+  assertion satisfied
+withal.l4:35:1-72:
+  assertion satisfied
+withal.l4:38:1-59:
+  assertion satisfied
+withal.l4:39:1-54:
+  assertion satisfied
+withal.l4:47:1-43:
+  assertion satisfied
+withal.l4:52:1-86:
+  assertion satisfied
+withal.l4:59:1-50:
+  assertion satisfied
+withal.l4:60:1-48:
+  assertion satisfied
+withal.l4:61:1-46:
+  assertion satisfied
+withal.l4:72:1-38:
+  assertion satisfied
+withal.l4:73:1-40:
+  assertion satisfied
+withal.l4:82:1-35:
+  assertion satisfied
+withal.l4:88:1-24:
+  assertion satisfied

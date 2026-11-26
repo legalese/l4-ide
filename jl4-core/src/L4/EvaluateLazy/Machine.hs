@@ -70,6 +70,7 @@ module L4.EvaluateLazy.Machine
 , Presumed (..)
 , PresumedOrigin (..)
 , PresumedLog
+, presumedOwner
 , emptyPresumedLog
 , presumedEvents
 , renderPresumedPath
@@ -638,16 +639,26 @@ data EvalState =
       -- Each run gets its own registry ('L4.EvaluateLazy' builds a fresh
       -- 'EvalState' per evaluation), so concurrent requests share none of it.
       --
-      -- Known gap: a reader that peeks at a thunk without 'evalRef'
-      -- ('peekWHNF', 'peekNF'; the deontic machinery's reads of a party) sees
-      -- a decoder-filled default, which is a value from birth, without
-      -- reporting it.
+      -- Known gap: a reader that peeks at a thunk without 'evalRef' ('peekWHNF',
+      -- 'peekNF', 'peekName') sees a decoder-filled default, which is a value
+      -- from birth, without reporting it. The peeks feed only the deontic log and
+      -- a note's wording: the answer forces an event's party and action.
     , recordDefaults :: Map Unique (Map Text (Expr Resolved))
       -- ^ Each record type's field defaults, keyed by the type's 'Unique' and
       -- then by field name, from the @DECLARE@s of the evaluated module and of
       -- whatever modules the caller passed beside it. The JSON decoder fills an
       -- absent field from here (T1b). Static for the run, and deliberately
       -- lazy: only a run that decodes JSON pays for walking the modules.
+    , recordOwners :: Map Unique Text
+      -- ^ How a decode the rules make names a record type that is declared
+      -- under a section heading in the evaluated module: the type's declared
+      -- name behind its headings, spelled and quoted as the owner of a @WITH@
+      -- default is ('presumedOwner'), keyed by the type's 'Unique'. It is what
+      -- @JSONDECODE T: path@ in @presumed@ names, whatever spelling the decode
+      -- site used for the type. A type declared at the top of the module, or
+      -- in an imported module, is not here and is named as the site spelled it
+      -- (decision O6, assumed: the headings of an imported module do not
+      -- reach the evaluator). Static for the run, and lazy like 'recordDefaults'.
     , presumed :: !(IORef PresumedLog)
       -- ^ The defaults that took effect during this directive, in the order
       -- they were forced: W8's \"took its default\" event. Per directive,
@@ -703,8 +714,33 @@ data PresumedOrigin
   | FromDecode !Text
     -- ^ A field of a decode the RULES made, filled the same way; the text is
     -- the type that decode started from.
+  | FromNamedApp !Text
+    -- ^ An input or field a named application left out and the checker filled
+    -- from its @TYPICALLY@ ('DefaultFill'): W4 for a rule's inputs, W5 for a
+    -- record's fields. The text is the rule or record constructor the site
+    -- applies. The path is the one input or field.
   deriving stock (Eq, Ord, Show, Generic)
   deriving anyclass NFData
+
+-- | How the owner of a default reads in a @presumed@ entry: the way L4 writes
+-- the name in source ('L4.Print.quoteIfNeeded'), so that an entry can be split
+-- back into its parts and two different names do not print alike. A name
+-- behind the headings it is declared under is spelled as L4 spells a qualified
+-- name in an ambiguity error and when it prints source: each part that L4
+-- would write in backticks has them, so a heading with a space or a dot
+-- (@Part 1. Fees@) stays one part. A name with no heading in front of it is
+-- quoted the same way, so a top-level rule called @Pricing.scaled@ prints as
+-- @`Pricing.scaled`@ and not as the rule @scaled@ under @§ Pricing@.
+-- Two declarations with the same name under the same sections print the same
+-- entry: the entry names the sections, not the file, so the same name in two
+-- imported files shares one, and a @WHERE@ or @LET@ local, which is named
+-- bare, shares one with a top-level rule of that name.
+-- Assumed, not ruled: card O6 (ruled 2026-10-11) says the headings are named,
+-- and not how they are quoted.
+presumedOwner :: RawName -> Text
+presumedOwner = \ case
+  q@QualifiedName{} -> prettyLayout q
+  other             -> quoteIfNeeded (rawNameToText other)
 
 -- | Report a default that took effect ('EvalState.presumed'), once.
 tellPresumed :: Presumed -> Eval ()
@@ -799,9 +835,12 @@ type Machine = Eval
 -- allocation limit, a cancelled thread, a Haskell crash) leaves the frame
 -- stack as it was, because only 'raiseException' unwinds it; so the frames
 -- still on it are unwound here, and a thunk whose force was interrupted gets
--- its blackhole mark back ('unwindFrame'). Thunks of imported modules outlive
+-- its blackhole mark back ('unwindFrame'). Thunks of imported modules outlived
 -- the run, and a mark left on one made the next run on the same thread report
--- an infinite loop (smucclaw/l4-ide#1020).
+-- an infinite loop (smucclaw/l4-ide#1020). A directive now forces a copy of
+-- them ('L4.EvaluateLazy.forEachDirectiveFreshHeap', smucclaw/l4-ide#1116), so
+-- the mark lands on a copy; the unwinding stays for a force that reaches a heap
+-- some other way, such as 'L4.EvaluateLazy.evalExprForLedgerWithEnv'.
 --
 -- The unwinding is uninterruptible, so a second exception cannot cut it
 -- short, and it is cheap for the same reason: one walk over the frame list,
@@ -1452,7 +1491,9 @@ plainStep clock ev scrutiny norm outcome = MkDeonticStep
 -- An allocation limit or a timeout that landed between the pop and
 -- 'unwindFrame' lost the frame: 'runEval' only unwinds the frames still on the
 -- stack, so an 'UpdateThunk' popped but not yet unwound left its thunk
--- blackholed, which for an imported thunk is smucclaw/l4-ide#1020 again.
+-- blackholed, which for an imported thunk was smucclaw/l4-ide#1020 again (a
+-- directive now forces a copy of one, smucclaw/l4-ide#1116, and the same holds
+-- of a heap a host forces directly).
 -- Between frames the mask is off, so a limit landing there finds the next
 -- frame still on the stack, and 'runEval' unwinds it. The mask is only on this
 -- exception path, so evaluation that raises nothing pays nothing.
@@ -3040,6 +3081,14 @@ forwardExpr env = \ case
     -- Money OF ...". An argument is never in this position -- arguments are
     -- allocated, not forwarded -- so an 'App1' carrying arguments on top of the
     -- stack means this reference is the function of that application.
+    --
+    -- An operand of RAND or ROR is evaluated in this position too: the compound
+    -- pushes the 'App1' that gives it the time and the events. So an imported
+    -- rule that reads a section GIVEN and returns a contract, written directly
+    -- as such an operand, is still not applied to its own cell here and stops
+    -- with "given signatures' values' lengths do not match"
+    -- (smucclaw/l4-ide#1115; the same before 'allocate_' applied one). The two
+    -- uses of this 'App1' cannot be told apart from here.
     beingApplied <- topFrameAppliesArguments
     -- A bare JSONDECODE in value position, passed as a function, decodes at
     -- the type its own reference was checked at ('jsonDecodeTargetOfReference').
@@ -3091,7 +3140,19 @@ forwardExpr env = \ case
         let expectedType = case getAnno ann of
               Anno {extra = Extension {resolvedInfo = Just (TypeInfo ty _)}} -> Just ty
               _ -> Nothing
-        rs <- traverse (`allocate_` env) es
+        rs <- traverse (allocateArgument env) es
+        -- An argument the checker added from a TYPICALLY default
+        -- ('DefaultFill') reports itself when it is first forced, like every
+        -- other default that takes effect ('registerPresumable'). It has a
+        -- cell of its own ('allocateArgument'), so what is registered is this
+        -- default and nothing else.
+        for_ (zip es rs) \ (e, rf) ->
+          for_ (exprDefaultFill e) \ fill ->
+            registerPresumable rf MkPresumed
+              { path       = [rawNameToText fill.binder]
+              , declaredAt = fill.declaredAt
+              , origin     = FromNamedApp (presumedOwner fill.owner)
+              }
         pushFrame (App1 rs expectedType)
         -- Re-enter as a 'Var'. That extra 'ForwardMachine' step is what the
         -- evaluation tracer records as the function being entered, so short-
@@ -6656,10 +6717,16 @@ data DecodeAt = MkDecodeAt
 decodeRoot :: Type' Resolved -> Machine DecodeAt
 decodeRoot ty = do
   rr <- asks (.requestRecord)
+  owners <- asks (.recordOwners)
   let isRequest = case (rr, ty) of
         (Just r, TyApp _ tyRef []) -> nameToText (TypeCheck.getName tyRef) == r
         _                          -> False
-  pure (MkDecodeAt (prettyLayout ty) [] isRequest)
+      -- a record declared under a heading is named behind it, as a WITH default
+      -- is, whichever way the decode site spelled the type
+      root = case ty of
+        TyApp _ tyRef [] | Just owner <- Map.lookup (getUnique tyRef) owners -> owner
+        _                                                                    -> prettyLayout ty
+  pure (MkDecodeAt root [] isRequest)
 
 -- | @ for field 'a.b'@, or nothing at the root of the decode.
 atField :: DecodeAt -> Text
@@ -6680,8 +6747,8 @@ renderPresumedPath = Text.concat . go True
 
 -- | The value of a @TYPICALLY@ default, which is a literal ('L4.TypeCheck.isTypicallyLiteral'):
 -- a number, a string, or a nullary constructor. 'Nothing' for anything else,
--- which the checker does not admit today; R8 rule 3 (expression defaults, W7)
--- will need an environment here.
+-- which the checker does not admit: HAIRCUT (2026-10-12) ruled that a default
+-- is a literal, so expression defaults (R8 rule 3, W7) are withdrawn.
 typicallyLiteralValue :: Expr Resolved -> Maybe WHNF
 typicallyLiteralValue = \ case
   Lit _ (NumericLit _ r) -> Just (ValNumber r)
@@ -6994,7 +7061,7 @@ jsonListToWHNFTyped at = go (0 :: Int)
         SuppliedNull spelling
           | isMaybeFieldTy elementType -> pure (ValConstructor TypeCheck.nothingRef [])
           | otherwise -> userException $ UserError $
-              "Field '" <> renderPresumedPath elementAt.fieldPath <> "' " <> nullRefusalText spelling False
+              "Field '" <> renderPresumedPath elementAt.fieldPath <> "' " <> nullRefusalText spelling NoDefaultToTake
         _ -> jsonValueToWHNFTyped elementAt x elementType
       headRef <- allocateValue headVal
       tailVal <- go (i + 1) xs elementType
@@ -8469,6 +8536,21 @@ preAllocate ns = do
   pairs <- traverse preAllocateRef ns
   pure (Map.fromList pairs)
 
+-- | Allocate the cell of one argument of an application.
+--
+-- A default the checker added ('DefaultFill') always gets a cell of its own,
+-- even when it is a bare constructor (@TRUE@, @NOTHING@, an enum value).
+-- 'allocate_' would hand such an argument the one cell every use of that
+-- constructor shares, and 'registerPresumable' would then mark that shared
+-- cell: every later force of @FALSE@ anywhere in the run would report the
+-- default, whether or not the rule read it, and two defaults that are the same
+-- constructor would take the one registry slot between them. A numeric or
+-- string default was never affected, because a literal always gets a cell.
+allocateArgument :: Environment -> Expr Resolved -> Machine Reference
+allocateArgument env e
+  | isJust (exprDefaultFill e) = fst <$> allocateRecursive e (const env)
+  | otherwise                  = allocate_ e env
+
 allocate_ :: Expr Resolved -> Environment -> Machine Reference
 allocate_ (Var ann n) env = do
   -- An argument that is a bare JSONDECODE, as in @map JSONDECODE xs@, gets
@@ -8478,19 +8560,29 @@ allocate_ (Var ann n) env = do
   case target of
     Just ty -> allocateValue (ValUnaryBuiltinFun (UnaryJsonDecodeAt ty))
     Nothing ->
-      -- special case where we do not actually need to allocate
-      --
-      -- NOT extended to auto-apply a discharged import (see
-      -- 'dischargedImportClosure'). Allocating the application here instead of
-      -- sharing the cell fixes an operand-position reference across an IMPORT, but
-      -- it also fires on every RECORD CONSTRUCTOR: a @DECLARE@'s field names are
-      -- module-level selectors, so a constructor's parameters are keys in its own
-      -- captured environment exactly as a discharged reader's are, and the guard
-      -- cannot tell them apart. Measured 2026-09-05 on the sweep corpus:
-      -- @legal\/promissory-note.l4@ and @legal\/regcf\/regcf.l4@ both went red with
-      -- \"expected a function but found: Money OF ...\". See the operand-position
-      -- limitation recorded in IMPLICIT-PROPS-DESIGN.md.
-      expectTerm env n
+      -- special case where we do not actually need to allocate: the name's
+      -- own cell is the reference
+      do
+        r <- expectTerm env n
+        -- With one exception: a discharged import ('dischargedImportClosure').
+        -- Sharing its cell hands the consumer the CLOSURE where it asked for a
+        -- value, and 'forwardExpr', the only other place that applies one, is
+        -- not where every consumer looks. A built-in forces its operands with
+        -- 'continueRef' (@doubled PLUS 1@ was an internal error and
+        -- @doubled EQUALS 30@ compared a function); a list element or a record
+        -- field simply held the function; a rule's argument and a projection's
+        -- scrutinee passed it on to those (smucclaw/l4-ide#1115). So such a
+        -- reference gets a thunk of its own, @App n []@, which 'forwardExpr'
+        -- applies when it is forced, as it does for a bare @#EVAL doubled@.
+        --
+        -- The guard is the one 'autoApplyDischargedImport' and 'matchGivens''
+        -- use. A rule with inputs of its own, and a record constructor, each
+        -- passed on as a value, still fail it and stay functions
+        -- (ok/section-given-import-operand-call.l4).
+        discharged <- dischargedImportClosure r
+        if discharged
+          then fst <$> allocateRecursive (App ann n []) (const env)
+          else pure r
 allocate_ expr env =
   fst <$> allocateRecursive expr (const env)
 

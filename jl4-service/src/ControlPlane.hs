@@ -21,7 +21,7 @@ module ControlPlane (
 
 import qualified BundleStore
 import L4.FunctionSchema (Parameters (..))
-import Compatibility (FnIface, ifaceFromFunction, ifaceFromSummary, detectBreakingChanges)
+import Compatibility (FnIface, ifaceFromFunction, ifaceFromSummary, detectBreakingChanges, detectDefaultChanges)
 import Compiler (compileBundle, computeVersion)
 import qualified Version
 import DeploymentLoader (triggerCompilationIfPending)
@@ -100,6 +100,10 @@ data UpdateStatusResponse = UpdateStatusResponse
   , usDeploymentId :: !Text
   , usStatus       :: !Text   -- "compiling" | "applied" | "rejected"
   , usError        :: !(Maybe Text)
+  , usNotices      :: ![DefaultChange]
+  -- ^ Non-blocking notices: each published default the upload changed (U2
+  -- option B, 2026-11-17). Always rendered, @[]@ when there are none or the
+  -- job is still compiling; a rejection for a breaking change lists them too.
   }
   deriving stock (Show, Generic)
 
@@ -108,6 +112,7 @@ instance ToJSON UpdateStatusResponse where
     [ "updateId"     .= u.usUpdateId
     , "deploymentId" .= u.usDeploymentId
     , "status"       .= u.usStatus
+    , "notices"      .= u.usNotices
     ] <> maybe [] (\e -> ["error" .= e]) u.usError
 
 instance FromJSON UpdateStatusResponse where
@@ -117,6 +122,7 @@ instance FromJSON UpdateStatusResponse where
       <*> o Aeson..: "deploymentId"
       <*> o Aeson..: "status"
       <*> o Aeson..:? "error"
+      <*> (o Aeson..:? "notices" Aeson..!= [])
 
 -- | The control plane API for managing deployments.
 type ControlPlaneApi =
@@ -302,12 +308,16 @@ getUpdateStatusHandler deployIdText jobId = do
         { usUpdateId = jobId
         , usDeploymentId = j.ujDeploymentId
         , usStatus = case j.ujStatus of
-            JobCompiling  -> "compiling"
-            JobApplied    -> "applied"
-            JobRejected _ -> "rejected"
+            JobCompiling    -> "compiling"
+            JobApplied _    -> "applied"
+            JobRejected _ _ -> "rejected"
         , usError = case j.ujStatus of
-            JobRejected m -> Just m
-            _             -> Nothing
+            JobRejected m _ -> Just m
+            _               -> Nothing
+        , usNotices = case j.ujStatus of
+            JobApplied ns    -> ns
+            JobRejected _ ns -> ns
+            JobCompiling     -> []
         }
     _ -> throwError err404
 
@@ -444,26 +454,33 @@ runDeployJob env deployId jobId sourceMap storedMeta mDesc mGate = do
         setAllocationCounter compileMemLimitBytes
         enableAllocationLimit
         compileBundle env.logger deployId.unDeploymentId sourceMap
-      reject msg = do
+      reject notices msg = do
         logWarn env.logger "Deploy job rejected"
           [ ("deploymentId", toJSON deployId.unDeploymentId)
           , ("jobId", toJSON jobId)
           , ("reason", toJSON msg)
           ]
-        setJob env jobId (JobRejected msg)
+        setJob env jobId (JobRejected msg notices)
   mResult <- timeout compileTimeoutMicros compileLimited
     `catch` \AllocationLimitExceeded -> pure Nothing
   case mResult of
     Nothing ->
-      reject "Update rejected: compilation timed out or exceeded the memory limit"
+      reject [] "Update rejected: compilation timed out or exceeded the memory limit"
     Just (Left err) ->
-      reject ("Update rejected: compilation failed: " <> err)
+      reject [] ("Update rejected: compilation failed: " <> err)
     Just (Right (fns, meta0)) -> do
+      reg0 <- readTVarIO env.deploymentRegistry
       let newIfaces = map (ifaceFromFunction . (.fnImpl)) (Map.elems fns)
           breaking = maybe [] (`detectBreakingChanges` newIfaces) mGate
+          -- The interface a changed default is reported against: the gate's
+          -- (PUT), or, for the ungated POST that overwrites a deployment, what
+          -- the registry holds now. A brand-new deployment has none, so no
+          -- notice. Notices never block: only 'breaking' does (U2 option B).
+          mPrevIfaces = mGate <|> (currentIfaces =<< Map.lookup deployId reg0)
+          notices = maybe [] (`detectDefaultChanges` newIfaces) mPrevIfaces
       case breaking of
         (_:_) ->
-          reject $ "Update rejected — it would break existing integrations: "
+          reject notices $ "Update rejected — it would break existing integrations: "
                      <> Text.intercalate "; " breaking
         [] -> do
           -- Compute the deployment version from the previously-deployed
@@ -485,6 +502,8 @@ runDeployJob env deployId jobId sourceMap storedMeta mDesc mGate = do
               -- this deploy is breaking vs the previous interface (only
               -- reachable via the ungated POST/overwrite path — gated PUTs
               -- reject breaking changes above). First deploy → {major}.0.0.
+              -- a changed default ('notices') is not breaking: it does not
+              -- move the BREAKING counter (U2 option B, 2026-11-17)
               isBreaking = case mPrevMeta of
                 Nothing -> False
                 Just pm -> not (null (detectBreakingChanges
@@ -512,10 +531,11 @@ runDeployJob env deployId jobId sourceMap storedMeta mDesc mGate = do
                 ]
           atomically $ modifyTVar' env.deploymentRegistry $
             Map.insert deployId (DeploymentReady fns meta)
-          setJob env jobId JobApplied
+          setJob env jobId (JobApplied notices)
           logInfo env.logger "Deploy job applied"
             [ ("deploymentId", toJSON deployId.unDeploymentId)
             , ("jobId", toJSON jobId)
+            , ("defaultsChanged", toJSON (length notices))
             ]
 
 -- ----------------------------------------------------------------------------

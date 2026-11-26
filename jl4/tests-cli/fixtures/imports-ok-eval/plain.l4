@@ -1,0 +1,4 @@
+-- Uses nothing from lib.
+IMPORT lib
+
+#EVAL 1 PLUS 1

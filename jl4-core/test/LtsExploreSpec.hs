@@ -1386,6 +1386,15 @@ spec = describe "l4 explore" do
         coverageComplete g.gCoverage `shouldBe` False
         coverageLine g.gCoverage `shouldSatisfy` Text.isInfixOf "not a whole number"
         filter hasFraction [ l | t <- g.gTransitions, let l = t.tnLabel, "DOES" `Text.isInfixOf` l ] `shouldBe` []
+      it "a deadline that is not a whole number: the line says what is tried by default and under --grid, not that only whole instants are" do
+        g <- exploreSrc halfSrc "half" regions []
+        let line = coverageLine g.gCoverage
+        line `shouldSatisfy` Text.isInfixOf "by default only whole instants, and the clock where it stands, are tried; --grid N tries the multiples of N"
+        line `shouldSatisfy` (not . Text.isInfixOf "and only whole instants are tried")
+      it "--grid 0.5 on the same deadline tries it: no fraction is named as left untried" do
+        g <- exploreSrc halfSrc "half" regions {eoTime = Grid (1 / 2)} []
+        coverageComplete g.gCoverage `shouldBe` True
+        coverageLine g.gCoverage `shouldSatisfy` (not . Text.isInfixOf "not a whole number")
       it "--grid 2 on a deadline that is not a multiple of 2 says so" do
         g <- exploreSrc clocks "clocks" regions {eoTime = Grid 2} []
         coverageComplete g.gCoverage `shouldBe` False

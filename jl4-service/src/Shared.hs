@@ -17,6 +17,11 @@ module Shared (
   sanitizePropertyName,
   sanitizePropertyNames,
   sanitizeParameters,
+  -- * The reserved presumption argument (MCP and WebMCP)
+  presumptionKey,
+  presumptionSchema,
+  presumptionCollision,
+  inputSanitizedTo,
   buildPropertyReverseMap,
   remapFnLiteralKeys,
   remapTraceKeys,
@@ -47,6 +52,7 @@ import qualified Data.ByteString.Lazy as LBS
 import Data.Char (isAlphaNum)
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import Data.Map.Strict (Map)
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -165,9 +171,12 @@ encodeMetadataCache meta =
 
 -- | Raw property name sanitization: replaces special characters with hyphens
 -- and collapses consecutive hyphens. Does NOT truncate.
--- Preserves alphanumeric, underscore, and hyphen — matches Anthropic's
--- tool/property name regex `^[a-zA-Z0-9_-]{1,64}$` (no dots allowed,
--- even though MCP spec is more permissive).
+-- Preserves what 'isAlphaNum' preserves (any Unicode letter or number),
+-- underscore, and hyphen; dots are replaced, though the MCP spec allows them.
+-- That is wider than Anthropic's tool/property name regex
+-- `^[a-zA-Z0-9_-]{1,64}$`, which a name with a non-ASCII letter does not match.
+-- The WebMCP script's sanitiser keeps the same set (the tables of the engine
+-- decide what a letter is, and they are not the same in GHC and in a browser).
 -- Used for structural collision detection (so "foo bar" vs "foo-bar" still collide).
 sanitizePropertyNameRaw :: Text -> Text
 sanitizePropertyNameRaw name =
@@ -266,6 +275,41 @@ sanitizeParameterValue p =
         Just items -> Aeson.KeyMap.insert "items" (sanitizeParameterValue items) withProps
         Nothing -> withProps
   in Aeson.Object withItems
+
+-- | The reserved argument that sets the presumption (U3 option A, bench ruling
+-- 2026-11-17): the same name and values as @/evaluation@ and @l4 batch@.
+presumptionKey :: Text
+presumptionKey = "presumption"
+
+-- | What @tools/list@ advertises for 'presumptionKey', on every function tool.
+presumptionSchema :: Aeson.Value
+presumptionSchema = Aeson.object
+  [ "type" .= ("string" :: Text)
+  , "enum" .= (["soft", "hard"] :: [Text])
+  , "description" .= (Text.unwords
+      [ "Optional. What to do with an input you leave out that the rule gives a default (TYPICALLY)."
+      , "\"soft\" (the default): the rule uses its default, and the answer lists it under \"presumed\"."
+      , "\"hard\": nothing is assumed for you, and a call that leaves out an input the rule needs is refused, naming it."
+      , "Send \"hard\" when the answer must rest only on what you were told."
+      ] :: Text)
+  ]
+
+-- | The input of a rule whose name, as @tools/list@ advertises it, is
+-- 'presumptionKey': the name the switch would be shadowed by. Tested on the
+-- sanitized name (the one a client sends), so @presumption@ and a name that
+-- sanitizes to it, such as @presumption@ with a trailing space, both match.
+presumptionCollision :: Parameters -> Maybe Text
+presumptionCollision = inputSanitizedTo presumptionKey
+
+-- | The input of a rule that a tool lists under the given name: the rule's own
+-- spelling of the input whose sanitized name is it, if any. A tool is called with
+-- the sanitized names, so a question of whether a key of a call is one of the
+-- rule's inputs is asked of these and not of the rule's own spellings (an input
+-- called @arguments?@ is the key @arguments@).
+inputSanitizedTo :: Text -> Parameters -> Maybe Text
+inputSanitizedTo name (MkParameters props _) =
+  Maybe.listToMaybe
+    [ orig | (orig, san) <- Map.toList (sanitizePropertyNames (Map.keys props)), san == name ]
 
 -- | Build a reverse mapping from sanitized property names back to original L4 names.
 -- Recursively includes entries from nested object properties and array items,

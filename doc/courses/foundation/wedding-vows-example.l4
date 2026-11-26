@@ -25,12 +25,14 @@ GIVETH A DEONTIC Person Action
         LEST BREACH BY Spouse2 BECAUSE "failed to exchange vows"
     LEST BREACH BY Spouse1 BECAUSE "failed to exchange vows"
 
--- "To love and to cherish": two obligations that hold at the same time
+-- "To love and to cherish": two obligations that hold at the same time.
+-- The vow sets no deadline, so there is no LEST: with no WITHIN, time alone
+-- could never reach one.
 GIVETH A DEONTIC Person Action
 `love obligation` MEANS
-    (PARTY Spouse1 MUST `love and cherish` HENCE FULFILLED LEST BREACH BY Spouse1)
+    (PARTY Spouse1 MUST `love and cherish` HENCE FULFILLED)
     RAND
-    (PARTY Spouse2 MUST `love and cherish` HENCE FULFILLED LEST BREACH BY Spouse2)
+    (PARTY Spouse2 MUST `love and cherish` HENCE FULFILLED)
 
 -- "Forsaking all others": two prohibitions
 GIVETH A DEONTIC Person Action

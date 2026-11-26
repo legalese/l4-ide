@@ -1,0 +1,246 @@
+{
+  "description": "Cases for the redeploy check on a changed default (bench card U2, option B: a changed default is accepted and reported, never blocked). Each case gives the old and new parameter schema of one exported function (JSON Schema subset: type, properties, required, items, enum, default) and what the check must return: breaking[] (blocks a PUT) and notices[] (non-blocking, reported before and after the deploy). One notice per changed default. A notice is {kind, function, input, old, new}; input is the dotted path of the input (a record field is cfg.retries). A default present on only one side is not a change (adding is compatible; removing makes the input required and is already breaking by the existing rule). The BREAKING counter does not move for a notice.",
+  "cases": [
+    {
+      "name": "default changed 0 to 1",
+      "function": "the smaller of",
+      "old": {
+        "type": "object",
+        "properties": {
+          "a": { "type": "number" },
+          "b": { "type": "number", "default": 0 }
+        },
+        "required": ["a"]
+      },
+      "new": {
+        "type": "object",
+        "properties": {
+          "a": { "type": "number" },
+          "b": { "type": "number", "default": 1 }
+        },
+        "required": ["a"]
+      },
+      "expect": {
+        "breaking": [],
+        "notices": [
+          {
+            "kind": "default-changed",
+            "function": "the smaller of",
+            "input": "b",
+            "old": 0,
+            "new": 1
+          }
+        ]
+      }
+    },
+    {
+      "name": "unchanged default",
+      "function": "the smaller of",
+      "old": {
+        "type": "object",
+        "properties": {
+          "a": { "type": "number" },
+          "b": { "type": "number", "default": 0 }
+        },
+        "required": ["a"]
+      },
+      "new": {
+        "type": "object",
+        "properties": {
+          "a": { "type": "number" },
+          "b": { "type": "number", "default": 0 }
+        },
+        "required": ["a"]
+      },
+      "expect": { "breaking": [], "notices": [] }
+    },
+    {
+      "name": "default added (input becomes optional): compatible, no notice",
+      "function": "the smaller of",
+      "old": {
+        "type": "object",
+        "properties": { "a": { "type": "number" }, "b": { "type": "number" } },
+        "required": ["a", "b"]
+      },
+      "new": {
+        "type": "object",
+        "properties": {
+          "a": { "type": "number" },
+          "b": { "type": "number", "default": 0 }
+        },
+        "required": ["a"]
+      },
+      "expect": { "breaking": [], "notices": [] }
+    },
+    {
+      "name": "default removed (input becomes required): breaking by the existing rule, no notice",
+      "function": "the smaller of",
+      "old": {
+        "type": "object",
+        "properties": {
+          "a": { "type": "number" },
+          "b": { "type": "number", "default": 0 }
+        },
+        "required": ["a"]
+      },
+      "new": {
+        "type": "object",
+        "properties": { "a": { "type": "number" }, "b": { "type": "number" } },
+        "required": ["a", "b"]
+      },
+      "expect": {
+        "breaking": ["the smaller of parameter b is now required"],
+        "notices": []
+      }
+    },
+    {
+      "name": "old side carries no default key (cached metadata from an older service): unknown, no notice",
+      "function": "the smaller of",
+      "old": {
+        "type": "object",
+        "properties": { "a": { "type": "number" }, "b": { "type": "number" } },
+        "required": ["a"]
+      },
+      "new": {
+        "type": "object",
+        "properties": {
+          "a": { "type": "number" },
+          "b": { "type": "number", "default": 1 }
+        },
+        "required": ["a"]
+      },
+      "expect": { "breaking": [], "notices": [] }
+    },
+    {
+      "name": "record field default changed, reported by its path",
+      "function": "run job",
+      "old": {
+        "type": "object",
+        "properties": {
+          "cfg": {
+            "type": "object",
+            "properties": { "retries": { "type": "number", "default": 3 } },
+            "required": []
+          }
+        },
+        "required": ["cfg"]
+      },
+      "new": {
+        "type": "object",
+        "properties": {
+          "cfg": {
+            "type": "object",
+            "properties": { "retries": { "type": "number", "default": 5 } },
+            "required": []
+          }
+        },
+        "required": ["cfg"]
+      },
+      "expect": {
+        "breaking": [],
+        "notices": [
+          {
+            "kind": "default-changed",
+            "function": "run job",
+            "input": "cfg.retries",
+            "old": 3,
+            "new": 5
+          }
+        ]
+      }
+    },
+    {
+      "name": "enum default changed (a constructor name)",
+      "function": "pick colour",
+      "old": {
+        "type": "object",
+        "properties": {
+          "c": {
+            "type": "string",
+            "enum": ["Green", "Red"],
+            "default": "Green"
+          }
+        },
+        "required": []
+      },
+      "new": {
+        "type": "object",
+        "properties": {
+          "c": { "type": "string", "enum": ["Green", "Red"], "default": "Red" }
+        },
+        "required": []
+      },
+      "expect": {
+        "breaking": [],
+        "notices": [
+          {
+            "kind": "default-changed",
+            "function": "pick colour",
+            "input": "c",
+            "old": "Green",
+            "new": "Red"
+          }
+        ]
+      }
+    },
+    {
+      "name": "a default change and an unrelated breaking change in one upload: the default is reported, the break still blocks",
+      "function": "the smaller of",
+      "old": {
+        "type": "object",
+        "properties": {
+          "a": { "type": "number" },
+          "b": { "type": "number", "default": 0 },
+          "z": { "type": "number" }
+        },
+        "required": ["a", "z"]
+      },
+      "new": {
+        "type": "object",
+        "properties": {
+          "a": { "type": "number" },
+          "b": { "type": "number", "default": 1 }
+        },
+        "required": ["a"]
+      },
+      "expect": {
+        "breaking": ["the smaller of parameter z removed"],
+        "notices": [
+          {
+            "kind": "default-changed",
+            "function": "the smaller of",
+            "input": "b",
+            "old": 0,
+            "new": 1
+          }
+        ]
+      }
+    },
+    {
+      "name": "input retyped (number to string): breaking by the existing rule, its default is not compared",
+      "function": "the smaller of",
+      "old": {
+        "type": "object",
+        "properties": {
+          "a": { "type": "number" },
+          "b": { "type": "number", "default": 0 }
+        },
+        "required": ["a"]
+      },
+      "new": {
+        "type": "object",
+        "properties": {
+          "a": { "type": "number" },
+          "b": { "type": "string", "default": "0" }
+        },
+        "required": ["a"]
+      },
+      "expect": {
+        "breaking": [
+          "the smaller of parameter b type changed from number to string"
+        ],
+        "notices": []
+      }
+    }
+  ]
+}

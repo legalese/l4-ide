@@ -54,9 +54,12 @@ executable jl4-repl
     directory,
     haskeline,
     hls-graph,
+    lsp,
     lsp-types,
     optparse-applicative,
     filepath,
+    stm,
     text,
+    text-rope,
     time,
   ghc-options: -threaded -rtsopts

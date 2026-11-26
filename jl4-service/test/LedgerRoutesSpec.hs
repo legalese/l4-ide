@@ -72,6 +72,8 @@ import Ledger.Store.Sqlite (ledgerFileName)
 import Logging (newLogger)
 import Options (Options (..), buildOpts)
 import TestStoreDir (withStoreDir)
+import TestData (takenLibJL4, takenMainAloneJL4, takenLocalAloneJL4)
+import IntegrationSpec (withFixedNow)
 import Types
 
 import L4.Ledger.Replay (Deployment (..))
@@ -85,6 +87,7 @@ spec = do
     guardSpec dinner
     restartSpec dinner
     limitSpec dinner
+  importedRuleSpec
 
 ----------------------------------------------------------------------------
 -- The service
@@ -449,3 +452,49 @@ restartSpec dinner = describe "a restart, with the sqlite default" do
         outcome <$> at s 65220 (propose s "dinner" "kept" "k4" buy) `shouldReturn` (200, Just "appended", Just 4)
         outcome <$> at s 65230 (propose s "dinner" "kept" "k3" bobBuys) `shouldReturn` (200, Just "appended", Just 3)
         fst <$> position s "dinner" "forgotten" `shouldReturn` 404
+
+----------------------------------------------------------------------------
+-- An imported rule that reads a ledger (smucclaw/l4-ide#1116)
+----------------------------------------------------------------------------
+
+-- | The issue's contract, as an instance. The deployment that imports `taken
+-- now` and the deployment that has the same rules written in its one file are
+-- asked the same four things, and must answer them alike: create the instance,
+-- propose @go skip@, read the position, then propose @buy@, which `taken` passes
+-- over (the step commits nothing, where a @buy@ that took would commit
+-- @taken@ a second time).
+--
+-- A guard, not a repair: the unfixed service answers these alike too, under the
+-- clock free and under the clock pinned (measured 2026-11-26), and so does the
+-- fixed one. It does not show whether the replays of one call share the
+-- imports' environment, and this sequence is not one that could. A call
+-- builds its own environment of the imports ('L4.Ledger.Replay.check'), so no
+-- call meets what an earlier one worked out; the rows and then the rows with
+-- the act are replayed on one environment, and each of them reads `taken now` at
+-- the ledger the rows left (read from "L4.Ledger.Replay", not measured), so what
+-- the first replay worked out is what the second would. A contract whose rows
+-- read an imported rule at a ledger that the act then changes would be needed,
+-- and none is written here.
+importedRuleSpec :: Spec
+importedRuleSpec = describe "an instance of a contract that reads an imported rule that reads a ledger (smucclaw/l4-ide#1116)" do
+  let ask name sources = withStoreDir ("ledger-routes-imported-" <> name) \ dir -> do
+        clk <- newIORef 0
+        withService dir clk [(Text.pack name, Map.fromList sources)] \ s -> do
+          let dep = Text.pack name
+              path = "/deployments/" <> name <> "/instances"
+              propose' k act = request s "POST" (path <> "/i1/events") (Just (Aeson.object
+                [ "party" Aeson..= ("Bob" :: Text), "action" Aeson..= (act :: Text), "idempotencyKey" Aeson..= (k :: Text) ]))
+          created <- at s 0 (request s "POST" path (Just (Aeson.object ["instance" Aeson..= ("i1" :: Text), "contract" Aeson..= ("`start`" :: Text)])))
+          skipped <- at s 1 (propose' "k1" "go skip")
+          mid <- position s dep "i1"
+          bought <- at s 2 (propose' "k2" "buy")
+          end <- position s dep "i1"
+          pure (map (\ (c, v) -> (c, summary v)) [created, skipped, mid, bought, end])
+      summary v = [ (k, field k v) | k <- ["result", "applied", "head", "seq", "wrote", "ledger", "commits", "terminal", "because"] ]
+      clocks = [("the clock free", Nothing), ("the clock pinned", Just "2025-01-31T15:45:30Z")]
+  for_ clocks \ (clockName, clock) ->
+    it ("answers as the same rules written in the contract's file do, " <> clockName) do
+      withFixedNow clock do
+        imported <- ask "imported" [("closed.l4", takenMainAloneJL4), ("taken.l4", takenLibJL4)]
+        local <- ask "local" [("closed.l4", takenLocalAloneJL4)]
+        imported `shouldBe` local

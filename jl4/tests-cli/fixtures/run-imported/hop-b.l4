@@ -1,0 +1,9 @@
+-- Imported by hop-via.l4 and hop-both.l4: a rule over `taken now` of taken.l4,
+-- a file one import further away, so the ledger-reading rule is two hops from
+-- the file that uses it (smucclaw/l4-ide#1116).
+
+IMPORT prelude
+IMPORT taken
+
+GIVETH A BOOLEAN
+`shop is closed` MEANS `taken now`

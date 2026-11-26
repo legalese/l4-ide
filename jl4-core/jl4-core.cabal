@@ -297,6 +297,8 @@ test-suite jl4-core-test
     OverloadScaleSpec
     YmdOwnDefinitionSpec
     CheckDirectiveResultsSpec
+    TraceFractionalStampSpec
+    LestWithoutDeadlineSpec
     ResolutionCascadeSpec
     RefAnnotationSpec
     NlgPercentSpec
@@ -315,6 +317,8 @@ test-suite jl4-core-test
     LedgerSubstrateSpec
     LedgerThunkCacheSpec
     InterruptedForceSpec
+    ImportedHeapFreshSpec
+    ApiImportsSpec
     RecordLedgerSpec
     LedgerRenderingSpec
     M4PartyLedgerSpec

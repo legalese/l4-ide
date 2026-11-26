@@ -1,6 +1,6 @@
 -- Reading through calls to other rules (specs/todo/WHERE-INLINING-SPEC.md §9).
 --
--- An exception, and an offence the exception defeats. A textbook draws this as
+-- An exception, and an offence the exception defeats. The exception reads as
 -- "[conditions] -> not an offence": the exception is SUFFICIENT for the offence
 -- not to be made out. `the arrow is broken` asks for both at once, so if the
 -- offence really is defeated by the exception it can never be true.

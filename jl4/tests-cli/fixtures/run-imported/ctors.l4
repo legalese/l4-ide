@@ -1,0 +1,14 @@
+-- smucclaw/l4-ide#1116. A guard on the repair, not on the fault: each
+-- directive reads imported rules over a copy of the imports' rules, and a rule
+-- of ctor-a.l4 or ctor-b.l4 must find the constructors its own file declares.
+-- The ledger is empty throughout, so `taken now` is FALSE and the answers are
+-- `ajar` and `raised`, in either order and however often they are asked.
+
+IMPORT prelude
+IMPORT `ctor-a`
+IMPORT `ctor-b`
+
+#EVAL `door`
+#EVAL `gate`
+#EVAL `door`
+#EVAL `gate`

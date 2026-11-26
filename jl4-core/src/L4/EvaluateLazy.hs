@@ -99,6 +99,7 @@ import L4.TracePolicy (TracePolicy)
 import Control.Exception (throwIO, try, evaluate, finally, catch, ErrorCall)
 import GHC.IO.Exception (AllocationLimitExceeded (..))
 import Data.Int (Int64)
+import System.Mem.StableName (StableName, hashStableName, makeStableName)
 import GHC.Conc (setAllocationCounter, enableAllocationLimit, disableAllocationLimit)
 import Data.Time (UTCTime, getCurrentTime)
 import qualified Data.Time.Format.ISO8601 as ISO8601
@@ -1226,7 +1227,7 @@ mkInitialEvalStateWith readsNormLog evalConfig entityInfo moduleUri = do
     , presume = evalConfig.presumeDefaults
     , requestRecord = evalConfig.requestRecord
       -- filled by 'withDefaultsKnown' for a module run
-    , presumableDefs = Map.empty, presumable, recordDefaults = Map.empty, presumed
+    , presumableDefs = Map.empty, presumable, recordDefaults = Map.empty, recordOwners = Map.empty, presumed
     , answerInJust = evalConfig.answerInJust, maxFrameDepth
     , tracePostprocessor = evalConfig.tracePostprocessor
     }
@@ -1257,6 +1258,7 @@ withDefaultsKnown :: EvalConfig -> RootFills -> Module Resolved -> [Declare Reso
 withDefaultsKnown evalConfig rootFills m imported st =
   st { presumableDefs = binderDefaults <> rootFills
      , recordDefaults = recordFieldDefaults (moduleDeclares m <> imported)
+     , recordOwners = declaredOwners m
      }
  where
   binderDefaults
@@ -1284,6 +1286,28 @@ moduleDeclares (MkModule _ _ sect) = goSection sect
     Section _ s -> goSection s
     _ -> []
 
+-- | The record types a module declares under a section heading, each with the
+-- name a decode the rules make reports for it ('EvalState.recordOwners'): the
+-- declared name behind the headings it sits under, written and quoted as the
+-- owner of a @WITH@ default is, by the same two functions
+-- ('TypeCheck.qualifiedOwner', 'presumedOwner'). Keyed by the type's 'Unique'.
+-- A type at the top of the module is left out, and is named as it always was.
+-- Only the module itself is walked: the @DECLARE@s of its imports arrive as a
+-- flat list that has lost its headings.
+declaredOwners :: Module Resolved -> Map Unique Text
+declaredOwners (MkModule _ _ sect) = Map.fromList (goSection [] sect)
+ where
+  goSection heads (MkSection _ mname _ _ decls) =
+    let heads' = heads <> [ rawNameToText (rawName (getActual n)) | Just n <- [mname] ]
+    in decls >>= goDecl heads'
+  goDecl heads = \ case
+    Declare _ (MkDeclare _ _ (MkAppForm _ tyName _ _) _)
+      | not (null heads) ->
+          [ ( getUnique tyName
+            , presumedOwner (rawName (TypeCheck.qualifiedOwner heads (getOriginal tyName))) ) ]
+    Section _ s -> goSection heads s
+    _ -> []
+
 -- | The field defaults of every record among some @DECLARE@s, keyed by the
 -- record type's 'Unique', then by field name. Only fields with a @TYPICALLY@
 -- appear.
@@ -1301,24 +1325,51 @@ recordFieldDefaults decls = Map.fromList
 -- evaluation forced: each as the input's name, or the path to a field below
 -- it. Shared by @l4 batch@ and the service.
 --
--- Only events that belong to the request count (T6b): a section binder's or a
--- root fill's for an input the function takes, and one from the request's own
--- decode. A decode the RULES made is not the request's, and is listed only
--- when presumption is hard (@presume@ False): there it is a default the switch
--- could not withdraw, because no request can supply it, and the answer rests
--- on it (T4b: "rests on presumed x"). It is written @JSONDECODE T: path@,
--- naming the type the rules decoded.
+-- Two kinds of event are listed. The request's own (T6b): a section binder's
+-- or a root fill's for an input the function takes, and one from the request's
+-- own decode. And the rules' own, which no request owns and the answer rests
+-- on: a decode the RULES made, and a default a named application took (below).
+-- Any other event is not listed.
+--
+-- A decode the RULES made, of JSON written in the rules or of text the
+-- request sent, is not the request's, and its defaults are listed in both
+-- presumption modes (O1 condition 3, DECODERRING, ruled 2026-10-11): the switch reaches
+-- the request's own decode only, and the answer rests on them (T4b: "rests on
+-- presumed x"). It is written @JSONDECODE T: path@, naming the record the rules
+-- decoded as it is declared: behind the section headings it sits under, as a
+-- @WITH@ default's owner is ('EvalState.recordOwners'), whichever way the
+-- decode site wrote the type. A record declared under a heading in an imported
+-- module is named bare.
+--
+-- A default a named application of the rules took (W4, W5) is a default no
+-- request could supply, and the answer rests on it just the same. It is listed
+-- in BOTH modes, as @WITH rule: input@ (O1, ruled
+-- 2026-10-11): R8 asks that every output name each parameter that took
+-- its default, and T4b that the mark cover every default that took effect,
+-- wherever filled. T6b's "keeps only those whose binder or JSON path is part of
+-- the request" is read, for these sites, as keeping the request's own inputs
+-- apart from the callee's, which the @WITH rule:@ prefix does: the binder of an
+-- input a rule leaves out at its own call is part of no request, and an entry
+-- for it is not an input's name. The trace still carries every event.
 --
 -- @fieldName@ maps a wrapper's own field name back to the input's (the service
 -- suffixes them, 'Backend.CodeGen.inputFieldName').
-requestPresumed :: Bool -> (Text -> Text) -> Set Text -> [Presumed] -> [Text]
-requestPresumed presume fieldName inputs events =
+requestPresumed :: (Text -> Text) -> Set Text -> [Presumed] -> [Text]
+requestPresumed fieldName inputs events =
   nubOrd (mapMaybe entry events)
  where
   entry p = case (p.origin, p.path) of
-    (FromDecode root, path)
-      | not presume -> Just ("JSONDECODE " <> root <> ": " <> renderPresumedPath path)
-      | otherwise   -> Nothing
+    (FromDecode root, path) ->
+      Just ("JSONDECODE " <> root <> ": " <> renderPresumedPath path)
+    -- A default a named application of the RULES took (W4, W5): no request
+    -- could supply it, so the switch does not withdraw it and the answer
+    -- rests on it, in either mode. Its binder is the callee's, not an input of
+    -- the request, so it must not fall through to the case below, where a
+    -- binder that shares an input's spelling would be listed as that input.
+    -- Written @WITH scaled: rate@ (the application, then the input), as a
+    -- rules' own decode is written @JSONDECODE T: path@.
+    (FromNamedApp callee, path) ->
+      Just ("WITH " <> callee <> ": " <> renderPresumedPath path)
     (_, n : rest)
       | fieldName n `Set.member` inputs -> Just (renderPresumedPath (fieldName n : rest))
     _ -> Nothing
@@ -1382,22 +1433,27 @@ evalModuleAndDirectivesWith runDirective env m = do
   -- First pass: get env' (the module's exported bindings) and the directive
   -- count/order for the return value.
   (env', directives0) <- evalModule baseEnv m
-  -- STATE-AS-LEDGER CAF ISOLATION: re-thunk the top-level heap per directive so a
-  -- nullary top-level definition that is forced (and memoized in its shared
-  -- Reference IORef) in directive N is Unevaluated again in directive N+1. This is
-  -- the heap analog of 'withFreshLedger': each directive evaluates the top-level
-  -- defs against fresh References, so an effectful read (RECALL) inside a CAF is
+  -- STATE-AS-LEDGER CAF ISOLATION: each directive gets its OWN heap, of the
+  -- module's top-level definitions AND of the imports' ('forEachDirectiveFreshHeap'),
+  -- so a nullary definition that is forced (and memoized in its Reference IORef)
+  -- in directive N is Unevaluated again in directive N+1. This is the heap
+  -- analog of 'withFreshLedger': an effectful read (RECALL) inside a CAF is
   -- re-run against that directive's own (isolated) ledger instead of returning a
-  -- value cached from whichever directive forced it first. See 'forEachDirectiveFreshHeap'.
-  results <- forEachDirectiveFreshHeap (\_ -> pure ()) runDirective baseEnv m (length directives0)
+  -- value cached from whichever directive forced it first. The imports' heap
+  -- 'env' is only ever COPIED, never forced: it is kept by the host between
+  -- evaluations (jl4-lsp's Shake cache), and an evaluation that forced it would
+  -- leave its answers to the next one (smucclaw/l4-ide#1116).
+  results <- forEachDirectiveFreshHeap (\_ -> pure ()) runDirective env baseEnv m (length directives0)
   -- NOTE: We are only returning the new definitions of this module, not any imports.
   -- Depending on future export semantics, this may have to change.
   pure (env', results)
 
--- | Run every directive of a module against its OWN freshly-allocated top-level
--- heap. We re-run 'evalModule' once per directive: each pass re-'preAllocate's a
--- fresh set of top-level References (all 'Unevaluated') and re-writes the body
--- thunks into them, then we normal-form just the i-th directive from THAT pass.
+-- | Run every directive of a module against its OWN freshly-allocated heap: its
+-- own top-level definitions, and a copy of the imports' ('freshImportsHeap').
+-- We re-run 'evalModule' once per directive, over that directive's copy of the
+-- imports: each pass re-'preAllocate's a fresh set of top-level References (all
+-- 'Unevaluated') and re-writes the body thunks into them, then we normal-form
+-- just the i-th directive from THAT pass.
 --
 -- Why this is correct and minimal:
 --   * Top-level definitions are stored as shared 'Reference' IORefs that the lazy
@@ -1406,9 +1462,18 @@ evalModuleAndDirectivesWith runDirective env m = do
 --     whose body performs an effectful read ('RECALL'), because its WHNF is not a
 --     pure function of the source — it depends on the per-directive ledger that
 --     'withFreshLedger' (correctly) resets. Re-thunking discards the stale WHNF.
+--   * That holds for a definition of an IMPORTED file as much as for one of the
+--     module's own: the imports' environment is allocated once per process (one
+--     per imported file, in jl4-lsp's Shake cache) and shared by every
+--     evaluation in it, so a directive that forced an imported rule left its
+--     answer to every later directive, and to every later evaluation of the
+--     file. Each directive therefore takes its own copy of the imports' heap
+--     and forces only that; the originals stay as they were allocated, unforced.
 --   * 'evalModule' forces nothing (it only allocates References and writes
 --     thunks), so re-running it per directive is side-effect-free except for heap
---     allocation and supply/address bumps; pure CAFs simply recompute (cheap).
+--     allocation and supply/address bumps. A constant is worked out again by
+--     each directive that reads it, at whatever it costs, imported or not:
+--     the price of a constant grows with the number of directives that read it.
 --   * 'nfDirective' still wraps each evaluation in 'withFreshLedger', so ledger
 --     isolation is unchanged.
 --
@@ -1418,22 +1483,126 @@ evalModuleAndDirectivesWith runDirective env m = do
 forEachDirectiveFreshHeap
   :: (Environment -> Eval ())     -- ^ per-pass preparation over the fresh combined env (e.g. JSON writes)
   -> (EvalDirective -> Eval r)    -- ^ how to run one directive ('nfDirective', or its step-logging form)
+  -> Environment                  -- ^ the imports' environment, allocated once and never forced here: each directive gets its own copy
   -> Environment                  -- ^ base env (imports <> initial environment), allocated once
   -> Module Resolved
   -> Int                          -- ^ number of directives (from the first pass)
   -> Eval [r]
-forEachDirectiveFreshHeap prepare runDirective baseEnv m n =
+forEachDirectiveFreshHeap prepare runDirective importsEnv baseEnv m n =
   for [0 .. n - 1] $ \i -> do
-    (moduleEnv, dirs) <- evalModule baseEnv m  -- fresh preAllocate => fresh IORefs => Unevaluated CAFs
-    prepare (moduleEnv <> baseEnv)
+    -- this directive's copy of the imports' heap, over the rest of the base env
+    let copyOf imports = imports <> baseEnv
+    directiveBase <- copyOf <$> freshImportsHeap importsEnv
+    (moduleEnv, dirs) <- evalModule directiveBase m  -- fresh preAllocate => fresh IORefs => Unevaluated CAFs
+    prepare (moduleEnv <> directiveBase)
     case drop i dirs of
       (d : _) -> runDirective d
       []      -> error "forEachDirectiveFreshHeap: directive index out of range (evalModule produced fewer directives than the first pass)"
+
+-- | A copy of the imports' heap for ONE directive: a new 'Reference', at the
+-- same 'Address' and over a new cell, for every one that evaluation can
+-- overwrite, each closing over the copies.
+--
+-- The imports' environment is one heap per imported file, allocated when the
+-- file is evaluated and kept by the host (jl4-lsp's Shake cache) for every
+-- later evaluation. A directive that forced an imported rule with no inputs
+-- overwrote its Reference with the answer, and every later directive, and
+-- every later evaluation of the file, was served that answer instead of reading
+-- its own ledger (smucclaw/l4-ide#1116).
+--
+-- What is copied, from the cell's current thunk:
+--
+--   * 'Unevaluated': a new 'Unevaluated', its thread marks empty (the original
+--     may be under evaluation by another thread, the copy is not);
+--   * 'WHNFWhen': a new 'Unevaluated' of its expression, its cached answer
+--     dropped (a copy starts as the rule was before anything forced it);
+--   * a 'WHNF' closure: a new closure of the same code. One over an empty
+--     environment is left as it is: it reaches no Reference but its arguments,
+--     so it has no state to be isolated from (a record's selectors);
+--   * an imported @ASSUME@ ('ValAssumed'): a new cell holding the same value,
+--     so that the JSON hook of 'forEachDirectiveFreshHeap' ('prepare', which
+--     overwrites the cell of an assumed name) writes into the copy and never
+--     into the host's original. The copy is made on every host, for every
+--     directive of a module whose imports declare an @ASSUME@ or a section
+--     @GIVEN@ (which "L4.Desugar" turns into an @ASSUME@). What it guards
+--     against is not reachable today: the hook's one caller,
+--     'execEvalModuleWithJSON', has no imports to copy;
+--   * any other 'WHNF' (a constructor, a builtin) is left shared. A value the
+--     evaluator has finished, such as a list or an obligation, can name
+--     References that a later force would overwrite; leaving it shared is safe
+--     only because nothing forces the originals, so none of them is one unless
+--     a host forced the environment by another route ('evalExprForLedgerWithEnv').
+--
+-- Each copy closes over the copies, not over the originals: its environment is
+-- the copies laid over the one it had. All of one file's top-level thunks close
+-- over the same environment value, so the rewritten environment is built ONCE
+-- per distinct one (by 'StableName': a miss costs a second build, never a wrong
+-- answer) rather than once per Reference, which would cost the heap's size for
+-- every one of them, per directive.
+--
+-- The originals are only read here, so a host's environment stays as it was
+-- allocated. That holds for rules whose every free name is in the environment
+-- given, which is what a host builds: the imports' own definitions and those of
+-- what they import ('LSP.L4.Rules.evaluateOn'). A name outside it is looked up
+-- where the rule was allocated, and reaches the original.
+--
+-- Ruled by Meng 2026-11-26 (CLEANSLATE): every @#EVAL@, @#TRACE@ and
+-- jl4-service request reads an imported rule afresh, as it reads the file's
+-- own, with no opt-out for the service (smucclaw/l4-ide#1116).
+freshImportsHeap :: Environment -> Eval Environment
+freshImportsHeap imports
+  | Map.null imports = pure imports
+  | otherwise = liftIO do
+      -- first, the cells: nothing is written to an original, and every copy
+      -- exists before any of them is closed over the others
+      cells <- for (Map.toList imports) \ (u, rf) -> do
+        thunk <- readIORef rf.pointer
+        if copyable thunk
+          then do
+            cell <- newIORef thunk
+            pure (Just (u, MkReference rf.address cell))
+          else pure Nothing
+      let fresh = Map.fromList (catMaybes cells)
+      rewritten <- newIORef (IntMap.empty :: IntMap.IntMap [(StableName Environment, Environment)])
+      let closeOver env' = do
+            name <- makeStableName $! env'
+            let hash = hashStableName name
+            known <- IntMap.findWithDefault [] hash <$> readIORef rewritten
+            case lookup name known of
+              Just done -> pure done
+              Nothing -> do
+                let !done = fresh <> env'
+                modifyIORef' rewritten (IntMap.insertWith (<>) hash [(name, done)])
+                pure done
+      -- then each copy over the copies
+      for_ (Map.elems fresh) \ rf -> do
+        thunk' <- readIORef rf.pointer >>= \ case
+          Unevaluated _ e env' -> Unevaluated Set.empty e <$> closeOver env'
+          WHNFWhen _ _ e env'  -> Unevaluated Set.empty e <$> closeOver env'
+          WHNF (ValClosure g e env') -> do
+            !env'' <- closeOver env'
+            pure (WHNF (ValClosure g e env''))
+          other                -> pure other
+        writeIORef rf.pointer $! thunk'
+      pure fresh
+  where
+    copyable = \ case
+      Unevaluated{}              -> True
+      WHNFWhen{}                 -> True
+      WHNF (ValClosure _ _ env') -> not (Map.null env')
+      WHNF ValAssumed{}          -> True
+      WHNF _                     -> False
 
 -- | Evaluate module with JSON input bindings for batch processing.
 -- JSON keys are matched to ASSUME'd L4 variables by name.
 -- The approach: first evaluate the module normally (which pre-allocates References),
 -- then write JSON values into the References for ASSUME'd variables.
+--
+-- Nothing calls this, or 'execEvalModuleWithJSON' (searched 2026-11-26, every
+-- @*.hs@ outside @dist-newstyle@): @l4 batch@ evaluates each row through
+-- 'LSP.L4.Rules.evaluateOn', once per row, and not through here. Since
+-- 'execEvalModuleWithJSON' hands it no imports, 'freshImportsHeap' copies nothing
+-- for it, and its @prepare@ hook has not been run over an imports' heap.
 evalModuleAndDirectivesWithJSON :: Aeson.Value -> Environment -> Module Resolved -> Eval (Environment, [EvalDirectiveResult])
 evalModuleAndDirectivesWithJSON json env m = do
   ienv <- initialEnvironment
@@ -1444,13 +1613,15 @@ evalModuleAndDirectivesWithJSON json env m = do
   -- 'prepare' hook re-applies the JSON ASSUME bindings to EACH fresh heap's
   -- combined environment — otherwise the freshly re-thunked References would lack
   -- the JSON-provided values.
-  results <- forEachDirectiveFreshHeap (writeJSONToReferences json) nfDirective baseEnv m (length dirs0)
+  results <- forEachDirectiveFreshHeap (writeJSONToReferences json) nfDirective env baseEnv m (length dirs0)
   pure (moduleEnv, results)
 
+-- | No caller: see 'evalModuleAndDirectivesWithJSON'. It passes no imports.
 execEvalModuleWithJSON :: EvalConfig -> EntityInfo -> Aeson.Value -> Module Resolved -> IO (Environment, [EvalDirectiveResult])
 execEvalModuleWithJSON evalConfig entityInfo json m0@(MkModule _ moduleUri _) = do
-  -- @l4 batch@: the JSON is written into the module-level References, which are
-  -- the ROOT of the evaluation, so discharge and a JSON supply compose — a
+  -- The batch entry point this was written for: the JSON is written into the
+  -- module-level References, which are the ROOT of the evaluation, so
+  -- discharge and a JSON supply compose — a
   -- definition reads its binder through its own parameter, and the value that
   -- parameter is handed at the root is the one the request supplied.
   let m = dischargeModuleWith evalConfig.presumeDefaults m0

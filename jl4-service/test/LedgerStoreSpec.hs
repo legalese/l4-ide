@@ -399,7 +399,7 @@ sqlStoreContract = describe "the SQL stores' backstops" do
 -- the two proposals (and sometimes a third act) go in from their own
 -- threads with the clock fixed at 18:06:40, so the same-second tie is
 -- decided by arrival, as R-O1 rules. In a third of the rounds Bob's
--- proposal goes first and Alice's waits until his row is in the store,
+-- proposal goes first and Alice's, and any third act, wait until his row is in the store,
 -- in a third the other way round, and in a third both start at once, so
 -- both outcomes happen whatever the machine's speed, and the last third
 -- races: an append takes two replays, so both read the head before
@@ -428,12 +428,15 @@ concurrencyItem rounds dep = it ("concurrency (§8), " <> show rounds <> " round
     j1 <- generate (chooseInt (0, 2000))
     j2 <- generate (chooseInt (0, 2000))
     let jitter d = threadDelay d
-        (bobStart, aliceStart) = case i `mod` 3 of
-          0 -> (jitter 0, waitForKey inst (tag "bob"))
-          1 -> (waitForKey inst (tag "alice"), jitter 0)
-          _ -> (jitter j0, jitter j1)
+        -- where Bob goes first, the extra racer waits for his row too: left to a
+        -- jitter of up to 2 ms, a second buy can reach the store before Bob's
+        -- row and commit the dinner (in one pre-fix trace, 8 of 20 such rounds)
+        (bobStart, aliceStart, extraStart) = case i `mod` 3 of
+          0 -> (jitter 0, waitForKey inst (tag "bob"), waitForKey inst (tag "bob"))
+          1 -> (waitForKey inst (tag "alice"), jitter 0, jitter j2)
+          _ -> (jitter j0, jitter j1, jitter j2)
         racers = [(bobStart, tag "bob", bobBuys), (aliceStart, tag "alice", buy)]
-              <> [ (jitter j2, key, a) | (key, a) <- extra ]
+              <> [ (extraStart, key, a) | (key, a) <- extra ]
     writeIORef env.clockRef 65200
     results <- mapConcurrently (\ (start, key, a) -> start >> appendIf env.ledger inst (proposal key a)) racers
     rs <- mapM appended results
@@ -443,7 +446,7 @@ concurrencyItem rounds dep = it ("concurrency (§8), " <> show rounds <> " round
     sort (map (.row.seqNo) rs) `shouldBe` [3 .. 2 + length rs]
     let dinners = [ r.row.seqNo | r <- rs, commitsDinner r ]
         takens = [ r.row.seqNo | r <- rs, recordsTaken r ]
-    (i, dinners, takens) `shouldSatisfy` \ (_, ds, ts) -> length ds <= 1 && and [ d < t | d <- ds, t <- ts ]
+    (i, dinners, takens) `shouldSatisfy` \ (_, ds, ts) -> length ds <= 1 && length ts == 1 && and [ d < t | d <- ds, t <- ts ]
     -- and the stored history, replayed whole, holds at most one dinner
     final <- replay env.ledger.evalConfig env.ledger.timeBound dep rows Nothing >>= either (fail . show) pure
     officialCount "dinners bought" final.headLedger `shouldSatisfy` (<= 1)

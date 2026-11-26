@@ -1,0 +1,94 @@
+{
+  "_about": "What jl4-service published and answered for the rule below, captured 2026-11-17 from a jl4-service built from unstable 35aa3bd67 (l4 deploy --server, then GET /deployments/{id}/functions/{fn}, GET /deployments/{id}/openapi.json, POST /deployments/{id}/.mcp tools/list, POST .../evaluation). Recorded, not live: regenerate it the same way if the schema shape changes. The Haskell side of the call is asserted in jl4-service/test/IntegrationSpec.hs (\"TYPICALLY defaults\").",
+  "source": "@export default The smaller of two numbers; b is typically 0\nGIVEN a IS A NUMBER @desc The first number\n      b IS A NUMBER TYPICALLY 0 @desc The second number\nGIVETH A NUMBER\nDECIDE `the smaller of` IS IF a < b THEN a ELSE b\n",
+  "functionEndpoint": {
+    "description": "The smaller of two numbers; b is typically 0",
+    "isDeontic": false,
+    "name": "the smaller of",
+    "parameters": {
+      "properties": {
+        "a": {
+          "description": "The first number",
+          "type": "number"
+        },
+        "b": {
+          "default": 0,
+          "description": "The second number",
+          "type": "number"
+        }
+      },
+      "required": ["a"],
+      "type": "object"
+    },
+    "returnSchema": {
+      "type": "number"
+    },
+    "returnType": "NUMBER",
+    "section": null
+  },
+  "openApiArguments": {
+    "properties": {
+      "a": {
+        "description": "The first number",
+        "type": "number"
+      },
+      "b": {
+        "default": 0,
+        "description": "The second number",
+        "type": "number"
+      }
+    },
+    "required": ["a"],
+    "type": "object"
+  },
+  "mcpInputSchema": {
+    "properties": {
+      "a": {
+        "description": "The first number",
+        "type": "number"
+      },
+      "b": {
+        "default": 0,
+        "description": "The second number",
+        "type": "number"
+      }
+    },
+    "required": ["a"],
+    "type": "object"
+  },
+  "callWithBLeftOut": {
+    "request": {
+      "arguments": {
+        "a": 5
+      }
+    },
+    "response": {
+      "contents": {
+        "presumed": ["b"],
+        "result": {
+          "value": 0
+        }
+      },
+      "report": "default",
+      "tag": "SimpleResponse"
+    }
+  },
+  "callWithBGiven": {
+    "request": {
+      "arguments": {
+        "a": 5,
+        "b": 3
+      }
+    },
+    "response": {
+      "contents": {
+        "presumed": [],
+        "result": {
+          "value": 3
+        }
+      },
+      "report": "default",
+      "tag": "SimpleResponse"
+    }
+  }
+}

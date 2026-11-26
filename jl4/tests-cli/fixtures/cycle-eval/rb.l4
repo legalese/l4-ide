@@ -1,0 +1,5 @@
+IMPORT ra
+
+bar MEANS 2
+
+#EVAL bar

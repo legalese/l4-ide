@@ -262,7 +262,7 @@ exploreWith opts evalConfig = do
   (errs, mLoaded) <- runOneshot evalConfig opts.exFile \nfp -> do
     let uri = normalizedFilePathToUri nfp
     _ <- Shake.addVirtualFileFromFS nfp
-    mTc <- Shake.use Rules.SuccessfulTypeCheck uri
+    mTc <- Rules.useEvaluableTypeCheck uri
     case mTc of
       Nothing -> pure Nothing
       Just tcRes -> do

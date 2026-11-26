@@ -1,0 +1,31 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+section-given-import-operand-unset.l4:17:1-25:
+  I could not continue evaluating, because I needed to know the value of
+    dflt
+  but it is an assumed term.
+section-given-import-operand-unset.l4:18:1-32:
+  I could not continue evaluating, because I needed to know the value of
+    dflt
+  but it is an assumed term.
+section-given-import-operand-unset.l4:19:1-32:
+  I could not continue evaluating, because I needed to know the value of
+    dflt
+  but it is an assumed term.
+section-given-import-operand-unset.l4:20:1-35:
+  I could not continue evaluating, because I needed to know the value of
+    dflt
+  but it is an assumed term.
+section-given-import-operand-unset.l4:21:1-29:
+  I could not continue evaluating, because I needed to know the value of
+    dflt
+  but it is an assumed term.
+section-given-import-operand-unset.l4:22:1-33:
+  I could not continue evaluating, because I needed to know the value of
+    dflt
+  but it is an assumed term.
+section-given-import-operand-unset.l4:23:1-32:
+  I could not continue evaluating, because I needed to know the value of
+    dflt
+  but it is an assumed term.

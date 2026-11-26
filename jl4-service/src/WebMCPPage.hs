@@ -10,10 +10,10 @@ module WebMCPPage (
   renderOrgWebMCPScript,
 ) where
 
+import qualified Data.Aeson as Aeson
 import qualified Data.ByteString.Char8 as BS8
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy.Char8 as LBS
-import qualified Data.Aeson as Aeson
 import Data.Char (isAsciiLower, isAsciiUpper, isDigit)
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -21,6 +21,8 @@ import qualified Data.Text.Encoding as Text.Encoding
 import SearchPattern (identifierSyntax, noMatchHint, patternSyntax, rulesQuerySyntax)
 import Network.HTTP.Media ((//), (/:))
 import Servant (Accept (..), MimeRender (..))
+
+import Shared (presumptionKey, presumptionSchema)
 
 -- | HTML content type for Servant.
 data HTML
@@ -116,28 +118,42 @@ renderOrgWebMCPScript originTrialToken = RawJs $ LBS.fromStrict $ Text.Encoding.
   , "  // backend request. Older builds pass no second argument, hence the guards."
   , "  function execSignal(ctx) { return (ctx && ctx.signal) || undefined; }"
   , ""
-  , "  // Allowed chars match Anthropic's tool / property name regex"
-  , "  // ^[a-zA-Z0-9_-]{1,64}$ — no dots, even though the MCP spec is"
-  , "  // more permissive. Dots in source names are mapped to hyphens."
+  , "  // Allowed chars are the ones the MCP endpoint keeps (Shared.sanitizePropertyNameRaw"
+  , "  // keeps what Haskell's isAlphaNum keeps: any Unicode letter or number, and _ and -),"
+  , "  // so that both surfaces name the same input the same way, e.g. presumptionΩ"
+  , "  // is not read as presumption. No dots, even though the MCP spec is more"
+  , "  // permissive: dots in source names are mapped to hyphens. That set is wider than"
+  , "  // Anthropic's ^[a-zA-Z0-9_-]{1,64}$, which a non-ASCII name does not match."
+  , "  // Where the two surfaces still differ: a tool name that starts with a digit gets a"
+  , "  // leading _ here and not there, and each engine's Unicode tables decide what a"
+  , "  // letter is."
+  , ""
+  , "  // Cut to n characters, counting code points as Haskell's Text.take does, not"
+  , "  // UTF-16 units as substring does: an astral letter is one character, and a cut"
+  , "  // inside a surrogate pair would leave a lone surrogate."
+  , "  function cutChars(s, n) { return Array.from(s).slice(0, n).join(''); }"
+  , ""
   , "  function sanitizeName(name, maxLen) {"
-  , "    var s = name.replace(/[^a-zA-Z0-9_-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');"
-  , "    if (!s || !/^[a-zA-Z_]/.test(s)) s = '_' + s;"
-  , "    return s.substring(0, maxLen || 60);"
+  , "    var s = name.replace(/[^\\p{L}\\p{N}_-]/gu, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');"
+  , "    if (!s || !/^[\\p{L}_]/u.test(s)) s = '_' + s;"
+  , "    return cutChars(s, maxLen || 60);"
   , "  }"
   , ""
   , "  // Sanitize a property name: truncate to 60 chars so a 4-char dedup suffix"
   , "  // can fit within Anthropic's 64-char property-key limit. No dedup here."
   , "  function sanitizePropName(name) {"
-  , "    var s = name.replace(/[^a-zA-Z0-9_-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');"
+  , "    var s = name.replace(/[^\\p{L}\\p{N}_-]/gu, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');"
   , "    s = s || '_unnamed';"
-  , "    return s.substring(0, 60).replace(/-+$/, '');"
+  , "    return cutChars(s, 60).replace(/-+$/, '');"
   , "  }"
   , ""
   , "  // Deterministic 3-hex-char hash of a string, used to disambiguate"
-  , "  // property names whose 60-char truncations collide."
+  , "  // property names whose 60-char truncations collide. Over code points, as"
+  , "  // Shared.shortHashSuffix is over characters, so both surfaces suffix a"
+  , "  // name the same."
   , "  function shortHashSuffix(s) {"
   , "    var h = 1;"
-  , "    for (var i = 0; i < s.length; i++) { h = ((h * 131) + s.charCodeAt(i)) % 16777259; }"
+  , "    Array.from(s).forEach(function(ch) { h = ((h * 131) + ch.codePointAt(0)) % 16777259; });"
   , "    var hex = (h % 4096).toString(16);"
   , "    while (hex.length < 3) hex = '0' + hex;"
   , "    return hex;"
@@ -153,7 +169,7 @@ renderOrgWebMCPScript originTrialToken = RawJs $ LBS.fromStrict $ Text.Encoding.
   , "    Object.keys(groups).forEach(function(s) {"
   , "      var os = groups[s];"
   , "      if (os.length === 1) { out[os[0]] = s; return; }"
-  , "      var base = s.substring(0, 60).replace(/-+$/, '');"
+  , "      var base = cutChars(s, 60).replace(/-+$/, '');"
   , "      os.forEach(function(o) { out[o] = base + '-' + shortHashSuffix(o); });"
   , "    });"
   , "    return out;"
@@ -225,6 +241,22 @@ renderOrgWebMCPScript originTrialToken = RawJs $ LBS.fromStrict $ Text.Encoding.
   , "      if (original !== sanitized) result = result.split(original).join(sanitized);"
   , "    });"
   , "    return result;"
+  , "  }"
+  , ""
+  , "  // The reserved presumption argument (U3 option A): the same name, values"
+  , "  // and wording as the MCP endpoint's tools/list, from the same definition."
+  , "  // A rule tool carries it beside its inputs (flat) or beside `arguments`"
+  , "  // (DEONTIC), and forwards it into the /evaluation body beside `arguments`,"
+  , "  // where /evaluation reads it. An invalid value is the service's to refuse."
+  , "  var presumptionKey = " <> jsonText presumptionKey <> ";"
+  , "  var presumptionSchema = " <> jsonText presumptionSchema <> ";"
+  , "  // A value that is not soft or hard is refused here too, in the service's own"
+  , "  // words, instead of being posted: the service's 400 for it is not JSON, which"
+  , "  // a tool could not read, so the agent would see a parse failure, not the reason."
+  , "  function presumptionRefusal(v) {"
+  , "    if (v === undefined || v === null) return null;"
+  , "    if (typeof v === 'string' && (v.toLowerCase() === 'soft' || v.toLowerCase() === 'hard')) return null;"
+  , "    return { content: [{ type: 'text', text: JSON.stringify({ error: 'presumption must be \"soft\" or \"hard\", not ' + JSON.stringify(v) }) }], isError: true };"
   , "  }"
   , ""
   , "  // Every tool below is annotated readOnlyHint: true. Rule evaluation is a"
@@ -390,10 +422,13 @@ renderOrgWebMCPScript originTrialToken = RawJs $ LBS.fromStrict $ Text.Encoding.
   , "    regTool({"
   , "      name: 'evaluate_rule',"
   , "      description: 'Tooling: Evaluate a legal rule with arguments. Use get_rule_schema first to understand required inputs. For DEONTIC rules, also pass startTime (number) and events (array of {party, action, at}).',"
-  , "      inputSchema: { type: 'object', properties: { deployment: { type: 'string', description: 'Deployment ID' }, function_name: { type: 'string', description: 'Function name' }, arguments: { type: 'object', description: 'Key-value pairs matching the function parameters' }, startTime: { type: 'number', description: 'Start time for DEONTIC contract simulation' }, events: { type: 'array', description: 'Events for DEONTIC contract simulation', items: { type: 'object' } } }, required: ['deployment', 'function_name', 'arguments'] },"
+  , "      inputSchema: { type: 'object', properties: { deployment: { type: 'string', description: 'Deployment ID' }, function_name: { type: 'string', description: 'Function name' }, arguments: { type: 'object', description: 'Key-value pairs matching the function parameters' }, presumption: presumptionSchema, startTime: { type: 'number', description: 'Start time for DEONTIC contract simulation' }, events: { type: 'array', description: 'Events for DEONTIC contract simulation', items: { type: 'object' } } }, required: ['deployment', 'function_name', 'arguments'] },"
   , "      annotations: { readOnlyHint: true },"
   , "      execute: function(args, ctx) {"
+  , "        var refusal = presumptionRefusal(args[presumptionKey]);"
+  , "        if (refusal) return refusal;"
   , "        var body = { arguments: args.arguments };"
+  , "        if (args[presumptionKey] !== undefined) body[presumptionKey] = args[presumptionKey];"
   , "        if (args.startTime !== undefined) body.startTime = args.startTime;"
   , "        if (args.events !== undefined) body.events = args.events;"
   , "        return doFetch(baseUrl + '/deployments/' + encodeURIComponent(args.deployment) + '/functions/' + encodeURIComponent(args.function_name) + '/evaluation', {"
@@ -495,14 +530,27 @@ renderOrgWebMCPScript originTrialToken = RawJs $ LBS.fromStrict $ Text.Encoding.
   , "    return named.map(function(entry) {"
   , "      var fn = entry.fn;"
   , "      var sanitized = sanitizeParamsSchema(fn.parameters);"
+  , "      // A flat tool whose rule has an input named like the reserved key is not"
+  , "      // registered: the switch would shadow the input, or the input the switch."
+  , "      if (!fn.isDeontic && Object.prototype.hasOwnProperty.call(sanitized.schema.properties || {}, presumptionKey)) {"
+  , "        console.error('WebMCP: not registering tool ' + entry.toolName + ': the rule has an input named ' + presumptionKey + ', which is reserved for the presumption switch (soft or hard). Rename the input in the rule.');"
+  , "        return Promise.resolve();"
+  , "      }"
+  , "      var flatSchema = Object.assign({}, sanitized.schema, { properties: Object.assign({}, sanitized.schema.properties, { presumption: presumptionSchema }) });"
   , "      return registerToolAsync({"
   , "        name: entry.toolName,"
   , "        description: 'L4 Rule: ' + (fn.description || fn.name) + ' [' + fn.deployment + '/' + fn.name + ']',"
-  , "        inputSchema: fn.isDeontic ? { type: 'object', properties: { arguments: sanitized.schema, startTime: { type: 'number', description: 'Start time for contract simulation' }, events: { type: 'array', description: 'Events for contract simulation (each: {party, action, at})', items: { type: 'object' } } }, required: ['arguments', 'startTime', 'events'] } : sanitized.schema,"
+  , "        inputSchema: fn.isDeontic ? { type: 'object', properties: { arguments: sanitized.schema, presumption: presumptionSchema, startTime: { type: 'number', description: 'Start time for contract simulation' }, events: { type: 'array', description: 'Events for contract simulation (each: {party, action, at})', items: { type: 'object' } } }, required: ['arguments', 'startTime', 'events'] } : flatSchema,"
   , "        annotations: { readOnlyHint: true },"
   , "        execute: function(args, ctx) {"
-  , "          var originalArgs = fn.isDeontic ? remapArgs(args.arguments || {}, sanitized.reverseMap) : remapArgs(args, sanitized.reverseMap);"
+  , "          var refusal = presumptionRefusal(args[presumptionKey]);"
+  , "          if (refusal) return refusal;"
+  , "          // the switch is never an input: take it out before the keys are remapped"
+  , "          var flatArgs = Object.assign({}, args);"
+  , "          delete flatArgs[presumptionKey];"
+  , "          var originalArgs = fn.isDeontic ? remapArgs(args.arguments || {}, sanitized.reverseMap) : remapArgs(flatArgs, sanitized.reverseMap);"
   , "          var body = { arguments: originalArgs };"
+  , "          if (args[presumptionKey] !== undefined) body[presumptionKey] = args[presumptionKey];"
   , "          if (fn.isDeontic) { body.startTime = args.startTime; body.events = args.events; }"
   , "          return doFetch(baseUrl + '/deployments/' + encodeURIComponent(fn.deployment) + '/functions/' + encodeURIComponent(fn.name) + '/evaluation', {"
   , "            method: 'POST',"
@@ -521,6 +569,10 @@ renderOrgWebMCPScript originTrialToken = RawJs $ LBS.fromStrict $ Text.Encoding.
   , "  }"
   , "})();"
   ]
+
+-- | A JSON value as text, for a JavaScript literal.
+jsonText :: Aeson.ToJSON a => a -> Text
+jsonText = Text.Encoding.decodeUtf8 . LBS.toStrict . Aeson.encode
 
 -- | The part of the script that adds an origin-trial token to the embedding
 -- page, so that the browser offers the modelContext API there while WebMCP

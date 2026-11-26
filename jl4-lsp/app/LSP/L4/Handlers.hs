@@ -532,14 +532,23 @@ handlers evalConfig recorder =
         liftIO $ runVizHandlerM $ withVizRequestContext recorder (Proxy @Ladder.EvalAppMethodName) params ide $
           \evalParams tcRes recentViz -> do
             let vizConfig = Ladder.getVizConfig . (.vizState) $ recentViz
-            mEvalDeps <- liftIO $ runAction "l4/evalApp" ide $ use (AttachCallStack [vizConfig.moduleUri] GetLazyEvaluationDependencies) vizConfig.moduleUri
-            case mEvalDeps of
-              Nothing -> throwError $ TResponseError
+            -- A module whose imports did not all typecheck is not evaluated,
+            -- as a module with errors of its own is not ('evaluable'), and the
+            -- ladder is told why (decided by Claude 2026-11-25, pending Meng's
+            -- review).
+            evalDeps <- liftIO $ runAction "l4/evalApp" ide $
+              use SuccessfulTypeCheck vizConfig.moduleUri >>= \case
+                Just tc | not (evaluable tc) ->
+                  pure (Left "A module this file imports has errors, so nothing is evaluated; the error on its IMPORT names it.")
+                _ -> maybe (Left ("Failed to get evaluation dependencies for " <> (fromNormalizedUri vizConfig.moduleUri).getUri)) Right
+                  <$> use (AttachCallStack [vizConfig.moduleUri] GetLazyEvaluationDependencies) vizConfig.moduleUri
+            case evalDeps of
+              Left why -> throwError $ TResponseError
                 { _code = InR ErrorCodes_InvalidRequest
-                , _message = "Failed to get evaluation dependencies for " <> (fromNormalizedUri vizConfig.moduleUri).getUri
+                , _message = why
                 , _xdata = Nothing
                 }
-              Just (evalEnv, _) -> do
+              Right (evalEnv, _) -> do
                 result <- MkVizHandler $ evalApp evalConfig tcRes.entityInfo (evalEnv, tcRes.module') evalParams recentViz
                 logWith recorder Debug $
                   LogHandlingCustomRequest evalParams.verDocId._uri

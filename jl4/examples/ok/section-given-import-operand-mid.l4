@@ -1,0 +1,18 @@
+-- The middle file of a chain of three: it imports
+-- ok/section-given-import-operand-def.l4, uses a rule that reads that file's
+-- section GIVEN as an operand, and has a section GIVEN of its own.
+-- ok/section-given-import-operand-chain.l4 imports this one.
+
+IMPORT `section-given-import-operand-def`
+
+§ `Bonus`
+    GIVEN bonus IS A NUMBER TYPICALLY 4
+
+GIVETH A NUMBER
+`window plus bonus` MEANS `the window` PLUS bonus
+
+GIVETH A NUMBER
+`window and one` MEANS `the window` PLUS 1
+
+#EVAL `window plus bonus`                           -- 34
+#EVAL `window and one`                              -- 31

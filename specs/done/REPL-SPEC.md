@@ -1221,6 +1221,18 @@ jl4-core/src/L4/
 5. **Should the REPL auto-reload files when they change on disk?**
    - Nice for development, but could be surprising
    - Could be an option: `:set autoreload on`
+   - Not answered; what the REPL does as of 2026-11-25 (smucclaw/l4-ide#1099), decided by Claude 2026-11-25, pending Meng's review:
+     `:load`, `:reload` and `:reset` read again from disk every file the REPL has read: the loaded file, every module it imports, directly or not, and every module `:import` added.
+     A line reads no file the REPL has read again: it answers from what was read until the next of the three, so there is no auto-reload.
+     A file that one of the three could not read is dropped from the store, and the next line that needs it looks for it on disk again.
+     `:reset` re-reads in the same store as `:reload`; it does not start a new store.
+     Before #1099 the three read the loaded file again but put it back in the store under the version it had, 0, so nothing built from its old text was built again; a module it imports, or one `:import` added, was never read again (`syncStoreWithDisk` in `jl4-repl/app/Main.hs` says why).
+     Only a fresh REPL sees a module added where `IMPORT` looks before the one in use, such as a `lib.l4` put in the `JL4_LIBRARY_PATH` folder while the importer's own `lib.l4` is in use: the store's copy of a module is tier 0 of resolution.
+   - A file that is not there, decided by Claude 2026-11-25, pending Meng's review (smucclaw/l4-ide#1099):
+     `:load` or `:l` of a file that is not there replies `Error: there is no file <path>` and keeps the file loaded before.
+     A loaded file deleted since it was loaded is reported the same way at `:reload` and `:reset` (`Error reloading: there is no file <path>`), and a file named at start-up that is not there gets `Error loading file: there is no file <path>`.
+     In each case the REPL goes on, and a line that does not need the file still answers.
+     Each of these used to end the session: start-up, `:load`, `:reload` and `:reset` read the file with nothing to catch a failure.
 
 ## References
 

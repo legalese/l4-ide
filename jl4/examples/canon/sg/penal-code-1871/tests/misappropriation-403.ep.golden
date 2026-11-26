@@ -156,10 +156,10 @@
 -- 4. NO `commits dishonest misappropriation` WRAPPER. s 378 says "is said to
 --    commit theft" and s 405 says "commits 'criminal breach of trust'"; s 403
 --    says neither. It runs straight from "Whoever dishonestly misappropriates"
---    to "shall be punished". Woon's rightmost consequent box reads "Commits
---    Dishonest misappropriation", but that wording comes from the section's
---    heading, not from its enacting words, and it is there to keep his diagrams
---    uniform across the chapter. A wrapper rule would add nothing — it would
+--    to "shall be punished". "Dishonest misappropriation of property" is the
+--    section's heading, not its enacting words, so a rule named for it would
+--    name an offence the section never says is committed (notes/forks.md,
+--    PC-5). A wrapper rule would add nothing — it would
 --    draw as a single box on the ladder — so `offence under s 403` IS the
 --    defining ladder. Do not "restore" the missing half.
 --
@@ -403,8 +403,8 @@ GIVETH A Charge
 -- This is the fixture that pins the section's factoring. `dishonestly` stands
 -- in SERIES in front of both verbs, so it defeats the conversion branch as well
 -- as the misappropriation branch. Attach the adverb to `misappropriates` only —
--- the natural-looking alternative, and the one Woon's series placement rules
--- out — and this record convicts a man who did nothing dishonest.
+-- the natural-looking alternative, and the one the section's word order rules
+-- out (notes/forks.md, PC-4) — and this record convicts a man who did nothing dishonest.
 `the umbrella sold before the mistake was discovered` MEANS `Misappropriation Facts` WITH
     particulars           IS `high road particulars, s 403`
     `the property`        IS `the umbrella taken by mistake`'s `the property`

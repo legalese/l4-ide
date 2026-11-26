@@ -38,6 +38,25 @@ A start that is neither a number nor a date is refused with exit 1 and says so.
 (One exploration is made for each distinct contract and starting day among the file's traces.
 To explore a rule no trace names, give `--contract NAME`, with `--at T` for the day it starts, 0 if left out.)
 
+`l4 explore` does not read the time stamps of a trace's events.
+From a `#TRACE` it takes the contract and the start, as above, and it chooses the instants it tries itself.
+By default those are whole instants: a day is 3 or 4, and a time between two whole days, such as 3.8, is not one it chooses.
+The exception is the clock where it already stands, which can be a fraction ("When", below): `AT 0.5` is explored from 0.5, and an act is tried there.
+`--grid` steps by any N above 0 that you give it, and N need not be a whole number: `--grid 0.5` tries every half day as well (the section on `--grid`, below).
+To reach a stamp such as 3.8 the step has to divide it, and 0.5 does not: `--grid 0.5` tries no act at 3.8 and says nothing about it, since the explorer never reads the stamp, while `--grid 0.2` does try one (measured 2026-11-24 on `jl4/tests-cli/fixtures/explore-instants/frac-stamp.l4`).
+The note names such a step, one over the stamp's denominator: 0.2 for 3.8, 0.25 for 1.25.
+
+A `#TRACE` can still write a time stamp that is not a whole number, and `l4 run` uses it as written.
+So that it is not a surprise that `l4 explore` does not explore a run at such a time, `l4 run` and `l4 check` print a note (code `lint/fractional-trace-stamp`, severity Information) on each such stamp in an event: in a `WAITUNTIL`, or in the `AT` of an act.
+A percentage of a number is read as the number it stands for, so `WAITUNTIL (350%)` is a stamp of 3.5 and gets the note, and `WAITUNTIL (400%)` is 4 and does not.
+It is a note and not an error: nothing is refused and the exit status is not changed.
+Two kinds of stamp get no note:
+
+- a stamp that is not a literal number, such as `WAITUNTIL (7 / 2)`, has no value until it is evaluated;
+- the start of the trace, such as `AT 0.5`.
+  `l4 explore` reads it as its clock, so it is not a time the explorer ignores.
+  It names for itself what that leaves untried: from a start of 0.5, an obligation `WITHIN 3` has its deadline at 3.5, which is not a whole instant, so the explorer tries the act at 0.5, says `an instant it needs (3.5) is not a whole number`, and exits 2 (measured 2026-11-24 on `jl4/tests-cli/fixtures/explore-instants/frac-start.l4`).
+
 What comes back, abridged at the residuals (the contract as it stands in each state, which the next section explains):
 
 ```text
@@ -186,7 +205,10 @@ A refusal names the variable the rule leaves open, its type, and the field that 
 It never tries a sample in the place of a refused act: `0` for every number would be a claim about numbers it never tried.
 
 **When.**
-An act is tried at whole instants only, because contract time is discrete: a day, an hour, whatever unit the contract's numbers are in.
+By default an act is tried at whole instants, because contract time is discrete: a day, an hour, whatever unit the contract's numbers are in.
+The one other instant is the clock where the position already stands.
+It is a fraction after a start such as `AT 0.5`, and after time passes a deadline that is itself a fraction: when `WITHIN 2.5` lapses the explorer lets time pass to 3.5, and an act that follows is tried at 3.5 (measured 2026-11-24 on `jl4/tests-cli/fixtures/explore-instants/frac-wait.l4`, which shows `PARTY Q DOES b AT 3.5`).
+`--grid` is the way to try the instants between whole ones (below).
 Which whole instants is the question the page "[Where the region scheme stops being exact](#silent-not-on-the-coverage-line-either)" answers the other way round, so here is what is tried and why.
 After an act at some instant, the deadlines the contract is then waiting for are of two kinds.
 Some were already running, or are fixed to an instant that was already fixed (`WITHIN 3 OF THE DEADLINE`): they do not move with the act.
@@ -225,7 +247,8 @@ Measured on the 78 files in this repository's examples and docs that carry a `#T
   With no live deadline and no `--until`, the instants are the first one the act's window is open and the one after it.
   The boundaries matter: a rule that treats an act at exactly the deadline differently from one just before it is only visible if the explorer tries the deadline itself, and a breach that names two parties is only visible if it tries the instant at which the deadlines meet.
   The coverage line says which scheme was used (`time by regions`) and how many acts were tried at how many instants (`instants: …`).
-  A fraction is never tried: a deadline or stamp that is not a whole number leaves the instants it needs untried, and the line says so.
+  By default a fraction is not an instant it chooses: a deadline or window opening that is not a whole number leaves the instants it needs untried, and the line says so.
+  The clock where the position already stands is tried even when it is a fraction (a start of `AT 0.5`, or the instant after a deadline that is one), and `--grid` with a step that is not a whole number, such as `--grid 0.5`, tries the fractions that are multiples of it.
 
 **What the cap and the window mean for a long deadline.**
 Take `room.l4` with its numbers changed to deadlines of 365, 400 and 400 days (R, `a` and `u`) and acts that start deadlines of 30 and 14 days (Q and V), measured 2026-11-23.
@@ -243,6 +266,8 @@ It does not promise that the graph holds every position the evaluator can reach:
 
 `--grid N` is the alternative, for a rule whose guard reads the clock arithmetically: it tries every multiple of N from the first instant the act's window is open up to the next deadline, and keeps the clock in the state.
 It explores the model in which every event happens at a multiple of N, so an act at any other instant is outside it, and the explorer cannot say what it did not try: `--grid 2` on a contract whose numbers are all even does not hold the position an act at 1 reaches (a review found one, 2026-11-23); use `--grid 1` to hold every whole instant.
+N must be above 0: `--grid 0` is refused with `N must be a positive number` and exit 1, and a negative one is refused as not a number (measured 2026-11-24).
+The step need not be a whole number: `--grid 0.5` on `half.l4`, whose deadline is 2.5, tried acts at 0, 0.5, 1, 1.5, 2 and 2.5 and exited 0 (measured 2026-11-24).
 What it does check is the other half of the condition: a clock, a deadline or a window opening that is not a multiple of N, in a position it reaches, is named as untried, and so is a run with no deadline and no `--until`, because a grid has no end to try up to then.
 The cost is the whole window: `--grid 1` on an obligation that is `WITHIN 365` tries 366 instants per act in each state, and the clock tells states apart, so the graph is several times larger than the regions graph for the same contract.
 **One act is tried at no more than 256 instants in one state**, so that run exits 2 and says how many it did not try; `--max-instants 400` lifts the bound.
@@ -401,7 +426,8 @@ These are sorted by which signal carries them.
   `--max-states 5` on `jl4/examples/explore/brief/d1-naive.l4`, a 20-state graph, printed `frontier NOT exhausted: 6 new states past the state bound 5 not added` and exited 3 (measured 2026-11-23).
   The number is of states the bound kept out, each once; before that date the same run printed 12, because the code added one for each move that reached such a state.
 - **An act could not be tried at an instant the scheme chose (exit 2).** The coverage line has `UNTRIED n` and the text before it names the act and why:
-  - _an instant that is not a whole number_: a deadline or stamp in the file is a fraction (`WITHIN 2.5`), so the instants the scheme needs for it are not whole, and only whole instants are tried.
+  - _an instant that is not a whole number_: a deadline in the file is a fraction (`WITHIN 2.5`), or a trace starts at one (`AT 0.5`) and a deadline counted from it falls on one, so an instant the scheme needs is not whole, and only whole instants, and the instant the clock already stands at, are tried.
+    The line says so in its own words, `by default only whole instants, and the clock where it stands, are tried; --grid N tries the multiples of N`: with `--grid 0.5` the 2.5 is a multiple of the step and is tried (`half.l4` under `--grid 0.5` exits 0, measured 2026-11-24).
     `jl4/tests-cli/fixtures/explore-instants/half.l4` gives 3 states, 4 transitions and `UNTRIED 1` (measured 2026-11-22);
   - _the instant cap_: one act in one state would need more than `--max-instants` instants (256 unless you say otherwise), which a grid reaches quickly: `--grid 1` on an obligation that is `WITHIN 365` needs 366;
   - _the grid's end_: with `--grid`, no deadline and no `--until`, so the clock has no end to try up to; or a clock, deadline or window opening that is not a multiple of the step.
@@ -486,7 +512,7 @@ These are all in the output, on the coverage line or the property's own line, an
 - **Where the region scheme stops being exact.** Positions that differ only in the clock are merged under `time by regions` when the same deadlines have passed and the deadlines and openings come in the same order, and an act is tried only at the instants where something can change.
   Both are right while no guard reads the clock arithmetically, or compares it against a value the contract recorded, and the explorer does not check that none does.
   The line names the scheme and that is all it does.
-  What it does say, loudly (exit 2): a tie that needs a chain of acts (above), a deadline or stamp that is not a whole number, and a state that needs more instants than the cap.
+  What it does say, loudly (exit 2): a tie that needs a chain of acts (above), a deadline or window opening that is not a whole number, and a state that needs more instants than the cap.
   What it does not say: an act whose behaviour changes at some instant for a reason that is neither a deadline nor a window opening, and a window opening the explorer cannot read (an `AFTER` that names a date).
   Two cases a review found (2026-11-23) were silent and are now handled, and are listed so that the next one is looked for in the same places.
   A deadline started by a lapse (a `LEST` that arms a cure) is not started by an act, so no act's own offset named the tie it makes.

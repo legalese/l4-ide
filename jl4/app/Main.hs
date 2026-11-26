@@ -160,7 +160,7 @@ commandParser =
                <> footerDoc (Just (verbatim (propositionalBound <> "\n" <> verifyLimitsNote)))))
       <> command "prove"
            (info (helper <*> (CmdProve <$> proveOptionsParser))
-             (progDesc "Prove or refute, with an SMT solver (z3), each #ASSERT the evaluator cannot decide because it reads a section GIVEN"
+             (progDesc "Prove or refute, with an SMT solver (z3, then cvc5 where z3 gives no answer, if it is installed), each #ASSERT the evaluator cannot decide because it reads a section GIVEN"
                <> footerDoc (Just (verbatim proveBound))))
       <> command "coverage"
            (info (helper <*> (CmdCoverage <$> coverageOptionsParser))

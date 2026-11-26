@@ -1,6 +1,150 @@
 Parsing successful
 Typechecking successful
 Evaluation successful
+regcf-denovo.l4:1865:5-9:
+  I found a problem while checking the definition of `the issuer's § 227.201 disclosure duty`:
+    This LEST can never be reached, because the rule has no deadline.
+    
+    After MUST, the LEST is what follows when the deadline passes without the action.
+    This rule has no WITHIN and no BEFORE, so it waits for its action however long it takes, and time alone never takes it to this LEST.
+    
+    To say by when the action is due, add a WITHIN (or a BEFORE). Otherwise, remove the LEST.
+regcf-denovo.l4:1956:5-9:
+  I found a problem while checking the definition of `the issuer's offering statement filing duty`:
+    This LEST can never be reached, because the rule has no deadline.
+    
+    After MUST, the LEST is what follows when the deadline passes without the action.
+    This rule has no WITHIN and no BEFORE, so it waits for its action however long it takes, and time alone never takes it to this LEST.
+    
+    To say by when the action is due, add a WITHIN (or a BEFORE). Otherwise, remove the LEST.
+regcf-denovo.l4:1966:10-14:
+  I found a problem while checking the definition of `the issuer's offering statement amendment duty`:
+    This LEST can never be reached, because the rule has no deadline.
+    
+    After MUST, the LEST is what follows when the deadline passes without the action.
+    This rule has no WITHIN and no BEFORE, so it waits for its action however long it takes, and time alone never takes it to this LEST.
+    
+    To say by when the action is due, add a WITHIN (or a BEFORE). Otherwise, remove the LEST.
+regcf-denovo.l4:2069:5-9:
+  I found a problem while checking the definition of `the issuer's permission to solicit interest before filing`:
+    This LEST can never be reached, because the rule has no deadline.
+    
+    After MAY, the LEST is what follows when the permission goes unused until its deadline passes.
+    This rule has no WITHIN and no BEFORE, so the permission never runs out, and this LEST never follows.
+    
+    To say when the permission ends, add a WITHIN (or a BEFORE). Otherwise, remove the LEST.
+regcf-denovo.l4:2138:5-9:
+  I found a problem while checking the definition of `the issuer's permission to use the intermediary's communication channels`:
+    This LEST can never be reached, because the rule has no deadline.
+    
+    After MAY, the LEST is what follows when the permission goes unused until its deadline passes.
+    This rule has no WITHIN and no BEFORE, so the permission never runs out, and this LEST never follows.
+    
+    To say when the permission ends, add a WITHIN (or a BEFORE). Otherwise, remove the LEST.
+regcf-denovo.l4:2172:5-9:
+  I found a problem while checking the definition of `the issuer's permission to compensate a promoter`:
+    This LEST can never be reached, because the rule has no deadline.
+    
+    After MAY, the LEST is what follows when the permission goes unused until its deadline passes.
+    This rule has no WITHIN and no BEFORE, so the permission never runs out, and this LEST never follows.
+    
+    To say when the permission ends, add a WITHIN (or a BEFORE). Otherwise, remove the LEST.
+regcf-denovo.l4:2282:5-9:
+  I found a problem while checking the definition of `the intermediary's educational materials duty`:
+    This LEST can never be reached, because the rule has no deadline.
+    
+    After MUST, the LEST is what follows when the deadline passes without the action.
+    This rule has no WITHIN and no BEFORE, so it waits for its action however long it takes, and time alone never takes it to this LEST.
+    
+    To say by when the action is due, add a WITHIN (or a BEFORE). Otherwise, remove the LEST.
+regcf-denovo.l4:2514:5-9:
+  I found a problem while checking the definition of `the intermediary's notice-of-commitment duty`:
+    This LEST can never be reached, because the rule has no deadline.
+    
+    After MUST, the LEST is what follows when the deadline passes without the action.
+    This rule has no WITHIN and no BEFORE, so it waits for its action however long it takes, and time alone never takes it to this LEST.
+    
+    To say by when the action is due, add a WITHIN (or a BEFORE). Otherwise, remove the LEST.
+regcf-denovo.l4:2547:10-14:
+  I found a problem while checking the definition of `the funding portal's fund-flow duty`:
+    This LEST can never be reached, because the rule has no deadline.
+    
+    After MAY, the LEST is what follows when the permission goes unused until its deadline passes.
+    This rule has no WITHIN and no BEFORE, so the permission never runs out, and this LEST never follows.
+    
+    To say when the permission ends, add a WITHIN (or a BEFORE). Otherwise, remove the LEST.
+regcf-denovo.l4:2551:10-14:
+  I found a problem while checking the definition of `the funding portal's fund-flow duty`:
+    This LEST can never be reached, because the rule has no deadline.
+    
+    After MUST, the LEST is what follows when the deadline passes without the action.
+    This rule has no WITHIN and no BEFORE, so it waits for its action however long it takes, and time alone never takes it to this LEST.
+    
+    To say by when the action is due, add a WITHIN (or a BEFORE). Otherwise, remove the LEST.
+regcf-denovo.l4:2572:5-9:
+  I found a problem while checking the definition of `the intermediary's transaction confirmation duty`:
+    This LEST can never be reached, because the rule has no deadline.
+    
+    After MUST, the LEST is what follows when the deadline passes without the action.
+    This rule has no WITHIN and no BEFORE, so it waits for its action however long it takes, and time alone never takes it to this LEST.
+    
+    To say by when the action is due, add a WITHIN (or a BEFORE). Otherwise, remove the LEST.
+regcf-denovo.l4:2610:10-14:
+  I found a problem while checking the definition of `the intermediary's duty to deny access for a disqualification`:
+    This LEST can never be reached, because the rule has no deadline.
+    
+    After MUST, the LEST is what follows when the deadline passes without the action.
+    This rule has no WITHIN and no BEFORE, so it waits for its action however long it takes, and time alone never takes it to this LEST.
+    
+    To say by when the action is due, add a WITHIN (or a BEFORE). Otherwise, remove the LEST.
+regcf-denovo.l4:2623:15-19:
+  I found a problem while checking the definition of `the intermediary's duty on a fraud or investor-protection concern`:
+    This LEST can never be reached, because the rule has no deadline.
+    
+    After MUST, the LEST is what follows when the deadline passes without the action.
+    This rule has no WITHIN and no BEFORE, so it waits for its action however long it takes, and time alone never takes it to this LEST.
+    
+    To say by when the action is due, add a WITHIN (or a BEFORE). Otherwise, remove the LEST.
+regcf-denovo.l4:2627:15-19:
+  I found a problem while checking the definition of `the intermediary's duty on a fraud or investor-protection concern`:
+    This LEST can never be reached, because the rule has no deadline.
+    
+    After MUST, the LEST is what follows when the deadline passes without the action.
+    This rule has no WITHIN and no BEFORE, so it waits for its action however long it takes, and time alone never takes it to this LEST.
+    
+    To say by when the action is due, add a WITHIN (or a BEFORE). Otherwise, remove the LEST.
+regcf-denovo.l4:2671:5-9:
+  I found a problem while checking the definition of `the funding portal's registration duty`:
+    This LEST can never be reached, because the rule has no deadline.
+    
+    After MUST, the LEST is what follows when the deadline passes without the action.
+    This rule has no WITHIN and no BEFORE, so it waits for its action however long it takes, and time alone never takes it to this LEST.
+    
+    To say by when the action is due, add a WITHIN (or a BEFORE). Otherwise, remove the LEST.
+regcf-denovo.l4:2725:10-14:
+  I found a problem while checking the definition of `the funding portal's withdrawal duty`:
+    This LEST can never be reached, because the rule has no deadline.
+    
+    After MUST, the LEST is what follows when the deadline passes without the action.
+    This rule has no WITHIN and no BEFORE, so it waits for its action however long it takes, and time alone never takes it to this LEST.
+    
+    To say by when the action is due, add a WITHIN (or a BEFORE). Otherwise, remove the LEST.
+regcf-denovo.l4:2847:7-11:
+  I found a problem while checking the definition of `the funding portal's recordkeeping duty`:
+    This LEST can never be reached, because the rule has no deadline.
+    
+    After MUST, the LEST is what follows when the deadline passes without the action.
+    This rule has no WITHIN and no BEFORE, so it waits for its action however long it takes, and time alone never takes it to this LEST.
+    
+    To say by when the action is due, add a WITHIN (or a BEFORE). Otherwise, remove the LEST.
+regcf-denovo.l4:2853:7-11:
+  I found a problem while checking the definition of `the funding portal's recordkeeping duty`:
+    This LEST can never be reached, because the rule has no deadline.
+    
+    After MUST, the LEST is what follows when the deadline passes without the action.
+    This rule has no WITHIN and no BEFORE, so it waits for its action however long it takes, and time alone never takes it to this LEST.
+    
+    To say by when the action is due, add a WITHIN (or a BEFORE). Otherwise, remove the LEST.
 regcf-denovo.l4:3340:1-101:
   assertion satisfied
 regcf-denovo.l4:3344:1-112:

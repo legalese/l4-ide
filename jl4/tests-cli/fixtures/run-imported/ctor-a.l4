@@ -1,0 +1,11 @@
+-- Imported by ctors.l4: an enum this file declares, and a rule that returns a
+-- constructor of it according to `taken now` of taken.l4 (smucclaw/l4-ide#1116).
+-- The rule has to find `ajar` and `bolted` of its own file.
+
+IMPORT prelude
+IMPORT taken
+
+DECLARE Door IS ONE OF ajar, bolted
+
+GIVETH A Door
+`door` MEANS IF `taken now` THEN bolted ELSE ajar

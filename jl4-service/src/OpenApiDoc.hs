@@ -341,7 +341,7 @@ presumptionSchema :: Aeson.Value
 presumptionSchema = Aeson.object
   [ "type" .= ("string" :: Text)
   , "enum" .= (["soft", "hard"] :: [Text])
-  , "description" .= ("soft (the default): an argument left out takes its default; hard: no defaults are used, so an argument left out is missing" :: Text)
+  , "description" .= ("soft (the default): an argument left out takes its default; hard: no default is used for an argument left out, so it is missing; a default a rule takes itself is still used" :: Text)
   ]
 
 -- | Build the request body schema for evaluation endpoints.
@@ -433,16 +433,19 @@ batchResponseSchema fn =
                     , "@presumed" .= Aeson.object
                         [ "type" .= ("array" :: Text)
                         , "items" .= Aeson.object ["type" .= ("string" :: Text)]
-                        , "description" .= ("Inputs the case left out whose defaults its answer or refusal used, by name (a record field by its path)" :: Text)
+                        , "description" .= ("The defaults its answer or refusal rests on. Most entries are inputs the case left out whose defaults were used, by name (a record field by its path); an entry that starts with WITH, such as WITH scaled: rate, is a default the rules themselves took, which no case could supply; one that starts with JSONDECODE, such as JSONDECODE Settings: limit, is a default in a decode the rules made, of JSON written in the rules or of text the case sent. The record is named as it is declared, behind its section heading; a record from an imported file is named without the heading" :: Text)
                         ]
                     , "value" .= Aeson.object
                         [ "description" .= ("The answer, of type " <> fn.fsReturnType <> ". Only on an answered case" :: Text) ]
                     , "@refused" .= typed "string" "The reason the rule gave for refusing to answer. A refused case counts as processed"
                     , "@error" .= typed "string" "Why the case has no answer. Counted in casesIgnored"
+                    -- The description of a memory stop was rewritten for smucclaw/l4-ide#1116:
+                    -- a request no longer keeps what an earlier one worked out
+                    -- (ruled by Meng 2026-11-26, CLEANSLATE).
                     , "@limit" .= Aeson.object
                         [ "type" .= ("string" :: Text)
                         , "enum" .= (["time", "memory"] :: [Text])
-                        , "description" .= ("Beside @error when the service stopped the case at a limit: time is --eval-timeout, memory is --max-eval-memory-mb. Sending the case again may give an answer, with a higher limit, or for time when the service is less busy. Neither @limit nor its absence promises what a retry will do: values the deployment has already worked out are kept, so a case can fail where a later identical one answers. The evaluator's recursion-depth limit is a plain @error, without @limit" :: Text)
+                        , "description" .= ("Beside @error when the service stopped the case at a limit: time is --eval-timeout, memory is --max-eval-memory-mb. Sending the case again may give an answer, with a higher limit, or for time when the service is less busy. A memory stop does not depend on what earlier requests worked out, so the same case under the same --max-eval-memory-mb is stopped again; a time stop can differ from one attempt to the next, because the limit is wall-clock. The evaluator's recursion-depth limit is a plain @error, without @limit" :: Text)
                         ]
                     , "@graphviz" .= Aeson.object
                         [ "type" .= ("object" :: Text)

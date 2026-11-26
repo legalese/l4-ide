@@ -1,0 +1,8 @@
+-- Imported by own-eval.l4: a file with a directive of its own that reads
+-- `taken now` of taken.l4 (smucclaw/l4-ide#1116). The directive is this file's;
+-- the file that imports it must read `taken now` as if it were not there.
+
+IMPORT prelude
+IMPORT taken
+
+#EVAL `taken now`

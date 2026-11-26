@@ -1,0 +1,10 @@
+-- Imported by ctors.l4: as ctor-a.l4, with an enum and a rule of its own
+-- (smucclaw/l4-ide#1116).
+
+IMPORT prelude
+IMPORT taken
+
+DECLARE Gate IS ONE OF raised, lowered
+
+GIVETH A Gate
+`gate` MEANS IF `taken now` THEN lowered ELSE raised

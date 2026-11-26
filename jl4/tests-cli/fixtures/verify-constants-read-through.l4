@@ -1,0 +1,88 @@
+§ `VerifyConstantsReadThroughFixture`
+
+-- Controls for verify-constants.l4 (smucclaw/l4-ide#1095): only a body that
+-- IS the literal is a constant. A rule that reads through a constant keeps
+-- whatever finding the constant gives it, and so does a contradiction written
+-- out.
+
+GIVETH A BOOLEAN
+`the waiver was signed` MEANS FALSE
+
+GIVETH A BOOLEAN
+DECIDE `the rule is in force` IF TRUE
+
+-- FALSE either way, but not the literal itself, so still `unsat`: the
+-- exemption is for a body that IS the literal, not for any body without atoms.
+GIVETH A BOOLEAN
+DECIDE `false either way` IF FALSE OR FALSE
+
+-- A contradiction written out: still `unsat`.
+GIVEN x IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `nobody can satisfy this` x IF
+    x AND NOT x
+
+-- Reads through the constant FALSE, so it is TRUE for no input.
+GIVEN y IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `needs the waiver` y IF
+    y AND `the waiver was signed`
+
+-- Reads through the constant TRUE, so `x` cannot change the answer.
+GIVEN x IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `x cannot matter` x IF
+    x OR `the rule is in force`
+
+-- A rule whose meaning is FALSE once it is read through, but which is not
+-- itself a constant: its body is a call. Reading through it says so.
+GIVETH A BOOLEAN
+`the waiver, as recorded` MEANS `the waiver was signed`
+
+GIVEN y IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `needs the recorded waiver` y IF
+    y AND `the waiver, as recorded`
+
+-- Reads through both constants, and is TRUE for no input. The FALSE one can
+-- be why; the TRUE one cannot, and is not named.
+GIVEN y IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `needs the waiver while in force` y IF
+    y AND `the waiver was signed` AND `the rule is in force`
+
+-- Reads through both, and is TRUE for every input. Only the TRUE one is named
+-- for that; the FALSE one is a dead branch, which it is named for.
+GIVEN x IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `x cannot matter, whatever the waiver` x IF
+    x OR `the rule is in force` OR `the waiver was signed`
+
+-- TRUE for no input because of a NOT over the constant TRUE: read where it
+-- stands, the constant is FALSE, so it is named.
+GIVEN y IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `needs the rule not in force` y IF
+    y AND (NOT `the rule is in force`)
+
+-- The second condition is entailed by the third, and has the constant TRUE
+-- inside it under a NOT, where it cannot make anything hold: it is not named
+-- for that finding.
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `a NOT over the constant TRUE` a b IF
+    a AND (NOT (b AND `the rule is in force`)) AND (NOT b)
+
+-- The scope entails the requirement whatever the constant TRUE is: in the
+-- scope of an IMPLIES, it is read as the other literal, and is not named.
+GIVEN x IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `in force, and x, means x` x IF
+    (x AND `the rule is in force`) IMPLIES x
+
+-- The scope entails the requirement only because the constant FALSE is, so
+-- it is named.
+GIVEN x IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `signed, or x, means x` x IF
+    (x OR `the waiver was signed`) IMPLIES x

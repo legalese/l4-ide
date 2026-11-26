@@ -1,0 +1,4 @@
+-- Imports a ring of imports without being in it.
+IMPORT ra
+
+#EVAL 1 PLUS 1

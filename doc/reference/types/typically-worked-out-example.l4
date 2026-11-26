@@ -1,0 +1,35 @@
+-- When the usual value of one input is worked out from another
+-- Reference: doc/reference/types/TYPICALLY.md, "When the usual value is worked out from other facts"
+--
+-- TYPICALLY takes only a literal, so the discount cannot be written as
+-- `TYPICALLY (list price DIVIDED BY 10)`. The input that may be left out is a
+-- MAYBE that is usually NOTHING, and the rule that reads it works the fallback out.
+
+§ `Pricing`
+    GIVEN `list price` IS A NUMBER TYPICALLY 100
+          discount IS A MAYBE NUMBER TYPICALLY NOTHING
+
+-- A discount that was given is used as it is; without one, the fallback is a tenth of the list price.
+GIVETH A NUMBER
+`the discount` MEANS CONSIDER discount
+                       WHEN JUST d THEN d
+                       OTHERWISE `list price` DIVIDED BY 10
+
+GIVETH A NUMBER
+`final price` MEANS `list price` MINUS `the discount`
+
+-- Nothing given: the list price is 100, so the fallback discount is 10.
+#ASSERT `final price` EQUALS 90
+
+-- A list price of 1000 and no discount: the fallback follows the list price.
+#ASSERT (`final price` WITH `list price` IS 1000) EQUALS 900
+
+-- A discount that is given wins over the fallback.
+#ASSERT (`final price` WITH `list price` IS 1000, discount IS JUST 50) EQUALS 950
+
+-- The fallback is worked out where it is read, so a call written inside a rule
+-- that changes the list price changes the fallback with it.
+GIVETH A NUMBER
+dearer MEANS `final price` WITH `list price` IS 1000
+
+#ASSERT dearer EQUALS 900

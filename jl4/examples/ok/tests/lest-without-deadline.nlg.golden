@@ -1,0 +1,11 @@
+executing contract `rent, no deadline` at 0 with the following events: `WAITUNTIL` with 1000000
+executing contract `DO, no deadline` at 0 with the following events: `WAITUNTIL` with 1000000
+executing contract `MAY, no deadline` at 0 with the following events: `WAITUNTIL` with 1000000
+executing contract `AFTER alone` at 0 with the following events: `WAITUNTIL` with 1000000
+executing contract `everyone, no deadline` at 0 with the following events: `WAITUNTIL` with 1000000
+executing contract `nested, inner has none` at 0 with the following events: `WAITUNTIL` with 1000000
+executing contract `rent within 30` at 0 with the following events: `WAITUNTIL` with 1000000
+executing contract `rent before a date` at `DATE_SERIAL` with 1 June 2026 with the following events: `WAITUNTIL` with `DATE_SERIAL` with 1 January 2027
+executing contract `everyone within 30` at 0 with the following events: `WAITUNTIL` with 1000000
+executing contract `no smoking` at 0 with the following events: party `alice` did `smoke` at 5
+executing contract `rent, HENCE only` at 0 with the following events: party `alice` did `payRent` at 3

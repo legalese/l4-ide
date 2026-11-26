@@ -293,6 +293,9 @@ data TypeCheckWithDepsResult = TypeCheckWithDepsResult
   , tcdImplicitReaders :: Set Unique
     -- ^ Definitions with a non-empty read-set, this module's and its imports'.
     -- See 'L4.TypeCheck.Types.CheckResult.implicitReaders'.
+  , tcdInputDefaults :: TypeCheck.InputDefaults
+    -- ^ The @TYPICALLY@ defaults of this module's rules and records, and its
+    -- imports'. See 'L4.TypeCheck.Types.CheckResult.inputDefaults'.
   , tcdAnnotationWarnings :: [Resolve.Warning]
     -- ^ The main module's annotation warnings, from the parser: an @\@nlg@
     -- that attaches to nothing, a lone language tag, a slot with spaces in it.
@@ -433,6 +436,7 @@ typecheckWithDependenciesKnowingLocated knownNames ownName lookupModule uri sour
             , tcdUri = uri
             , tcdSectionPaths = result.sectionPaths
             , tcdImplicitReaders = result.implicitReaders
+            , tcdInputDefaults = result.inputDefaults
             , tcdAnnotationWarnings = annotationWarnings
             }
 
@@ -463,6 +467,7 @@ combineResolvedImports uri imports =
         , TypeCheck.plural = False
         , TypeCheck.bindLog = []
         , TypeCheck.bindLogLen = 0
+        , TypeCheck.overloadedCallees = Map.empty
         }
     , finalEnv
     )
@@ -500,8 +505,9 @@ combineResolvedImports uri imports =
              , TypeCheck.plural = False
              , TypeCheck.bindLog = []
              , TypeCheck.bindLogLen = 0
+             , TypeCheck.overloadedCallees = Map.empty
              }
-         , TypeCheck.unionImportedCheckEnv accEnv r.environment resolvedEntityInfo r.mixfixRegistry r.implicitReaders
+         , TypeCheck.unionImportedCheckEnv accEnv r.environment resolvedEntityInfo r.mixfixRegistry r.implicitReaders r.inputDefaults
          )
 
 -- | Update a module's import declarations with resolved URIs.

@@ -1,0 +1,3 @@
+[{"n": 10, "one": true,  "two": false},
+ {"n": 10, "one": false, "two": true},
+ {"n": 10, "one": true,  "two": true}]

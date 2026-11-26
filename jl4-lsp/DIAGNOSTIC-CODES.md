@@ -101,6 +101,7 @@ Match it with `^\s*Code:\s+(\S+)$`.
 | `check/jsondecode-at-type-parameter`        | A JSONDECODE applied where the type to decode into mentions a type parameter.            |
 | `check/jsondecode-passed-at-type-parameter` | A bare JSONDECODE handed on as a function at a type that mentions a type parameter.      |
 | `check/lifecycle-unavailable`               | THE JOIN or THE DEADLINE with no such position; THE INSTANT outside a PROVIDED guard.    |
+| `check/means-on-alternative-field`          | A MEANS clause on a payload field of an enum constructor.                                |
 | `check/misattached-section-given`           | A column-1 GIVEN declares a name the declaration below it never uses.                    |
 | `check/misdelivered-implicit-supply`        | A WITH value checked against one section input would reach another of the same spelling. |
 | `check/nonassertable-on-non-definition`     | `@nonassertable` above something that is not a definition.                               |
@@ -111,6 +112,7 @@ Match it with `^\s*Code:\s+(\S+)$`.
 | `check/read-refused`                        | A norm-log read with no instant, in an operand, of wrong arity, or matching no norm.     |
 | `check/regulative-actor-mismatch`           | A party performs an action that belongs to another actor.                                |
 | `check/restated-section-binder`             | A definition's GIVEN restates a name a section GIVEN binds.                              |
+| `check/typically-on-computed-field`         | A TYPICALLY default on a computed field.                                                 |
 | `check/typically-on-type-variable`          | A TYPICALLY default on a type.                                                           |
 | `check/typically-requires-type`             | A TYPICALLY default on a name with no explicit type.                                     |
 | `check/typically-value-not-a-literal`       | A TYPICALLY default that is not a literal.                                               |
@@ -120,6 +122,8 @@ Match it with `^\s*Code:\s+(\S+)$`.
 | `check/whose-without-cast`                  | WHOSE under an EVERY with no cast to take fields from.                                   |
 | `check/ends-because-needs-reason`           | An `@ends-because` with no reason after it on its line.                                  |
 | `check/ends-because-on-non-definition`      | `@ends-because` above something that is not a definition, such as an input.              |
+| `check/withal-fields-without-default`       | A record's WITHAL names fields that declare no TYPICALLY.                                |
+| `check/withal-misused`                      | WITHAL on something that is not a record whose defaults it can take.                     |
 
 ## lint/
 
@@ -145,6 +149,7 @@ Warnings, except `lint/redundant-lang-en`, which is a hint.
 | `lint/spaced-nlg-slot`                 | `parser` | A `% name %` slot with spaces, which prints as plain text.                                 |
 | `lint/unreachable-clause`              | `check`  | A clause that is never used.                                                               |
 | `lint/action-pattern-reference`        | `check`  | A bare name in an action was read as a reference to what it names. Severity Information.   |
+| `lint/fractional-trace-stamp`          | `check`  | A fractional `#TRACE` event stamp, which `l4 explore` ignores. Severity Information.       |
 | `lint/deprecated-assume`               | `check`  | An ASSUME, which is deprecated.                                                            |
 | `lint/deprecated-exactly`              | `check`  | An EXACTLY in an action, which is deprecated.                                              |
 | `lint/fixity-ignored-non-binary`       | `check`  | A fixity annotation on a definition that is not a binary infix operator.                   |
@@ -167,6 +172,9 @@ Warnings, except `lint/redundant-lang-en`, which is a hint.
 | `lint/not-shown-to-end`                | `check`  | A rule whose HENCE or LEST leads back to it, not shown to come to an end.                  |
 | `lint/starts-again-with-no-time`       | `check`  | A rule that starts itself again with no time passing.                                      |
 | `lint/starts-copies-at-once`           | `check`  | A rule that starts two or more copies of itself at once.                                   |
+| `lint/lest-without-deadline`           | `check`  | A LEST on a MUST, DO or MAY with no deadline, which nothing can reach.                     |
+
+- `lint/lest-without-deadline`: Scope ruled HOURGLASS, Meng 2026-11-25: MUST, DO and MAY with neither WITHIN nor BEFORE; not MUST NOT; not an EVERY with no join line.
 
 ## eval/
 

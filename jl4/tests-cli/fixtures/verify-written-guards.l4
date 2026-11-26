@@ -1,0 +1,143 @@
+§ `VerifyWrittenGuardsFixture`
+
+-- Negative controls: conditions the drafter DID write that exclude nothing
+-- (smucclaw/l4-ide#1093). Most are a `vacuous-guard`, once, where the rule as
+-- written has it; (6) twice, (11) and (12) as a dead branch, (10) not at all.
+--
+-- verify-vacuous-guard.l4 has the plainest case, `x AND (x OR y)`, whose
+-- normal form is the rule itself. These are the cases where the normal form
+-- and the rule as written come apart.
+
+-- (1) The second condition is redundant, and its normal form is two clauses,
+--     `x OR q` and `x OR r`. One finding, at the condition, not one per clause.
+GIVEN x IS A BOOLEAN, q IS A BOOLEAN, r IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `a hurdle in two parts` x q r IF
+    x AND (x OR (q AND r))
+
+-- (2) The redundant condition is inside one limb of a disjunction. The rule
+--     as written has no conjunction at the top; its normal form does.
+GIVEN p IS A BOOLEAN, q IS A BOOLEAN, r IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `a hurdle inside a limb` p q r IF
+       (p AND (p OR q))
+    OR r
+
+-- (3) The redundant condition is inside the requirement of a rule with a
+--     scope, which is read in the context of that scope.
+GIVEN s IS A BOOLEAN, x IS A BOOLEAN, y IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `a hurdle in the requirement` s x y IF
+    s IMPLIES (x AND (x OR y))
+
+-- (4) The redundant condition is in what a row of a BRANCH says, which is
+--     checked like any other condition the drafter wrote.
+GIVEN s IS A BOOLEAN, x IS A BOOLEAN, y IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `a hurdle in a row` s x y IF
+  BRANCH IF s THEN x AND (x OR y)
+         OTHERWISE FALSE
+
+-- (5) The redundant condition is the first word of a bracket inside another
+--     bracket. Its place is that word, not the bracket before it, which opens
+--     the group around it.
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN, c IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `a hurdle in two brackets` a b c IF
+    a AND ((a AND b) OR c)
+
+-- (6) The redundant condition is in a local definition with a parameter, and
+--     its first word is the parameter. Read through, that word is the argument
+--     at the call; the condition is placed in the definition, where it is
+--     written, once for each use.
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN, d IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `a hurdle in a definition` a b d IF
+    `qualifies` a AND `qualifies` b
+  WHERE
+    GIVEN x IS A BOOLEAN
+    GIVETH A BOOLEAN
+    `qualifies` x MEANS x AND (x OR d)
+
+-- (7) The redundant condition is in what the ELSE of an IF says, which is
+--     checked like what a THEN says.
+GIVEN g IS A BOOLEAN, x IS A BOOLEAN, y IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `a hurdle in an ELSE` g x y IF
+    IF g THEN FALSE ELSE x AND (x OR y)
+
+-- (8) The redundant condition is in what the OTHERWISE of a BRANCH says.
+GIVEN g IS A BOOLEAN, x IS A BOOLEAN, y IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `a hurdle in an OTHERWISE` g x y IF
+  BRANCH IF g THEN TRUE
+         OTHERWISE x AND (x OR y)
+
+-- (9) The redundant condition is a call, which reads through to a condition
+--     the rule already asks for: `either a b` means `a OR b`. It is placed
+--     at the call.
+GIVEN x IS A BOOLEAN, y IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `either` x y IF x OR y
+
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `a hurdle through a call` a b IF
+    a AND `either` a b
+
+-- (13) The same through a call written between its arguments, its first
+--      argument in brackets: `(a AND b) `or else` c` means `(a AND b) OR c`,
+--      which `c` already entails. It is placed at the first word of that
+--      argument, not at either bracket before it.
+GIVEN x IS A BOOLEAN, y IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE x `or else` y IF x OR y
+
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN, c IS A BOOLEAN, d IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `a hurdle through an infix call` a b c d IF
+    c AND d AND ((a AND b) `or else` c)
+
+-- Not reported.
+
+-- (10) The redundant condition is in the test of a row. Every row after the
+--      first carries the tests before it, negated, which nobody wrote, so the
+--      tests are not checked; this is what that costs.
+GIVEN g IS A BOOLEAN, x IS A BOOLEAN, y IS A BOOLEAN, z IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `a hurdle in a test` g x y z IF
+  BRANCH IF x AND (x OR y) THEN g
+         OTHERWISE z
+
+-- Reported once, as a dead branch, not also as a redundant condition.
+
+-- (11) Under a NOT, a condition the context entails is, read the other way
+--      round, an alternative that cannot hold: `a AND NOT (a AND b)` is
+--      `a AND ((NOT a) OR (NOT b))`, whose `NOT a` is dead.
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `a hurdle under a NOT` a b IF
+    a AND NOT (a AND b)
+
+-- (12) The same, deeper: inside an alternative under the NOT.
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN, c IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `a hurdle in an alternative under a NOT` a b c IF
+    a AND NOT (b OR (a AND c))
+
+-- Reported as a redundant condition under a NOT.
+
+-- (14) Under a NOT, a condition only its sibling entails: read the other way
+--      round, `NOT (a AND (a OR b))` is `(NOT a) OR ((NOT a) AND (NOT b))`,
+--      whose second alternative the first already covers. No branch is dead.
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN, c IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `a hurdle inside a NOT` a b c IF
+    c AND NOT (a AND (a OR b))
+
+-- (15) The case of (11) inside an alternative. The normal form distributes
+--      the NOT away and has no dead branch for it, so it is reported here.
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN, c IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `a hurdle under a NOT in an alternative` a b c IF
+    (a AND NOT (a AND b)) OR c

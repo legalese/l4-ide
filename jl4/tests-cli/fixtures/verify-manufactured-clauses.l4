@@ -1,0 +1,44 @@
+§ `VerifyManufacturedClausesFixture`
+
+-- Positive control: rules with no redundant condition (smucclaw/l4-ide#1093).
+--
+-- The ladder's normal form is conjunctive, and distributing a disjunction of
+-- conjunctions manufactures clauses nobody wrote. `(a AND b) OR ((NOT a) AND e)`
+-- becomes `(a OR NOT a) AND (a OR e) AND (NOT a OR b) AND (b OR e)`, and the
+-- last clause follows from the two before it. No condition in any rule below
+-- is redundant -- every input changes the answer somewhere -- so `l4 verify`
+-- must report nothing here and exit 0.
+--
+-- The parentheses around `NOT a` are load-bearing: on one line, NOT reaches to
+-- the end of the line, so `NOT a AND e` reads as `NOT (a AND e)`.
+
+-- The issue's rule, written as a disjunction.
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN, e IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `eligible` a b e IF
+    (a AND b) OR ((NOT a) AND e)
+
+-- The same rule, written as the choice it is.
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN, e IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `eligible, as a choice` a b e IF
+    IF a THEN b ELSE e
+
+-- Three limbs, none implied by the other two. Its normal form has twelve
+-- clauses, several of them entailed by their siblings.
+GIVEN p IS A BOOLEAN, q IS A BOOLEAN, r IS A BOOLEAN, s IS A BOOLEAN, t IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `three ways in` p q r s t IF
+       (p AND q)
+    OR (p AND r AND s)
+    OR (t AND s)
+
+-- Rows that exclude one another. Each row also carries "no row above it
+-- applied", and here the second row's own test already says so: `NOT a`
+-- entails `NOT (a AND b)`. Nobody wrote that negation, so it is not reported.
+GIVEN a IS A BOOLEAN, b IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `exclusive rows` a b IF
+  BRANCH IF a AND b THEN TRUE
+         IF NOT a   THEN TRUE
+         OTHERWISE FALSE

@@ -1,0 +1,5 @@
+IMPORT lib
+
+#EVAL `the answer`
+
+#ASSERT `the answer` EQUALS 42

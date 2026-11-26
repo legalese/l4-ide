@@ -43,7 +43,11 @@ GIVETH A DEONTIC Party Action
 - A plain deadline counts from the moment its rule becomes active: from the start time for the first rule, from the event that completed the rule before it for a rule after `HENCE`, and from the moment the rule before it failed (its missed deadline) for a rule after `LEST`, not from the later event that brought the failure to light. Above, the buyer confirms at 10, so the seller must deliver by 15. [When the next clock starts](#when-the-next-clock-starts) has the `LEST` case.
 - To count from something else, anchor the deadline with `OF` ([below](#anchoring-a-deadline-with-of)), or name a date with [`BEFORE`](#before).
 - As events are read, the time left shrinks: after an event at 12, what was `WITHIN 14` from 0 has 2 left.
-- A rule without `WITHIN` has no deadline. It waits for its action however long it takes, and time alone never takes it to `LEST`.
+- A rule without `WITHIN` (or [`BEFORE`](#before)) has no deadline.
+  It waits for its action however long it takes, and time alone never takes it to `LEST`.
+  So a `LEST` on a `MUST`, `DO` or `MAY` with no deadline can never be reached, and `l4 check` and the editor warn about it ([A LEST that can never be reached](../errors/README.md#lint-lest-without-deadline)): add a `WITHIN`, or remove the `LEST`.
+  A `MUST NOT` (or `SHANT`) is not warned about, because its `LEST` follows the forbidden act, deadline or not.
+  Under [`EVERY`](EVERY.md), a `WITHIN` on the `ONCE` or `UPON EACH` line is a deadline too.
 - L4 finds that a deadline has passed when it reads an event, or a `WAITUNTIL` (see [EVENT](EVENT.md)), with a later time. That event only shows that time has moved on: it is offered in turn to the rule that follows, so a late payment that is the first thing recorded can still discharge the `LEST` reparation it was written for.
 
 ### Anchoring a deadline with OF

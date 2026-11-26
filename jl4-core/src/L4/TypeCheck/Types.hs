@@ -113,6 +113,26 @@ data CheckState =
     -- state are a prefix of the log, which is how 'alikeStates' finds them
     -- without comparing two substitutions in full.
     , bindLogLen :: !Int
+    , overloadedCallees :: !(Map Unique [Type' Resolved])
+    -- ^ For each callee THIS branch of the nondeterministic search chose from
+    -- among several candidates that were all still in the running
+    -- ('resolveTermFilteredIn'), the types of the OTHER candidates, so that a
+    -- named application of it can tell whether its name is an overload for the
+    -- inputs it names. A named site whose callee has such a rival takes a
+    -- @TYPICALLY@ default only if no rival could take the inputs the site
+    -- writes ('L4.TypeCheck.siteTakesNoDefault'): R8 does not rule on
+    -- overloads, and letting a default decide which overload an under-specified
+    -- site means would change a site that was ambiguous into one that quietly
+    -- picks a rule and runs it on a presumed value (review silent F3,
+    -- 2026-10-03; narrowed by decision O3, 2026-10-11).
+    --
+    -- It is cleared before each named application resolves its callee and read
+    -- straight after ('L4.TypeCheck.inferExpr', @AppNamed@), so it describes
+    -- that site and no other (review silent N3). Why the types and not a flag:
+    -- whether another candidate is a rival depends on the site, since a record
+    -- field selector takes no named inputs and a bare definition takes only
+    -- section binders (review silent N2), and whether a rival COULD TAKE the
+    -- site depends on the types of the inputs it names.
     }
   deriving stock (Generic)
 
@@ -123,6 +143,20 @@ data CheckErrorWithContext =
     }
   deriving stock (Eq, Generic, Show)
   deriving anyclass (NFData)
+
+-- | Why @T WITHAL@ cannot be read as a record built from its defaults.
+data WithalMisuse
+  = WithalOnRule Bool
+    -- ^ @T@ is a rule or a field selector, not a record. The flag is @True@ for
+    -- a rule every input of which has a @TYPICALLY@ default: no call can leave
+    -- all of them to their defaults, because @WITH@ names at least one input.
+  | WithalOnPlainAlternative
+    -- ^ @T@ is an alternative of an enumeration that carries nothing.
+  | WithalOverloaded
+    -- ^ @T@ is one of several definitions of its name; @WITHAL@ names no field
+    -- to choose between them.
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass NFData
 
 data CheckError =
     OutOfScopeError Name (Type' Resolved)
@@ -145,10 +179,22 @@ data CheckError =
   | AmbiguousOperatorError Text
   | AmbiguousTypeError Name [(Resolved, Kind)]
   | InternalAmbiguityError
-  | IncorrectArgsNumberApp Resolved Int Int -- expected, given
+  | IncorrectArgsNumberApp Resolved Int Int [Text] [Text]
+    -- ^ expected, given; then, when a call by position gives fewer inputs than
+    -- the callee takes and the callee declares a @TYPICALLY@ default for some
+    -- of them, the names of the inputs that have one and of those that do not,
+    -- so the message can show the @WITH@ form that leaves the first to their
+    -- defaults (both lists are empty otherwise).
   | IllegalApp Resolved (Type' Resolved) Int
   | IllegalAppNamed Resolved (Type' Resolved)
   | IncompleteAppNamed Resolved [OptionallyNamedType Resolved]
+  | IncompleteWithal Resolved [(OptionallyNamedType Resolved, Bool)]
+    -- ^ The fields that have no default, each with whether a @TYPICALLY@ could
+    -- give it one ('L4.TypeCheck.fieldTakesLiteralDefault').
+    -- ^ @T WITHAL@ (TYPICALLY-ONE-BEHAVIOUR-SPEC.md T1) on a record, some of
+    -- whose fields declare no @TYPICALLY@: it names each of them.
+  | IllegalWithal Resolved WithalMisuse
+    -- ^ @T WITHAL@ where @T@ is not a record whose defaults it can take.
   | CheckInfo (Type' Resolved) (Maybe SrcRange)
   | CheckWarning CheckWarning
   | IllegalTypeInKindSignature (Type' Resolved)
@@ -265,6 +311,16 @@ data CheckError =
     --
     -- Arguments: the name as written in the pattern, and the referent's
     -- defining name (whose range is the definition site).
+  | FractionalTraceStamp Rational (Maybe SrcRange)
+    -- ^ The time stamp of one of a @#TRACE@'s events (@AT@ or @WAITUNTIL@) is
+    -- a literal, or a percentage of one, that is not a whole number. A notice,
+    -- never an error: the evaluator uses the stamp as written, and the notice
+    -- is only to say what @l4 explore@ does with it, which is not to read it
+    -- (from a @#TRACE@ it takes the contract and the start), and by default to
+    -- try whole instants. The trace's own start is not noticed, because the
+    -- explorer reads it as its clock. Severity 'SInfo'.
+    --
+    -- Arguments: the stamp, and where it is written.
   | ActionPatternNotComparable (Expr Name) (Type' Resolved)
     -- ^ An argument slot of a regulative action pins a value of a __function__
     -- type — @MUST apply g@ under @GIVEN g IS A FUNCTION FROM NUMBER TO
@@ -378,6 +434,16 @@ data CheckError =
   | TypicallyOnTypeVariable Name
     -- ^ A TYPICALLY default was written on a TYPE variable / type binder, where
     -- a default value is meaningless.
+  | TypicallyOnComputedField Name
+    -- ^ A TYPICALLY default was written on a computed field (one with a MEANS
+    -- clause). The field is derived, so a default would never be used
+    -- (TYPICALLY-ONE-BEHAVIOUR-SPEC.md T1). Carries the field.
+  | MeansOnAlternativeField Name Name
+    -- ^ A MEANS clause was written on a payload field of an enum constructor.
+    -- Only a record's field can be computed: a constructor's payload is
+    -- supplied when the constructor is applied, so the clause would never be
+    -- evaluated (Lane C L7, ruled 2026-10-12). Carries the constructor
+    -- and the field.
   | NonassertableOnNonDefinition Text (Maybe Text) (Maybe SrcRange)
     -- ^ An @\@nonassertable@ annotation sits above something that is not a
     -- definition: the first text says what (a declaration, an input, a section
@@ -576,6 +642,27 @@ data CheckWarning
     -- spelling and the new one (@`WAIT UNTIL`@ is now @WAITUNTIL@). The old
     -- spelling still resolves to the same built-in, so nothing changes but
     -- the warning (Note [Renamed built-ins] in "L4.TypeCheck.Environment").
+  | LestWithoutDeadline LestWithoutDeadlineInfo
+    -- ^ smucclaw/l4-ide#1097: a @LEST@ that nothing can ever reach, because
+    -- the rule's modal reaches its @LEST@ only when its deadline passes and
+    -- the rule has no deadline ('L4.TypeCheck.warnLestWithoutDeadline').
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass NFData
+
+-- | Everything 'LestWithoutDeadline' needs to phrase its advice.
+data LestWithoutDeadlineInfo = MkLestWithoutDeadlineInfo
+  { range :: Maybe SrcRange
+    -- ^ The @LEST@ keyword, the warning's anchor; the @LEST@'s body when the
+    -- keyword cannot be found.
+  , modal :: DeonticModal
+    -- ^ @MUST@, @DO@ or @MAY@: never 'DMustNot', whose @LEST@ is reached by
+    -- the forbidden act, deadline or not.
+  , quantified :: Bool
+    -- ^ An @EVERY@ rule, whose deadline may also go on its @ONCE@ or
+    -- @UPON EACH@ line.
+  , opens :: Bool
+    -- ^ The rule has an @AFTER@: a window that opens and never closes.
+  }
   deriving stock (Eq, Generic, Show)
   deriving anyclass NFData
 
@@ -898,6 +985,7 @@ severity (MkCheckErrorWithContext e _) =
     SuspiciousClausePattern {} -> SInfo
     ActionPatternReference {}  -> SInfo
     EndsBecauseNoted {}        -> SInfo
+    FractionalTraceStamp {}    -> SInfo
     _                          -> SError
 
 -- | The answers to @#CHECK@ directives among a module's diagnostics.
@@ -1002,6 +1090,7 @@ checkErrorCode = \ case
   ExportAssumeArityInput {}       -> "check/export-assume-arity-input"
   ExportAssumeNameClash {}        -> "check/export-assume-name-clash"
   ActionPatternReference {}       -> "lint/action-pattern-reference"
+  FractionalTraceStamp {}         -> "lint/fractional-trace-stamp"
   ActionPatternNotComparable {}   -> "check/action-pattern-not-comparable"
   JoinWithoutEvery {}             -> "check/join-without-every"
   EmptyBreachBy {}                -> "check/empty-breach-by"
@@ -1032,6 +1121,11 @@ checkErrorCode = \ case
   NotReachesConnective {}         -> "check/not-reaches-connective"
   OpenedFieldCollisionAtRead {}   -> "check/opened-field-collision-at-read"
   OpenedFieldCollisionAtOpening {}-> "check/opened-field-collision-at-opening"
+  -- TYPICALLY wave (codes decided by Claude 2026-11-23, pending Meng's review)
+  IncompleteWithal {}                -> "check/withal-fields-without-default"
+  IllegalWithal {}                   -> "check/withal-misused"
+  TypicallyOnComputedField {}        -> "check/typically-on-computed-field"
+  MeansOnAlternativeField {}         -> "check/means-on-alternative-field"
   -- codes decided by Claude 2026-11-22, pending Meng's review
   EndsBecauseOnNonDefinition {}   -> "check/ends-because-on-non-definition"
   EndsBecauseNeedsReason {}       -> "check/ends-because-needs-reason"
@@ -1060,6 +1154,8 @@ checkWarningCode = \ case
   RenamedBuiltin {}               -> "lint/renamed-builtin"
   -- codes decided by Claude 2026-11-22, pending Meng's review
   CycleAlarm w                    -> cycleTroubleCode w.trouble
+  -- smucclaw/l4-ide#1097 (code decided by Claude 2026-11-25, pending Meng's review)
+  LestWithoutDeadline {}          -> "lint/lest-without-deadline"
 
 -- | The code of each warning about a rule that starts itself again
 -- (smucclaw/l4-ide#1075; "L4.Cycles.Warning"). One code for each warning,
@@ -1148,6 +1244,8 @@ instance HasSrcRange CheckErrorContext where
 
 instance HasSrcRange CheckError where
   rangeOf (OutOfScopeError n _)             = rangeOf n
+  rangeOf (TypicallyOnComputedField n)      = rangeOf n
+  rangeOf (MeansOnAlternativeField _ n)     = rangeOf n
   rangeOf (InconsistentNameInSignature n _) = rangeOf n
   rangeOf (InconsistentNameInAppForm n _)   = rangeOf n
   rangeOf (ClausePatternCountMismatch r _ _ _) = r
@@ -1163,6 +1261,7 @@ instance HasSrcRange CheckError where
   rangeOf (WhoseNotAField n _ _)            = rangeOf n
   rangeOf (WhoseOperandNotBare e)           = rangeOf e
   rangeOf (ActionPatternReference n _)      = rangeOf n
+  rangeOf (FractionalTraceStamp _ r)        = r
   rangeOf (ActionPatternNotComparable e _)  = rangeOf e
   rangeOf (AnchorUnavailable _ a _)         = rangeOf a
   rangeOf (LifecycleUnavailable _ e _)      = rangeOf e
@@ -1191,6 +1290,7 @@ instance HasSrcRange CheckError where
   rangeOf (CheckWarning (DeprecatedAssume info)) = rangeOf info.name
   rangeOf (CheckWarning (DeprecatedExactly info)) = info.range
   rangeOf (CheckWarning (RenamedBuiltin r _ _)) = Just r
+  rangeOf (CheckWarning (LestWithoutDeadline info)) = info.range
   rangeOf (CheckWarning (SiblingLedgerRead w)) = w.compound
   rangeOf (CheckWarning (CycleAlarm w)) = w.at
   rangeOf (CheckWarning (OpenedFieldShadowsDefinition s)) = rangeOf s.fieldRead
@@ -1371,6 +1471,32 @@ lookupByFirstKeyword kw reg =
 lookupByCanonicalName :: RawName -> MixfixRegistry -> [FunTypeSig]
 lookupByCanonicalName cn reg = fromMaybe [] $ Map.lookup cn reg.byCanonicalName
 
+-- | The @TYPICALLY@ default of one rule input or record field, as the checker
+-- keeps it for the sites that leave it out.
+data InputDefault = MkInputDefault
+  { owner      :: !Name
+    -- ^ The rule or record constructor that declares the input or field, named
+    -- as its declaration writes it, behind the headings it is declared under
+    -- (@Pricing.scaled@; 'L4.TypeCheck.qualifiedOwner'): not an @AKA@ alias, and
+    -- a mixfix rule by the name it is declared with. A rule declared at the top
+    -- of a file, or in a @WHERE@ or @LET@, has no heading to name and stays
+    -- bare. This is the name the evaluator's report gives for the default
+    -- ('L4.Syntax.DefaultFill'), so it must not depend on how a site spelled
+    -- the callee.
+  , binder     :: !Name
+    -- ^ The input or field, as declared.
+  , declaredAt :: !(Maybe SrcRange)
+    -- ^ The @TYPICALLY@ that gave the value.
+  , value      :: !(Expr Resolved)
+    -- ^ The checked default: a literal or a nullary constructor.
+  }
+  deriving stock (Eq, Generic, Show)
+  deriving anyclass (NFData)
+
+-- | The defaults a rule or a record constructor declares, keyed by its
+-- 'Unique', then by the 'Unique' of the input or field that carries each.
+type InputDefaults = Map Unique (Map Unique InputDefault)
+
 data CheckEnv =
   MkCheckEnv
     { moduleUri            :: !NormalizedUri
@@ -1408,6 +1534,13 @@ data CheckEnv =
     -- the spelling (R-X2, smucclaw\/l4-ide#956).
     --
     -- Reset across imports for the same reason 'sectionBinderNames' is.
+    , visibleInputDefaults :: !InputDefaults
+    -- ^ The @TYPICALLY@ defaults of every rule input and record field this
+    -- module can see, keyed by the rule or record constructor that declares
+    -- them. A named application ('L4.TypeCheck.supplyAppNamed') that leaves one
+    -- out reads the value from here instead of reporting it missing
+    -- (TYPICALLY-ONE-BEHAVIOUR-SPEC.md W4 and W5). Unlike 'functionTypeSigs'
+    -- this accumulates: a @WHERE@ body can still see its enclosing rules'.
     , importedImplicitReaders :: !(Set Unique)
     -- ^ Definitions in IMPORTED modules whose read-set is non-empty: they take
     -- section binders as parameters once their own module is discharged, and
@@ -1538,8 +1671,8 @@ data ActionPatternPos
 -- 'RawName' and unioning it across modules could conflate same-named
 -- record types; the cost is error-message quality only (see the notes in
 -- the exhaustiveness design doc).
-unionImportedCheckEnv :: CheckEnv -> Environment -> EntityInfo -> MixfixRegistry -> Set Unique -> CheckEnv
-unionImportedCheckEnv accEnv depEnvironment depEntityInfo depMixfixRegistry depImplicitReaders =
+unionImportedCheckEnv :: CheckEnv -> Environment -> EntityInfo -> MixfixRegistry -> Set Unique -> InputDefaults -> CheckEnv
+unionImportedCheckEnv accEnv depEnvironment depEntityInfo depMixfixRegistry depImplicitReaders depInputDefaults =
   MkCheckEnv
     { moduleUri = accEnv.moduleUri
     , environment = Map.unionWith List.union accEnv.environment depEnvironment
@@ -1552,6 +1685,7 @@ unionImportedCheckEnv accEnv depEnvironment depEntityInfo depMixfixRegistry depI
     , computedFields = Map.empty
     , sectionBinderNames = mempty
     , sectionBinderDecls = mempty
+    , visibleInputDefaults = Map.union accEnv.visibleInputDefaults depInputDefaults
     , importedImplicitReaders =
         Set.union accEnv.importedImplicitReaders depImplicitReaders
     , inNonexhaustiveDecide = False
@@ -1621,6 +1755,13 @@ data CheckResult =
     , descMap        :: !DescMap
     , mixfixRegistry :: !MixfixRegistry
     -- ^ Registry of mixfix functions from this module (to be propagated to importers)
+    , inputDefaults  :: !InputDefaults
+    -- ^ The @TYPICALLY@ defaults of every rule input and record field this
+    -- module declares, plus those it inherited from its dependencies, so a chain
+    -- of imports carries them all the way out. An importer merges this into
+    -- 'CheckEnv.visibleInputDefaults', which is what lets a named application of an
+    -- imported rule, or a construction of an imported record, leave a defaulted
+    -- input or field out (TYPICALLY-ONE-BEHAVIOUR-SPEC.md W4 and W5).
     , implicitReaders :: !(Set Unique)
     -- ^ Definitions with a non-empty read-set: this module's own, plus those
     -- it inherited from its dependencies, so a chain of imports carries them
@@ -2287,7 +2428,21 @@ resolveTermFilteredIn shadowing preambleErr p viab n kont = do
     [(_t, x)] -> x >>= kont
     xs ->
       let
-        kept = [ x | (t', x) <- xs, viab t' ]
+        keptT = [ (t', x) | (t', x) <- xs, viab t' ]
+        kept0 = map snd keptT
+        -- Several candidates remain in the running: remember, on each branch,
+        -- which one it chose and what the others were, so that a named site can
+        -- see whether its callee is an overload ('overloadedCallees'). A single
+        -- survivor is no overload. Which of the others count as rivals is the
+        -- site's to say, not this function's: it knows the inputs it names.
+        kept
+          | length kept0 > 1 = zipWith markOverloaded [0 :: Int ..] keptT
+          | otherwise        = kept0
+        markOverloaded i (_, cand) = do
+          chosen@(rn, _) <- cand
+          modifying #overloadedCallees
+            (Map.insert (getUnique rn) [ t' | (j, (t', _)) <- zip [0 :: Int ..] keptT, j /= i ])
+          pure chosen
         fallback = do
           v <- fresh (rawName n)
           n' <- setAnnResolvedType v Nothing n
@@ -2669,6 +2824,20 @@ orElseKeepAll m1 m2 = do
         then candidates
         else runCheck m2 e s
 
+-- | Would the computation come out 'True' on some branch that reports no error?
+--
+-- It is run from the current state and then forgotten: whatever the branches
+-- unified, minted or reported never reaches the caller's search, and exactly
+-- one outcome comes back, in the state the caller had. This is for asking
+-- whether something WOULD fit. 'orElse' is for keeping the first computation
+-- that does.
+speculate :: Check Bool -> Check Bool
+speculate m = MkCheck $ \ e s ->
+  [ ( Plain (or [ b | (w, _) <- runCheck m e s, viableCandidate w, let (_, b) = runWith w ])
+    , s
+    )
+  ]
+
 -- | Allow the subcomputation to have at most one result.
 --
 -- NOTE: This backtracking search is type-directed and prunes only after it
@@ -3005,6 +3174,7 @@ extendEnv cis env =
     , computedFields = e.computedFields
     , sectionBinderNames = e.sectionBinderNames
     , sectionBinderDecls = e.sectionBinderDecls
+    , visibleInputDefaults = e.visibleInputDefaults
     , importedImplicitReaders = e.importedImplicitReaders
     , inNonexhaustiveDecide = e.inNonexhaustiveDecide
     , enclosingObligation = e.enclosingObligation

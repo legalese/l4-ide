@@ -182,12 +182,15 @@ test-suite l4-cli-test
     CliTest.Catala
     CliTest.Common
     CliTest.Coverage
+    CliTest.Deploy
     CliTest.DmnBpmn
     CliTest.Docassemble
     CliTest.Ledger
     CliTest.Explore
+    CliTest.RunImported
     CliTest.JsonDecode
     CliTest.SiblingReads
+    CliTest.WithOverride
     CliTest.OpenFisca
     CliTest.Prove
     CliTest.Yscript
@@ -205,9 +208,11 @@ test-suite l4-cli-test
     directory,
     filepath,
     hspec,
+    http-types,
     jl4-core,
     lsp-types,
     process,
     temporary,
     text,
-
+    wai,
+    warp,

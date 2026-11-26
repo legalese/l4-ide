@@ -61,7 +61,11 @@ If the event's action holds a fact the case has not supplied, at a place where t
 
 The same holds when the missing fact is checked by a rule that uses `CONSIDER`, whether in the action or in a `PROVIDED` condition: an `OTHERWISE` line is not taken just because the fact is missing, so where a line before it could still match, the run stops and names it.
 
-For `MUST`, doing the action leads to `HENCE` and a missed deadline to `LEST`. For `MAY`, both lead to `HENCE`, because not using a permission is no breach. A prohibition, `SHANT`, turns `MUST` around: doing the forbidden act leads to `LEST`, and reaching the deadline without it leads to `HENCE`. In every case, `HENCE` names the outcome the law wants, and `LEST` the one it does not. `DO` is the bare form, with no modal word; on the current release it behaves exactly as `MUST` does — the same defaults, and the same outcomes when the action is taken and when the deadline passes.
+For `MUST`, doing the action leads to `HENCE` and a missed deadline to `LEST`.
+For `MAY`, doing the action leads to `HENCE` and a passed deadline to `LEST`, and a `LEST` left out is `FULFILLED`, because not using a permission is no breach.
+A prohibition, `SHANT`, turns `MUST` around: doing the forbidden act leads to `LEST`, and reaching the deadline without it leads to `HENCE`.
+For a duty or a prohibition, `HENCE` names the outcome the law wants, and `LEST` the one it does not.
+`DO` is the bare form, with no modal word; on the current release it behaves exactly as `MUST` does — the same defaults, and the same outcomes when the action is taken and when the deadline passes.
 
 The timeline is just numbers. It can stand for days, hours or business days, as long as deadlines and event times use the same unit.
 
@@ -126,8 +130,8 @@ Larger contracts are built by putting rules inside rules.
         │ arrives  │    │             │  │                │
         └────┬─────┘    └──────┬──────┘  └──────┬─────────┘
              │                 │                │
-   (MUST/MAY: HENCE)   (MUST: LEST,            │
-   (SHANT:    LEST)     SHANT/MAY: HENCE)      │
+   (MUST/MAY: HENCE)   (MUST/MAY: LEST,        │
+   (SHANT:    LEST)     SHANT:    HENCE)       │
              │                 │           (skip, try next ─┘
              ▼                 ▼            with clock advanced)
        ┌──────────┐      ┌──────────┐

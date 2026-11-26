@@ -1,0 +1,16 @@
+-- The last file of a chain of three (smucclaw/l4-ide#1115). It imports
+-- ok/section-given-import-operand-mid.l4, which imports
+-- ok/section-given-import-operand-def.l4.
+--
+-- `window and one` reads nothing of mid's own section GIVEN, so it is an
+-- ordinary rule here; `window plus bonus` reads `bonus` (4 by default) and
+-- itself reads `the window` (30) from the file beyond, so here it is an
+-- imported rule that reads a section GIVEN, used as an operand.
+
+IMPORT `section-given-import-operand-mid`
+
+#EVAL `window and one`                              -- 31
+#EVAL `window plus bonus`                           -- 34
+#EVAL `window plus bonus` PLUS 1                    -- 35
+#EVAL 1 PLUS `window and one`                       -- 32
+#EVAL `window plus bonus` > `window and one`        -- TRUE

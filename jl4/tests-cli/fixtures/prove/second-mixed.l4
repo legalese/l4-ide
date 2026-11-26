@@ -1,0 +1,8 @@
+-- l4 prove fixture (smucclaw/l4-ide#1098): three obligations, so that one
+-- run can ask the second solver about some of them and not the others.
+§ `Three claims`
+    GIVEN x IS A NUMBER
+
+#ASSERT x PLUS x EQUALS 2 TIMES x
+#ASSERT x TIMES 0 EQUALS 0
+#ASSERT x MINUS x EQUALS 0

@@ -1,0 +1,10 @@
+-- smucclaw/l4-ide#1025: a module with one type error. Every other file
+-- here imports it, top.l4 through mid.l4.
+
+`the answer` MEANS 42
+
+`broken` MEANS 1 PLUS TRUE
+
+GIVEN x IS A BOOLEAN
+GIVETH A BOOLEAN
+DECIDE `lib agrees` x IF x

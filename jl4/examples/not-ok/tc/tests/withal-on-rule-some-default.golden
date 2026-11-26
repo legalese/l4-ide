@@ -1,0 +1,16 @@
+Parsing successful
+Typechecking successful
+Info | updateFileDiagnostics published different from new diagnostics - file diagnostics:
+File: withal-on-rule-some-default.l4
+  Hidden: no
+  Range: 10:7-10:20
+  Source: check
+  Severity: DiagnosticSeverity_Error
+  Code: check/withal-misused
+  Message:
+    WITHAL builds a record with the default of every field, but
+
+      scaled (defined at withal-on-rule-some-default.l4:8:1-7)
+
+    is not a record: it is a rule, or a field of one. To use a rule and leave
+    some of its inputs to their defaults, name the other inputs with WITH.

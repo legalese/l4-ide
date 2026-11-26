@@ -59,6 +59,7 @@ import Control.Monad (forM, when)
 import Data.Foldable (for_, toList)
 import Data.Int (Int32)
 import Data.List (findIndex, isSuffixOf, sort)
+import Data.Maybe (isJust)
 import Data.Time (UTCTime (..), fromGregorian, secondsToDiffTime)
 import System.Directory (listDirectory)
 import System.Environment (lookupEnv)
@@ -614,8 +615,15 @@ barrierExpiredSrc = Text.unlines $ everyPrologue <>
 
 -- review of P1, M1 and W1: a rule in an imported module, whose residual is
 -- shared between directives
-importLibSrc, importUserSrc :: Text.Text
-importLibSrc = Text.unlines $ prologue4 <>
+importLibSrc, importUserSrc, importLocalSrc :: Text.Text
+importLibSrc = Text.unlines $ prologue4 <> importLibBody
+importUserSrc = Text.unlines ("IMPORT wlib" : "" : importUserDirectives)
+-- the same two files as one: what each directive reads, written in the file
+-- itself (smucclaw/l4-ide#1116)
+importLocalSrc = Text.unlines $ prologue4 <> importLibBody <> [""] <> importUserDirectives
+
+importLibBody, importUserDirectives :: [Text.Text]
+importLibBody =
   [ "GIVETH DEONTIC Person Action"
   , "c MEANS"
   , "  PARTY Alice MUST deliver WITHIN 3"
@@ -629,10 +637,8 @@ importLibSrc = Text.unlines $ prologue4 <>
   , "GIVETH DEONTIC Person Action"
   , "r MEANS EVALTRACE c 0 (LIST EVENT Alice deliver 1)"
   ]
-importUserSrc = Text.unlines
-  [ "IMPORT wlib"
-  , ""
-  , "#EVAL r"
+importUserDirectives =
+  [ "#EVAL r"
   , "#EVAL EVALTRACE r 1 (LIST EVENT Bob (pay 50) 2)"
   , "#EVAL LIST (EVALTRACE other 0 (LIST EVENT Carol deliver 5)), (EVALTRACE r 1 (LIST EVENT Bob (pay 50) 2))"
   ]
@@ -665,8 +671,19 @@ retraceSrc = Text.unlines $ prologue4 <>
 
 -- the same residual, defined in an imported module and re-traced twice, and a
 -- user whose only directive names it
-retraceLibSrc, retraceUserSrc, holeUserSrc :: Text.Text
-retraceLibSrc = Text.unlines $ prologue4 <>
+retraceLibSrc, retraceUserSrc, retraceLocalSrc, holeUserSrc :: Text.Text
+retraceLibSrc = Text.unlines $ prologue4 <> retraceLibBody
+retraceUserSrc = Text.unlines ("IMPORT rtlib" : "" : retraceUserDirectives)
+-- the same two files as one (smucclaw/l4-ide#1116)
+retraceLocalSrc = Text.unlines $ prologue4 <> retraceLibBody <> [""] <> retraceUserDirectives
+holeUserSrc = Text.unlines
+  [ "IMPORT rtlib"
+  , ""
+  , "#EVAL r"
+  ]
+
+retraceLibBody, retraceUserDirectives :: [Text.Text]
+retraceLibBody =
   [ "GIVETH DEONTIC Person Action"
   , "c MEANS"
   , "  PARTY Alice MUST deliver WITHIN 3"
@@ -675,16 +692,9 @@ retraceLibSrc = Text.unlines $ prologue4 <>
   , "GIVETH DEONTIC Person Action"
   , "r MEANS EVALTRACE c 0 (LIST EVENT Carol deliver 5)"
   ]
-retraceUserSrc = Text.unlines
-  [ "IMPORT rtlib"
-  , ""
+retraceUserDirectives =
+  [ "#EVAL EVALTRACE r 0 (LIST EVENT Bob (pay 2) 7)"
   , "#EVAL EVALTRACE r 0 (LIST EVENT Bob (pay 2) 7)"
-  , "#EVAL EVALTRACE r 0 (LIST EVENT Bob (pay 2) 7)"
-  ]
-holeUserSrc = Text.unlines
-  [ "IMPORT rtlib"
-  , ""
-  , "#EVAL r"
   ]
 
 -- review of P1, L1: a party that prints over more than one line
@@ -979,16 +989,25 @@ spec = describe "the norm log writer (NORM-LOG-SPEC, P1)" do
       length rs `shouldBe` 3
       length (fatesOf 0 rs) `shouldSatisfy` (> 0)
 
-    it "W1: a residual defined in an imported module does not take a parent from another directive's hand-offs" do
+    it "W1: a residual defined in an imported module is made by each directive that forces it, so its parent link is that directive's own" do
       rs <- runImports
       -- the one LEST hand-off in the third directive is Carol's, and Dan's norm hangs from it
       [ o.noBranch | e <- fatesOf 2 rs, e.neFate == FateArmed, keyPrefix' e.neBearer == "Dan", Just o <- [e.neOrigin] ]
         `shouldBe` [ViaLest]
-      -- Bob's norm was armed by Alice's HENCE when the residual was first made,
-      -- in another evaluation; this directive must not read that hand-off as its own
-      let bob = [ e.neOrigin | e <- fatesOf 2 rs, keyPrefix' e.neBearer == "Bob" ]
+      -- Bob's norm is armed by Alice's HENCE, in the evaluation of `r` this
+      -- directive made: each directive reads an imported rule afresh, as it
+      -- reads one written in the file (smucclaw/l4-ide#1116). Before that
+      -- the residual was made once, in the first directive, and this one read
+      -- a hand-off that was not in its own log, so the link was left out. The
+      -- link is now in the log it is read from, and the same as the rule
+      -- written in the file gives.
+      let bob = [ e | e <- fatesOf 2 rs, keyPrefix' e.neBearer == "Bob" ]
+          own = map ownRef (fatesOf 2 rs)
       length bob `shouldSatisfy` (> 0)
-      bob `shouldBe` map (const Nothing) bob
+      [ (isJust (parentOf e), parentOf e `elem` own) | e <- bob ] `shouldBe` map (const (True, True)) bob
+      local <- run True importLocalSrc
+      let linksOf es = [ (o.noBranch, o.noParent.nrActivation, o.noParentBearer) | e <- es, keyPrefix' e.neBearer == "Bob", Just o <- [e.neOrigin] ]
+      linksOf (fatesOf 2 rs) `shouldBe` linksOf (fatesOf 2 local)
 
     it "W4: a declared BREACH reached before a norm's clock is forced is written after that norm's Armed entry" do
       rs <- run True breachFirstSrc
@@ -1026,10 +1045,15 @@ spec = describe "the norm log writer (NORM-LOG-SPEC, P1)" do
       rs <- runIn (vfsFromList [("rtlib", retraceLibSrc)]) (\ cfg -> cfg {normLog = True}) retraceUserSrc
       length rs `shouldBe` 2
       let instants d = [ (a, b) | (a, b, _) <- bobArmed d rs ]
-      -- the first directive makes the residual, then re-traces it; the second
-      -- only re-traces it, and its parent link is another evaluation's (W1)
+      -- each directive makes the residual, then re-traces it: the first does
+      -- not leave its residual to the second (smucclaw/l4-ide#1116, before
+      -- which the second only re-traced one made in the first, and its parent
+      -- link was another evaluation's (W1))
       instants 0 `shouldBe` [(Just 3, Just 5), (Just 0, Just 0)]
-      instants 1 `shouldBe` [(Just 0, Just 0)]
+      instants 1 `shouldBe` instants 0
+      -- and they are what the rule written in the file gives
+      local <- run True retraceLocalSrc
+      [ bobArmed d rs | d <- [0, 1] ] `shouldBe` [ bobArmed d local | d <- [0, 1] ]
 
     it "M1b: the extra corpus's control reaches a file whose only trace is an imported EVALTRACE" do
       let modules = [("rtlib", retraceLibSrc), ("rtuser", holeUserSrc)]

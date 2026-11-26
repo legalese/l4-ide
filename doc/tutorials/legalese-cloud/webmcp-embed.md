@@ -42,6 +42,10 @@ The **Integrate** dialog of a deployment in VS Code shows this tag filled in for
 
 Values can be combined: `data-tools="rules,file-tools"`. With `auto`, the tools follow your redeploys without any change to the page. The search tools do the same job as the all-deployments MCP server's `search_rules`, `get_schema` and `evaluate`, under different names; see [Connect an AI agent](ai-agents.md#tool-names-in-webmcp).
 
+## Telling a rule not to assume anything
+
+Every rule tool, and `evaluate_rule`, accepts a `presumption` argument that is `"soft"` (the default) or `"hard"`. With `"hard"`, no default is used: a call that leaves out an input that has a default is refused, naming the input, instead of using the default. The script passes the argument on to the rule with the other arguments, and refuses any other value before sending it. An ordinary rule that has an input called `presumption` is not registered as a tool, and the browser console says so; a rule that describes obligations (its result is a contract) is registered, because its inputs are inside `arguments`. See [Connect an AI agent](ai-agents.md#telling-a-rule-not-to-assume-anything).
+
 ## The API key
 
 1. Open the [Legalese Cloud console](https://legalese.cloud).
