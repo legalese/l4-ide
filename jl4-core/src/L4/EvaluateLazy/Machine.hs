@@ -2935,6 +2935,14 @@ forwardExpr env = \ case
     -- Money OF ...". An argument is never in this position -- arguments are
     -- allocated, not forwarded -- so an 'App1' carrying arguments on top of the
     -- stack means this reference is the function of that application.
+    --
+    -- An operand of RAND or ROR is evaluated in this position too: the compound
+    -- pushes the 'App1' that gives it the time and the events. So an imported
+    -- rule that reads a section GIVEN and returns a contract, written directly
+    -- as such an operand, is still not applied to its own cell here and stops
+    -- with "given signatures' values' lengths do not match"
+    -- (smucclaw/l4-ide#1115; the same before 'allocate_' applied one). The two
+    -- uses of this 'App1' cannot be told apart from here.
     beingApplied <- topFrameAppliesArguments
     -- A bare JSONDECODE in value position, passed as a function, decodes at
     -- the type its own reference was checked at ('jsonDecodeTargetOfReference').
@@ -8384,19 +8392,29 @@ allocate_ (Var ann n) env = do
   case target of
     Just ty -> allocateValue (ValUnaryBuiltinFun (UnaryJsonDecodeAt ty))
     Nothing ->
-      -- special case where we do not actually need to allocate
-      --
-      -- NOT extended to auto-apply a discharged import (see
-      -- 'dischargedImportClosure'). Allocating the application here instead of
-      -- sharing the cell fixes an operand-position reference across an IMPORT, but
-      -- it also fires on every RECORD CONSTRUCTOR: a @DECLARE@'s field names are
-      -- module-level selectors, so a constructor's parameters are keys in its own
-      -- captured environment exactly as a discharged reader's are, and the guard
-      -- cannot tell them apart. Measured 2026-09-05 on the sweep corpus:
-      -- @legal\/promissory-note.l4@ and @legal\/regcf\/regcf.l4@ both went red with
-      -- \"expected a function but found: Money OF ...\". See the operand-position
-      -- limitation recorded in IMPLICIT-PROPS-DESIGN.md.
-      expectTerm env n
+      -- special case where we do not actually need to allocate: the name's
+      -- own cell is the reference
+      do
+        r <- expectTerm env n
+        -- With one exception: a discharged import ('dischargedImportClosure').
+        -- Sharing its cell hands the consumer the CLOSURE where it asked for a
+        -- value, and 'forwardExpr', the only other place that applies one, is
+        -- not where every consumer looks. A built-in forces its operands with
+        -- 'continueRef' (@doubled PLUS 1@ was an internal error and
+        -- @doubled EQUALS 30@ compared a function); a list element or a record
+        -- field simply held the function; a rule's argument and a projection's
+        -- scrutinee passed it on to those (smucclaw/l4-ide#1115). So such a
+        -- reference gets a thunk of its own, @App n []@, which 'forwardExpr'
+        -- applies when it is forced, as it does for a bare @#EVAL doubled@.
+        --
+        -- The guard is the one 'autoApplyDischargedImport' and 'matchGivens''
+        -- use. A rule with inputs of its own, and a record constructor, each
+        -- passed on as a value, still fail it and stay functions
+        -- (ok/section-given-import-operand-call.l4).
+        discharged <- dischargedImportClosure r
+        if discharged
+          then fst <$> allocateRecursive (App ann n []) (const env)
+          else pure r
 allocate_ expr env =
   fst <$> allocateRecursive expr (const env)
 

@@ -1,0 +1,13 @@
+Parsing successful
+Typechecking successful
+Evaluation successful
+section-given-import-operand-chain.l4:12:1-23:
+  31
+section-given-import-operand-chain.l4:13:1-26:
+  34
+section-given-import-operand-chain.l4:14:1-33:
+  35
+section-given-import-operand-chain.l4:15:1-30:
+  32
+section-given-import-operand-chain.l4:16:1-45:
+  TRUE

@@ -896,6 +896,13 @@ renderSectionGivenEvalFixture = fixtureDir </> "render-section-given-eval.l4"
 sectionGivenBridgeSource :: FilePath
 sectionGivenBridgeSource = "examples/ok/section-given-bridge.l4"
 
+-- Rules imported from a file whose section GIVEN has a default, used as operands
+-- (smucclaw/l4-ide#1115), and the same where the section GIVEN has none.
+sectionGivenImportOperandCall, sectionGivenImportOperandUnset, sectionGivenImportOperandChain :: FilePath
+sectionGivenImportOperandCall = "examples/ok/section-given-import-operand-call.l4"
+sectionGivenImportOperandUnset = "examples/ok/section-given-import-operand-unset.l4"
+sectionGivenImportOperandChain = "examples/ok/section-given-import-operand-chain.l4"
+
 -- A mixfix call whose first operand is itself a call.
 renderMixfixOperandFixture :: FilePath
 renderMixfixOperandFixture = fixtureDir </> "render-mixfix-operand.l4"
@@ -1186,6 +1193,7 @@ coreFixtures =
   , renderMeaningFixture, renderHouseStyleFixture, nlgOwnLineFixture, renderUnstableConstructsFixture
   , renderBrokenImportFixture, renderBrokenImportLib, renderHebrewWordsFixture
   , renderSectionGivenEvalFixture, sectionGivenBridgeSource
+  , sectionGivenImportOperandCall, sectionGivenImportOperandUnset, sectionGivenImportOperandChain
   , renderMixfixOperandFixture, renderMixfixNestedFixture, renderSectionGivenBlanksFixture
   , regulativeActionParamSource
   , everyRandSource
@@ -1824,6 +1832,47 @@ spec bin = do
         [ "`tax on` where `amount` is 10 is equal to 12"
         , "`tax on` where `amount` is 10 and `surcharge` is 7 is equal to 17"
         ]
+
+  -- smucclaw/l4-ide#1115. A rule that reads a section GIVEN, defined in an
+  -- IMPORTED file, reached the importer's #EVAL as a function of that GIVEN. A
+  -- bare #EVAL applied it; as an operand it did not, so `PLUS 1` was an
+  -- internal error, `EQUALS 30` said one side was a function, and a list or a
+  -- record that held it held the function. The values are those of the same
+  -- rules in one file.
+  describe "l4 run: an imported rule that reads a section GIVEN, used as an operand" $ do
+    it "gives its value in every position, and keeps a rule with inputs and a constructor functions" $ do
+      o <- runL4 bin ["run", sectionGivenImportOperandCall]
+      let Output code sout _ = o
+          resultOf n = T.strip (T.takeWhile (/= '\n') (T.drop (T.length "Result:\n") (snd (T.breakOn "Result:\n" (resultIn n o)))))
+      code `shouldBe` ExitSuccess
+      sout `shouldNotSatisfy` ("Internal error" `isInfixOf`)
+      map resultOf [1 .. 30] `shouldBe`
+        [ "30", "31", "31", "31", "31", "29", "60", "15"
+        , "TRUE", "FALSE", "TRUE", "TRUE", "assertion satisfied", "assertion satisfied"
+        , "TRUE", "FALSE", "1"
+        , "LIST 30, 1", "Pair OF 30, 2", "31", "31"
+        , "3", "4", "\"thirty\""
+        , "6", "7", "6", "Pair OF 1, 2", "7", "8"
+        ]
+
+    -- Three files: the middle one uses the rule as an operand and has a
+    -- section GIVEN of its own, and this one imports the middle one.
+    it "gives its value through a middle file that uses it as an operand and has a section GIVEN of its own" $ do
+      o <- runL4 bin ["run", sectionGivenImportOperandChain]
+      let Output code sout _ = o
+          resultOf n = T.strip (T.takeWhile (/= '\n') (T.drop (T.length "Result:\n") (snd (T.breakOn "Result:\n" (resultIn n o)))))
+      code `shouldBe` ExitSuccess
+      sout `shouldNotSatisfy` ("Internal error" `isInfixOf`)
+      map resultOf [1 .. 5] `shouldBe` ["31", "34", "35", "32", "TRUE"]
+
+    it "says it is stuck on the assumed term, never that L4 has a bug, where the section GIVEN has no default" $ do
+      Output code sout serr <- runL4 bin ["run", sectionGivenImportOperandUnset]
+      code `shouldBe` ExitFailure 1
+      (sout <> serr) `shouldNotSatisfy` ("Internal error" `isInfixOf`)
+      let out = filter (/= '\r') sout
+      forM_ [1 .. 7] \n -> do
+        evalBlockIn n out `shouldSatisfy` T.isInfixOf "needed to know the value of"
+        evalBlockIn n out `shouldSatisfy` T.isInfixOf "an assumed term"
 
   -- `Marker WITHAL` on a record with no fields checks to a named application
   -- with nothing written. It used to render as a field list with no fields
