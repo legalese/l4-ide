@@ -20,10 +20,12 @@
 //   the same calls. Any answer that differs is a FAIL. The service is stopped
 //   by PID.
 //
-//   The service listens on 127.0.0.1 only (`--host 127.0.0.1`). Without the
-//   option it listens on every interface, so each gate run that touched
-//   jl4-service/ put the service's whole HTTP API, deploy included, on the
-//   network for as long as the probe ran. Every request here goes to 127.0.0.1.
+//   A jl4-service that has `--host` is started with `--host 127.0.0.1`, so it
+//   listens on 127.0.0.1 only. Without the option it listens on every
+//   interface, so each gate run that touched jl4-service/ put the service's
+//   whole HTTP API, deploy included, on the network for as long as the probe
+//   ran. Every request here goes to 127.0.0.1. (A binary that lacks `--host`
+//   cannot be kept on loopback: see the second case below.)
 //
 //   The probe also asks for /health on this machine's own non-loopback IPv4
 //   address, on the same port, and FAILS if the service answers there. That is
@@ -119,7 +121,7 @@ function knowsHost() {
       `could not run \`${bin} --help\` to see whether it has --host: ${why}${said ? ` (${said})` : ""}`,
     );
   }
-  return /--host\b/.test(`${r.stdout}${r.stderr}`);
+  return /--host(?![-\w])/.test(`${r.stdout}${r.stderr}`);
 }
 
 function die(msg) {
@@ -312,7 +314,7 @@ const hostArgs = hostKnown ? ["--host", HOST] : [];
 if (!hostKnown) {
   if (perturbHost) die("--perturb-host needs a jl4-service that has --host");
   console.log(
-    "WARN: this jl4-service has no --host, so it listens on every interface while the probe runs, and the listener was not checked",
+    "NOTE: this jl4-service has no --host, so it listens on every interface while the probe runs",
   );
 }
 const port = await freePort();
@@ -351,18 +353,19 @@ for (let i = 0; i < list.length; i++) {
   if (!same) console.log(`         after:  ${cut(after[i])}`);
 }
 rmSync(dir, { recursive: true, force: true });
-if (hostKnown)
-  console.log(
-    outsideAnswered === null
-      ? "WARN: this machine has no non-loopback IPv4 address, so the check that the service listens on loopback only was not made"
-      : outsideAnswered
-        ? `FAIL: the service answered /health on ${outside.name}, outside loopback${perturbHost ? " (--perturb-host: expected)" : ""}`
-        : `ok    no answer on ${outside.name}, outside loopback`,
-  );
 console.log(
   differs
     ? `FAIL: ${differs} of ${list.length} answers differ after a restart${perturb ? " (--perturb: expected)" : ""}`
     : `ok    ${list.length} answers identical before and after a restart`,
+);
+console.log(
+  !hostKnown
+    ? "WARN: this jl4-service has no --host: it listened on every interface while the probe ran, and the listener was not checked"
+    : outsideAnswered === null
+      ? "WARN: this machine has no non-loopback IPv4 address, so the check that the service listens on loopback only was not made"
+      : outsideAnswered
+        ? `FAIL: the service answered /health on ${outside.name}, outside loopback${perturbHost ? " (--perturb-host: expected)" : ""}`
+        : `ok    no answer on ${outside.name}, outside loopback`,
 );
 const failed = differs > 0 || outsideAnswered === true;
 console.log(failed ? "FAIL" : "PASS");

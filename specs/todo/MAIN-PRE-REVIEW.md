@@ -222,7 +222,7 @@ A build from the round-3 fix branch, `fix/clause-group-round3`, passes on both s
 ### (b) A restart from the store, when `jl4-service/` changes
 
 `node etc/probe-service-restart.mjs <jl4-service>` starts the service on a fresh store and a free port, deploys an ordinary boolean rule and a rule written as clauses, and makes five calls: the boolean rule twice, its query plan, a matching clause, and an input no clause matches.
-It stops the service by PID, checks that `bundle.cbor` was written, restarts it on the same store, waits for both deployments, and makes the same calls; any difference FAILs.
+It stops the service by PID, restarts it on the same store, waits for both deployments, and makes the same calls; any difference FAILs.
 On a build without clause groups it says so and probes the ordinary rule alone.
 `--perturb` asks for a different colour after the restart, so a working probe FAILs.
 It starts the service with `--host 127.0.0.1`, and FAILs if the service answers `/health` on the machine's own non-loopback IPv4 address; `--perturb-host` starts it on `*` instead, so a working probe FAILs.

@@ -33,7 +33,8 @@
 #   (a) jl4-core/src/L4/Parser*: `l4 check` CPU time at 1,000 and 4,000 lines
 #       (etc/probe-parse-scaling.mjs). FAIL above a ratio of 8.
 #   (b) jl4-service/: the same calls before and after a restart, with the
-#       service listening on 127.0.0.1 only (etc/probe-service-restart.mjs).
+#       service started on 127.0.0.1 only, when it has --host
+#       (etc/probe-service-restart.mjs).
 #       FAIL on any difference, or if the service answers outside loopback.
 #       A `WARN:` line from the probe (a binary without --host, or a machine
 #       with no non-loopback IPv4 address: the listener was not checked) does

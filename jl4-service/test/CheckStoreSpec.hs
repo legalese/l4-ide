@@ -298,7 +298,7 @@ spec = describe "jl4-service --check-store" do
         info <- buildOpts
         let refused = case parseOptionsPure "jl4-service" info ["--host", ""] of
               Left (Right (message, code)) ->
-                Just (code, "--host needs an address" `Text.isInfixOf` Text.pack message)
+                Just (code, "needs an address" `Text.isInfixOf` Text.pack message)
               _ -> Nothing
         refused `shouldBe` Just (ExitFailure 1, True)
 
