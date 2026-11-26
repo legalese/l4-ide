@@ -874,6 +874,7 @@ Prefer the literal address to a name.
 Measured on macOS on 2026-11-26, `--host localhost` bound `[::1]`, the IPv6 loopback, and a request to `127.0.0.1` on that port got no answer.
 A value that cannot be bound stops the service at start with the resolver's error.
 `JL4_HOST=` with nothing after it counts as unset.
+`--host ""` is refused with a usage error, because an empty host reached Warp as every interface (measured with `lsof` on macOS on 2026-11-26), and a script that meant one address with `--host "$ADDRESS"` would have exposed the service on all of them when `ADDRESS` was unset.
 
 In a container, leave the default.
 A port published by the container runtime arrives on the container's own network interface and not on its loopback address, so `--host 127.0.0.1` there would make the service unreachable from outside; this is reasoned, not measured.
