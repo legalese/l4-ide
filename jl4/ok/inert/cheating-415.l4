@@ -102,7 +102,7 @@ DECIDE `commits cheating` IF
 #EVAL `commits cheating` TRUE TRUE TRUE FALSE TRUE FALSE FALSE FALSE FALSE FALSE FALSE FALSE FALSE FALSE FALSE FALSE TRUE TRUE TRUE
 
 
--- The "cheating tautology": "whether such deception was or was not
+-- The tautology in s 415: "whether such deception was or was not
 -- the sole or main inducement" - demonstrates a phrase that is structurally
 -- a tautology when the boolean leaves are set appropriately.
 
