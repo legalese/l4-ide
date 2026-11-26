@@ -43,6 +43,7 @@ import L4.EvaluateLazy
   ( EvalConfig (..)
   , EvalDirectiveResult (..)
   , NormLogMutant (..)
+  , evalDirectiveCode
   , execEvalModuleWithEnv
   , prettyEvalDirectiveResult
   , resolveEvalConfig
@@ -1268,9 +1269,15 @@ spec = describe "the norm log writer (NORM-LOG-SPEC, P1)" do
             Nothing -> []
           performed rs i = not (null [ () | e <- fatesOf i rs, e.neFate == FatePerformed, e.neActionHead == Just "pay" ])
           -- does the guard hold at the event of trace 0?
-          -- (and that the run produced a result at all: a guard that cannot be
-          -- answered is an error, not a "no", and the error leaves no result)
-          holds body = do { rs <- run False (src body); length rs `shouldBe` 1; pure (performed rs 0) }
+          -- and was it answered: a read that is refused (a party never forced,
+          -- a clock not reached) is a directive that came to an error, which
+          -- writes no fate, so without the second assertion every
+          -- `holds ... shouldReturn False` would pass on a refusal (review of
+          -- P2b, second review, finding 4)
+          holds body = do
+            rs <- run False (src body)
+            map (evalDirectiveCode . (.result)) rs `shouldBe` ["eval/result"]
+            pure (performed rs 0)
           lestPay g =
             [ "c MEANS"
             , "  PARTY Alice MUST deliver WITHIN 3"
@@ -1455,6 +1462,30 @@ spec = describe "the norm log writer (NORM-LOG-SPEC, P1)" do
         -- Carol's payment and Bob's: Bob's guard is NOT pending, true only if pending was read again
         length [ () | e <- fatesOf 0 rs, e.neFate == FatePerformed, e.neActionHead == Just "pay" ] `shouldBe` 2
 
+      it "R12b: a read in a rule with no input, shared by two guards at two instants, is read again at the second (the shared thunk of N4; review of P2b, second review, finding 3)" do
+        -- R12 now passes the instant in, so no thunk is shared between its two
+        -- guards, and the mutant "the read does not set crNormRead" survived
+        -- it. Here `pending` is one thunk: at Alice's guard, at 2, her
+        -- delivery is outstanding as of 2; at Bob's, at 3, it was performed at
+        -- 2 and is not (the reader compares with <=), so Bob's `NOT pending`
+        -- holds only if the read was made again
+        let shared =
+              [ "c MEANS"
+              , "  PARTY Carol MUST pay m WITHIN 10"
+              , "  HENCE (PARTY Alice MUST deliver PROVIDED pending WITHIN 10"
+              , "         HENCE (PARTY Bob MUST pay n PROVIDED NOT pending WITHIN 10))"
+              , "GIVETH A BOOLEAN"
+              , "pending MEANS OUTSTANDING (PARTY _ MUST deliver) AS OF 2"
+              , "#TRACE c AT 0 WITH"
+              , "  PARTY Carol DOES pay 1 AT 1"
+              , "  PARTY Alice DOES deliver AT 2"
+              , "  PARTY Bob DOES pay 1 AT 3"
+              ]
+        checked shared `shouldBe` True
+        rs <- run False (src shared)
+        map (evalDirectiveCode . (.result)) rs `shouldBe` ["eval/result"]
+        length [ () | e <- fatesOf 0 rs, e.neFate == FatePerformed, e.neActionHead == Just "pay" ] `shouldBe` 2
+
       it "R14: a norm's own guard can read the norm, as outstanding, at its first event" do
         -- a root norm's arming clock is not forced until its first event, and the
         -- writer waits for it (tellArmed); the read must not see the log without it
@@ -1565,6 +1596,24 @@ spec = describe "the norm log writer (NORM-LOG-SPEC, P1)" do
               ]
         checked two `shouldBe` True
         rs <- run False (src two)
+        length [ () | e <- fatesOf 0 rs, e.neFate == FatePerformed, e.neActionHead == Just "pay" ] `shouldBe` 1
+        length [ () | e <- fatesOf 0 rs, e.neFate == FateArmed, e.neActionHead == Just "deliver" ] `shouldBe` 1
+
+      it "R19b: a run that saw no event leaves nothing for the next run to read (review of P2b, second review, finding 1)" do
+        -- a root norm's arming clock is forced at its first event, so a run
+        -- with no event leaves its root norm waiting for a clock; the next
+        -- run's first read forced and wrote it after that run had begun, and
+        -- g's guard counted c's delivery as outstanding
+        let noEvent =
+              [ "c MEANS PARTY Alice MUST deliver WITHIN 10"
+              , "GIVETH DEONTIC Person Action"
+              , "g MEANS PARTY Bob MUST pay n PROVIDED NOT OUTSTANDING (PARTY _ MUST deliver) WITHIN 10"
+              , "#EVAL LIST (EVALTRACE c 0 (LIST)), (EVALTRACE g 0 (LIST EVENT Bob (pay 1) 5))"
+              ]
+        checked noEvent `shouldBe` True
+        rs <- run False (src noEvent)
+        map (evalDirectiveCode . (.result)) rs `shouldBe` ["eval/result"]
+        -- g alone is fulfilled by Bob's payment; with c before it, so is g
         length [ () | e <- fatesOf 0 rs, e.neFate == FatePerformed, e.neActionHead == Just "pay" ] `shouldBe` 1
         length [ () | e <- fatesOf 0 rs, e.neFate == FateArmed, e.neActionHead == Just "deliver" ] `shouldBe` 1
 
