@@ -559,18 +559,30 @@ In pixels that is `TAG_RISE` (its own constant) plus the ascent of the tag's tex
 The OR stack makes room for it.
 Under a medial inert the gap above the rung grows by the band and the inert keeps its place, so the tag has the new room to itself.
 Under a heading the heading's band grows by the band, mirrored below so the rail stays straight.
-An OR with no heading, and a series, pass the first rung's band up to what holds them, so a ghost that is the first rung of a nested OR, or sits in a series rung, clears the parent's "or" too.
-A NOT or IMPLIES rung draws no tag and reserves nothing, and a ghost under no connective already has room in the ordinary gap.
+An OR with no heading, a series and an IMPLIES rule pass up the band of what sits at their own top edge (a series by what its tallest sibling leaves uncovered, in TB only its first child's; a rule by what its height, at least that of the lamp pair, does not already cover), so a ghost that is the first rung of a nested OR, sits in a series rung, or is in the scope or requirement of a rule, clears the parent's "or" too.
+A NOT rung draws no tag and reserves nothing, and a ghost under no connective already has room in the ordinary gap.
 The ASCII band is two rows, because an odd count would put a stack's centre between rows.
-A scene with no eliminable rung is unchanged: 608 fixtures give the same `scene.size` and primitives, byte for byte, as at `a61da005e` (the merge of #895).
-Revertible alone: the commit "ladder: make room above an eliminable rung for its tag".
-Limits, all silent (the scene draws without error), measured under `estimateMetrics` as the gap between two inks in px, negative meaning overlap:
-a ghost leaf whose label is under about 12 characters is narrower than its own tag, and a neighbouring rung's fan curve can cross the overhang (−4.3 to −5.5 px), which this change neither caused nor removes;
-a ghost leaf directly under a NOT shares its band with the NOT label (−7.0 px);
+A scene with no eliminable rung is unchanged: 608 fixtures (600 seeded random trees, in both orientations) give the same `scene.size` and primitives, byte for byte, as at `a61da005e` (the merge of #895).
+Revertible alone: the commits "ladder: make room above an eliminable rung for its tag" and, for the rule, "ladder: pass the tag band through an IMPLIES rung; draw nothing for an unknown glyph role".
+
+**Tag fit, decided by Claude 2026-11-28, pending Meng's review (not a ruling):**
+An eliminable box is at least as wide as its tag, so the tag lies over the box.
+Before that, a ghost label under about 12 characters made a box narrower than its 123 px tag (under `estimateMetrics`: 7.84 px a character plus 28), and a fan curve could cross the overhang; the tag band made some of those cases worse, not only left them as they were.
+Measured as the gap between the tag's ink and a fan curve, negative meaning overlap: in a sweep of 432 scenes (4 shapes of OR, 9 ghost labels of 1 to 16 characters, 6 neighbour labels, LR and TB; the shapes are in `ghost-tag.test.ts`) the ghost's own curves crossed the tag in 112 scenes at `a61da005e` and in 118 at the first tag-band commit (6 of them new, +0.72 to +2.17 becoming −1.53 to −0.32; 16 worse, 40 better), and cross it in none now.
+In a fuzz of 1,300 ghost tags in 900 seeded random trees the tag crossed some curve 162 times at `a61da005e`, 169 at the first tag-band commit and 14 now (one new: +13.14 becoming −1.84), and another ghost's tag 12 times at the first tag-band commit and never now.
+The cost is that a ghost with a short label is a wide, mostly empty box (four characters: 123 px where it was 59).
+Revertible alone: the commit "ladder: widen an eliminable box to its tag".
+
+Limits, all silent (the scene draws without error), measured under `estimateMetrics` as the gap between two inks in px, negative meaning overlap, in the same 1,300-tag fuzz:
+in TB, a series connector passes through the tag of a ghost leaf that is not first in its column, because the wire enters the box from above where the tag is: 246 of 662 TB tags at `a61da005e` (and 3 LR tags), 243 at the first tag-band commit, 239 now; this change does not address it;
+a ghost leaf directly under a NOT shares its band with the NOT label (−7.0 px; 71 of the 1,300 tags overlap some NOT label);
 the `typically` tag, and the `assumed` tag drawn at the same offset, have the collision the otiose tag had (measured for `typically`: −10.08 px under a medial "or"), left alone so that a scene with no ghost stays identical;
-in TB, the series connector crosses the tag of a ghost leaf that is second in a column or of a ghost under an OR that is first in one (−5.4 px and −5.3 px, against −5.4 px and −3.7 px before), which this change neither caused nor removes;
-the geometry of a scene now depends on its states, so the applicants' panel of the s 415 figure is not coordinate-identical to the court's (the deception OR is one band taller and its rungs sit 8.8 px farther from the axis), and §15.3's "one geometry tree under two contexts" holds for the tree and not for the coordinates: the `s415-diff.svg` figure stacks the two panels and is unaffected, but an overlay of one under the other would not line up;
-a call panel builds its own measure and does not pass a band up, and no scene with a ghost inside a panel was measured.
+a call panel builds its own measure and does not pass a band up, and no scene with a ghost inside a panel was measured;
+the geometry of a scene now depends on its states, so the applicants' panel of the s 415 figure is not coordinate-identical to the court's (the deception OR is one band taller and its rungs sit 8.8 px farther from the axis), and §15.3's "one geometry tree under two contexts" holds for the tree and not for the coordinates: the stacking in the `s415-diff.svg` figure is unaffected, but its bytes change, and an overlay of one panel on the other would not line up.
+
+**A decision for later, not made (Claude, 2026-11-28):**
+An opt-in `ViewSpec` field, off by default, could reserve the band on every panel of a comparison, so that two readings of one tree share their coordinates; about ten lines and a test, and no existing scene changes.
+The other way, reserving the band for every leaf and folded group whether or not it is a ghost, so geometry never depends on state, was measured and rejected: in 600 seeded random trees it makes 105 of 290 LR scenes taller (median +70.3 px among them, at most +298.9) and 98 of 310 TB scenes (median +52.7, at most +263.7), and every existing figure and golden would move.
 
 ### 15.2 Source of the flag (both respect the pure-core boundary, §3.2)
 
@@ -579,7 +591,7 @@ a call panel builds its own measure and does not pass a band up, and no scene wi
 
 ### 15.3 Minimisation / diff overlay (extends §13.7's "annotated print mode")
 
-Render one geometry tree under two contexts (two interpretations, two fact-assignments, or before/after a minimisation pass) and mark which rungs changed state — especially which went **eliminable**. The headline artifact: two stacked panels of one circuit, the disputed rung live in one and ghosted in the other. The visual proof of a surplusage argument — and a strong poster (target D).
+Render one geometry tree under two contexts (two interpretations, two fact-assignments, or before/after a minimisation pass) and mark which rungs changed state — especially which went **eliminable**. The headline artifact: two stacked panels of one circuit, the disputed rung live in one and ghosted in the other. (Since 2026-11-27 the two panels are no longer coordinate-identical, because a ghost's tag takes room; see the limits in §15.1.) The visual proof of a surplusage argument — and a strong poster (target D).
 
 Worked SVG + generator (hand-rolled, pre-`ladder-core`): `~/src/legalese/sandbox/mengwong/layman/cheating-415-ladder.{svg,py}`.
 
@@ -1708,9 +1720,9 @@ It is §16's fold model applied to calls, and it gives a folded call §16.1's Ti
 
 As built:
 
-- **Shape.** A panel is a filled rounded box measured like the NOT scope frame (§21): padding on every side, a name band at the top mirrored at the bottom so the ports sit on the panel's own axis, and wire stubs from the panel's edge to its contents (`measurePanel`, `ts-shared/ladder-core/src/layout.ts:1087`).
+- **Shape.** A panel is a filled rounded box measured like the NOT scope frame (§21): padding on every side, a name band at the top mirrored at the bottom so the ports sit on the panel's own axis, and wire stubs from the panel's edge to its contents (`measurePanel`, `ts-shared/ladder-core/src/layout.ts:1092`).
   It is at least as wide as its name.
-  The constants are `PANEL_PAD_X`, `PANEL_PAD_Y`, `PANEL_LABEL` and `PANEL_FONT` in `PIXEL_GEOMETRY` (`layout.ts:120-123`) and `ASCII_GEOMETRY` (`ascii.ts:92-95`); the ASCII carrier draws the panel's outline and name.
+  The constants are `PANEL_PAD_X`, `PANEL_PAD_Y`, `PANEL_LABEL` and `PANEL_FONT` in `PIXEL_GEOMETRY` (`layout.ts:119-122`) and `ASCII_GEOMETRY` (`ascii.ts:92-95`); the ASCII carrier draws the panel's outline and name.
 - **Name.** The call's wire label, prefix-normalised and without backticks, prefixed `▾`: `` `is creditworthy` OF a `` on the wire reads `is creditworthy a` (`callLabel` in `ts-shared/ladder-core/src/viz-adapter.ts`).
   It is not the call as the drafter wrote it; in leaf mode the same call is one box showing its wire label as it is, backticks and `OF` included.
   Clicking the name folds the panel, which is an ordinary `foldSet` fold; folded, it is §16's placeholder, whose `▸` opens it again and whose box takes a value click.
@@ -1719,9 +1731,9 @@ As built:
   Rule boxes keep `boxFill`: white on screen, so the terms are the lightest surface on the page.
   On screen the step is 4.5 lightness points from 95, reproducing the approved page (`palette.ts:228-233`); print and dark keep the same order (`palette.ts:266-270`, `:318-326`).
 - **Open wire on a shaded backdrop.** The plain open-wire ink nearly disappears on the backdrop, so a diagram with panels draws open wire in `wireOpenPanel`, and a diagram without panels is byte for byte as before.
-- **A value on a call is set aside while its panel is open** (`dropOpenPanels`, `layout.ts:1057`).
+- **A value on a call is set aside while its panel is open** (`dropOpenPanels`, `layout.ts:1062`).
   A value on a group is an override (§19); on an open panel it would make the circuit conduct through contents that say otherwise, so it holds only while the panel is folded.
-  While it holds, current follows it: a folded call or group carrying a value conducts by that value, as a leaf does, and not by its hidden contents (`energize`, `layout.ts:469-521`; fixed 2026-10-06, when a folded call pinned TRUE drew green while the circuit stopped at it, and one pinned FALSE drew red with the circuit made straight through it).
+  While it holds, current follows it: a folded call or group carrying a value conducts by that value, as a leaf does, and not by its hidden contents (`energize`, `layout.ts:468-520`; fixed 2026-10-06, when a folded call pinned TRUE drew green while the circuit stopped at it, and one pinned FALSE drew red with the circuit made straight through it).
 - **One click, every copy.** A click on a term sets, or clears, the value on every box with the same `atomId` and no other (`spreadValue`, also in `viz-adapter.ts`), so the `a` inside `is creditworthy a` and the caller's own `a` change together, and `b`'s copy does not.
   Which boxes share an `atomId` is `WHERE-INLINING-SPEC.md` §10.1's identity rule.
 - **Wires stay outside panels they do not enter.** An OR whose branches draw panels routes its fan clear of them (`ladder-core/test/call-panels.test.ts`, "no wire runs through a panel it neither starts nor ends at").
@@ -1730,8 +1742,8 @@ As built:
 
 **Ruled by Meng, 2026-10-05**, in chat: _"When a NOTted term is set to red let’s fill the exit circle with a green and vice versa"_.
 
-As built: the layout puts the NOT's own output value on its inverter glyph, read from the honest three-valued evaluation like box ink and never from a grounding assumption (§26.2), and omits it while unknown (`layout.ts:931-941`).
-The renderer fills the bubble `inverterTrue` when the NOT is TRUE (its term is FALSE), `inverterFalse` when the NOT is FALSE (its term is TRUE), and the old `inverterFill` while unknown (`ladder-svg/src/svg.ts:162`).
+As built: the layout puts the NOT's own output value on its inverter glyph, read from the honest three-valued evaluation like box ink and never from a grounding assumption (§26.2), and omits it while unknown (`layout.ts:936-946`).
+The renderer fills the bubble `inverterTrue` when the NOT is TRUE (its term is FALSE), `inverterFalse` when the NOT is FALSE (its term is TRUE), and the old `inverterFill` while unknown (`ladder-svg/src/svg.ts:166`).
 
 | palette | `inverterTrue`      | `inverterFalse`                 | source               |
 | ------- | ------------------- | ------------------------------- | -------------------- |
