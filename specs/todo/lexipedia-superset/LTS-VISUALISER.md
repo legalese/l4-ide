@@ -397,7 +397,7 @@ leaving it ambiguous will cause someone to cite the wrong one.
 | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
 | `EVERY-EACH-QUANTIFIER-SPEC` §3.1/§3.2/§14 — `EVERY` = AND-join, `EACH` = fork             | **This is what §7 means for semantics.** The only place L4 constructs get Petri readings. |
 | `VERIFICATION-BACKEND-LOWERING-SPEC:60` — TAPAAL, timed-arc nets, "parties-as-token-flows" | **This is what §7 means for tooling** — and P2 declines to join it. §2.4                  |
-| `logic-not-flowcharts.md:697,868`; `DESIGN.md:1207-1209,1368-1372`                         | The published promise P2 redeems.                                                         |
+| `logic-not-flowcharts.md:697,868`; `DESIGN.md:1234-1236,1395-1399`                         | The published promise P2 redeems.                                                         |
 | `DMN-STEELMAN` — Zaidi & Levis 1997, Petri-net encoding of decision-rule chains            | **Red herring.** Decision-side verification; not this.                                    |
 
 ---

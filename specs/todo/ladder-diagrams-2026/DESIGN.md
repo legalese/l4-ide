@@ -180,7 +180,11 @@ type ScenePrim =
       role: "rail" | "rung" | "stub";
       state: ScenePrim["state"];
     }
-  | { kind: "glyph"; at: Pt; role: "open-contact" | "power-terminal" }
+  | {
+      kind: "glyph";
+      at: Pt;
+      role: "power-terminal" | "inverter" | "changeover";
+    }
   | {
       kind: "text";
       id: NodeId;
@@ -537,13 +541,36 @@ Orthogonal to T/F/U:
 | known-true             | closed bump                     | current flows                                                                         |
 | known-false            | dead ink, no break glyph        | current stopped _here, now_                                                           |
 | unknown                | grey passthrough                | value not yet supplied — **may still matter**                                         |
-| **eliminable** _(new)_ | ghosted/dashed box, broken rail | value **cannot matter**: flipping it never changes the output over the region in view |
+| **eliminable** _(new)_ | ghosted/dashed box, fan and tag | value **cannot matter**: flipping it never changes the output over the region in view |
 
-`eliminable ≠ known-false`: a false leaf could flip and change the result; an eliminable leaf is a don't-care — the function's **Boolean difference** w.r.t. it is identically zero. Render: dashed ghost box, reduced opacity, an open-contact break on the rail, optional "otiose" tag.
+`eliminable ≠ known-false`: a false leaf could flip and change the result; an eliminable leaf is a don't-care — the function's **Boolean difference** w.r.t. it is identically zero. Render: dashed ghost box and fan, reduced opacity, and the tag "otiose — always open" over the box of a leaf or folded group; no open-contact break (rulings below).
 
-**Ruling (Meng, 2026-11-27, typed in chat), leaf limb:** open-contact break dropped for FALSE leaves (this includes a folded group pinned FALSE, which is drawn as one box and so takes the leaf path); notes verbatim: "i wonder if we can do without the open-contact break; the colour should be sufficient to indicate that the current stops." (typed with a leading "oh. ", dropped here) and, next, "if we need to update the official ladder diagrams codebase to omit the open contacts, please assign that"; condition kept: an ELIMINABLE rung on an OR fan still draws its ghost break (a leaf, a folded group, a NOT or an IMPLIES; an open AND or OR reports no state of its own and draws none), because the ruling was about FALSE, and no shipped app can produce that state today (the webview and `jl4-web` mount `LadderFlow`, which has no such glyph; `charge-generator` and `regcf-wizard` pass no `states`), so it is reachable only from the demos, the playground, `ladder-svg`'s API and the visualizer's dev route, and is open for Meng to drop as well.
+**Ruling (Meng, 2026-11-27, typed in chat), leaf limb:** open-contact break dropped for FALSE leaves (this includes a folded group pinned FALSE, which is drawn as one box and so takes the leaf path); notes verbatim: "i wonder if we can do without the open-contact break; the colour should be sufficient to indicate that the current stops." (typed with a leading "oh. ", dropped here) and, next, "if we need to update the official ladder diagrams codebase to omit the open contacts, please assign that"; condition kept at the time, and ended by the eliminable limb below: an ELIMINABLE rung on an OR fan still drew its ghost break (a leaf, a folded group, a NOT or an IMPLIES), because the ruling was about FALSE.
 
-**Parent-node limb, decided by Claude 2026-11-27, pending Meng's review (not a ruling):** Meng asked, as a question, "Do you reckon we could get rid of open contacts over parent nodes as well?", and the question was taken as a direction the same day, so a dead parent rung (a NOT whose negand is true, or an IMPLIES) draws no break on the OR fan either; revertible alone: restore the dead branch of the fan-site condition in `layout.ts` (`m.state === "dead" && !m.ownBreak`, with `Measured.ownBreak` set by `leafBox`), which leaves the leaf limb as ruled: a dead leaf and a folded group pinned FALSE stay without a break.
+**Parent-node limb, decided by Claude 2026-11-27, pending Meng's review (not a ruling):** Meng asked, as a question, "Do you reckon we could get rid of open contacts over parent nodes as well?", and the question was taken as a direction the same day, so a dead parent rung (a NOT whose negand is true, or an IMPLIES) draws no break on the OR fan either; revertible alone: restore the dead branch of the fan-site condition in `layout.ts` (`m.state === "dead" && !m.ownBreak`, with `Measured.ownBreak` set by `leafBox`), which leaves the leaf limb as ruled: a dead leaf and a folded group pinned FALSE stay without a break; that revert is no longer a one-branch restore, because the eliminable limb below removed the fan-site emitter whole, so it now means re-adding the emitter for dead rungs.
+
+**Ruling (Meng, 2026-11-27, typed in chat), eliminable limb:** open-contact break dropped for the ELIMINABLE ghost as well, so no scene draws one and the `open-contact` glyph role is gone from `ScenePrim`; note verbatim: "yeah, get rid of the open switch on the eliminable too."
+
+**Ruling (Meng, 2026-11-27, typed in chat), tag spacing:** the OR is spaced out vertically so the ghost's tag does not collide with the medial "or"; note verbatim: "speaking of the eliminable, though, we need to vertically space out the OR so it doesn't collide with the 'otios -- always open'." (his "otios" is the tag text "otiose — always open").
+
+**How the spacing is done, decided by Claude 2026-11-27, pending Meng's review (not a ruling):**
+A leaf or folded group in the `eliminable` state reports `Measured.tagBand`, which is `Geometry.TAG_BAND`: how far the ink of its tag reaches above its box.
+In pixels that is `TAG_RISE` (its own constant) plus the ascent of the tag's text, and the ascent comes from the one `OTIOSE_TAG_SIZE` that also sets the tag's drawn size; in the ASCII geometry the band is set by rule to two rows.
+The OR stack makes room for it.
+Under a medial inert the gap above the rung grows by the band and the inert keeps its place, so the tag has the new room to itself.
+Under a heading the heading's band grows by the band, mirrored below so the rail stays straight.
+An OR with no heading, and a series, pass the first rung's band up to what holds them, so a ghost that is the first rung of a nested OR, or sits in a series rung, clears the parent's "or" too.
+A NOT or IMPLIES rung draws no tag and reserves nothing, and a ghost under no connective already has room in the ordinary gap.
+The ASCII band is two rows, because an odd count would put a stack's centre between rows.
+A scene with no eliminable rung is unchanged: 608 fixtures give the same `scene.size` and primitives, byte for byte, as at `a61da005e` (the merge of #895).
+Revertible alone: the commit "ladder: make room above an eliminable rung for its tag".
+Limits, all silent (the scene draws without error), measured under `estimateMetrics` as the gap between two inks in px, negative meaning overlap:
+a ghost leaf whose label is under about 12 characters is narrower than its own tag, and a neighbouring rung's fan curve can cross the overhang (−4.3 to −5.5 px), which this change neither caused nor removes;
+a ghost leaf directly under a NOT shares its band with the NOT label (−7.0 px);
+the `typically` tag, and the `assumed` tag drawn at the same offset, have the collision the otiose tag had (measured for `typically`: −10.08 px under a medial "or"), left alone so that a scene with no ghost stays identical;
+in TB, the series connector crosses the tag of a ghost leaf that is second in a column or of a ghost under an OR that is first in one (−5.4 px and −5.3 px, against −5.4 px and −3.7 px before), which this change neither caused nor removes;
+the geometry of a scene now depends on its states, so the applicants' panel of the s 415 figure is not coordinate-identical to the court's (the deception OR is one band taller and its rungs sit 8.8 px farther from the axis), and §15.3's "one geometry tree under two contexts" holds for the tree and not for the coordinates: the `s415-diff.svg` figure stacks the two panels and is unaffected, but an overlay of one under the other would not line up;
+a call panel builds its own measure and does not pass a band up, and no scene with a ghost inside a panel was measured.
 
 ### 15.2 Source of the flag (both respect the pure-core boundary, §3.2)
 
@@ -723,10 +750,10 @@ stay linear). One reading: boxes + spine are rigid structure, curves are flow.
 - Scene IR gains `{ kind: 'curve'; from; c1; c2; to }`; `hCurve(from, to, state)`
   builds it (tangent `t = clamp(max(0.6·|dx|, 0.35·|dy|), 22, 60)`); svg emits a
   `<path>` (class `lad-wire`, so it still fades on FLIP).
-- An eliminable rung's in-curve is dashed/ghosted with the open-contact break glyph at
-  the curve's parametric midpoint (`cubicMid`). **A dead rung takes no break here, and
-  no break anywhere** — see the 2026-11-27 ruling in §15.1; it took one at the leaf that
-  actually failed until then (§26.1).
+- An eliminable rung's curves are dashed/ghosted and carry **no break glyph**: Meng
+  dropped it for the ghost on 2026-11-27, as he had earlier that day for a dead rung — see
+  the rulings in §15.1. **No rung takes a break here, and none anywhere**; a dead rung took
+  one at the leaf that actually failed until then (§26.1).
 - Curves carry the rung's `state` colour. This bullet used to read "green live / grey
   unknown / ghost dead", which was **wrong in two directions at once** and is corrected
   in §26: `dead` had no colour of its own at all (it fell through to the unknown grey),
@@ -1681,9 +1708,9 @@ It is §16's fold model applied to calls, and it gives a folded call §16.1's Ti
 
 As built:
 
-- **Shape.** A panel is a filled rounded box measured like the NOT scope frame (§21): padding on every side, a name band at the top mirrored at the bottom so the ports sit on the panel's own axis, and wire stubs from the panel's edge to its contents (`measurePanel`, `ts-shared/ladder-core/src/layout.ts:1072`).
+- **Shape.** A panel is a filled rounded box measured like the NOT scope frame (§21): padding on every side, a name band at the top mirrored at the bottom so the ports sit on the panel's own axis, and wire stubs from the panel's edge to its contents (`measurePanel`, `ts-shared/ladder-core/src/layout.ts:1087`).
   It is at least as wide as its name.
-  The constants are `PANEL_PAD_X`, `PANEL_PAD_Y`, `PANEL_LABEL` and `PANEL_FONT` in `PIXEL_GEOMETRY` (`layout.ts:106-109`) and `ASCII_GEOMETRY` (`ascii.ts:91-94`); the ASCII carrier draws the panel's outline and name.
+  The constants are `PANEL_PAD_X`, `PANEL_PAD_Y`, `PANEL_LABEL` and `PANEL_FONT` in `PIXEL_GEOMETRY` (`layout.ts:120-123`) and `ASCII_GEOMETRY` (`ascii.ts:92-95`); the ASCII carrier draws the panel's outline and name.
 - **Name.** The call's wire label, prefix-normalised and without backticks, prefixed `▾`: `` `is creditworthy` OF a `` on the wire reads `is creditworthy a` (`callLabel` in `ts-shared/ladder-core/src/viz-adapter.ts`).
   It is not the call as the drafter wrote it; in leaf mode the same call is one box showing its wire label as it is, backticks and `OF` included.
   Clicking the name folds the panel, which is an ordinary `foldSet` fold; folded, it is §16's placeholder, whose `▸` opens it again and whose box takes a value click.
@@ -1692,9 +1719,9 @@ As built:
   Rule boxes keep `boxFill`: white on screen, so the terms are the lightest surface on the page.
   On screen the step is 4.5 lightness points from 95, reproducing the approved page (`palette.ts:228-233`); print and dark keep the same order (`palette.ts:266-270`, `:318-326`).
 - **Open wire on a shaded backdrop.** The plain open-wire ink nearly disappears on the backdrop, so a diagram with panels draws open wire in `wireOpenPanel`, and a diagram without panels is byte for byte as before.
-- **A value on a call is set aside while its panel is open** (`dropOpenPanels`, `layout.ts:1042`).
+- **A value on a call is set aside while its panel is open** (`dropOpenPanels`, `layout.ts:1057`).
   A value on a group is an override (§19); on an open panel it would make the circuit conduct through contents that say otherwise, so it holds only while the panel is folded.
-  While it holds, current follows it: a folded call or group carrying a value conducts by that value, as a leaf does, and not by its hidden contents (`energize`, `layout.ts:449-501`; fixed 2026-10-06, when a folded call pinned TRUE drew green while the circuit stopped at it, and one pinned FALSE drew red with the circuit made straight through it).
+  While it holds, current follows it: a folded call or group carrying a value conducts by that value, as a leaf does, and not by its hidden contents (`energize`, `layout.ts:469-521`; fixed 2026-10-06, when a folded call pinned TRUE drew green while the circuit stopped at it, and one pinned FALSE drew red with the circuit made straight through it).
 - **One click, every copy.** A click on a term sets, or clears, the value on every box with the same `atomId` and no other (`spreadValue`, also in `viz-adapter.ts`), so the `a` inside `is creditworthy a` and the caller's own `a` change together, and `b`'s copy does not.
   Which boxes share an `atomId` is `WHERE-INLINING-SPEC.md` §10.1's identity rule.
 - **Wires stay outside panels they do not enter.** An OR whose branches draw panels routes its fan clear of them (`ladder-core/test/call-panels.test.ts`, "no wire runs through a panel it neither starts nor ends at").
@@ -1703,8 +1730,8 @@ As built:
 
 **Ruled by Meng, 2026-10-05**, in chat: _"When a NOTted term is set to red let’s fill the exit circle with a green and vice versa"_.
 
-As built: the layout puts the NOT's own output value on its inverter glyph, read from the honest three-valued evaluation like box ink and never from a grounding assumption (§26.2), and omits it while unknown (`layout.ts:916-926`).
-The renderer fills the bubble `inverterTrue` when the NOT is TRUE (its term is FALSE), `inverterFalse` when the NOT is FALSE (its term is TRUE), and the old `inverterFill` while unknown (`ladder-svg/src/svg.ts:176`).
+As built: the layout puts the NOT's own output value on its inverter glyph, read from the honest three-valued evaluation like box ink and never from a grounding assumption (§26.2), and omits it while unknown (`layout.ts:931-941`).
+The renderer fills the bubble `inverterTrue` when the NOT is TRUE (its term is FALSE), `inverterFalse` when the NOT is FALSE (its term is TRUE), and the old `inverterFill` while unknown (`ladder-svg/src/svg.ts:162`).
 
 | palette | `inverterTrue`      | `inverterFalse`                 | source               |
 | ------- | ------------------- | ------------------------------- | -------------------- |

@@ -558,7 +558,7 @@ Expansion leaves are not added to the plan's variables: `vizExprToBoolExpr` make
   The label is not the call as the drafter wrote it: a prefix call loses its `OF` and commas, and a mixfix call reads in the surface form the server prints (§10.6), both without backticks.
   Leaf mode shows the wire label as it is, backticks and `OF` included, so ticking "draw calls in place" renames the box; that difference is kept, not designed.
 - `spreadValue(identity, nodeId, value, valuation)` sets, or clears for unknown, the value on every node that shares the clicked node's `atomId`, and on that node alone when it has none (also `viz-adapter.ts`).
-- An open call group is laid out as a **panel**, with the NOT scope frame (DESIGN §21) as its template (`measurePanel`, `ladder-core/src/layout.ts:1072`); `Scene.panelDepth` is the panel nesting of the whole decision, folds ignored (`panelLevels`, `:1053`).
+- An open call group is laid out as a **panel**, with the NOT scope frame (DESIGN §21) as its template (`measurePanel`, `ladder-core/src/layout.ts:1087`); `Scene.panelDepth` is the panel nesting of the whole decision, folds ignored (`panelLevels`, `:1053`).
   A value set on a call is set aside while its panel is open, so an open panel conducts by what it draws (`dropOpenPanels`, `:1042`).
 - `ladder-svg` shades panels by layer and fills the NOT bubble by the NOT's output; both are DESIGN §27.
 - The playground's client-side splice is gone (`ladder-svg/standalone/playground.ts`).

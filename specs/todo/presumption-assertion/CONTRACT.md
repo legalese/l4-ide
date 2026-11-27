@@ -44,25 +44,25 @@ Implementers copy the first table and not the second.
 | concept                   | ladder                                                                                                                           | where                                                                                 |
 | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
 | a node                    | `NodeId`, a box or a group                                                                                                       | `types.ts:236–241`                                                                    |
-| supplied / asserted       | an entry in `ViewSpec.valuation`; on a group it is an **override**: the group takes the value and its children are not consulted | DESIGN §19 (`:738`); `types.ts:236–241`; `nodeValue`, `layout.ts:225–230`             |
-| presumed                  | an entry in `ViewSpec.defaults`, laid _under_ `valuation`; `valuation` wins where both have an entry                             | DESIGN §26.3 (`:1625`); `types.ts:247–262`; `effectiveValuation`, `layout.ts:307–312` |
+| supplied / asserted       | an entry in `ViewSpec.valuation`; on a group it is an **override**: the group takes the value and its children are not consulted | DESIGN §19 (`:765`); `types.ts:236–241`; `nodeValue`, `layout.ts:245–250`             |
+| presumed                  | an entry in `ViewSpec.defaults`, laid _under_ `valuation`; `valuation` wins where both have an entry                             | DESIGN §26.3 (`:1652`); `types.ts:247–262`; `effectiveValuation`, `layout.ts:327–332` |
 | derived                   | a group with no entry of its own derives from its operative children, three-valued                                               | DESIGN §6, §19                                                                        |
-| soft / hard, as a display | `ViewSpec.respectDefaults`: true lays the defaults under, false withdraws them                                                   | DESIGN §26.3; `layout.ts:294–308`, `:415–420`                                         |
-| provenance                | `ViewSpec.provenance` marks a **declaration site** ("this leaf has a TYPICALLY clause"), not the source of the current value     | DESIGN §26.3 (`:1625–1630`); `types.ts:266–267`                                       |
+| soft / hard, as a display | `ViewSpec.respectDefaults`: true lays the defaults under, false withdraws them                                                   | DESIGN §26.3; `layout.ts:314–328`, `:435–440`                                         |
+| provenance                | `ViewSpec.provenance` marks a **declaration site** ("this leaf has a TYPICALLY clause"), not the source of the current value     | DESIGN §26.3 (`:1652–1657`); `types.ts:266–267`                                       |
 | the root                  | the diagram's output, which carries no entry of its own (this document's reading; DESIGN §19 does not say it)                    | —                                                                                     |
 
 Two places where the ladder and the evaluator differ, stated so that nobody copies the wrong one:
 
-- **What an answer rests on** is defined by **forcing in the evaluator** (§5.2), not by the ladder's `energize`, which still energizes an overridden group's children for their own entries and every branch of an OR (`layout.ts:456–457`, `:496`) and so over-counts.
+- **What an answer rests on** is defined by **forcing in the evaluator** (§5.2), not by the ladder's `energize`, which still energizes an overridden group's children for their own entries and every branch of an OR (`layout.ts:476–477`, `:516`) and so over-counts.
 - **A withheld presumption is an unknown, not a refusal, and on the connectives the two agree once the lift lands.** T4 rules an absent input with a withheld default "absent with none (stuck in decide mode, unknown in explore mode)" (TYPICALLY spec `:331`); `UNKNOWN-EVALUATION-SPEC.md` §4.8's `Presumed v` provenance for it is design, not built.
-  Under U1 a term `AND FALSE` is FALSE whatever the order (UES `:369`, row 1 at `:688`), as in the ladder (`layout.ts:225–227`); order matters only for errors and ⊥ (U1b), and U10b lists the remaining divergences and holds the ladder to the evaluator (`:1260`).
+  Under U1 a term `AND FALSE` is FALSE whatever the order (UES `:369`, row 1 at `:688`), as in the ladder (`layout.ts:245–247`); order matters only for errors and ⊥ (U1b), and U10b lists the remaining divergences and holds the ladder to the evaluator (`:1260`).
   At `c6d081622` the lift is not built: `q AND FALSE` is stuck on `q` (`Machine.hs:7310`, `stuckOnAssumed`; the installed binary says "needed to know the value of q"); #556, merged 2026-10-09, builds it.
 
 **Drawing (do not copy these into an evaluator).**
 
 | rule                                                                                | why it is UI only                                                         | where                               |
 | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------- | ----------------------------------- |
-| an override on a call panel holds only while the panel is folded (`dropOpenPanels`) | it keeps an open drawing honest; an evaluator has no open or folded state | DESIGN §27.1; `layout.ts:1033–1050` |
+| an override on a call panel holds only while the panel is folded (`dropOpenPanels`) | it keeps an open drawing honest; an evaluator has no open or folded state | DESIGN §27.1; `layout.ts:1048–1065` |
 | one click sets the value on every box with the same `atomId` (`spreadValue`)        | a gesture; the wire names a node once                                     | DESIGN §27.1; `viz-adapter.ts`      |
 | click cycles U → T → F → U                                                          | a gesture                                                                 | DESIGN §19                          |
 | `types.ts:38`: "a group's value derives; it is never presumed"                      | true today; §7, if ruled, would give `defaults` group entries             | `types.ts:38`                       |
@@ -234,7 +234,7 @@ This document does not change that; it notes that a fill taken at a named site i
 
 Neither evaluator over the ladder tree honours a value on a group today: `eval.ts` reads its assignment only at a `UBoolVar` (`l4-ladder-visualizer/src/lib/eval/eval.ts:99`) and evaluates every `And`/`Or` child (`:165`, `:190`), and the query planner's `BoolExpr` has only variable atoms (`UNKNOWN-EVALUATION-SPEC.md:205`).
 U10b replaces `eval.ts` with a call to the Haskell evaluator, so this document asks nothing of it.
-An assertion reaches the ladder as a `valuation` entry on the node, which `ladder-core`'s `nodeValue` already treats as an override (`layout.ts:225–230`), plus the `asserted` set of §2 for drawing.
+An assertion reaches the ladder as a `valuation` entry on the node, which `ladder-core`'s `nodeValue` already treats as an override (`layout.ts:245–250`), plus the `asserted` set of §2 for drawing.
 For the planner an asserted node is an atom with a fixed value; that is future work and not specified here.
 
 ## 6. The annotation
