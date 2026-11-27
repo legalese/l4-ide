@@ -1621,20 +1621,74 @@ spec = describe "the norm log writer (NORM-LOG-SPEC, P1)" do
         -- the fix writes a run's waiting rows at the start of the next run; the
         -- last run has no next one. A read made after it forces the clock and
         -- writes the row inside the last run's window, so it answers from it;
-        -- with no read, the end of the directive writes it with no instant
+        -- with no read, the end of the directive writes it with no instant.
+        -- The two branches differ, so the answer is seen and not only the row
+        -- (a third review's item A: with equal branches "answered from the
+        -- last run's norms", nit 8, was untested)
         let lone read' =
               [ "c MEANS PARTY Alice MUST deliver WITHIN 10"
               , "GIVETH A BOOLEAN"
               , "still MEANS OUTSTANDING (PARTY _ MUST deliver) AS OF 0"
+              , "GIVETH DEONTIC Person Action"
+              , "yes MEANS PARTY Bob MUST pay n WITHIN 5"
+              , "GIVETH DEONTIC Person Action"
+              , "no MEANS PARTY Carol MUST pay n WITHIN 5"
               , "#EVAL LIST (EVALTRACE c 0 (LIST))" <> read'
               ]
             observedOfDeliver rs = [ e.neObserved | e <- fatesOf 0 rs, e.neFate == FateArmed, e.neActionHead == Just "deliver" ]
-        withRead <- run False (src (lone ", (IF still THEN FULFILLED ELSE FULFILLED)"))
+            shown rs = prettyEvalDirectiveResult (rs !! 0)
+        withRead <- run False (src (lone ", (IF still THEN yes ELSE no)"))
         map (evalDirectiveCode . (.result)) withRead `shouldBe` ["eval/result"]
         observedOfDeliver withRead `shouldBe` [Just 0]
+        -- the read saw c's delivery, so it is outstanding and `yes` is chosen
+        shown withRead `shouldSatisfy` Text.isInfixOf "Bob"
+        shown withRead `shouldSatisfy` (not . Text.isInfixOf "Carol")
         withoutRead <- run False (src (lone ""))
         map (evalDirectiveCode . (.result)) withoutRead `shouldBe` ["eval/result"]
         observedOfDeliver withoutRead `shouldBe` [Nothing]
+
+      it "R19d: a read outside any run, after a run in the same directive, is answered from that run's norms and clock (review of P2b, second review, nit 8)" do
+        -- the run's window and clock are kept after it, so the read sees what
+        -- the run wrote: c's delivery was armed at 0 and performed at 2, so it
+        -- was outstanding as at 1. A window that closed with the run would
+        -- answer "no" (the log it reads is empty), and a clock that did not
+        -- last would refuse the read
+        let afterRun =
+              [ "c MEANS PARTY Alice MUST deliver WITHIN 10"
+              , "GIVETH A BOOLEAN"
+              , "still MEANS OUTSTANDING (PARTY _ MUST deliver) AS OF 1"
+              , "GIVETH DEONTIC Person Action"
+              , "yes MEANS PARTY Bob MUST pay n WITHIN 5"
+              , "GIVETH DEONTIC Person Action"
+              , "no MEANS PARTY Carol MUST pay n WITHIN 5"
+              , "#EVAL LIST (EVALTRACE c 0 (LIST EVENT Alice deliver 2)), (IF still THEN yes ELSE no)"
+              ]
+        checked afterRun `shouldBe` True
+        rs <- run False (src afterRun)
+        map (evalDirectiveCode . (.result)) rs `shouldBe` ["eval/result"]
+        prettyEvalDirectiveResult (rs !! 0) `shouldSatisfy` Text.isInfixOf "Bob"
+        prettyEvalDirectiveResult (rs !! 0) `shouldSatisfy` (not . Text.isInfixOf "Carol")
+
+      it "R19e: the clock is kept after a run, so a read outside any run may ask as at an event's instant that no norm was recorded at (review of P2b, second review, nit 8)" do
+        -- c's guard is false at the event (Alice's delivery at 8), so the run
+        -- records nothing at 8, and the latest instant in the norms it
+        -- recorded is 0; the event's own stamp is what makes 6 an instant the
+        -- run has been at. A clock that did not last would refuse the read
+        let afterGuard =
+              [ "c MEANS PARTY Alice MUST deliver PROVIDED FALSE WITHIN 20"
+              , "GIVETH A BOOLEAN"
+              , "still MEANS OUTSTANDING (PARTY _ MUST deliver) AS OF 6"
+              , "GIVETH DEONTIC Person Action"
+              , "yes MEANS PARTY Bob MUST pay n WITHIN 5"
+              , "GIVETH DEONTIC Person Action"
+              , "no MEANS PARTY Carol MUST pay n WITHIN 5"
+              , "#EVAL LIST (EVALTRACE c 0 (LIST EVENT Alice deliver 8)), (IF still THEN yes ELSE no)"
+              ]
+        checked afterGuard `shouldBe` True
+        rs <- run False (src afterGuard)
+        map (evalDirectiveCode . (.result)) rs `shouldBe` ["eval/result"]
+        prettyEvalDirectiveResult (rs !! 0) `shouldSatisfy` Text.isInfixOf "Bob"
+        prettyEvalDirectiveResult (rs !! 0) `shouldSatisfy` (not . Text.isInfixOf "Carol")
 
       it "R20: a run named once and used twice is run once, though it holds a read (review of P2b, S2)" do
         -- the run's value does not depend on the log it read as it ran; a
