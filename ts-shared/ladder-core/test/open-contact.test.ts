@@ -236,7 +236,7 @@ test("a NOT over a group, itself a rung of an OR, draws no break whether the gro
 
 /* ------------------------------------ …and in both orientations, not only LR */
 
-test("no dead element draws a break in the TB orientation either", () => {
+test("dead elements draw no break in the TB orientation, including the one case that is turned (a series)", () => {
   // Both emission sites sit in code that is written in (main, cross) and projected by
   // `Axis`, so a change that reinstated a break for one orientation alone would pass every
   // LR assertion above. (In TB only a series is turned; an OR is still drawn LR, but its
