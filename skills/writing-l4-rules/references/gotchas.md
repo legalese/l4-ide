@@ -269,7 +269,7 @@ L4 never silently converts between types. `"42" + 1` is a type error. Use the ex
 
 ## The `daydate` month-subtraction footgun
 
-After `IMPORT daydate`, you build calendar dates with `YMD year month day` (recommended for new code, BOUNDS-CHECKED) or the little-endian `Date day month year` (lenient). **This footgun is `Date`-specific**: `YMD` refuses an out-of-range month instead of clamping — `YMD 2025 (3 MINUS 6) 1` stops on `` `YMD refused an out-of-range month or day` `` where `Date 1 (3 MINUS 6) 2025` silently clamps to January 2025. Use `Date` when you _want_ rolling month arithmetic; use `YMD` for literals.
+After `IMPORT daydate`, you build calendar dates with `YMD year month day` (recommended for new code, BOUNDS-CHECKED) or the little-endian `Date day month year` (lenient). **This footgun is `Date`-specific**: `YMD` refuses an out-of-range month instead of clamping — `YMD 2025 (3 MINUS 6) 1` stops on `` `YMD refused an out-of-range month or day` `` (the `dev` build's reason, measured 2026-11-28: `main` builds 109 and 112 say `YMD: the month is not a whole number from 1 to 12`, and `main` build 98 has no `YMD`) where `Date 1 (3 MINUS 6) 2025` silently clamps to January 2025. Use `Date` when you _want_ rolling month arithmetic; use `YMD` for literals.
 
 The constructor does **not** normalise a non-positive month by rolling back a year — it **clamps a month `≤ 0` to January of the same year**. So `Date 1 (3 MINUS 6) 2025` is **January 2025**, _not_ September 2024. Month **overflow** past 12, by contrast, _does_ roll forward correctly: `month PLUS 6` on a December date lands in the next year.
 
@@ -454,7 +454,7 @@ comes next. These are the cases measured, not every possible follower, and only 
 - an `#ASSERT` follows → the same, silently. Measured 2026-11-28: ``DECIDE `doubled` IS n TIMES 2 @nlg SHOULD-BE-ON-RULE``
   followed by ``#ASSERT `doubled` 2 EQUALS 4`` prints `SHOULD-BE-ON-RULE with 2 is equal to 4`, with a clean typecheck and no diagnostic.
 - another rule follows → the herald silently becomes THAT rule's herald. Measured 2026-11-28:
-  `DECIDE a IS 1 @nlg SHOULD-BE-ON-A`, then `DECIDE b IS 2`, then `#EVAL a` and `#EVAL b`, prints `a` and then
+  `DECIDE a IS 1 @nlg SHOULD-BE-ON-A`, then `DECIDE b IS 2`, then `#EVAL a` and `#EVAL b`, prints `` `a` `` (with its backticks) and then
   `SHOULD-BE-ON-A`: the herald is on `b`, `a` is bare, and `l4 check` says `Check succeeded`.
 
 **"Immediately above the definition" means after `GIVETH`, not above `GIVEN` — and the trap here
