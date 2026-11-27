@@ -208,7 +208,7 @@ Guard 1 is the `asserted` list in the envelope; Guard 2 is that the exported fun
 - A node must be named to be addressable; a subexpression an author wants assertable gets a `WHERE` or sibling definition.
 - Building it touches the ladder, the service and the envelope, so it goes on a bench, not in a slice.
 
-Why default-open: it is what the ladder already does, where a value on a folded group overrides its children (`ts-shared/ladder-core/src/layout.ts:1033–1040`); for abduction it is a policy rather than a given, since abducibles are declared, and L4's Blawx export today declares only inputs abducible (`jl4-core/test/BlawxAssumeSpec.hs:159–168`), so default-open there means emitting `#abducible` for every named node not marked; and the opt-out makes the author state that a node is a conclusion.
+Why default-open: it is what the ladder already does, where a value on a folded group overrides its children (`ts-shared/ladder-core/src/layout.ts:1053–1060`); for abduction it is a policy rather than a given, since abducibles are declared, and L4's Blawx export today declares only inputs abducible (`jl4-core/test/BlawxAssumeSpec.hs:159–168`), so default-open there means emitting `#abducible` for every named node not marked; and the opt-out makes the author state that a node is a conclusion.
 Its silent failure, a conclusion left unmarked, is made visible by the `asserted` list.
 
 ## 8. How the design projects to each export (reasoned 2026-10-09; _census_ rows are from the TYPICALLY spec §2, measured 2026-10-01, or from `UNKNOWNS-BACKEND-CONTRACT.md` §6, 2026-10-08, as marked)

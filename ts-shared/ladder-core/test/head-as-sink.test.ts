@@ -25,6 +25,7 @@ import {
   defaultViewSpec,
   PIXEL_GEOMETRY,
 } from "../src/index.js";
+import { unknownGlyphs } from "./glyph-roles.js";
 import type {
   FunDecl,
   IRExpr,
@@ -137,8 +138,7 @@ test("the head takes the body's verdict, and draws no break of its own", () => {
       [theft.id, v],
       [forThatEnd.id, v],
     ]);
-  const breaks = (s: Scene) =>
-    s.prims.filter((p) => p.kind === "glyph" && p.role === "open-contact");
+  const breaks = (s: Scene) => unknownGlyphs(s.prims);
 
   const yes = layout(
     fn,

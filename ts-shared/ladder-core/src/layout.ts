@@ -52,6 +52,7 @@ export interface Geometry {
   FONT: number;
   CARET_PAD: number; // extra room beside a fold placeholder's ▸
   TAG_RISE: number; // how far above a box its otiose/typically tag sits
+  TAG_BAND: number; // room above an ELIMINABLE rung's top edge for its otiose tag (see `Measured.tagBand`)
   HEAD_PAD: number; // an OR heading's band = lineHeight + HEAD_PAD
   HEAD_DROP: number; // …and the heading's baseline nudge inside that band
   NOT_PAD_X: number;
@@ -76,6 +77,15 @@ export interface Geometry {
   PANEL_FONT: number; //  the name's type size
 }
 
+/** The otiose tag's type size: the one place it is written. `leafBox` sets the tag's `size`
+ *  from it, and `PIXEL_GEOMETRY.TAG_BAND` is derived from it, so the room reserved for the
+ *  tag cannot drift from the text it holds. */
+const OTIOSE_TAG_SIZE = 11;
+const OTIOSE_TAG_TEXT = "otiose — always open";
+/** How far a line of text's ink rises above its baseline, as a fraction of the type size. */
+const ASCENT_RATIO = 0.78;
+const PIXEL_TAG_RISE = 9;
+
 /** The pixel geometry the SVG target has always used. */
 export const PIXEL_GEOMETRY: Geometry = {
   PAD_X: 14,
@@ -88,7 +98,10 @@ export const PIXEL_GEOMETRY: Geometry = {
   MARGIN: 70,
   FONT: 14,
   CARET_PAD: 8,
-  TAG_RISE: 9,
+  TAG_RISE: PIXEL_TAG_RISE,
+  // the tag's baseline rides TAG_RISE above the box and its ink rises ASCENT_RATIO of its
+  // size above that baseline: this is how far above the box the tag's ink reaches
+  TAG_BAND: PIXEL_TAG_RISE + ASCENT_RATIO * OTIOSE_TAG_SIZE,
   HEAD_PAD: 12,
   HEAD_DROP: 2,
   NOT_PAD_X: 16,
@@ -166,6 +179,12 @@ interface Measured {
   w: number;
   h: number;
   state: State; // own state (leaf state, or 'inert' for a group/placeholder/inert)
+  /** How far above this box's own top edge something it draws reaches that its `h` does not
+   *  include: the otiose tag of an ELIMINABLE leaf or folded group (`Geometry.TAG_BAND`).
+   *  An OR stack reads it to keep a connective or heading clear of the tag, and passes it up
+   *  when the rung is the first and the stack's own top edge is that rung's. Absent when the
+   *  box draws nothing above itself, so a scene with no ghost is measured as it always was. */
+  tagBand?: number;
   emit(ox: number, oy: number, out: ScenePrim[]): { inPort: Pt; outPort: Pt };
 }
 
@@ -583,12 +602,19 @@ function leafBox(
 ): Measured {
   const { FONT, PAD_X, PAD_Y, CARET_PAD, TAG_RISE } = k;
   const caretW = role === "placeholder" ? tm.width("▸", FONT) + CARET_PAD : 0;
-  const w = caretW + tm.width(label, FONT) + 2 * PAD_X;
+  // An eliminable box is at least as wide as its tag. The tag is centred over the box, and
+  // a tag wider than the box overhangs it into the lanes where the fan curves arrive and
+  // leave, and into the tag of the next ghost along a series.
+  const w = Math.max(
+    caretW + tm.width(label, FONT) + 2 * PAD_X,
+    state === "eliminable" ? tm.width(OTIOSE_TAG_TEXT, OTIOSE_TAG_SIZE) : 0,
+  );
   const h = tm.lineHeight(FONT) + 2 * PAD_Y;
   return {
     w,
     h,
     state,
+    ...(state === "eliminable" ? { tagBand: k.TAG_BAND } : {}),
     // A known-FALSE leaf stops the circuit, and says so in INK alone: `dead` has its own
     // box stroke and wash, where unknown is the plain grey pass-through. No break glyph is
     // drawn at it (Meng, 2026-11-27: "the colour should be sufficient to indicate that the
@@ -629,11 +655,11 @@ function leafBox(
         out.push({
           kind: "text",
           at: { x: ox + w / 2, y: oy - TAG_RISE },
-          text: "otiose — always open",
+          text: OTIOSE_TAG_TEXT,
           anchor: "middle",
           state,
           tag: "otiose",
-          size: 11,
+          size: OTIOSE_TAG_SIZE,
         });
       else if (tag)
         // riding a TYPICALLY presumption (DESIGN §22) or a grounding assumption
@@ -658,7 +684,7 @@ function leafBox(
 // clearance between the wire and the nearest edge of connective text lives in
 // Geometry.CONNECTIVE_GAP — shared by above-wire / below-wire / straddle-wire so
 // they all hug the line identically. Ascent/descent are derived from the font.
-const ascent = (k: Geometry) => k.FONT * 0.78;
+const ascent = (k: Geometry) => k.FONT * ASCENT_RATIO;
 const descent = (k: Geometry) => k.FONT * 0.22;
 
 /** Split inert prose into two width-balanced lines (for 'straddle-wire'). One word
@@ -842,12 +868,6 @@ function curveCrosses(c: Curve, rects: Rect[]): boolean {
         return true;
   }
   return false;
-}
-function cubicMid(c: Curve): Pt {
-  return {
-    x: (c.from.x + 3 * c.c1.x + 3 * c.c2.x + c.to.x) / 8,
-    y: (c.from.y + 3 * c.c1.y + 3 * c.c2.y + c.to.y) / 8,
-  };
 }
 
 function measure(e: IRExpr, ctx: Ctx): Measured {
@@ -1168,9 +1188,26 @@ function measureAnd(e: And, ctx: Ctx): Measured {
   const crossE = Math.max(...kids.map((m) => A.cross(m)));
   const mainE =
     kids.reduce((s, m) => s + A.main(m), 0) + GAP_SERIES * (kids.length - 1);
+  // A child's tag reaches above the series' own top edge when the child's top is that edge:
+  // in LR every child is centred on the cross axis, so a shorter one sits (crossE - its
+  // height) / 2 below it, and in TB the series runs down and only the first child's top is
+  // the series' own. The OR that holds this series as a rung reads the result (`tagBand`).
+  const tagBand = Math.max(
+    0,
+    ...kids.map((m, i) =>
+      m.tagBand === undefined
+        ? 0
+        : A.orient === "TB"
+          ? i === 0
+            ? m.tagBand
+            : 0
+          : m.tagBand - (crossE - A.cross(m)) / 2,
+    ),
+  );
   return {
     ...A.size(mainE, crossE),
     state: "inert",
+    ...(tagBand > 0 ? { tagBand } : {}),
     emit(ox, oy, out) {
       const origin = { x: ox, y: oy };
       let mainPos = A.mainOf(origin);
@@ -1233,7 +1270,16 @@ function measureAnd(e: And, ctx: Ctx): Measured {
  *
  *  A DISJUNCTIVE MEDIAL inert (an inert BETWEEN two rungs, e.g. "or") just sits
  *  unboxed, centered in the gap between the boxes — the gap only widens if the text
- *  needs the room (DESIGN §17). Not connected to the buses; it carries no current. */
+ *  needs the room (DESIGN §17). Not connected to the buses; it carries no current.
+ *
+ *  A rung that draws a TAG above its box (`Measured.tagBand`: the otiose tag of an
+ *  ELIMINABLE leaf) has to keep it clear of what sits above it. Under a medial inert the
+ *  gap grows by the tag's band, and the inert stays where it was, centered in the part of
+ *  the gap it always had, so the tag has the new room to itself (Meng, 2026-11-27: "we
+ *  need to vertically space out the OR so it doesn't collide with the 'otios -- always
+ *  open'", "otios" being the tag's text). Under a heading the heading's band grows the
+ *  same way. With no connective and no heading the ordinary gap already holds the tag, as
+ *  it always did. */
 function measureOr(e: Or, ctx: Ctx): Measured {
   const { tm } = ctx;
   const { FONT, INERT_PAD, GAP_PARALLEL, BUS_PAD, HEAD_PAD, HEAD_DROP } = ctx.k;
@@ -1263,6 +1309,10 @@ function measureOr(e: Or, ctx: Ctx): Measured {
     gapLabel[k] ? tm.width(gapLabel[k] as string, FONT) + 2 * INERT_PAD : 0;
   const gapH = (k: number) =>
     gapLabel[k] ? Math.max(GAP_PARALLEL, lineH + 8) : GAP_PARALLEL;
+  // The tag band of rung `i`, or 0: what it draws above its own top edge.
+  const tagOf = (i: number) => rungs[i]?.m.tagBand ?? 0;
+  // Extra room under the medial inert in gap `k`, for the tag of the rung below it.
+  const tagRoom = (k: number) => (gapLabel[k] ? tagOf(k + 1) : 0);
   const colW = Math.max(
     0,
     ...rungs.map((r) => r.m.w),
@@ -1271,8 +1321,12 @@ function measureOr(e: Or, ctx: Ctx): Measured {
   const totalW = colW + 2 * BUS_PAD;
   const stackH =
     rungs.reduce((s, r) => s + r.m.h, 0) +
-    gapLabel.reduce((s, _, k) => s + gapH(k), 0);
-  const band = head ? lineH + HEAD_PAD : 0;
+    gapLabel.reduce((s, _, k) => s + gapH(k) + tagRoom(k), 0);
+  // The heading's own band is `headBand`, and the heading is set in it. A first rung that
+  // draws a tag adds that tag's band under the heading, mirrored at the bottom like the
+  // rest of the band so the stack stays centered.
+  const headBand = head ? lineH + HEAD_PAD : 0;
+  const band = headBand + (head ? tagOf(0) : 0);
   const h = stackH + 2 * band;
   // A branch that draws a call panel fills its whole row edge to edge, so the sprung fan —
   // which banks across the column on its way to a narrower, centred branch — cuts that
@@ -1291,6 +1345,9 @@ function measureOr(e: Or, ctx: Ctx): Measured {
     w: totalW,
     h,
     state: "inert",
+    // With no heading, the first rung's top edge is this stack's own, so its tag reaches
+    // above the stack and whatever holds the stack has to make room for it.
+    ...(!head && tagOf(0) > 0 ? { tagBand: tagOf(0) } : {}),
     emit(ox, oy, out) {
       const leftX = ox; // the OR's in-port: a single point all rungs fan from
       const rightX = ox + totalW; // the out-port, where they converge again
@@ -1318,7 +1375,7 @@ function measureOr(e: Or, ctx: Ctx): Measured {
               state: "inert",
               tag: "connective",
             });
-          y += gh;
+          y += gh + tagRoom(k);
         }
         const cx = ox + BUS_PAD + (colW - m.w) / 2; // <-- centered horizontally
         const p = m.emit(cx, y, buf);
@@ -1376,26 +1433,19 @@ function measureOr(e: Or, ctx: Ctx): Measured {
             act: fold,
             flow: outFlow,
           });
-        // The break glyph on the fan marks an ELIMINABLE rung only: a ghost, "this rung
-        // cannot matter" (DESIGN §15.1). A DEAD rung — a false leaf, a folded group
-        // pinned false, a NOT whose negand is true — draws no break, over a parent node or
-        // anywhere else (Meng, 2026-11-27: "the colour should be sufficient to indicate
-        // that the current stops"). The ink says it instead: the dead stroke on a box, the
-        // filled NOT bubble and, with current shown, an unlit wire out of the rung.
-        if (m.state === "eliminable") {
-          const mid = cubicMid(inCurve);
-          out.push({
-            kind: "glyph",
-            at: mid,
-            role: "open-contact",
-            state: m.state,
-          });
-        }
+        // No break glyph on the fan, whatever the rung's state. A DEAD rung — a false leaf,
+        // a folded group pinned false, a NOT whose negand is true — says so in ink (Meng,
+        // 2026-11-27: "the colour should be sufficient to indicate that the current
+        // stops"): the dead stroke on a box, the filled NOT bubble and, with current shown,
+        // an unlit wire out of the rung. An ELIMINABLE rung, a ghost that "cannot matter"
+        // (DESIGN §15.1), is the dashed box and fan, with the tag over its box when it is a
+        // leaf; Meng ruled the same for it on the same day ("get rid of the open switch on
+        // the eliminable too").
       });
       if (head)
         out.push({
           kind: "text",
-          at: { x: ox + totalW / 2, y: oy + band / 2 + HEAD_DROP },
+          at: { x: ox + totalW / 2, y: oy + headBand / 2 + HEAD_DROP },
           text: head,
           anchor: "middle",
           state: "inert",
@@ -1430,11 +1480,22 @@ function measureImplies(e: Implies, ctx: Ctx): Measured {
   const w = s.w + SEAM_W + r.w + lampsW;
   // tall enough for the widest panel AND for the lamp pair to clear the axis
   const h = Math.max(s.h, r.h, 2 * (COIL_SEP + COIL_R + tm.lineHeight(FONT)));
+  // A tag in the scope or the requirement reaches above the rule's own top edge unless the
+  // rule is taller than that panel: both are centred on the axis, so a shorter one sits
+  // (h - its height) / 2 below the top. The OR that holds this rule as a rung reads the
+  // result (`tagBand`), as it does for a series.
+  const tagBand = Math.max(
+    0,
+    ...[s, r].map((m) =>
+      m.tagBand === undefined ? 0 : m.tagBand - (h - m.h) / 2,
+    ),
+  );
 
   return {
     w,
     h,
     state: renderState(ctx, e.id),
+    ...(tagBand > 0 ? { tagBand } : {}),
     emit(ox, oy, out) {
       const cy = oy + h / 2; // the rule's axis
       const sp = s.emit(ox, cy - s.h / 2, out);
@@ -1579,7 +1640,7 @@ function measureImplies(e: Implies, ctx: Ctx): Measured {
  *   `svg.ts` keys `lad-clickable` off `act`, so omitting it is the whole fix.
  *
  *   NO break glyph. A `dead` head takes the dead ink, as the body does, and nothing
- *   else: no scene draws an open-contact break for a dead element any more (Meng,
+ *   else: no scene draws an open-contact break for any element any more (Meng,
  *   2026-11-27: "the colour should be sufficient to indicate that the current stops").
  *
  *   STATE COMES FROM THE BODY, not from `fn.id`. `values` is filled by walking

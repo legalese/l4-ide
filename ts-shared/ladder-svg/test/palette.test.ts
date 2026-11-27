@@ -109,7 +109,6 @@ const prims: ScenePrim[] = [
   { kind: "glyph", at: { x: 2, y: 2 }, role: "inverter" },
   { kind: "glyph", at: { x: 2, y: 3 }, role: "inverter", value: "TrueV" },
   { kind: "glyph", at: { x: 2, y: 4 }, role: "inverter", value: "FalseV" },
-  { kind: "glyph", at: { x: 3, y: 3 }, role: "open-contact" },
   { kind: "glyph", at: { x: 4, y: 4 }, role: "power-terminal" },
   {
     kind: "coil",

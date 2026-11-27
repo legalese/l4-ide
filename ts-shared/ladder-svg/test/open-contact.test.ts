@@ -1,11 +1,14 @@
 /**
- * What the SVG says for a FALSE element now that no open-contact break is drawn.
+ * What the SVG says for a FALSE or ELIMINABLE element now that no open-contact break is
+ * drawn.
  *
  * Meng, 2026-11-27: "i wonder if we can do without the open-contact break; the colour
  * should be sufficient to indicate that the current stops." — and over a parent node as
- * well as a leaf. The scene-level half of this (no `open-contact` glyph for any dead
- * state) is `ladder-core/test/open-contact.test.ts`; this file is the rendered half, and
- * it also pins the two cues that are meant to carry the meaning instead:
+ * well as a leaf — and then, for the ghost rung of an OR, "yeah, get rid of the open
+ * switch on the eliminable too." The scene-level half of this (no glyph outside the three
+ * the layout still emits, for any state) is `ladder-core/test/open-contact.test.ts`; this
+ * file is the rendered half, and it also pins the two cues that are meant to carry the
+ * meaning instead:
  *
  *   - the INK: a dead box is not the grey of an unanswered one, in every built-in palette;
  *   - the WIDTH: with current shown, a lit wire is drawn at `flowWidth("closed")` = 3.4 and
@@ -13,8 +16,12 @@
  *     reader who cannot tell the two colours apart. With current OFF there is no `flow`,
  *     every wire is 1.5, and the colour is the only cue — the last test says so.
  *
- * The break glyph is the only thing `svg.ts` draws with `<line>`, which is why the absence
- * of that tag is a faithful "no glyph in the output".
+ * The break was the only thing `svg.ts` drew with `<line>`, so the absence of that tag is a
+ * faithful "no break in the output". `svg.ts` is now exhaustive over the glyph roles: a
+ * role it does not know fails `tsc`, and a hand-built scene that carries one anyway draws
+ * nothing (it used to draw the power terminal's dot). So a reinstated emitter under a new
+ * name would be invisible in the SVG, and the guard that catches it is the scene-level one in
+ * `ladder-core/test/open-contact.test.ts`; the last-but-one test here pins the renderer half.
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -25,7 +32,13 @@ import {
   DARK_PALETTE,
 } from "../src/index.js";
 import { layout, defaultViewSpec, estimateMetrics } from "@repo/ladder-core";
-import type { FunDecl, IRExpr, NodeId, UBoolValue } from "@repo/ladder-core";
+import type {
+  FunDecl,
+  IRExpr,
+  NodeId,
+  Scene,
+  UBoolValue,
+} from "@repo/ladder-core";
 
 const leaf = (id: NodeId, label: string): IRExpr => ({
   $type: "UBoolVar",
@@ -116,17 +129,64 @@ test("a FALSE element renders no open-contact break, leaf or parent, in either t
     }
 });
 
-test("the ELIMINABLE ghost break is still drawn: the renderer is not what changed", () => {
+test("an ELIMINABLE rung renders as a dashed ghost with its tag, and no break", () => {
+  // The ghost is told by its dash and its tag alone. Compare the same OR with and without
+  // the ghost state: the glyph count is the same, and nothing drawn is a `<line>`.
   const body = or(2, [leaf(3, "a"), leaf(4, "b")]);
-  const svg = sceneToSvg(
-    layout(
-      { id: 1, name: "r", params: [], body } satisfies FunDecl,
-      defaultViewSpec({ states: new Map([[4, "eliminable" as const]]) }),
-      estimateMetrics,
-    ),
+  const draw = (states: Map<NodeId, "eliminable">) =>
+    sceneToSvg(
+      layout(
+        { id: 1, name: "r", params: [], body } satisfies FunDecl,
+        defaultViewSpec({ states }),
+        estimateMetrics,
+      ),
+    );
+  for (const [name, svg] of [
+    ["ghost", draw(new Map([[4, "eliminable" as const]]))],
+    ["plain", draw(new Map())],
+  ] as const) {
+    assert.doesNotMatch(svg, /<line\b/, `${name}: no bars`);
+  }
+  const ghost = draw(new Map([[4, "eliminable" as const]]));
+  assert.match(ghost, /stroke-dasharray="5 4"/, "the ghost is still dashed");
+  assert.match(ghost, /otiose — always open/, "…and still tagged");
+});
+
+test("a glyph of an unknown role draws nothing: no dot, no bars", () => {
+  const scene = layout(
+    {
+      id: 1,
+      name: "r",
+      params: [],
+      body: or(2, [leaf(3, "a"), leaf(4, "b")]),
+    } satisfies FunDecl,
+    defaultViewSpec({}),
+    estimateMetrics,
   );
-  assert.equal(svg.match(/<line\b/g)?.length, 2, "two bars");
-  assert.match(svg, /stroke="#b9bdc2" stroke-width="1.6"/);
+  const stray = {
+    kind: "glyph",
+    at: { x: 120, y: 80 },
+    role: "open-switch",
+  } as unknown as Scene["prims"][number];
+  // an empty drawing is an empty line in the output, so compare without blank lines
+  const marks = (svg: string) => svg.split("\n").filter((l) => l !== "");
+  const withStray = sceneToSvg({ ...scene, prims: [...scene.prims, stray] });
+  assert.deepEqual(
+    marks(withStray),
+    marks(sceneToSvg(scene)),
+    "the stray glyph left no mark",
+  );
+  // positive control: a KNOWN role at the same point does draw something
+  const known = {
+    kind: "glyph",
+    at: { x: 120, y: 80 },
+    role: "power-terminal",
+  } as const;
+  assert.notEqual(
+    sceneToSvg({ ...scene, prims: [...scene.prims, known] }),
+    sceneToSvg(scene),
+    "…and a known role does",
+  );
 });
 
 test("a lit wire and a dark wire still differ in stroke width, not in colour alone", () => {

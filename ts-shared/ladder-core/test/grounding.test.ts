@@ -14,6 +14,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { layout, defaultViewSpec, estimateMetrics } from "../src/index.js";
+import { unknownGlyphs } from "./glyph-roles.js";
 import type {
   FunDecl,
   Grounding,
@@ -64,8 +65,7 @@ const boxFor = (s: Scene, id: NodeId) =>
     (p): p is Extract<ScenePrim, { kind: "box" }> =>
       p.kind === "box" && p.id === id,
   )!;
-const breaks = (s: Scene) =>
-  s.prims.filter((p) => p.kind === "glyph" && p.role === "open-contact");
+const breaks = (s: Scene) => unknownGlyphs(s.prims);
 const tags = (s: Scene) =>
   s.prims
     .filter(
