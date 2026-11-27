@@ -318,7 +318,7 @@ type Default = Either (Maybe Bool) (Maybe Bool)
 Leaf rendering as a relay contact:
 
 - **known true** → raised bump / closed contact (current flows through)
-- **known false** → gap / open contact (current stopped)
+- **known false** → the dead ink (current stopped); drawn with no break glyph since 2026-11-27, see the ruling in §15.1
 - **unknown** → plain pass-through box (grey)
 
 Combinator highlighting: when one branch of an OR is true while siblings are unknown/false, show the circuit **closed over** the true element and **stopped** by false ones. True/false lines are drawn against the _inner_ element (margins-aware), per §5.7.
@@ -535,11 +535,15 @@ Orthogonal to T/F/U:
 | state                  | contact                         | meaning                                                                               |
 | ---------------------- | ------------------------------- | ------------------------------------------------------------------------------------- |
 | known-true             | closed bump                     | current flows                                                                         |
-| known-false            | open gap                        | current stopped _here, now_                                                           |
+| known-false            | dead ink, no break glyph        | current stopped _here, now_                                                           |
 | unknown                | grey passthrough                | value not yet supplied — **may still matter**                                         |
 | **eliminable** _(new)_ | ghosted/dashed box, broken rail | value **cannot matter**: flipping it never changes the output over the region in view |
 
 `eliminable ≠ known-false`: a false leaf could flip and change the result; an eliminable leaf is a don't-care — the function's **Boolean difference** w.r.t. it is identically zero. Render: dashed ghost box, reduced opacity, an open-contact break on the rail, optional "otiose" tag.
+
+**Ruling (Meng, 2026-11-27, typed in chat), leaf limb:** open-contact break dropped for FALSE leaves (this includes a folded group pinned FALSE, which is drawn as one box and so takes the leaf path); notes verbatim: "i wonder if we can do without the open-contact break; the colour should be sufficient to indicate that the current stops." (typed with a leading "oh. ", dropped here) and, next, "if we need to update the official ladder diagrams codebase to omit the open contacts, please assign that"; condition kept: an ELIMINABLE rung on an OR fan still draws its ghost break (a leaf, a folded group, a NOT or an IMPLIES; an open AND or OR reports no state of its own and draws none), because the ruling was about FALSE, and no shipped app can produce that state today (the webview and `jl4-web` mount `LadderFlow`, which has no such glyph; `charge-generator` and `regcf-wizard` pass no `states`), so it is reachable only from the demos, the playground, `ladder-svg`'s API and the visualizer's dev route, and is open for Meng to drop as well.
+
+**Parent-node limb, decided by Claude 2026-11-27, pending Meng's review (not a ruling):** Meng asked, as a question, "Do you reckon we could get rid of open contacts over parent nodes as well?", and the question was taken as a direction the same day, so a dead parent rung (a NOT whose negand is true, or an IMPLIES) draws no break on the OR fan either; revertible alone: restore the dead branch of the fan-site condition in `layout.ts` (`m.state === "dead" && !m.ownBreak`, with `Measured.ownBreak` set by `leafBox`), which leaves the leaf limb as ruled: a dead leaf and a folded group pinned FALSE stay without a break.
 
 ### 15.2 Source of the flag (both respect the pure-core boundary, §3.2)
 
@@ -720,9 +724,9 @@ stay linear). One reading: boxes + spine are rigid structure, curves are flow.
   builds it (tangent `t = clamp(max(0.6·|dx|, 0.35·|dy|), 22, 60)`); svg emits a
   `<path>` (class `lad-wire`, so it still fades on FLIP).
 - An eliminable rung's in-curve is dashed/ghosted with the open-contact break glyph at
-  the curve's parametric midpoint (`cubicMid`). **A dead rung no longer takes its break
-  here** — see §26: the break is drawn at the leaf that actually failed, and the fan
-  suppresses its own when the rung already drew one.
+  the curve's parametric midpoint (`cubicMid`). **A dead rung takes no break here, and
+  no break anywhere** — see the 2026-11-27 ruling in §15.1; it took one at the leaf that
+  actually failed until then (§26.1).
 - Curves carry the rung's `state` colour. This bullet used to read "green live / grey
   unknown / ghost dead", which was **wrong in two directions at once** and is corrected
   in §26: `dead` had no colour of its own at all (it fell through to the unknown grey),
@@ -763,7 +767,7 @@ stay unknown.
 
 **Next (P1): current flow.** The energization pass (DESIGN discussion): propagate
 current from the source — closed paths drawn **thick + dark**, open ones thin + light,
-the FALSE break-glyph at the stop — so cycling values visibly closes the circuit, and
+the FALSE break-glyph at the stop (dropped 2026-11-27, §15.1) — so cycling values visibly closes the circuit, and
 satisfied-OR siblings ghost as don't-cares. Binary closed/open (UNKNOWN = open) per the
 box-model spec.
 
@@ -1339,12 +1343,12 @@ One source on the left. **Two sinks** on the right. The requirement's verdict th
 **And now count the lamps.** Every outcome the rule has is legible from which lamp is lit, with
 no extra ink and — crucially — **no bypass**:
 
-| Scope     | Requirement   | Green   | Red     | Reading                                                          |
-| --------- | ------------- | ------- | ------- | ---------------------------------------------------------------- |
-| ✗ open    | _not reached_ | dark    | dark    | **N/A** — the rule never bit. The break is visible IN THE SCOPE. |
-| ? unknown | ?             | dark    | dark    | **undetermined** — nothing is asserted yet                       |
-| ✓ closed  | ✓ closed      | **LIT** | dark    | **complies**                                                     |
-| ✓ closed  | ✗ open        | dark    | **LIT** | **IN BREACH**                                                    |
+| Scope     | Requirement   | Green   | Red     | Reading                                                           |
+| --------- | ------------- | ------- | ------- | ----------------------------------------------------------------- |
+| ✗ open    | _not reached_ | dark    | dark    | **N/A** — the rule never bit. The scope is drawn in the dead ink. |
+| ? unknown | ?             | dark    | dark    | **undetermined** — nothing is asserted yet                        |
+| ✓ closed  | ✓ closed      | **LIT** | dark    | **complies**                                                      |
+| ✓ closed  | ✗ open        | dark    | **LIT** | **IN BREACH**                                                     |
 
 This is the whole reason the two-sink form is better than anything above it. §25.3 had to
 _special-case_ vacuity — grey the panel, stamp `N/A`. Here **N/A is simply "no current left the
@@ -1352,8 +1356,9 @@ scope"**, and the reader sees exactly _where_ it stopped. Nothing has to be draw
 nothing has to be suppressed either. The pedantry problem dissolves rather than being managed.
 
 _(N/A and "undetermined" are both dark lamps, and they are distinguished the same way a lawyer
-distinguishes them: by looking at **where the break is**. A scope that is definitively `✗` shows a
-clean open contact — tested, and it did not bite. A scope that is `?` is grey — not yet asked.)_
+distinguishes them: by looking at **the ink of the scope**. A scope that is definitively `✗` is drawn
+in the dead ink — tested, and it did not bite. A scope that is `?` is grey — not yet asked. Until
+2026-11-27 the first also showed a clean open-contact break; the ruling in §15.1 dropped it.)_
 
 **The polarity toggle is no longer needed.** The first draft made the citizen and the Bad Man
 read _different diagrams_. They now read the **same** diagram and simply care about different
@@ -1579,10 +1584,10 @@ byte-identical SVG to a never-asked one**. Step 4's seam-S8 palette extraction (
 carried the defect forward faithfully — `DARK_PALETTE`, added there, set `dead` to `inert`'s
 grey too, and `palette.test.ts` gained a test _asserting_ the byte-identity as "a
 pre-existing fact", with a note to whoever wired the state up. This is that. That contradicted §6 ("known false → gap / open contact" vs
-"unknown → plain pass-through box"), §15.1's four-state table, and §18's curve-colour bullet —
-and it broke something load-bearing: §25.4 distinguishes **N/A** from **undetermined** purely
-by _where the break is_ ("a scope that is definitively ✗ shows a clean open contact… a scope
-that is `?` is grey"). With one grey and no break, the two-lamp form had lost its only way to
+"unknown → plain pass-through box"; as then worded, see §15.1), §15.1's four-state table, and §18's curve-colour bullet —
+and it broke something load-bearing: §25.4 distinguished **N/A** from **undetermined** purely
+by _where the break was_ ("a scope that is definitively ✗ shows a clean open contact… a scope
+that is `?` is grey"; as then worded, see §15.1). With one grey and no break, the two-lamp form had lost its only way to
 say which of those a reader was looking at. The ASCII carrier had honoured the design all
 along (`✓ / ✗ / ?`, §24.3); the SVG had not.
 
@@ -1593,9 +1598,9 @@ question faintly, a don't-care fainter still. **On screen `dead` is a mild red**
 slate, with red withheld because red belongs to the breach lamp and a false atom is very often
 the _good_ outcome — an exception that did not apply. The mild red keeps that distinction: it
 is paler and browner than `coilRed`, so a false box does not read as a breach. Print
-(`INK_PALETTE`) and dark (`DARK_PALETTE`) are unchanged. And a dead leaf draws the §15.1 **open gap** at its own out-port, offset clear of
-the box, so the break sits where the current actually stopped rather than on some enclosing
-group. `Measured.ownBreak` stops the OR fan double-reporting the same failure.
+(`INK_PALETTE`) and dark (`DARK_PALETTE`) are unchanged. A dead leaf also drew the §15.1 **open gap** at its own out-port, offset clear of
+the box, with `Measured.ownBreak` stopping the OR fan double-reporting the same failure.
+That gap was dropped on 2026-11-27 (§15.1): the ink above is now the whole cue, and `ownBreak` and `NOT_BREAK_ROOM` went with it.
 
 ### 26.2 `ViewSpec.grounding` — choosing the epistemics, visibly and reversibly
 
@@ -1606,9 +1611,9 @@ library's own `holds` / `presumed` eliminators. Two invariants keep it from dege
 a global truth-value hack:
 
 1. **Collapse at the eliminator, never in the data.** `layout` computes the honest Kleene
-   values _and_ a second grounded map. Honest values drive **render state** — box ink, the
-   open-contact break; grounded values drive **conduction** — energize, lamps, `complete`. An
-   assumed atom therefore still draws grey and unbroken, and §25.4's read-off survives.
+   values _and_ a second grounded map. Honest values drive **render state** — box ink; grounded
+   values drive **conduction** — energize, lamps, `complete`. An assumed atom therefore still
+   draws grey, and §25.4's read-off survives.
 2. **It defaults for silence; it never overrules speech.** Grounding fills only atoms with no
    stated value. An author who wrote `holds p` here and `presumed q` there has chosen per use
    site, and this knob cannot reach that. (The spec assigns them by polarity — `presumed` for
@@ -1634,8 +1639,8 @@ answers), an answer always wins, and withdrawing presumptions touches no answer.
 
 A circuit can be complete on atoms nobody answered. `provisional` reports that, and renderers
 soften accordingly: a made circuit goes **muted** green rather than the §20 made-green, a lit
-lamp goes **hollow and dashed** rather than filled and bold, and a presumed-FALSE break takes
-§22's fine dash. The lamp case is not optional polish — an `Implies` body is never `complete`
+lamp goes **hollow and dashed** rather than filled and bold. (A presumed-FALSE break used to take
+§22's fine dash too; no break is drawn for a FALSE element since 2026-11-27, §15.1, and the box keeps the dash.) The lamp case is not optional polish — an `Implies` body is never `complete`
 (it has two sinks), so the wire treatment can never fire on a _rule_, which is exactly the
 diagram where a knob can carry a reader from "undetermined" to a lit IN BREACH lamp with no
 new facts.
@@ -1678,7 +1683,7 @@ As built:
 
 - **Shape.** A panel is a filled rounded box measured like the NOT scope frame (§21): padding on every side, a name band at the top mirrored at the bottom so the ports sit on the panel's own axis, and wire stubs from the panel's edge to its contents (`measurePanel`, `ts-shared/ladder-core/src/layout.ts:1072`).
   It is at least as wide as its name.
-  The constants are `PANEL_PAD_X`, `PANEL_PAD_Y`, `PANEL_LABEL` and `PANEL_FONT` in `PIXEL_GEOMETRY` (`layout.ts:110-113`) and `ASCII_GEOMETRY` (`ascii.ts:92-95`); the ASCII carrier draws the panel's outline and name.
+  The constants are `PANEL_PAD_X`, `PANEL_PAD_Y`, `PANEL_LABEL` and `PANEL_FONT` in `PIXEL_GEOMETRY` (`layout.ts:106-109`) and `ASCII_GEOMETRY` (`ascii.ts:91-94`); the ASCII carrier draws the panel's outline and name.
 - **Name.** The call's wire label, prefix-normalised and without backticks, prefixed `▾`: `` `is creditworthy` OF a `` on the wire reads `is creditworthy a` (`callLabel` in `ts-shared/ladder-core/src/viz-adapter.ts`).
   It is not the call as the drafter wrote it; in leaf mode the same call is one box showing its wire label as it is, backticks and `OF` included.
   Clicking the name folds the panel, which is an ordinary `foldSet` fold; folded, it is §16's placeholder, whose `▸` opens it again and whose box takes a value click.
@@ -1689,7 +1694,7 @@ As built:
 - **Open wire on a shaded backdrop.** The plain open-wire ink nearly disappears on the backdrop, so a diagram with panels draws open wire in `wireOpenPanel`, and a diagram without panels is byte for byte as before.
 - **A value on a call is set aside while its panel is open** (`dropOpenPanels`, `layout.ts:1042`).
   A value on a group is an override (§19); on an open panel it would make the circuit conduct through contents that say otherwise, so it holds only while the panel is folded.
-  While it holds, current follows it: a folded call or group carrying a value conducts by that value, as a leaf does, and not by its hidden contents (`energize`, `layout.ts:462-514`; fixed 2026-10-06, when a folded call pinned TRUE drew green while the circuit stopped at it, and one pinned FALSE drew red with the circuit made straight through it).
+  While it holds, current follows it: a folded call or group carrying a value conducts by that value, as a leaf does, and not by its hidden contents (`energize`, `layout.ts:449-501`; fixed 2026-10-06, when a folded call pinned TRUE drew green while the circuit stopped at it, and one pinned FALSE drew red with the circuit made straight through it).
 - **One click, every copy.** A click on a term sets, or clears, the value on every box with the same `atomId` and no other (`spreadValue`, also in `viz-adapter.ts`), so the `a` inside `is creditworthy a` and the caller's own `a` change together, and `b`'s copy does not.
   Which boxes share an `atomId` is `WHERE-INLINING-SPEC.md` §10.1's identity rule.
 - **Wires stay outside panels they do not enter.** An OR whose branches draw panels routes its fan clear of them (`ladder-core/test/call-panels.test.ts`, "no wire runs through a panel it neither starts nor ends at").
@@ -1699,7 +1704,7 @@ As built:
 **Ruled by Meng, 2026-10-05**, in chat: _"When a NOTted term is set to red let’s fill the exit circle with a green and vice versa"_.
 
 As built: the layout puts the NOT's own output value on its inverter glyph, read from the honest three-valued evaluation like box ink and never from a grounding assumption (§26.2), and omits it while unknown (`layout.ts:916-926`).
-The renderer fills the bubble `inverterTrue` when the NOT is TRUE (its term is FALSE), `inverterFalse` when the NOT is FALSE (its term is TRUE), and the old `inverterFill` while unknown (`ladder-svg/src/svg.ts:175`).
+The renderer fills the bubble `inverterTrue` when the NOT is TRUE (its term is FALSE), `inverterFalse` when the NOT is FALSE (its term is TRUE), and the old `inverterFill` while unknown (`ladder-svg/src/svg.ts:176`).
 
 | palette | `inverterTrue`      | `inverterFalse`                 | source               |
 | ------- | ------------------- | ------------------------------- | -------------------- |

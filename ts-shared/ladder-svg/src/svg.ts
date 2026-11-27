@@ -155,12 +155,13 @@ function prim(
         // one pole, two throws — the requirement's verdict throws the blade
         return `<circle cx="${p.at.x.toFixed(1)}" cy="${p.at.y.toFixed(1)}" r="3" fill="${pal.glyphDot}"/>`;
       if (p.role === "open-contact") {
-        // A break on a FALSE element is a settled fact and is drawn firmly; a break on an
-        // ELIMINABLE one is a ghost (DESIGN §15.1). Same glyph, different conviction.
+        // `layout` emits this glyph for an ELIMINABLE rung only, and that one is a ghost
+        // (DESIGN §15.1). It stopped emitting one for a FALSE element on 2026-11-27 (Meng:
+        // "the colour should be sufficient to indicate that the current stops"); a scene
+        // built by hand can still carry a `dead` break, and it is drawn firmly here.
         const col = p.state === "dead" ? pal.dead : pal.ghost;
         const wdt = p.state === "dead" ? 2 : 1.6;
-        // …and a break whose falsity is only PRESUMED takes §22's fine dash, exactly as
-        // its box does. Same ink (a presumption is not a ghost), softer line.
+        // …and a hand-built break marked `tentative` takes §22's fine dash, as a box does.
         const d = p.tentative ? ' stroke-dasharray="1.5 3"' : "";
         return (
           `<line x1="${(p.at.x - 7).toFixed(1)}" y1="${(p.at.y - 7).toFixed(1)}" x2="${(p.at.x - 7).toFixed(1)}" y2="${(p.at.y + 7).toFixed(1)}" stroke="${col}" stroke-width="${wdt}"${d}/>` +

@@ -4,7 +4,7 @@
  * A.3 as `covers IMPLIES requirement-met`, drawn as ONE path with TWO lamps. The
  * point of the exercise is the verdict table: count the lit lamps.
  *
- *   scope ✗   → both dark  → N/A: the rule never bit (the break is IN THE SCOPE)
+ *   scope ✗   → both dark  → N/A: the rule never bit (the scope is drawn in the dead ink)
  *   scope ?   → both dark  → undetermined
  *   ✓ then ✓  → GREEN      → complies
  *   ✓ then ✗  → RED        → in breach

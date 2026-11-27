@@ -131,7 +131,7 @@ test("the head carries no click affordance — its value is derived, not settabl
   assert.equal(heads(withHead)[0].act, undefined);
 });
 
-test("the head takes the body's verdict, and does not draw a second break", () => {
+test("the head takes the body's verdict, and draws no break of its own", () => {
   const val = (v: UBoolValue) =>
     new Map<NodeId, UBoolValue>([
       [theft.id, v],
@@ -153,10 +153,11 @@ test("the head takes the body's verdict, and does not draw a second break", () =
     tm,
   );
   assert.equal(heads(no)[0].state, "dead");
-  // the break belongs where the current stopped — inside the body — and the head must
-  // not report the same failure a second time
+  // A dead head takes the dead ink and nothing more: no scene draws a break for a dead
+  // element (Meng, 2026-11-27), so the head and the headless picture agree on none.
   const noPlain = layout(fn, defaultViewSpec({ valuation: val("FalseV") }), tm);
-  assert.equal(breaks(no).length, breaks(noPlain).length);
+  assert.equal(breaks(no).length, 0);
+  assert.equal(breaks(noPlain).length, 0);
 
   const dunno = layout(fn, defaultViewSpec({ headAsSink: true }), tm);
   assert.equal(heads(dunno)[0].state, "inert");

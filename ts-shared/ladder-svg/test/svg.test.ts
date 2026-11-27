@@ -307,9 +307,10 @@ test("completeness does not recolour streamer or open runs", () => {
 
 /** The bug this pins: `strokeFor` sent `dead` to `p.inert` and both palettes set
  *  `dead === inert`, so a tested-and-false element and a never-asked one emitted
- *  BYTE-IDENTICAL SVG. §25.4 distinguishes N/A from undetermined purely by "where the
- *  break is" — a definitively ✗ scope shows a clean open contact, a ? scope is grey —
- *  so collapsing the two deleted the two-lamp form's only means of saying which it is.
+ *  BYTE-IDENTICAL SVG. §25.4 distinguishes N/A from undetermined by "where the break
+ *  is" — a definitively ✗ scope shows a clean open contact, a ? scope is grey — and the
+ *  break has since gone (2026-11-27): the ink is now the whole of it, so collapsing the
+ *  two would delete the two-lamp form's only means of saying which it is.
  *  The ASCII carrier always honoured this (`✓ / ✗ / ?`); the SVG did not. */
 test("a FALSE box and an UNKNOWN box do not render the same ink", () => {
   const box = (state: "dead" | "inert"): ScenePrim => ({
@@ -356,8 +357,10 @@ test("all four leaf states are mutually distinguishable in both themes", () => {
 
 /** The break glyph is shared by `dead` and `eliminable`, and they mean different
  *  things: a false contact was TESTED and did not bite; a don't-care CANNOT matter.
- *  Firm ink vs ghost. Absent `state` keeps the old ghost rendering. */
-test("a dead break is drawn firmly; an eliminable break stays a ghost", () => {
+ *  Firm ink vs ghost. Absent `state` keeps the old ghost rendering. `layout` emits only
+ *  the eliminable one since 2026-11-27; this pins what the RENDERER does with a hand-built
+ *  scene, and `open-contact.test.ts` pins what the layout emits. */
+test("a hand-built dead break is drawn firmly; an eliminable break stays a ghost", () => {
   const brk = (state?: "dead" | "eliminable"): string =>
     sceneToSvg(
       scene({

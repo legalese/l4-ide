@@ -81,7 +81,6 @@ export const ASCII_GEOMETRY: Geometry = {
   NOT_LABEL: CELL_H,
   NOT_BUBBLE: 2 * CELL_W,
   NOT_R: CELL_W,
-  NOT_BREAK_ROOM: 0, // the ASCII break is a character on the wire, not bars about a centre
   CONNECTIVE_GAP: 0,
   STRADDLE_MIN_WIDTH: Infinity, // a code cell has no sub-line room: use 'on-wire'
   SEAM_W: 10 * CELL_W, //  ══MUST══▶
@@ -453,7 +452,8 @@ export function sceneToAscii(scene: Scene, opts: AsciiOpts = {}): string {
     else if (p.role === "changeover") g.text(col(p.at.x), row(p.at.y), "┿");
     else if (p.role === "inverter") g.text(col(p.at.x), row(p.at.y), "○");
     // 'open-contact' is left to the dotted flow + the ✗ marker: a single cell
-    // cannot draw -| |- , and the rung already reads as broken.
+    // cannot draw -| |- , and the rung already reads as broken. (`layout` now emits one
+    // only for an eliminable rung; the ASCII carrier never drew it.)
   }
 
   /* NOT scope frames (§21) */

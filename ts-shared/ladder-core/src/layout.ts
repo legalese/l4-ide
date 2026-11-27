@@ -59,10 +59,6 @@ export interface Geometry {
   NOT_LABEL: number;
   NOT_BUBBLE: number; // output room for the inverter bubble
   NOT_R: number; // bubble radius
-  // Extra room between a NOT's negand and its bubble, so a FALSE leaf's open-contact break
-  // (drawn BREAK_CLEAR past the box, bars ±7) clears the bubble instead of poking out above
-  // and below it. 0 where the target draws no such glyph.
-  NOT_BREAK_ROOM: number;
   CONNECTIVE_GAP: number; // clearance between wire and connective text
   STRADDLE_MIN_WIDTH: number; // only wrap connectives wider than this
   // §25 IMPLIES — the seam, the changeover fork, and the two sinks
@@ -100,7 +96,6 @@ export const PIXEL_GEOMETRY: Geometry = {
   NOT_LABEL: 16,
   NOT_BUBBLE: 20,
   NOT_R: 5,
-  NOT_BREAK_ROOM: 9, // BREAK_CLEAR 9 + bar 7 + stroke 1 + gap 2 + NOT_R 5 + ring 1 - NOT_PAD_X 16
   CONNECTIVE_GAP: 3,
   STRADDLE_MIN_WIDTH: 160,
   SEAM_W: 66,
@@ -167,19 +162,10 @@ const TB_AXIS: Axis = {
 
 const axisFor = (o: Orient): Axis => (o === "TB" ? TB_AXIS : LR_AXIS);
 
-/** Half-width of the open-contact glyph's bar pair, plus a hair. A dead leaf's break sits
- *  this far past its right edge so BOTH bars clear the box (see `leafBox`). Every context a
- *  leaf can sit in leaves more room than this downstream: GAP_SERIES 44, LEAD 40, SEAM_W 66. */
-const BREAK_CLEAR = 9;
-
 interface Measured {
   w: number;
   h: number;
   state: State; // own state (leaf state, or 'inert' for a group/placeholder/inert)
-  /** Did this element already draw its own open-contact break (DESIGN §15.1)? Set by
-   *  `leafBox` for a `dead` leaf, so a parent does not draw a SECOND break for the same
-   *  failure — the break belongs at the point where current actually stopped. */
-  ownBreak?: boolean;
   emit(ox: number, oy: number, out: ScenePrim[]): { inPort: Pt; outPort: Pt };
 }
 
@@ -190,8 +176,8 @@ interface Ctx {
   /** LR or TB, as a projection (see `Axis`). */
   axis: Axis;
   /** HONEST three-valued evaluation — what is actually known. Drives RENDER STATE only
-   *  (box ink, the open-contact break), so the picture never forges a tested contact out
-   *  of an assumption. */
+   *  (the ink of a box or a wire), so the picture never forges a tested contact out of an
+   *  assumption. */
   values: Map<NodeId, UBoolValue>;
   /** The same evaluation READ UNDER `vs.grounding` — unknown atoms collapsed to F or T.
    *  Drives CONDUCTION only (energize, local closure, lamps, `complete`). Identical to
@@ -358,8 +344,9 @@ function groundValues(
 
 /** Which lamp is lit (DESIGN §25.4). The whole verdict, in two booleans.
  *  Neither lit ⇒ **N/A** (the scope did not conduct) or **undetermined** (something
- *  is still `?`). The reader tells those apart by looking at WHERE the break is —
- *  a definitively-open scope shows a clean break; an unknown one is grey. */
+ *  is still `?`). The reader tells those apart by the INK of the scope —
+ *  a definitively-false scope is drawn in the dead ink; an unknown one is grey. (There is
+ *  no break glyph: Meng ruled 2026-11-27 that the colour is enough.) */
 export interface Lamps {
   green: boolean;
   red: boolean;
@@ -602,12 +589,10 @@ function leafBox(
     w,
     h,
     state,
-    // A known-FALSE leaf breaks the circuit, and DESIGN §15.1 says so in ink: known-false
-    // is an OPEN GAP, where unknown is a plain grey pass-through. That distinction is
-    // load-bearing — §25.4 tells N/A from undetermined purely by "where the break is" —
-    // so the break is drawn at the leaf that actually stopped the current, not at some
-    // enclosing group.
-    ownBreak: state === "dead" || undefined,
+    // A known-FALSE leaf stops the circuit, and says so in INK alone: `dead` has its own
+    // box stroke and wash, where unknown is the plain grey pass-through. No break glyph is
+    // drawn at it (Meng, 2026-11-27: "the colour should be sufficient to indicate that the
+    // current stops"); §25.4 tells N/A from undetermined by that ink.
     emit(ox, oy, out) {
       const cy = oy + h / 2;
       out.push({
@@ -619,18 +604,6 @@ function leafBox(
         tentative: tentative || undefined,
         act: { t: "value", id },
       });
-      if (state === "dead")
-        out.push({
-          kind: "glyph",
-          // BREAK_CLEAR past the box, not ON it: the glyph is two vertical bars drawn at
-          // ±7 about its centre, so centring it on the out-port put the left-hand bar 7px
-          // INSIDE the box — reading as a stray stroke through the label rather than as a
-          // gap in the wire. The break belongs on the conductor leaving the contact.
-          at: { x: ox + w + BREAK_CLEAR, y: cy },
-          role: "open-contact",
-          state,
-          tentative: tentative || undefined,
-        });
       if (role === "placeholder")
         out.push({
           kind: "text",
@@ -899,8 +872,7 @@ function measure(e: IRExpr, ctx: Ctx): Measured {
     const BR = k.NOT_R; // bubble radius
     const BUB = k.NOT_BUBBLE; // output room for the bubble
     const band = LBL + NPY; // symmetric top/bottom so the port stays centred
-    // the frame's right padding also holds the negand's own break, clear of the bubble
-    const framW = inner.w + 2 * NPX + k.NOT_BREAK_ROOM;
+    const framW = inner.w + 2 * NPX;
     const w = framW + BUB;
     const h = inner.h + 2 * band;
     return {
@@ -1404,13 +1376,14 @@ function measureOr(e: Or, ctx: Ctx): Measured {
             act: fold,
             flow: outFlow,
           });
-        // Break on the fan only when the rung has not already drawn its own (a dead LEAF
-        // marks itself, so a second glyph here would double-report one failure). A dead
-        // GROUP still gets one: it says "this whole branch is out", and the interior break
-        // says why.
-        if (m.state === "eliminable" || (m.state === "dead" && !m.ownBreak)) {
+        // The break glyph on the fan marks an ELIMINABLE rung only: a ghost, "this rung
+        // cannot matter" (DESIGN §15.1). A DEAD rung — a false leaf, a folded group
+        // pinned false, a NOT whose negand is true — draws no break, over a parent node or
+        // anywhere else (Meng, 2026-11-27: "the colour should be sufficient to indicate
+        // that the current stops"). The ink says it instead: the dead stroke on a box, the
+        // filled NOT bubble and, with current shown, an unlit wire out of the rung.
+        if (m.state === "eliminable") {
           const mid = cubicMid(inCurve);
-          // current can't pass
           out.push({
             kind: "glyph",
             at: mid,
@@ -1563,8 +1536,8 @@ function measureImplies(e: Implies, ctx: Ctx): Measured {
         id: e.id,
       });
 
-      // N/A is not a stamp and not a path — it is BOTH LAMPS DARK, with the break
-      // visible in the scope. We only say so in words when the scope is DEFINITIVELY
+      // N/A is not a stamp and not a path — it is BOTH LAMPS DARK, with the scope drawn
+      // in the dead ink. We only say so in words when the scope is DEFINITIVELY
       // open (a `?` scope is merely undetermined, and must not be reported as N/A).
       if (inE && ctx.gvalues.get(e.scope.id) === "FalseV")
         out.push({
@@ -1605,9 +1578,9 @@ function measureImplies(e: Implies, ctx: Ctx): Measured {
  *   so a click that cycled it would be offering to set something that is not settable.
  *   `svg.ts` keys `lad-clickable` off `act`, so omitting it is the whole fix.
  *
- *   NO break glyph. A `dead` head does not draw its own open contact, because the
- *   break belongs where the current actually stopped, which is inside the body (see
- *   `leafBox`'s `ownBreak`). Drawing a second one would report one failure twice.
+ *   NO break glyph. A `dead` head takes the dead ink, as the body does, and nothing
+ *   else: no scene draws an open-contact break for a dead element any more (Meng,
+ *   2026-11-27: "the colour should be sufficient to indicate that the current stops").
  *
  *   STATE COMES FROM THE BODY, not from `fn.id`. `values` is filled by walking
  *   `fn.body`, so `fn.id` is simply absent from it; reading state off the body's id is

@@ -107,15 +107,15 @@ test("grounding drives CONDUCTION but never RENDER STATE — an assumed atom sti
   assert.equal(
     breaks(s).length,
     0,
-    "an assumption must not draw a tested break",
+    "no break glyph at all (since 2026-11-27 a dead element draws none either)",
   );
 });
 
-test("a genuinely FALSE atom keeps its break; grounding changes nothing about it", () => {
+test("a genuinely FALSE atom keeps its dead ink; grounding changes nothing about it", () => {
   for (const grounding of ["none", "closed", "open"] as const) {
     const s = sceneOf(conj(), { vals: [[4, "FalseV"]], grounding });
     assert.equal(boxFor(s, 4).state, "dead", `${grounding}: still dead`);
-    assert.equal(breaks(s).length, 1, `${grounding}: still one break`);
+    assert.equal(breaks(s).length, 0, `${grounding}: and no break glyph`);
     assert.equal(s.complete, false, `${grounding}: a false contact stops it`);
   }
 });
