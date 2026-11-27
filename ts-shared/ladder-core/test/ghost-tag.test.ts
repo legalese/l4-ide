@@ -357,6 +357,130 @@ test("a ghost leaf deep inside an IMPLIES rung reserves no band: the rule is tal
   }
 });
 
+/* --------------------------------- the tag fits over its own box: a ghost is as wide as its tag */
+
+/** Separation from an ink to a point: negative when the point is inside the ink. */
+const pointClearance = (ink: Ink, x: number, y: number): number =>
+  Math.max(ink.x0 - x, x - ink.x1, ink.y0 - y, y - ink.y1);
+
+/** The least separation between a tag's ink and one fan curve, sampled along it. */
+const curveClearance = (
+  ink: Ink,
+  c: Extract<ScenePrim, { kind: "curve" }>,
+): number => {
+  let best = Infinity;
+  for (let i = 0; i <= 80; i++) {
+    const t = i / 80;
+    const u = 1 - t;
+    const at = (a: number, b: number, c1: number, d: number) =>
+      u * u * u * a + 3 * u * u * t * b + 3 * u * t * t * c1 + t * t * t * d;
+    best = Math.min(
+      best,
+      pointClearance(
+        ink,
+        at(c.from.x, c.c1.x, c.c2.x, c.to.x),
+        at(c.from.y, c.c1.y, c.c2.y, c.to.y),
+      ),
+    );
+  }
+  return best;
+};
+
+test("an ELIMINABLE box is at least as wide as its tag, and no wider than it needs to be", () => {
+  for (const len of [1, 3, 6, 12, 16, 21]) {
+    const label = "g".repeat(len);
+    const ghost = leaf(label);
+    const body = or([leaf("n".repeat(len)), inert("or"), ghost]);
+    const withGhost = sceneOf(body, [ghost]);
+    const [tag] = tagsOf(withGhost);
+    const tagW = estimateMetrics.width(tag.text, tag.size ?? 14);
+    const box = boxes(withGhost).find((b) => b.id === ghost.id)!;
+    const plain = boxes(sceneOf(body, [])).find((b) => b.id === ghost.id)!;
+    assert.equal(
+      box.rect.w,
+      Math.max(plain.rect.w, tagW),
+      `${len} chars: the wider of the label's box and the tag`,
+    );
+    assert.ok(box.rect.w >= tagW, `${len} chars: the box covers its tag`);
+  }
+  // …and only an eliminable box: a dead or unknown one keeps its label's width
+  const g = leaf("g");
+  const body = or([leaf("n"), inert("or"), g]);
+  const widthOf = (vals: Array<[NodeId, UBoolValue]>) =>
+    boxes(sceneOf(body, [], { valuation: new Map(vals) })).find(
+      (b) => b.id === g.id,
+    )!.rect.w;
+  const labelW =
+    estimateMetrics.width("g", PIXEL_GEOMETRY.FONT) + 2 * PIXEL_GEOMETRY.PAD_X;
+  assert.equal(widthOf([]), labelW, "unknown: the label's box");
+  assert.equal(widthOf([[g.id, "FalseV"]]), labelW, "dead");
+  assert.equal(widthOf([[g.id, "TrueV"]]), labelW, "live");
+});
+
+test("the tag lies over its own box, leaf or folded group, LR and TB", () => {
+  for (const orient of ["LR", "TB"] as const)
+    for (const len of [1, 2, 4, 8, 12, 20]) {
+      const g = leaf("g".repeat(len));
+      const grp = and([leaf("x"), leaf("y")]);
+      for (const [name, rung, extra] of [
+        ["leaf", g, {}],
+        ["folded group", grp, { foldSet: new Set([grp.id]) }],
+      ] as const) {
+        const s = sceneOf(or([leaf("n"), inert("or"), rung]), [rung], {
+          orient,
+          ...extra,
+        });
+        const [tag] = tagsOf(s);
+        const ink = inkOf(tag);
+        const box = boxes(s).find((b) => b.id === rung.id)!;
+        assert.ok(
+          ink.x0 >= box.rect.x - 1e-9 &&
+            ink.x1 <= box.rect.x + box.rect.w + 1e-9,
+          `${orient} ${name} ${len}: the tag [${ink.x0.toFixed(1)}, ${ink.x1.toFixed(1)}] is over the box [${box.rect.x.toFixed(1)}, ${(box.rect.x + box.rect.w).toFixed(1)}]`,
+        );
+      }
+    }
+});
+
+test("a ghost's own fan curves never cross its tag, for short labels beside short and long neighbours", () => {
+  // Before the box was widened to its tag, 118 of these 432 scenes had a curve through
+  // the overhang (measured under estimateMetrics, 5c4b9ef6c).
+  let measured = 0;
+  const shapes: Array<[string, (g: IRExpr, k: number) => IRExpr]> = [
+    ["second under 'or'", (g, k) => or([leaf("n".repeat(k)), inert("or"), g])],
+    ["second, no 'or'", (g, k) => or([leaf("n".repeat(k)), g])],
+    [
+      "middle of three",
+      (g, k) =>
+        or([
+          leaf("n".repeat(k)),
+          inert("or"),
+          g,
+          inert("or"),
+          leaf("m".repeat(k)),
+        ]),
+    ],
+    ["first under 'or'", (g, k) => or([g, inert("or"), leaf("n".repeat(k))])],
+  ];
+  for (const orient of ["LR", "TB"] as const)
+    for (const [name, mk] of shapes)
+      for (const nbr of [0, 1, 3, 6, 10, 14])
+        for (const len of [1, 2, 3, 4, 6, 8, 10, 12, 16]) {
+          const g = leaf("g".repeat(len));
+          const s = sceneOf(mk(g, nbr === 0 ? len : nbr), [g], { orient });
+          const [tag] = tagsOf(s);
+          for (const c of s.prims)
+            if (c.kind === "curve" && c.state === "eliminable") {
+              measured++;
+              assert.ok(
+                curveClearance(inkOf(tag), c) >= 0,
+                `${orient} ${name}, ghost ${len} chars, neighbour ${nbr || "same"}: a fan curve crosses the tag`,
+              );
+            }
+        }
+  assert.equal(measured, 864, "every scene's two ghost curves were measured");
+});
+
 /* ------------------------- the band is for ELIMINABLE rungs, and for the first child only */
 
 test("only an ELIMINABLE rung gets a band: dead, live and unknown rungs under an 'or' do not", () => {

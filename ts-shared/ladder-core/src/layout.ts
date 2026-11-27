@@ -81,6 +81,7 @@ export interface Geometry {
  *  from it, and `PIXEL_GEOMETRY.TAG_BAND` is derived from it, so the room reserved for the
  *  tag cannot drift from the text it holds. */
 const OTIOSE_TAG_SIZE = 11;
+const OTIOSE_TAG_TEXT = "otiose — always open";
 /** How far a line of text's ink rises above its baseline, as a fraction of the type size. */
 const ASCENT_RATIO = 0.78;
 const PIXEL_TAG_RISE = 9;
@@ -601,7 +602,13 @@ function leafBox(
 ): Measured {
   const { FONT, PAD_X, PAD_Y, CARET_PAD, TAG_RISE } = k;
   const caretW = role === "placeholder" ? tm.width("▸", FONT) + CARET_PAD : 0;
-  const w = caretW + tm.width(label, FONT) + 2 * PAD_X;
+  // An eliminable box is at least as wide as its tag. The tag is centred over the box, and
+  // a tag wider than the box overhangs it into the lanes where the fan curves arrive and
+  // leave, and into the tag of the next ghost along a series.
+  const w = Math.max(
+    caretW + tm.width(label, FONT) + 2 * PAD_X,
+    state === "eliminable" ? tm.width(OTIOSE_TAG_TEXT, OTIOSE_TAG_SIZE) : 0,
+  );
   const h = tm.lineHeight(FONT) + 2 * PAD_Y;
   return {
     w,
@@ -648,7 +655,7 @@ function leafBox(
         out.push({
           kind: "text",
           at: { x: ox + w / 2, y: oy - TAG_RISE },
-          text: "otiose — always open",
+          text: OTIOSE_TAG_TEXT,
           anchor: "middle",
           state,
           tag: "otiose",
