@@ -405,18 +405,10 @@ export type ScenePrim =
   | {
       kind: "glyph";
       at: Pt;
-      role: "open-contact" | "power-terminal" | "inverter" | "changeover";
-      /** For `open-contact` only: whose break is this? `layout` emits one for an
-       *  `eliminable` rung alone, a ghost (DESIGN §15.1); it no longer emits one for a
-       *  `dead` element, a leaf or a parent node (Meng, 2026-11-27: "the colour should be
-       *  sufficient to indicate that the current stops"). A renderer still draws a `dead`
-       *  one in the firm dead ink if a hand-built scene carries it. Absent ⇒ ghost. */
-      state?: State;
-      /** …and is the FALSITY itself only presumed (DESIGN §22)? Nothing in `layout` sets
-       *  this since the dead break went: a `TYPICALLY FALSE` leaf keeps §22's fine dash on
-       *  its box, and has no break to dash. A renderer still dashes a hand-built break that
-       *  carries it. */
-      tentative?: boolean;
+      /** There is no open-contact (break) role: a dead or eliminable element is told by
+       *  ink and dash alone (Meng, 2026-11-27: "the colour should be sufficient to indicate
+       *  that the current stops", then "get rid of the open switch on the eliminable too"). */
+      role: "power-terminal" | "inverter" | "changeover";
       /** For `inverter` only: the NOT's OUTPUT value, so the bubble can be filled with it —
        *  green when the negand is false (the NOT conducts), the mild red when the negand is
        *  true, plain when unknown (Meng, 2026-10-05). Read from the honest three-valued

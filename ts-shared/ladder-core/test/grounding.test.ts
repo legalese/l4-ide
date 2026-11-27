@@ -64,8 +64,12 @@ const boxFor = (s: Scene, id: NodeId) =>
     (p): p is Extract<ScenePrim, { kind: "box" }> =>
       p.kind === "box" && p.id === id,
   )!;
+// The `open-contact` role is gone from the type; `open-contact.test.ts` is the guard that
+// catches a glyph of any unknown role, and this stays as a second look in this fixture.
 const breaks = (s: Scene) =>
-  s.prims.filter((p) => p.kind === "glyph" && p.role === "open-contact");
+  s.prims.filter(
+    (p) => p.kind === "glyph" && String(p.role) === "open-contact",
+  );
 const tags = (s: Scene) =>
   s.prims
     .filter(

@@ -355,30 +355,6 @@ test("all four leaf states are mutually distinguishable in both themes", () => {
   }
 });
 
-/** The break glyph is shared by `dead` and `eliminable`, and they mean different
- *  things: a false contact was TESTED and did not bite; a don't-care CANNOT matter.
- *  Firm ink vs ghost. Absent `state` keeps the old ghost rendering. `layout` emits only
- *  the eliminable one since 2026-11-27; this pins what the RENDERER does with a hand-built
- *  scene, and `open-contact.test.ts` pins what the layout emits. */
-test("a hand-built dead break is drawn firmly; an eliminable break stays a ghost", () => {
-  const brk = (state?: "dead" | "eliminable"): string =>
-    sceneToSvg(
-      scene({
-        kind: "glyph",
-        at: { x: 50, y: 50 },
-        role: "open-contact",
-        state,
-      }),
-    );
-  assert.match(brk("dead"), /stroke="#a8483e" stroke-width="2"/);
-  assert.match(brk("eliminable"), /stroke="#b9bdc2" stroke-width="1.6"/);
-  assert.equal(
-    brk(),
-    brk("eliminable"),
-    "no state ⇒ the pre-existing ghost break",
-  );
-});
-
 /* ------------------------------- provisionality reaches BOTH kinds of sink */
 
 /** An `Implies` body is never `complete` — it has two sinks, not one (§25.4) — so the

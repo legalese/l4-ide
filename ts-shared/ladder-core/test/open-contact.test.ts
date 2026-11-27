@@ -1,18 +1,26 @@
 /**
  * The open-contact BREAK — the pair of short vertical bars once drawn on the wire where
- * the circuit stopped (DESIGN §15.1, §25.4) — and why a FALSE element no longer draws one.
+ * the circuit stopped (DESIGN §15.1, §25.4) — and why no element draws one any more.
  *
- * Meng, 2026-11-27: "i wonder if we can do without the open-contact break; the colour
- * should be sufficient to indicate that the current stops." — and, in the same breath,
- * over a parent node as well as a leaf. So a FALSE (`dead`) element draws no break,
- * wherever it sits: a leaf, a folded group pinned false, a NOT rung whose negand is true,
- * a group inside a NOT. What tells a reader "this stopped here" is the INK: the dead box
- * stroke and wash, the NOT bubble's fill, and — in `ladder-svg`, with current shown — the
- * wire that is no longer lit (`ladder-svg/test/open-contact.test.ts` measures that).
+ * Meng, 2026-11-27, first: "i wonder if we can do without the open-contact break; the
+ * colour should be sufficient to indicate that the current stops." — and, in the same
+ * breath, over a parent node as well as a leaf. So a FALSE (`dead`) element draws no
+ * break, wherever it sits: a leaf, a folded group pinned false, a NOT rung whose negand
+ * is true, a group inside a NOT. What tells a reader "this stopped here" is the INK: the
+ * dead box stroke and wash, the NOT bubble's fill, and — in `ladder-svg`, with current
+ * shown — the wire that is no longer lit (`ladder-svg/test/open-contact.test.ts`
+ * measures that).
  *
- * One break survives, deliberately: an ELIMINABLE rung in an OR (DESIGN §15.1) keeps its
- * ghost break, because that is a different claim — "this rung cannot matter", not "current
- * stopped here" — and the ruling was about FALSE.
+ * Meng, 2026-11-27, then, on the one break that had been kept for an ELIMINABLE rung in
+ * an OR: "yeah, get rid of the open switch on the eliminable too." So nothing draws one,
+ * and the `open-contact` glyph role is gone from `ScenePrim`.
+ *
+ * `breaks` below therefore does not look for one role: it returns every glyph whose role
+ * is not one of the three the layout still emits (the power terminal, the NOT bubble and
+ * the changeover pivot). The type no longer has an `open-contact` member to compare
+ * against, so a test that named it would not compile, and a test that compared a string
+ * would pass for a typo; "not one of the three" is the check that a reinstated emitter,
+ * under any name, cannot slip past.
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -61,11 +69,18 @@ const sceneOf = (
     estimateMetrics,
   );
 
+/** The glyph roles `layout` still emits. Anything else is a break, however it is named. */
+const KNOWN_ROLES: readonly string[] = [
+  "power-terminal",
+  "inverter",
+  "changeover",
+];
 const breaks = (prims: ScenePrim[]) =>
   prims.filter(
     (p): p is Extract<ScenePrim, { kind: "glyph" }> =>
-      p.kind === "glyph" && p.role === "open-contact",
+      p.kind === "glyph" && !KNOWN_ROLES.includes(p.role),
   );
+const glyphs = (prims: ScenePrim[]) => prims.filter((p) => p.kind === "glyph");
 const box = (s: Scene, id: NodeId) =>
   s.prims.find(
     (p): p is Extract<ScenePrim, { kind: "box" }> =>
@@ -281,27 +296,101 @@ test("dead elements draw no break in the TB orientation, including the one case 
     }
 });
 
-/* ------------------------- the ELIMINABLE ghost break is the one that is kept */
+/* ----------------------- …and an ELIMINABLE rung draws none either (the second ruling) */
 
-test("an ELIMINABLE rung in an OR still draws its ghost break; one in a series draws none", () => {
+const ghostStates = (...ids: NodeId[]) =>
+  new Map<NodeId, State>(ids.map((id) => [id, "eliminable"]));
+/** The ghost fan: a curve drawn in the eliminable state. Positive control that a fixture
+ *  does reach the OR's fan site, where the glyph used to be emitted. */
+const ghostFans = (s: Scene) =>
+  s.prims.filter((p) => p.kind === "curve" && p.state === "eliminable");
+const tagsOf = (s: Scene) =>
+  s.prims.filter((p) => p.kind === "text" && p.tag === "otiose");
+
+test("an ELIMINABLE leaf in an OR draws no break — only the dashed box and fan and its tag", () => {
   const disj = or(2, [leaf(3, "a"), leaf(4, "b")]);
-  const states = new Map<NodeId, State>([[4, "eliminable"]]);
-  const got = breaks(sceneOf(disj, [], { states }).prims);
-  assert.equal(got.length, 1);
-  assert.equal(got[0].state, "eliminable");
-  const conj = and(2, [leaf(3, "a"), leaf(4, "b")]);
-  assert.equal(breaks(sceneOf(conj, [], { states }).prims).length, 0);
+  const s = sceneOf(disj, [], { states: ghostStates(4) });
+  assert.equal(breaks(s.prims).length, 0);
+  assert.equal(box(s, 4).state, "eliminable", "the ghost box is still drawn");
+  assert.equal(ghostFans(s).length, 2, "…and its fan: in-curve and out-curve");
+  assert.equal(tagsOf(s).length, 1, "…and the tag that says what it is");
+  assert.ok(
+    glyphs(s.prims).length >= 2,
+    "the scene's own glyphs (the power terminals) are still there",
+  );
 });
 
-test("a dead rung beside an eliminable one: only the eliminable rung has a break", () => {
+test("an ELIMINABLE folded group, NOT rung and IMPLIES rung draw no break on the fan", () => {
+  const fixtures: Array<[string, IRExpr, NodeId, Record<string, unknown>]> = [
+    [
+      "folded group",
+      or(2, [and(5, [leaf(6, "x"), leaf(7, "y")]), leaf(4, "b")]),
+      5,
+      { foldSet: new Set([5]) },
+    ],
+    ["NOT rung", or(2, [not(5, leaf(6, "x")), leaf(4, "b")]), 5, {}],
+    [
+      "IMPLIES rung",
+      or(2, [implies(5, leaf(6, "a"), leaf(7, "b")), leaf(4, "c")]),
+      5,
+      {},
+    ],
+  ];
+  for (const orient of ["LR", "TB"] as const)
+    for (const [name, body, id, extra] of fixtures) {
+      const s = sceneOf(body, [], {
+        states: ghostStates(id),
+        orient,
+        ...extra,
+      });
+      assert.equal(
+        ghostFans(s).length,
+        2,
+        `${orient} ${name}: the fan is a ghost`,
+      );
+      assert.equal(breaks(s.prims).length, 0, `${orient} ${name}`);
+    }
+});
+
+test("an ELIMINABLE leaf draws no break in either orientation, in an OR or in a series", () => {
+  // The fan site is written in (main, cross) and projected by `Axis`, and a TB-only
+  // reinstatement would pass every LR assertion above.
+  const disj = or(2, [leaf(3, "a"), leaf(4, "b")]);
+  const conj = and(2, [leaf(3, "a"), leaf(4, "b")]);
+  for (const orient of ["LR", "TB"] as const) {
+    const s = sceneOf(disj, [], { states: ghostStates(4), orient });
+    assert.equal(ghostFans(s).length, 2, `${orient} OR: the fan is a ghost`);
+    assert.equal(breaks(s.prims).length, 0, `${orient} OR`);
+    const t = sceneOf(conj, [], { states: ghostStates(4), orient });
+    assert.equal(
+      box(t, 4).state,
+      "eliminable",
+      `${orient} series: a ghost box`,
+    );
+    assert.equal(breaks(t.prims).length, 0, `${orient} series`);
+  }
+});
+
+test("a dead rung beside an eliminable one: neither draws a break, each keeps its own ink", () => {
   const disj = or(2, [leaf(3, "a"), leaf(4, "b"), leaf(5, "c")]);
-  const got = breaks(
-    sceneOf(disj, [[3, "FalseV"]], {
-      states: new Map<NodeId, State>([[4, "eliminable"]]),
-    }).prims,
-  );
-  assert.deepEqual(
-    got.map((g) => g.state),
-    ["eliminable"],
+  const s = sceneOf(disj, [[3, "FalseV"]], { states: ghostStates(4) });
+  assert.equal(breaks(s.prims).length, 0);
+  assert.equal(box(s, 3).state, "dead");
+  assert.equal(box(s, 4).state, "eliminable");
+  assert.equal(box(s, 5).state, "inert");
+});
+
+test("the mutation guard bites: a hand-built scene with a stray glyph role is counted", () => {
+  // `breaks` must see a glyph of ANY role outside the three, not only the old name — else
+  // every test above would pass vacuously after a reinstatement under a new one.
+  const stray = {
+    kind: "glyph",
+    at: { x: 1, y: 1 },
+    role: "open-switch",
+  } as unknown as ScenePrim;
+  assert.equal(breaks([stray]).length, 1);
+  assert.equal(
+    breaks([{ kind: "glyph", at: { x: 1, y: 1 }, role: "inverter" }]).length,
+    0,
   );
 });

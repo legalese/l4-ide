@@ -334,7 +334,7 @@ test("a FALSE term feeding a NOT draws no break, and the bubble sits NOT_PAD_X p
   // went with it: nothing is drawn between the term and the bubble but wire.
   const s = draw(notOf(leaf(2, "p")), { valuation: new Map([[2, "FalseV"]]) });
   const tick = s.prims.find(
-    (q): q is Glyph => q.kind === "glyph" && q.role === "open-contact",
+    (q): q is Glyph => q.kind === "glyph" && String(q.role) === "open-contact", // the role is gone; see open-contact.test.ts
   );
   const term = s.prims.find(
     (q): q is Extract<ScenePrim, { kind: "box" }> =>

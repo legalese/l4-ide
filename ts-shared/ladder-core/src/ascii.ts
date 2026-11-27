@@ -451,9 +451,6 @@ export function sceneToAscii(scene: Scene, opts: AsciiOpts = {}): string {
     if (p.role === "power-terminal") g.text(col(p.at.x), row(p.at.y), "●");
     else if (p.role === "changeover") g.text(col(p.at.x), row(p.at.y), "┿");
     else if (p.role === "inverter") g.text(col(p.at.x), row(p.at.y), "○");
-    // 'open-contact' is left to the dotted flow + the ✗ marker: a single cell
-    // cannot draw -| |- , and the rung already reads as broken. (`layout` now emits one
-    // only for an eliminable rung; the ASCII carrier never drew it.)
   }
 
   /* NOT scope frames (§21) */

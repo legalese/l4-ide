@@ -1,11 +1,14 @@
 /**
- * What the SVG says for a FALSE element now that no open-contact break is drawn.
+ * What the SVG says for a FALSE or ELIMINABLE element now that no open-contact break is
+ * drawn.
  *
  * Meng, 2026-11-27: "i wonder if we can do without the open-contact break; the colour
  * should be sufficient to indicate that the current stops." — and over a parent node as
- * well as a leaf. The scene-level half of this (no `open-contact` glyph for any dead
- * state) is `ladder-core/test/open-contact.test.ts`; this file is the rendered half, and
- * it also pins the two cues that are meant to carry the meaning instead:
+ * well as a leaf — and then, for the ghost rung of an OR, "yeah, get rid of the open
+ * switch on the eliminable too." The scene-level half of this (no glyph outside the three
+ * the layout still emits, for any state) is `ladder-core/test/open-contact.test.ts`; this
+ * file is the rendered half, and it also pins the two cues that are meant to carry the
+ * meaning instead:
  *
  *   - the INK: a dead box is not the grey of an unanswered one, in every built-in palette;
  *   - the WIDTH: with current shown, a lit wire is drawn at `flowWidth("closed")` = 3.4 and
@@ -13,8 +16,12 @@
  *     reader who cannot tell the two colours apart. With current OFF there is no `flow`,
  *     every wire is 1.5, and the colour is the only cue — the last test says so.
  *
- * The break glyph is the only thing `svg.ts` draws with `<line>`, which is why the absence
- * of that tag is a faithful "no glyph in the output".
+ * Two marks say "no break" in the SVG, and the second is the one that bites. The break
+ * used to be the only thing `svg.ts` drew with `<line>`, so the absence of that tag was a
+ * faithful "no glyph in the output". With the renderer branch gone, a glyph of an unknown
+ * role falls through to the power terminal's dot, so a reinstated emitter would draw a
+ * `<circle r="3.5">` and NOT a `<line>`. Every scene has exactly two such dots (the rails'
+ * power terminals), and `strayDots` counts any beyond them.
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -60,6 +67,12 @@ const render = (
     ),
     opts.theme ?? "screen",
   );
+
+/** Circles of the power terminal's radius beyond the two every scene carries, one at each
+ *  rail. A glyph the renderer does not know falls through to this circle, so a break
+ *  reinstated under any role name shows up here and not as a `<line>`. */
+const strayDots = (svg: string): number =>
+  (svg.match(/<circle [^>]*\br="3\.5"/g)?.length ?? 0) - 2;
 
 /** The `stroke-width` of every wire and curve in the output, in drawing order. */
 const wireWidths = (svg: string): number[] =>
@@ -113,20 +126,32 @@ test("a FALSE element renders no open-contact break, leaf or parent, in either t
         `${name}: and it drew boxes, so the absence below means something`,
       );
       assert.doesNotMatch(svg, /<line\b/, `${name} (${theme}) drew a break`);
+      assert.equal(strayDots(svg), 0, `${name} (${theme}) drew a stray dot`);
     }
 });
 
-test("the ELIMINABLE ghost break is still drawn: the renderer is not what changed", () => {
+test("an ELIMINABLE rung renders as a dashed ghost with its tag, and no break", () => {
+  // The ghost is told by its dash and its tag alone. Compare the same OR with and without
+  // the ghost state: the glyph count is the same, and nothing drawn is a `<line>`.
   const body = or(2, [leaf(3, "a"), leaf(4, "b")]);
-  const svg = sceneToSvg(
-    layout(
-      { id: 1, name: "r", params: [], body } satisfies FunDecl,
-      defaultViewSpec({ states: new Map([[4, "eliminable" as const]]) }),
-      estimateMetrics,
-    ),
-  );
-  assert.equal(svg.match(/<line\b/g)?.length, 2, "two bars");
-  assert.match(svg, /stroke="#b9bdc2" stroke-width="1.6"/);
+  const draw = (states: Map<NodeId, "eliminable">) =>
+    sceneToSvg(
+      layout(
+        { id: 1, name: "r", params: [], body } satisfies FunDecl,
+        defaultViewSpec({ states }),
+        estimateMetrics,
+      ),
+    );
+  for (const [name, svg] of [
+    ["ghost", draw(new Map([[4, "eliminable" as const]]))],
+    ["plain", draw(new Map())],
+  ] as const) {
+    assert.doesNotMatch(svg, /<line\b/, `${name}: no bars`);
+    assert.equal(strayDots(svg), 0, `${name}: no stray dot`);
+  }
+  const ghost = draw(new Map([[4, "eliminable" as const]]));
+  assert.match(ghost, /stroke-dasharray="5 4"/, "the ghost is still dashed");
+  assert.match(ghost, /otiose — always open/, "…and still tagged");
 });
 
 test("a lit wire and a dark wire still differ in stroke width, not in colour alone", () => {

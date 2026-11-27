@@ -843,12 +843,6 @@ function curveCrosses(c: Curve, rects: Rect[]): boolean {
   }
   return false;
 }
-function cubicMid(c: Curve): Pt {
-  return {
-    x: (c.from.x + 3 * c.c1.x + 3 * c.c2.x + c.to.x) / 8,
-    y: (c.from.y + 3 * c.c1.y + 3 * c.c2.y + c.to.y) / 8,
-  };
-}
 
 function measure(e: IRExpr, ctx: Ctx): Measured {
   const { vs, tm, k } = ctx;
@@ -1376,21 +1370,14 @@ function measureOr(e: Or, ctx: Ctx): Measured {
             act: fold,
             flow: outFlow,
           });
-        // The break glyph on the fan marks an ELIMINABLE rung only: a ghost, "this rung
-        // cannot matter" (DESIGN §15.1). A DEAD rung — a false leaf, a folded group
-        // pinned false, a NOT whose negand is true — draws no break, over a parent node or
-        // anywhere else (Meng, 2026-11-27: "the colour should be sufficient to indicate
-        // that the current stops"). The ink says it instead: the dead stroke on a box, the
-        // filled NOT bubble and, with current shown, an unlit wire out of the rung.
-        if (m.state === "eliminable") {
-          const mid = cubicMid(inCurve);
-          out.push({
-            kind: "glyph",
-            at: mid,
-            role: "open-contact",
-            state: m.state,
-          });
-        }
+        // No break glyph on the fan, whatever the rung's state. A DEAD rung — a false leaf,
+        // a folded group pinned false, a NOT whose negand is true — says so in ink (Meng,
+        // 2026-11-27: "the colour should be sufficient to indicate that the current
+        // stops"): the dead stroke on a box, the filled NOT bubble and, with current shown,
+        // an unlit wire out of the rung. An ELIMINABLE rung, a ghost that "cannot matter"
+        // (DESIGN §15.1), is the dashed box and fan, with the tag over its box when it is a
+        // leaf; Meng ruled the same for it on the same day ("get rid of the open switch on
+        // the eliminable too").
       });
       if (head)
         out.push({
@@ -1579,7 +1566,7 @@ function measureImplies(e: Implies, ctx: Ctx): Measured {
  *   `svg.ts` keys `lad-clickable` off `act`, so omitting it is the whole fix.
  *
  *   NO break glyph. A `dead` head takes the dead ink, as the body does, and nothing
- *   else: no scene draws an open-contact break for a dead element any more (Meng,
+ *   else: no scene draws an open-contact break for any element any more (Meng,
  *   2026-11-27: "the colour should be sufficient to indicate that the current stops").
  *
  *   STATE COMES FROM THE BODY, not from `fn.id`. `values` is filled by walking

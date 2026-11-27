@@ -138,7 +138,9 @@ test("the head takes the body's verdict, and draws no break of its own", () => {
       [forThatEnd.id, v],
     ]);
   const breaks = (s: Scene) =>
-    s.prims.filter((p) => p.kind === "glyph" && p.role === "open-contact");
+    s.prims.filter(
+      (p) => p.kind === "glyph" && String(p.role) === "open-contact",
+    );
 
   const yes = layout(
     fn,
