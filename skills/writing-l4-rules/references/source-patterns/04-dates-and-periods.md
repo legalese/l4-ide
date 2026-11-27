@@ -708,7 +708,8 @@ and `YMD`, the bounds-checked constructor, refuses it outright:
 
 ```text
 DATE OF 1, 1, 2025
-`YMD refused an out-of-range month or day`
+The model refuses to answer:
+  YMD refused an out-of-range month or day
 ```
 
 _(Probe `q15c-months-back.l4`, exit 0. January 2025, not September 2024.)_ Go backwards by adding to
