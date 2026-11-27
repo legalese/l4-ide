@@ -278,11 +278,11 @@ binary, exit 0.
 
 **Not** `REFUSE`, in your own rules. The standard library's `YMD` is the exception, and a stopgap:
 `YMD 2023 2 29` — no such leap day — is a `REFUSE` with the reason
-`YMD refused an out-of-range month or day`
-(measured 2026-11-28 on the dev build, which prints `The model refuses to answer:` and then that reason).
-The comment above its definition in `jl4-core/libraries/daydate.l4` says the designed shape is a change
-to the constructor's return type, which would make it an `EITHER` like the one above.
-Do not copy the stopgap into a rule of your own: an input the rule rules out returns `LEFT`, so the caller can fix it.
+`YMD refused an out-of-range month or day` (measured 2026-11-28 on the dev build, which prints
+`The model refuses to answer:` and then that reason). The comment above its definition in
+`jl4-core/libraries/daydate.l4` says the designed shape is a change to the constructor's return type,
+which would make it an `EITHER` like the one above. Do not copy the stopgap into a rule of your own:
+an input the rule rules out returns `LEFT`, so the caller can fix it.
 
 **Not** a silent clamp. `Date 1 (3 MINUS 6) 2025` clamps to January 2025 rather than rolling back to
 September 2024; `YMD` is the bounds-checked constructor and is what new code should use for literals.
