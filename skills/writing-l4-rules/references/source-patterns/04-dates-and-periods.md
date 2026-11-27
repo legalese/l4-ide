@@ -712,7 +712,10 @@ The model refuses to answer:
   YMD refused an out-of-range month or day
 ```
 
-_(Probe `q15c-months-back.l4`, exit 0. January 2025, not September 2024.)_ Go backwards by adding to
+_(Probe `q15c-months-back.l4`, exit 0. January 2025, not September 2024.)_
+The refusal text above is the `dev` build's, measured 2026-11-28.
+`main` builds 109 and 112 refuse too, with `YMD: the month is not a whole number from 1 to 12` for this case, and build 98 has no `YMD`.
+Go backwards by adding to
 the **earlier** date and comparing, or by decrementing the year, which can never produce a month of
 zero.
 
