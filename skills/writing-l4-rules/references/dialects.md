@@ -87,9 +87,9 @@ Build 98, run the same way, printed `census: 105 files, 58 fail (1.6.98 (main, 7
 Its census lines differ from those of build 112 in the seven probes that now pass and in the wording of one first error (probe 11, below).
 Of the `main` builds run (98, 99, 102, 108, 109 and 112), 99, 102 and 108 pass probes 01 and 44, and 109 and 112 pass all seven.
 Builds 100, 101, 103 to 107, 110 and 111 were not run.
-By source, `git grep` at the local build tags finds `REFUSE` absent from `jl4-core/src` at builds 98, 99, 100, 102, 104, 107 and 108, and present at 109, 110 and 112.
-By source, it finds `YMD` absent from `jl4-core/libraries/daydate.l4` at those same tags before 109 and present at 109, 110 and 112, and `@lang` in `jl4-core/src/L4/Lexer.hs` at every local tag from 99 to 112.
-Builds 101, 103, 105, 106 and 111 have no local tag, so neither a run nor a source check covers them.
+By source, `git grep` at the `l4-ide-build-N` tags of the `l4-ide` repository finds `REFUSE` absent from `jl4-core/src` at builds 98, 99, 100, 102, 104, 107 and 108, and present at 109, 110 and 112.
+By source, it finds `YMD` absent from `jl4-core/libraries/daydate.l4` at those tags before 109 and present at 109, 110 and 112, and `@lang` in `jl4-core/src/L4/Lexer.hs` at builds 99, 100, 102, 104, 107, 108, 109, 110 and 112, but not at 98.
+Builds 101, 103, 105, 106 and 111 were not among the tags available, so neither a run nor a source check covers them.
 `git grep` finds `REFUSE` and `YMD` in `jl4-core/src` and in `jl4-core/libraries` at `e4f4bf3`, and `@lang` in `jl4-core/src` there; it finds none of the three in either directory at `7689b0d`, the commit of build 98.
 
 A pass is not a reading.
@@ -102,9 +102,22 @@ Of the 51 numbered probes `main` 1.6.112 still rejects, 50 give the same first e
 This page's minimum for a `main` target is still build 98, so the "write instead" spellings of the seven rows stay the portable ones; the four that name a probe (`alt-maybe-nothing`, `alt-date`, `alt-date-compared`, `alt-inline-bracket`) pass `l4 check` on build 98, on build 112 and on the shelf build.
 `check.sh` compares with the newest `main` build by default, and that build reads the seven constructs, so it no longer goes red on them.
 To hold a module to this page's minimum, run it with `L4_MAIN_BUILD=98`.
-Measured 2026-11-28 with an 8-line module that uses `REFUSE`, `check.sh` with target `main`, and a `dev` build as `l4`: red with `L4_MAIN` set to build 98 or 108 (exit 1, `reads differently on main`), green with 109 or 112 (exit 0).
-With `L4_MAIN_BUILD=98` and no `L4_MAIN` it is red, and it ran from the cache with no download: the run had a proxy set that refuses every connection, and `fetch-main-l4.sh` printed no `fetching` line.
-With neither variable and the same dead proxy it fell back to the newest cached build, 112, and was green.
+Measured 2026-11-28 with the module below, `check.sh` with target `main`, and a `dev` build as `l4`; the module was the only `.l4` file in its directory:
+
+```l4
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`rate for` MEANS
+  IF n EQUALS 1 THEN 10
+  ELSE REFUSE "no rate for this n"
+
+#ASSERT `rate for` 1 EQUALS 10
+#ASSERT REFUSED `rate for` 2
+```
+
+The module is red with `L4_MAIN` set to build 98 or 108 (exit 1, `reads differently on main`), and green with 109 or 112 (exit 0).
+With `L4_MAIN_BUILD=98` and no `L4_MAIN` the module is red, and it ran from the cache with no download: the run had a proxy set that refuses every connection, and `fetch-main-l4.sh` printed no `fetching` line.
+With neither variable and the same dead proxy `check.sh` fell back to the newest cached build, 112, and the module was green.
 The "`main` build 98" columns are as measured on build 98, and each of the seven rows points here.
 The 42 pages under "The documented pages, by cause" were counted on build 98 and were not counted again; on the tree at `a61da005e` (123 `.l4` files under `doc/`), `etc/dialect-census.sh` found 37 failing on `main` 1.6.112 and none on the shelf build.
 

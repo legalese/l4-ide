@@ -90,7 +90,7 @@ The rules that decide whether a reviewer can trust the result:
 - **Vintages are inputs, never merged.** Where the law exists in two versions, use the rule-version (rule-effective-time) mechanism in `writing-l4-rules` (`references/source-patterns/04-dates-and-periods.md`), or take the vintage as an explicit input. A vintage that is silent on something answers with silence — never with a number borrowed from another vintage.
 - **`REFUSE "…"` where the sources do not answer** (target `unstable`) — never `FALSE`, `0` or a plausible default.
   By a run on 2026-11-27, `main` builds 98, 99, 102 and 108 have no `REFUSE`, and builds 109 and 112 read it.
-  By source (`git grep` at the local build tags), `REFUSE` is absent at builds 100, 104 and 107 and present at build 110.
+  By source (`git grep` at the `l4-ide-build-N` tags of the `l4-ide` repository), `REFUSE` is absent at builds 100, 104 and 107 and present at build 110.
   A `main` encoding that must run on a build before 109 returns `NOTHING` from a `MAYBE` instead, as `dialects.md` says; the default `main` target, build 98 or later, is such an encoding.
   `check.sh` compares with the newest `main` build, which reads `REFUSE`, so it will not catch one: run it with `L4_MAIN_BUILD=98` as well.
   `MAYBE` / `NOTHING` where the source itself names an absent case.

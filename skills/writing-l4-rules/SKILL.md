@@ -65,7 +65,7 @@ Two questions decide what you may write, and they are not the same question.
   The test separates the two only while `main` has no bullet lists.
   If it passes on a build whose `--version` says `main`, believe `--version`.
   A `dev` build that passes reads bullet lists, and its version string still does not say which track it came from.
-  Run the test again when a `main` build newer than 112 is cached, because `main` may have gained bullet lists by then.
+  Run the test again when `fetch-main-l4.sh` returns a `main` build newer than 112, because `main` may have gained bullet lists by then.
 - **The dialect you write** is the target, the compiler that has to read the finished file.
   The brief names it.
   If the brief is silent, the target is `main`; it is `unstable` only when the brief says so.
