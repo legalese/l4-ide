@@ -92,7 +92,7 @@ Each row gives one of three words for what `main` does with the construct.
    Where a row says **rejects**, write what its last column says, or leave the provision out and mark it "not encodable on main" in the coverage table of `NOTES.md`.
 2. Before you call a module done, run `check.sh` in the encoding directory.
    The target is `main` unless you set `L4_TARGET=unstable`.
-   It fetches the newest main build with `fetch-main-l4.sh` (cached), runs every module with both binaries, and compares the four counts.
+   It fetches the newest main build with `fetch-main-l4.sh` (cached), runs every module with both binaries (a `*-properties.l4` claims module, step 6a of `encoding-a-subject`, is the exception), and compares the four counts.
    A line that says `reads differently on main` is a module `main` cannot read as it stands, because its counts differ or because `main` did not finish it in `L4_MAIN_TIMEOUT` seconds (300 unless set).
    Exit status 2 means the main step could not run (no main build for this platform, no network, no `fetch-main-l4.sh` beside `check.sh`), and then the check is not done.
 3. Know what the check cannot see.
