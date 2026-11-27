@@ -276,10 +276,13 @@ binary, exit 0.
   In source these are ordinary application — `` `the levy is` 200 ``, `LEFT p`, `RIGHT x`. The word
   `OF` belongs to the printer. Copying output back into a file is the one way to get this wrong.
 
-**Not** `REFUSE`. The standard library agrees, deliberately: `YMD 2023 2 29` — no such leap day —
-evaluates to the distinguished term `` `YMD refused an out-of-range month or day` ``, and **despite
-the word in its name that is not a `REFUSE`**. Out-of-range date components were left as invalid
-input on purpose. Do not tidy them into refusals.
+**Not** `REFUSE`, in your own rules. The standard library's `YMD` is the exception, and a stopgap:
+`YMD 2023 2 29` — no such leap day — is a `REFUSE` with the reason
+`YMD refused an out-of-range month or day` (measured 2026-11-28 on the dev build, which prints
+`The model refuses to answer:` and then that reason). The comment above its definition in
+`jl4-core/libraries/daydate.l4` says the designed shape is a change to the constructor's return type,
+which would make it an `EITHER` like the one above. Do not copy the stopgap into a rule of your own:
+an input the rule rules out returns `LEFT`, so the caller can fix it.
 
 **Not** a silent clamp. `Date 1 (3 MINUS 6) 2025` clamps to January 2025 rather than rolling back to
 September 2024; `YMD` is the bounds-checked constructor and is what new code should use for literals.

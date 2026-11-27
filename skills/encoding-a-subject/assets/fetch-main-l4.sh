@@ -22,7 +22,7 @@
 #   * the newest release has no package for this platform: the next older release that has one,
 #     looking back at most 5 releases.
 # With a cold cache and no network it exits 4. To pin a build, give BUILD (check.sh passes
-# L4_MAIN_BUILD through).
+# L4_MAIN_BUILD through, but only when L4_MAIN is not set: it does not call this script then).
 #
 # A build older than 98, the build references/dialects.md is measured at, is still fetched (give
 # BUILD, or fall back to an old cached build) but with a warning on stderr: the page's rows may

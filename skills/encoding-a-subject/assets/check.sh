@@ -48,6 +48,7 @@
 #                    next to this script, prints: the newest main build, cached)
 #         L4_FETCH   a fetch-main-l4.sh somewhere else   (default: next to this script)
 #         L4_MAIN_BUILD  a main build number for fetch-main-l4.sh to fetch instead of the newest
+#                    (ignored, with a line on stderr, when L4_MAIN is set: it is read only when L4_MAIN is not)
 #         L4_MAIN_TIMEOUT  seconds each module may take on the main build (default: 300; 0 = no limit).
 #                    A module that main cannot finish in that time is red: main is the compiler
 #                    that has to read it. Your own l4 is never timed.
@@ -136,6 +137,9 @@ case "$TARGET" in
       ""|*[!0-9]*) echo "check.sh: L4_MAIN_TIMEOUT must be a number of seconds, not '$MAIN_TIMEOUT'." >&2; exit 2 ;;
     esac
     MAIN="${L4_MAIN:-}"
+    if [ -n "$MAIN" ] && [ -n "${L4_MAIN_BUILD:-}" ]; then
+      echo "check.sh: L4_MAIN_BUILD=$L4_MAIN_BUILD is ignored, because L4_MAIN is set; comparing with L4_MAIN=$MAIN." >&2
+    fi
     if [ -z "$MAIN" ]; then
       fetch="${L4_FETCH:-$HERE/fetch-main-l4.sh}"
       [ -x "$fetch" ] || fetch="$(command -v fetch-main-l4.sh 2>/dev/null || true)"

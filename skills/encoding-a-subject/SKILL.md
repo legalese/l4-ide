@@ -92,7 +92,7 @@ The rules that decide whether a reviewer can trust the result:
   By a run on 2026-11-27, `main` builds 98, 99, 102 and 108 have no `REFUSE`, and builds 109 and 112 read it.
   By source (`git grep` at the `l4-ide-build-N` tags of the `l4-ide` repository), `REFUSE` is absent at builds 100, 104 and 107 and present at build 110.
   A `main` encoding that must run on a build before 109 returns `NOTHING` from a `MAYBE` instead, as `dialects.md` says; the default `main` target, build 98 or later, is such an encoding.
-  `check.sh` compares with the newest `main` build, which reads `REFUSE`, so it will not catch one: run it with `L4_MAIN_BUILD=98` as well.
+  `check.sh` compares with the newest `main` build, which reads `REFUSE`, so it will not catch one: run it with `L4_MAIN_BUILD=98` as well, and no `L4_MAIN`.
   `MAYBE` / `NOTHING` where the source itself names an absent case.
   See `references/source-patterns/11-when-the-encoding-cannot-answer.md`.
   Do not invent your own three-valued logic (`Established` / `Rejected` / `Unresolved` enums threaded through every rule): the language already has these, and a home-made version is one more thing a reviewer must learn before they can read a single rule.
@@ -140,7 +140,7 @@ Run it after every unit you land. Report the numbers it prints, never "it's gree
 **It also makes the target check.**
 Unless you set `L4_TARGET=unstable`, `check.sh` runs every module with a main build as well as with your `l4`, and compares the four counts.
 Copy [`assets/fetch-main-l4.sh`](assets/fetch-main-l4.sh) beside it: `check.sh` calls that to get the newest main build, and caches it.
-`main` 1.6.112 reads `REFUSE`, `@lang` and `YMD`, which build 98 does not, so a check against the newest build does not hold an encoding to the default minimum, build 98: run `check.sh` with `L4_MAIN_BUILD=98` as well.
+`main` 1.6.112 reads `REFUSE`, `@lang` and `YMD`, which build 98 does not, so a check against the newest build does not hold an encoding to the default minimum, build 98: run `check.sh` with `L4_MAIN_BUILD=98` as well, and no `L4_MAIN`.
 A line that ends `reads differently on main` is a module `main` cannot read as it stands; `writing-l4-rules/references/dialects.md` says what to write instead.
 Every module is run twice, once with each build, with your environment (a module that fetches over the network or reads `ENV` does that twice), and the comparison is of counts, not of which assertion fails; the header of `check.sh` says what to do about both.
 Exit status 2 means the main step did not run (no main build for your platform, no network, no `fetch-main-l4.sh`), and that is not a pass.

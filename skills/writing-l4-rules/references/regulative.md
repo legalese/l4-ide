@@ -469,7 +469,9 @@ The `HENCE` branch reduces the balance; the `LEST` branch increases it with a pe
 L4 checks every rule whose `HENCE` or `LEST` leads back to itself, and gives one of three warnings (`doc/reference/regulative/rules-that-start-themselves-again.md` quotes each):
 
 - **"I could not check that this comes to an end"** when it cannot see that each new copy waits, for an event or for a deadline written as a number above 0.
-  The example above draws it unless `` `next due date` `` is a number written out in the same file: `` `next due date` MEANS 30 `` checks clean, and `` `next due date` MEANS 15 PLUS 15 `` warns (measured 2026-11-21), because L4 reads only a number written out there.
+  The example above checks clean, because its deadline is the number 30 written out.
+  Write `` WITHIN `next due date` `` in its place, and define the name, and it draws the warning unless `` `next due date` `` is a number written out in the same file: `` `next due date` MEANS 30 `` checks clean, and `` `next due date` MEANS 15 PLUS 15 `` warns (measured 2026-11-28 on the dev build), because L4 reads only a number written out there.
+  With no definition of the name at all it is an error (`check/unknown-identifier`), not this warning.
   If the rule does come to an end, write `@ends-because <reason>` on a line of its own above the rule the warning is shown on (the first, in the file, of rules that lead back to each other).
   That silences this warning only, and L4 shows the reason in an information message instead.
   A mark above another rule of the loop does not count.

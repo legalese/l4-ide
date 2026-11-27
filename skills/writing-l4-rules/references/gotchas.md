@@ -269,7 +269,7 @@ L4 never silently converts between types. `"42" + 1` is a type error. Use the ex
 
 ## The `daydate` month-subtraction footgun
 
-After `IMPORT daydate`, you build calendar dates with `YMD year month day` (recommended for new code, BOUNDS-CHECKED) or the little-endian `Date day month year` (lenient). **This footgun is `Date`-specific**: `YMD` refuses an out-of-range month instead of clamping — `YMD 2025 (3 MINUS 6) 1` stops on `` `YMD refused an out-of-range month or day` `` where `Date 1 (3 MINUS 6) 2025` silently clamps to January 2025. Use `Date` when you _want_ rolling month arithmetic; use `YMD` for literals.
+After `IMPORT daydate`, you build calendar dates with `YMD year month day` (recommended for new code, BOUNDS-CHECKED) or the little-endian `Date day month year` (lenient). **This footgun is `Date`-specific**: `YMD` refuses an out-of-range month instead of clamping — `YMD 2025 (3 MINUS 6) 1` stops on `` `YMD refused an out-of-range month or day` `` (the `dev` build's reason, measured 2026-11-28: `main` builds 109 and 112 say `YMD: the month is not a whole number from 1 to 12`, and `main` build 98 has no `YMD`) where `Date 1 (3 MINUS 6) 2025` silently clamps to January 2025. Use `Date` when you _want_ rolling month arithmetic; use `YMD` for literals.
 
 The constructor does **not** normalise a non-positive month by rolling back a year — it **clamps a month `≤ 0` to January of the same year**. So `Date 1 (3 MINUS 6) 2025` is **January 2025**, _not_ September 2024. Month **overflow** past 12, by contrast, _does_ roll forward correctly: `month PLUS 6` on a December date lands in the next year.
 
@@ -406,7 +406,7 @@ The lexer still reads it and the parser stores nothing from it (`refAdditionalP`
 Measured: `@ref-src this-file-does-not-exist.csv` passes `l4 check` with `Check succeeded` and no diagnostic.
 To tie an `@ref` to lines of a raw source text with `src:` locators that a script can check, see [source-locators.md](../../encoding-a-subject/references/source-locators.md) in the `encoding-a-subject` skill.
 
-### `@nlg` placement: a rule takes it on the line above, a name takes it trailing — and one leak
+### `@nlg` placement: a rule takes it on the line above or trailing its head, a name takes it trailing — and one leak
 
 Fuller treatment of what to put IN a herald — `%param%` slots, when a sentence replaces the
 implementation, and the three levers before you reach for one — is in
@@ -415,9 +415,11 @@ This section is only about WHERE it goes and what it will not do. Every claim be
 on 2026-09-21 on a build of `unstable` at `debf44d34`, which carries both `legalese/l4-ide#433`
 (attachment) and `#435` (field lists); the one-file probe is the measurement, not the merge log.
 The exception is the `GIVEN`-list paragraphs below, which were measured on 2026-10-02 at `e0366fd7f`.
+The paragraphs on trailing a herald were measured again on 2026-11-28 on the dev build, and where they differ from 2026-09-21 the later measurement is the one written.
 
-**A rule's herald goes on its own line, immediately above the definition.** That is the only
-placement that reaches a rule:
+**A rule's herald goes on its own line, immediately above the definition, or trails its head.**
+Those are the two placements that reach a rule.
+The own-line form:
 
 ```l4
 GIVEN n IS A NUMBER
@@ -428,16 +430,32 @@ DECIDE `כפול` IS n TIMES 2
 
 `l4 nlg --lang he` prints `שורה משלה עם 21`.
 
-**Trailing the definition line does NOT reach the rule**, and this is the trap, because it looks
-like it should. `DECIDE f n IS n TIMES 2 @nlg …`, the same with `MEANS`, and the head-line form
-with the body on the next line all render the rule as its bare name. What happens to the herald
-depends on what comes next, and only one of the two outcomes is loud:
+**Trailing the head reaches the rule too**, with the body on the next line, and it fills the `%param%` slots as the own-line form does.
+Measured 2026-11-28 on the dev build: ``DECIDE `is large` @nlg the claim of %amount% is large`` over `IF amount GREATER THAN 100` renders `the claim of 200 is large`, and ``DECIDE `doubled` @nlg twice %n%`` over `IS n TIMES 2` renders `twice 21`.
+The same holds when the head lists its inputs: `DECIDE f n @nlg twice %n%` over `IS n TIMES 2`, with no `GIVEN`, renders `twice 21` and `twice 5` for `#EVAL f 21` and `#EVAL f 5`, and so does ``DECIDE `doubled` n @nlg twice %n%`` under `GIVEN n IS A NUMBER`.
+An earlier version of this paragraph, measured 2026-09-21, had this head-line form rendering the bare name; on the dev build it does not.
+
+**Trailing the END of the definition line does NOT reach the rule**, and this is the trap, because it
+looks like it should. `DECIDE f n IS n TIMES 2 @nlg …` and the same with `MEANS` do not label the
+rule: the herald goes to whatever follows it. What happens to the herald depends on what
+comes next. These are the cases measured, not every possible follower, and only the first is loud:
 
 - nothing annotatable follows → `Not attached to any valid syntax node`, a parser diagnostic
-  pointing at the herald. Loud, and correct.
+  pointing at the herald. Loud, and correct. Measured 2026-11-28 on the dev build with another rule's `GIVEN` after a `DECIDE` and after a `MEANS`, and with the file ending after a `DECIDE`.
 - a `DECLARE` follows → the herald silently becomes THAT type's herald. Measured: a rule's
   trailing `@nlg SHOULD-BE-ON-RULE` rendered as `SHOULD-BE-ON-RULE where `x` is 1` on the
-  record declared beneath it, with a clean typecheck and no diagnostic. This is the silent one.
+  record declared beneath it, with a clean typecheck and no diagnostic. This is a silent one.
+- an `#EVAL` follows → the herald silently becomes the name's herald in that directive. Measured
+  2026-11-28: ``DECIDE `doubled` IS n TIMES 2 @nlg SHOULD-BE-ON-RULE`` followed by ``#EVAL `doubled` 21``
+  and ``#EVAL `doubled` 5`` prints `SHOULD-BE-ON-RULE with 21` and `` `doubled` with 5 ``, with a clean
+  typecheck and no diagnostic.
+  The tell is the slot: with `@nlg twice %n%` in that position the first directive prints ``twice `n` with 21``,
+  the input's name where a herald that had reached the rule prints its value, `twice 21`.
+- an `#ASSERT` follows → the same, silently. Measured 2026-11-28: ``DECIDE `doubled` IS n TIMES 2 @nlg SHOULD-BE-ON-RULE``
+  followed by ``#ASSERT `doubled` 2 EQUALS 4`` prints `SHOULD-BE-ON-RULE with 2 is equal to 4`, with a clean typecheck and no diagnostic.
+- another rule follows → the herald silently becomes THAT rule's herald. Measured 2026-11-28:
+  `DECIDE a IS 1 @nlg SHOULD-BE-ON-A`, then `DECIDE b IS 2`, then `#EVAL a` and `#EVAL b`, prints `` `a` `` (with its backticks) and then
+  `SHOULD-BE-ON-A`: the herald is on `b`, `a` is bare, and `l4 check` says `Check succeeded`.
 
 **"Immediately above the definition" means after `GIVETH`, not above `GIVEN` — and the trap here
 is silent, not loud.** `GIVEN`/`GIVETH` read like part of the rule, so `@nlg` above `GIVEN` looks
@@ -465,7 +483,8 @@ Move the herald to after `GIVETH`, and it attaches correctly regardless of what 
 
 **So do not trust `l4 check`'s silence as evidence a herald attached.** The only real check is `l4
 nlg` (or `l4 ast`) on a case that exercises the rule, confirming the herald's own text — not the
-bare fallback — comes out the other end.
+bare fallback — comes out the other end, with each `%param%` slot filled by its value (a herald
+captured by a later `#EVAL` prints its text with the slot left as the input's name).
 
 **A parameter's herald trails its own line.** `GIVEN n IS A NUMBER @nlg the count` describes `n`
 (`#433`; before it, the `NUMBER`). It describes the parameter, not the rule — a rule whose only

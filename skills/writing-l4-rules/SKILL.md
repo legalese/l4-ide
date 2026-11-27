@@ -72,7 +72,7 @@ Two questions decide what you may write, and they are not the same question.
   With no brief at all, assume `main` and say that you did.
 
 Running an `unstable` binary does not license `unstable` syntax.
-For a `main` target, write only what [references/dialects.md](references/dialects.md) says `main` reads, follow its "write instead" column for the rest, and run `check.sh` from the `encoding-a-subject` skill before you call a module done: it runs the module with a main build too (the newest `main`, unless you set `L4_MAIN_BUILD`), and goes red when `main` reads it differently.
+For a `main` target, write only what [references/dialects.md](references/dialects.md) says `main` reads, follow its "write instead" column for the rest, and run `check.sh` from the `encoding-a-subject` skill before you call a module done: it runs the module with a main build too (the newest `main`, unless you set `L4_MAIN`, or `L4_MAIN_BUILD` without it), and goes red when `main` reads it differently.
 
 ### 1. Analyse the source
 
@@ -679,7 +679,7 @@ Construct literals (after `IMPORT daydate`) with `YMD year month day` — e.g. `
 
 The older `Date`/`DATE` constructors are **little-endian** — `Date day month year`, e.g. `Date 15 1 2025`. So writing year-first with them is a bug: `Date 2025 1 15` is read as day 2025 of month 1 and silently evaluates to `0020-07-17`, not 2025-01-15.
 
-The two constructors split strict/lenient deliberately: `YMD` bounds-checks — a transposed `YMD 2025 15 1` produces no date, and neither does `YMD 2023 2 29` (no such leap day); both refuse, with the reason `YMD refused an out-of-range month or day`, which is what the result shows. It is a `REFUSE`, so no rule can turn it back into a date. `Date` stays lenient and rolls overflow silently, which month arithmetic relies on. Strict literals via `YMD`; lenient arithmetic via `Date`.
+The two constructors split strict/lenient deliberately: `YMD` bounds-checks — a transposed `YMD 2025 15 1` produces no date, and neither does `YMD 2023 2 29` (no such leap day); both refuse, with the reason `YMD refused an out-of-range month or day`, which is what the result shows. It is a `REFUSE`, so no rule can turn it back into a date. That reason is the `dev` build's (measured 2026-11-28): `main` builds 109 and 112 refuse too, with `YMD: that month has no such day in that year` for `YMD 2023 2 29` and `YMD: the month is not a whole number from 1 to 12` for month 15, and `main` build 98 has no `YMD`. `Date` stays lenient and rolls overflow silently, which month arithmetic relies on. Strict literals via `YMD`; lenient arithmetic via `Date`.
 
 Also: `Time hour minute second`, `DateTime date time`.
 
