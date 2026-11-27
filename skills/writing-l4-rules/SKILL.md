@@ -72,7 +72,7 @@ Two questions decide what you may write, and they are not the same question.
   With no brief at all, assume `main` and say that you did.
 
 Running an `unstable` binary does not license `unstable` syntax.
-For a `main` target, write only what [references/dialects.md](references/dialects.md) says `main` reads, follow its "write instead" column for the rest, and run `check.sh` from the `encoding-a-subject` skill before you call a module done: it runs the module with a main build too (the newest `main`, unless you set `L4_MAIN_BUILD` without `L4_MAIN`), and goes red when `main` reads it differently.
+For a `main` target, write only what [references/dialects.md](references/dialects.md) says `main` reads, follow its "write instead" column for the rest, and run `check.sh` from the `encoding-a-subject` skill before you call a module done: it runs the module with a main build too (the newest `main`, unless you set `L4_MAIN`, or `L4_MAIN_BUILD` without it), and goes red when `main` reads it differently.
 
 ### 1. Analyse the source
 
