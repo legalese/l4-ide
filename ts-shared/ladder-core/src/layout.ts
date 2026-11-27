@@ -81,10 +81,8 @@ export interface Geometry {
  *  from it, and `PIXEL_GEOMETRY.TAG_BAND` is derived from it, so the room reserved for the
  *  tag cannot drift from the text it holds. */
 const OTIOSE_TAG_SIZE = 11;
-/** Where a line of text's ink sits about its baseline: the ink rises `ASCENT_RATIO` of the
- *  type size above it and drops `DESCENT_RATIO` below. */
+/** How far a line of text's ink rises above its baseline, as a fraction of the type size. */
 const ASCENT_RATIO = 0.78;
-const DESCENT_RATIO = 0.22;
 const PIXEL_TAG_RISE = 9;
 
 /** The pixel geometry the SVG target has always used. */
@@ -680,7 +678,7 @@ function leafBox(
 // Geometry.CONNECTIVE_GAP — shared by above-wire / below-wire / straddle-wire so
 // they all hug the line identically. Ascent/descent are derived from the font.
 const ascent = (k: Geometry) => k.FONT * ASCENT_RATIO;
-const descent = (k: Geometry) => k.FONT * DESCENT_RATIO;
+const descent = (k: Geometry) => k.FONT * 0.22;
 
 /** Split inert prose into two width-balanced lines (for 'straddle-wire'). One word
  *  can't split -> single line.
@@ -1475,11 +1473,22 @@ function measureImplies(e: Implies, ctx: Ctx): Measured {
   const w = s.w + SEAM_W + r.w + lampsW;
   // tall enough for the widest panel AND for the lamp pair to clear the axis
   const h = Math.max(s.h, r.h, 2 * (COIL_SEP + COIL_R + tm.lineHeight(FONT)));
+  // A tag in the scope or the requirement reaches above the rule's own top edge unless the
+  // rule is taller than that panel: both are centred on the axis, so a shorter one sits
+  // (h - its height) / 2 below the top. The OR that holds this rule as a rung reads the
+  // result (`tagBand`), as it does for a series.
+  const tagBand = Math.max(
+    0,
+    ...[s, r].map((m) =>
+      m.tagBand === undefined ? 0 : m.tagBand - (h - m.h) / 2,
+    ),
+  );
 
   return {
     w,
     h,
     state: renderState(ctx, e.id),
+    ...(tagBand > 0 ? { tagBand } : {}),
     emit(ox, oy, out) {
       const cy = oy + h / 2; // the rule's axis
       const sp = s.emit(ox, cy - s.h / 2, out);

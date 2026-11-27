@@ -405,9 +405,10 @@ export type ScenePrim =
   | {
       kind: "glyph";
       at: Pt;
-      /** There is no open-contact (break) role: a dead or eliminable element is told by
-       *  ink and dash alone (Meng, 2026-11-27: "the colour should be sufficient to indicate
-       *  that the current stops", then "get rid of the open switch on the eliminable too"). */
+      /** There is no open-contact (break) role: a dead element is told by its ink, and an
+       *  eliminable one by its dash and, on a leaf or folded group, its tag; neither draws a
+       *  break (Meng, 2026-11-27: "the colour should be sufficient to indicate that the
+       *  current stops", then "get rid of the open switch on the eliminable too"). */
       role: "power-terminal" | "inverter" | "changeover";
       /** For `inverter` only: the NOT's OUTPUT value, so the bubble can be filled with it —
        *  green when the negand is false (the NOT conducts), the mild red when the negand is

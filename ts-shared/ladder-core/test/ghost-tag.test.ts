@@ -313,6 +313,49 @@ test("a ghost inside a series rung clears the parent's 'or' — first in a TB co
   }
 });
 
+test("a ghost that is the first rung of an OR inside an IMPLIES rung clears the parent's 'or', LR and TB", () => {
+  // `measureImplies` passes the band of its scope and requirement up, as a series does.
+  // The requirement is a three-rung OR, taller than the lamp pair, so the ghost's tag
+  // reaches above the rule's own top edge.
+  for (const orient of ["LR", "TB"] as const) {
+    for (const where of ["requirement", "scope"] as const) {
+      const ghost = leaf("a long ghost rung label");
+      const stack = or([ghost, leaf("c"), leaf("d")]);
+      const rule =
+        where === "requirement"
+          ? implies(leaf("p"), stack)
+          : implies(stack, leaf("q"));
+      const body = or([leaf("a"), inert("or"), rule]);
+      const s = sceneOf(body, [ghost], { orient });
+      assertTagsClear(
+        s,
+        1,
+        `${orient} ghost in the ${where} of an IMPLIES rung`,
+      );
+      assert.ok(
+        s.size.h > sceneOf(body, [], { orient }).size.h,
+        `${orient} ${where}: the parent made room for it`,
+      );
+    }
+  }
+});
+
+test("a ghost leaf deep inside an IMPLIES rung reserves no band: the rule is taller than it", () => {
+  // The lamp pair makes the rule at least 137 px tall, so a one-line requirement sits
+  // (h - its height) / 2 below the rule's top and its tag is inside the rule.
+  for (const orient of ["LR", "TB"] as const) {
+    const ghost = leaf("a long ghost rung label");
+    const body = or([leaf("a"), inert("or"), implies(leaf("p"), ghost)]);
+    const s = sceneOf(body, [ghost], { orient });
+    assertTagsClear(s, 1, `${orient} ghost requirement`);
+    assert.equal(
+      s.size.h,
+      sceneOf(body, [], { orient }).size.h,
+      `${orient}: not a pixel taller`,
+    );
+  }
+});
+
 /* ------------------------------------- no tag drawn, no band reserved */
 
 test("an eliminable NOT or IMPLIES rung draws no tag, so it reserves no band", () => {

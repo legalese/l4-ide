@@ -71,6 +71,10 @@ const fillFor = (s: State, p: Palette) =>
         ? p.eliminableFill
         : p.boxFill;
 
+/** Compile-time exhaustiveness: a `never` argument means every case was handled; what it
+ *  draws, if a hand-built scene gets past the types, is nothing. */
+const exhaustive = (_unhandled: never): string => "";
+
 const esc = (t: string) =>
   t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
@@ -160,7 +164,12 @@ function prim(
         // true, plain while unknown. Its own two fields, not `live`/`dead`, which are TEXT
         // inks and are neither green-and-red in dark nor distinguishable in ink.
         return `<circle cx="${p.at.x.toFixed(1)}" cy="${p.at.y.toFixed(1)}" r="5" fill="${p.value === "TrueV" ? pal.inverterTrue : p.value === "FalseV" ? pal.inverterFalse : pal.inverterFill}" stroke="${pal.inverterStroke}" stroke-width="1.5"/>`;
-      return `<circle cx="${p.at.x.toFixed(1)}" cy="${p.at.y.toFixed(1)}" r="3.5" fill="${pal.rail}"/>`;
+      if (p.role === "power-terminal")
+        return `<circle cx="${p.at.x.toFixed(1)}" cy="${p.at.y.toFixed(1)}" r="3.5" fill="${pal.rail}"/>`;
+      // A role added to `ScenePrim` without a branch here fails `tsc` at this line, and a
+      // hand-built scene carrying an unknown role draws nothing, as the ASCII carrier does.
+      // It used to fall through to the power terminal's dot.
+      return exhaustive(p.role);
     case "frame": {
       const { x, y, w, h } = p.rect;
       return (

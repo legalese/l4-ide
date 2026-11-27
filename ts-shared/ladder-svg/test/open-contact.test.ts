@@ -16,12 +16,12 @@
  *     reader who cannot tell the two colours apart. With current OFF there is no `flow`,
  *     every wire is 1.5, and the colour is the only cue — the last test says so.
  *
- * Two marks say "no break" in the SVG, and the second is the one that bites. The break
- * used to be the only thing `svg.ts` drew with `<line>`, so the absence of that tag was a
- * faithful "no glyph in the output". With the renderer branch gone, a glyph of an unknown
- * role falls through to the power terminal's dot, so a reinstated emitter would draw a
- * `<circle r="3.5">` and NOT a `<line>`. Every scene has exactly two such dots (the rails'
- * power terminals), and `strayDots` counts any beyond them.
+ * The break was the only thing `svg.ts` drew with `<line>`, so the absence of that tag is a
+ * faithful "no break in the output". `svg.ts` is now exhaustive over the glyph roles: a
+ * role it does not know fails `tsc`, and a hand-built scene that carries one anyway draws
+ * nothing (it used to draw the power terminal's dot). So a reinstated emitter under a new
+ * name would be invisible in the SVG, and the guard that catches it is the scene-level one in
+ * `ladder-core/test/open-contact.test.ts`; the last-but-one test here pins the renderer half.
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -32,7 +32,13 @@ import {
   DARK_PALETTE,
 } from "../src/index.js";
 import { layout, defaultViewSpec, estimateMetrics } from "@repo/ladder-core";
-import type { FunDecl, IRExpr, NodeId, UBoolValue } from "@repo/ladder-core";
+import type {
+  FunDecl,
+  IRExpr,
+  NodeId,
+  Scene,
+  UBoolValue,
+} from "@repo/ladder-core";
 
 const leaf = (id: NodeId, label: string): IRExpr => ({
   $type: "UBoolVar",
@@ -67,12 +73,6 @@ const render = (
     ),
     opts.theme ?? "screen",
   );
-
-/** Circles of the power terminal's radius beyond the two every scene carries, one at each
- *  rail. A glyph the renderer does not know falls through to this circle, so a break
- *  reinstated under any role name shows up here and not as a `<line>`. */
-const strayDots = (svg: string): number =>
-  (svg.match(/<circle [^>]*\br="3\.5"/g)?.length ?? 0) - 2;
 
 /** The `stroke-width` of every wire and curve in the output, in drawing order. */
 const wireWidths = (svg: string): number[] =>
@@ -126,7 +126,6 @@ test("a FALSE element renders no open-contact break, leaf or parent, in either t
         `${name}: and it drew boxes, so the absence below means something`,
       );
       assert.doesNotMatch(svg, /<line\b/, `${name} (${theme}) drew a break`);
-      assert.equal(strayDots(svg), 0, `${name} (${theme}) drew a stray dot`);
     }
 });
 
@@ -147,11 +146,47 @@ test("an ELIMINABLE rung renders as a dashed ghost with its tag, and no break", 
     ["plain", draw(new Map())],
   ] as const) {
     assert.doesNotMatch(svg, /<line\b/, `${name}: no bars`);
-    assert.equal(strayDots(svg), 0, `${name}: no stray dot`);
   }
   const ghost = draw(new Map([[4, "eliminable" as const]]));
   assert.match(ghost, /stroke-dasharray="5 4"/, "the ghost is still dashed");
   assert.match(ghost, /otiose — always open/, "…and still tagged");
+});
+
+test("a glyph of an unknown role draws nothing: no dot, no bars", () => {
+  const scene = layout(
+    {
+      id: 1,
+      name: "r",
+      params: [],
+      body: or(2, [leaf(3, "a"), leaf(4, "b")]),
+    } satisfies FunDecl,
+    defaultViewSpec({}),
+    estimateMetrics,
+  );
+  const stray = {
+    kind: "glyph",
+    at: { x: 120, y: 80 },
+    role: "open-switch",
+  } as unknown as Scene["prims"][number];
+  // an empty drawing is an empty line in the output, so compare without blank lines
+  const marks = (svg: string) => svg.split("\n").filter((l) => l !== "");
+  const withStray = sceneToSvg({ ...scene, prims: [...scene.prims, stray] });
+  assert.deepEqual(
+    marks(withStray),
+    marks(sceneToSvg(scene)),
+    "the stray glyph left no mark",
+  );
+  // positive control: a KNOWN role at the same point does draw something
+  const known = {
+    kind: "glyph",
+    at: { x: 120, y: 80 },
+    role: "power-terminal",
+  } as const;
+  assert.notEqual(
+    sceneToSvg({ ...scene, prims: [...scene.prims, known] }),
+    sceneToSvg(scene),
+    "…and a known role does",
+  );
 });
 
 test("a lit wire and a dark wire still differ in stroke width, not in colour alone", () => {
