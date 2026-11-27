@@ -415,9 +415,11 @@ This section is only about WHERE it goes and what it will not do. Every claim be
 on 2026-09-21 on a build of `unstable` at `debf44d34`, which carries both `legalese/l4-ide#433`
 (attachment) and `#435` (field lists); the one-file probe is the measurement, not the merge log.
 The exception is the `GIVEN`-list paragraphs below, which were measured on 2026-10-02 at `e0366fd7f`.
+The paragraphs on trailing a herald were measured again on 2026-11-28 on the dev build, and where they differ from 2026-09-21 the later measurement is the one written.
 
-**A rule's herald goes on its own line, immediately above the definition.** That is the only
-placement that reaches a rule:
+**A rule's herald goes on its own line, immediately above the definition, or trails its head.**
+Those are the two placements that reach a rule.
+The own-line form:
 
 ```l4
 GIVEN n IS A NUMBER
@@ -428,16 +430,24 @@ DECIDE `כפול` IS n TIMES 2
 
 `l4 nlg --lang he` prints `שורה משלה עם 21`.
 
-**Trailing the definition line does NOT reach the rule**, and this is the trap, because it looks
-like it should. `DECIDE f n IS n TIMES 2 @nlg …`, the same with `MEANS`, and the head-line form
-with the body on the next line all render the rule as its bare name. What happens to the herald
-depends on what comes next, and only one of the two outcomes is loud:
+**Trailing the head reaches the rule too**, with the body on the next line, and it fills the `%param%` slots as the own-line form does.
+Measured 2026-11-28 on the dev build: ``DECIDE `is large` @nlg the claim of %amount% is large`` over `IF amount GREATER THAN 100` renders `the claim of 200 is large`, and ``DECIDE `doubled` @nlg twice %n%`` over `IS n TIMES 2` renders `twice 21`.
+An earlier version of this paragraph, measured 2026-09-21, had this head-line form rendering the bare name; on the dev build it does not.
+
+**Trailing the END of the definition line does NOT reach the rule**, and this is the trap, because it
+looks like it should. `DECIDE f n IS n TIMES 2 @nlg …` and the same with `MEANS` render the rule as
+its bare name: the herald goes to whatever follows it. What happens to the herald depends on what
+comes next, and only the first of the three outcomes is loud:
 
 - nothing annotatable follows → `Not attached to any valid syntax node`, a parser diagnostic
-  pointing at the herald. Loud, and correct.
+  pointing at the herald. Loud, and correct. Measured 2026-11-28 with another rule's `GIVEN` after it, and with the file ending.
 - a `DECLARE` follows → the herald silently becomes THAT type's herald. Measured: a rule's
   trailing `@nlg SHOULD-BE-ON-RULE` rendered as `SHOULD-BE-ON-RULE where `x` is 1` on the
-  record declared beneath it, with a clean typecheck and no diagnostic. This is the silent one.
+  record declared beneath it, with a clean typecheck and no diagnostic. This is a silent one.
+- an `#EVAL` follows → the herald silently becomes the name's herald in that directive. Measured
+  2026-11-28: ``DECIDE `doubled` IS n TIMES 2 @nlg SHOULD-BE-ON-RULE`` followed by ``#EVAL `doubled` 21``
+  and ``#EVAL `doubled` 5`` prints `SHOULD-BE-ON-RULE with 21` and `` `doubled` with 5 ``, with a clean
+  typecheck and no diagnostic.
 
 **"Immediately above the definition" means after `GIVETH`, not above `GIVEN` — and the trap here
 is silent, not loud.** `GIVEN`/`GIVETH` read like part of the rule, so `@nlg` above `GIVEN` looks
