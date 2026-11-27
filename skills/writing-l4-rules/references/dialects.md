@@ -102,10 +102,10 @@ The `degrades-` probe `degrades-nlg-language-tag` is the one that `main` has sin
 It was run on the same six `main` builds (98, 99, 102, 108, 109 and 112), measured 2026-11-28, with `XDG_DATA_HOME` pointing at an empty folder and `JL4_LIBRARY_PATH` unset.
 `l4 check` passes it on all six, so the census counts above do not move.
 On build 98, `l4 ast` shows `TNlgString ":pt"`, as the row says, and `l4` has no `nlg` command.
-On builds 99, 102, 108, 109 and 112, `l4 ast` shows `MkLangTag "pt"` instead, and `l4 nlg --lang pt` prints `o valor 200 excede o limite`.
+On builds 99, 102, 108, 109 and 112, `l4 ast` shows `MkLangTag "pt"` instead, and `l4 nlg --lang pt` prints `o valor 200 excede o limite`, on the probe with ``#EVAL `is large` 200`` added at the end, because the shipped probe has no directive for `l4 nlg` to print.
 Those five builds also warn that `@nlg:pt` is the rule's only wording and that nothing makes `pt` a language: with no code on 99 and 102, and with the code `lint/lone-lang-tag` on 108, 109 and 112.
 A rule with `@nlg:en` and `@nlg:pt` wordings, run on builds 99 and 112 only, prints the wording that `--lang en` or `--lang pt` asks for.
-So the first build run that reads a language tag is 99, the build after 98, and the row's "degrades" is true of build 98 only.
+So the first build run that reads a language tag is 99, the build after 98, and of the builds run the row's "degrades" is true of build 98 only.
 
 Of the 51 numbered probes `main` 1.6.112 still rejects, 50 give the same first error as on build 98; probe 11 now says `The first argument of TIMES is expected to be of type NUMBER but is here of type …`.
 This page's minimum for a `main` target is still build 98, so the "write instead" spellings of the seven rows stay the portable ones; the four that name a probe (`alt-maybe-nothing`, `alt-date`, `alt-date-compared`, `alt-inline-bracket`) pass `l4 check` on build 98, on build 112 and on the shelf build.
@@ -155,7 +155,7 @@ Each row gives one of three words for what `main` does with the construct.
 3. Know what the check cannot see.
    It does not see a different `#TRACE` outcome.
    Only an error, or an `#ASSERT` that comes out differently, moves a count.
-   Three rows differ in what they do, and the check passes all three: an input named in an action, a `MAY` with a `LEST`, and, on build 98 only, a language tag on `@nlg`.
+   Three rows differ in what they do, and the check passes all three: an input named in an action, a `MAY` with a `LEST`, and, of the builds run, only on build 98, a language tag on `@nlg`.
    Use the spelling the table gives, and compare the two builds' output for every trace yourself: run each file with both builds and read the outcomes.
 4. A few constructs have no spelling both compilers read: anything the table says to leave out, and `WAITUNTIL` or `ISINTEGER` where no portable idiom fits (the table gives one for each common use).
    A module that needs one cannot be written with the shelf build.
