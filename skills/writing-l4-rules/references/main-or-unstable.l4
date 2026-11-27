@@ -1,0 +1,8 @@
+-- Run `l4 check` on this file to tell a `main` build from an `unstable` one.
+-- It uses a bullet list, a syntax that `unstable` reads and that `main` has not been measured to read.
+-- Step 0 of ../SKILL.md says what each answer means and when it was measured.
+GIVETH A LIST OF NUMBER
+`three numbers` MEANS
+  • 1
+  • 2
+  • 3
