@@ -1704,6 +1704,32 @@ spec = describe "the norm log writer (NORM-LOG-SPEC, P1)" do
         rs <- run False (src twice)
         length [ () | e <- fatesOf 0 rs, e.neFate == FateArmed, e.neActionHead == Just "deliver" ] `shouldBe` 1
 
+      it "R24: a limit: a named run that reads, started inside an outer run, is run again by each outer run that uses it (review of P2b, third review, item E)" do
+        -- S2's restore of crNormRead is in endNormRun, and a run started
+        -- inside another pushes no EndNormRun, so the span of the named inner
+        -- run stays marked as a read of the log and is not served again: the
+        -- inner run is run again, and writes its norms again, at each use.
+        -- Pinned as found (probed on lhs 2026-11-27: 1 and 2, where a run
+        -- named once and used twice at the top is run once, R20). Two uses
+        -- inside ONE outer run were not probed: a read in an operand is
+        -- refused, and no other form of two uses in one run was found
+        let nested =
+              [ "inner MEANS PARTY Alice MUST deliver PROVIDED OUTSTANDING (PARTY _ MUST deliver) WITHIN 10"
+              , "GIVETH DEONTIC Person Action"
+              , "r MEANS EVALTRACE inner 0 (LIST EVENT Alice deliver 2)"
+              , "GIVETH DEONTIC Person Action"
+              , "o MEANS PARTY Bob MUST pay n WITHIN 5 HENCE r"
+              , "#EVAL LIST (EVALTRACE o 0 (LIST EVENT Bob (pay 1) 1))"
+              , "#EVAL LIST (EVALTRACE o 0 (LIST EVENT Bob (pay 1) 1)), (EVALTRACE o 0 (LIST EVENT Bob (pay 1) 1))"
+              ]
+        checked nested `shouldBe` True
+        rs <- run False (src nested)
+        map (evalDirectiveCode . (.result)) rs `shouldBe` ["eval/result", "eval/result"]
+        let delivers i = length [ () | e <- fatesOf i rs, e.neFate == FateArmed, e.neActionHead == Just "deliver" ]
+        -- one outer run: the inner run's norm is written once; two outer
+        -- runs: once for each, where one run named once would write it once
+        (delivers 0, delivers 1) `shouldBe` (1, 2)
+
       it "R21: a read behind a rule an operand of RAND uses is refused when it is reached, by name (review of P2b, S1)" do
         -- the checker refuses a read written inside an operand; one written
         -- in a rule the operand names was not seen, and answered by whichever

@@ -129,6 +129,8 @@ L4 keeps the record only for a contract that reads it: running a module that con
 A read written in a module that is imported does not switch it on, so the read stops with an error naming it.
 Each contract run in one directive (two `EVALTRACE`s in one `#EVAL`) keeps its own record: a read in the second does not see the first's norms, whether or not the first saw an event.
 A contract run started inside another one (an `EVALTRACE` written in a guard or a `LEST`) is part of the run that holds it: it reads that run's norms and they read its (decided by Claude 2026-11-27, pending Meng's review: keeping a stack of runs needs a ruling on what an outer read sees of an inner run's norms).
+A named inner run that reads is run again by each outer run that uses it, and writes its norms again: probed with two outer runs of one directive that share one inner run, its norm was written once for each, where a run named once and used twice at the top is run once.
+Whether two uses inside one outer run do the same was not probed.
 
 ## Where the read has been run
 
