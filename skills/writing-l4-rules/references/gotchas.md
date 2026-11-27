@@ -432,15 +432,16 @@ DECIDE `כפול` IS n TIMES 2
 
 **Trailing the head reaches the rule too**, with the body on the next line, and it fills the `%param%` slots as the own-line form does.
 Measured 2026-11-28 on the dev build: ``DECIDE `is large` @nlg the claim of %amount% is large`` over `IF amount GREATER THAN 100` renders `the claim of 200 is large`, and ``DECIDE `doubled` @nlg twice %n%`` over `IS n TIMES 2` renders `twice 21`.
+The same holds when the head lists its inputs: `DECIDE f n @nlg twice %n%` over `IS n TIMES 2`, with no `GIVEN`, renders `twice 21` and `twice 5` for `#EVAL f 21` and `#EVAL f 5`, and so does ``DECIDE `doubled` n @nlg twice %n%`` under `GIVEN n IS A NUMBER`.
 An earlier version of this paragraph, measured 2026-09-21, had this head-line form rendering the bare name; on the dev build it does not.
 
 **Trailing the END of the definition line does NOT reach the rule**, and this is the trap, because it
-looks like it should. `DECIDE f n IS n TIMES 2 @nlg …` and the same with `MEANS` render the rule as
-its bare name: the herald goes to whatever follows it. What happens to the herald depends on what
+looks like it should. `DECIDE f n IS n TIMES 2 @nlg …` and the same with `MEANS` do not label the
+rule: the herald goes to whatever follows it. What happens to the herald depends on what
 comes next, and only the first of the three outcomes is loud:
 
 - nothing annotatable follows → `Not attached to any valid syntax node`, a parser diagnostic
-  pointing at the herald. Loud, and correct. Measured 2026-11-28 with another rule's `GIVEN` after it, and with the file ending.
+  pointing at the herald. Loud, and correct. Measured 2026-11-28 on the dev build with another rule's `GIVEN` after a `DECIDE` and after a `MEANS`, and with the file ending after a `DECIDE`.
 - a `DECLARE` follows → the herald silently becomes THAT type's herald. Measured: a rule's
   trailing `@nlg SHOULD-BE-ON-RULE` rendered as `SHOULD-BE-ON-RULE where `x` is 1` on the
   record declared beneath it, with a clean typecheck and no diagnostic. This is a silent one.
@@ -448,6 +449,8 @@ comes next, and only the first of the three outcomes is loud:
   2026-11-28: ``DECIDE `doubled` IS n TIMES 2 @nlg SHOULD-BE-ON-RULE`` followed by ``#EVAL `doubled` 21``
   and ``#EVAL `doubled` 5`` prints `SHOULD-BE-ON-RULE with 21` and `` `doubled` with 5 ``, with a clean
   typecheck and no diagnostic.
+  The tell is the slot: with `@nlg twice %n%` in that position the first directive prints ``twice `n` with 21``,
+  the input's name where a herald that had reached the rule prints its value, `twice 21`.
 
 **"Immediately above the definition" means after `GIVETH`, not above `GIVEN` — and the trap here
 is silent, not loud.** `GIVEN`/`GIVETH` read like part of the rule, so `@nlg` above `GIVEN` looks
@@ -475,7 +478,8 @@ Move the herald to after `GIVETH`, and it attaches correctly regardless of what 
 
 **So do not trust `l4 check`'s silence as evidence a herald attached.** The only real check is `l4
 nlg` (or `l4 ast`) on a case that exercises the rule, confirming the herald's own text — not the
-bare fallback — comes out the other end.
+bare fallback — comes out the other end, with each `%param%` slot filled by its value (a herald
+captured by a later `#EVAL` prints its text with the slot left as the input's name).
 
 **A parameter's herald trails its own line.** `GIVEN n IS A NUMBER @nlg the count` describes `n`
 (`#433`; before it, the `NUMBER`). It describes the parameter, not the rule — a rule whose only
