@@ -631,7 +631,7 @@ A residual is printed as L4 source over the input names, `x AND NOT y`, and a jo
   Its critique (`:19-30`) is that comparing three-valued results "can label variables as irrelevant when they actually influence whether the result becomes determined later" (`:29`), and that "once non-boolean predicates appear (`age >= 21`), the cofactor approach needs a consistent 'atomic predicate' layer anyway" (`:30`); its answer is to compile once to a reduced diagram and read determination and support off the restricted diagram (`:34-43`).
   §4.6's atoms are that predicate layer, and §4.7.2 is that read-off.
 - `specs/proposals/VERIFICATION-BACKEND-LOWERING-SPEC.md` owns what this evaluator declines to do, arithmetic over the atoms (§4.7.3).
-- `specs/todo/ladder-diagrams-2026/DESIGN.md` §23 (`:985`) is the membrane and §25f (`:1548`) is the seam; `BooleanDecisionQuery.hs:27-43` and `layout.ts:209-268` are the two places that already keep `IMPLIES` as a node.
+- `specs/todo/ladder-diagrams-2026/DESIGN.md` §23 (`:986`) is the membrane and §25f (`:1549`) is the seam; `BooleanDecisionQuery.hs:27-43` and `layout.ts:209-268` are the two places that already keep `IMPLIES` as a node.
 - `Machine.hs:2749-2753` is the precedent inside the evaluator itself: `RBinOp2` returns the operator applied to its evaluated operands when neither table row applies (§3.5).
 
 **Outside this tree.**

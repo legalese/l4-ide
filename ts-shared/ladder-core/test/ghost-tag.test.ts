@@ -537,6 +537,40 @@ test("TB: a series passes up the band of its FIRST child only", () => {
   );
 });
 
+test("an IMPLIES rule passes up half the height it has to spare, not all of it", () => {
+  // A two-rung stack is 2 boxes and a gap tall, a little shorter than the lamp pair makes
+  // the rule, so it sits SLACK = (rule - stack) / 2 below the rule's top, and the part of
+  // its tag that reaches above the rule is TAG_BAND - SLACK. Without the halving the slack
+  // would be twice as large, exceed the band, and nothing would pass up at all.
+  const k = PIXEL_GEOMETRY;
+  const boxH = estimateMetrics.lineHeight(k.FONT) + 2 * k.PAD_Y;
+  const stackH = 2 * boxH + k.GAP_PARALLEL;
+  const ruleH =
+    2 * (k.COIL_SEP + k.COIL_R + estimateMetrics.lineHeight(k.FONT));
+  const slack = (ruleH - stackH) / 2;
+  assert.ok(
+    slack > 0 && 2 * slack > k.TAG_BAND && slack < k.TAG_BAND,
+    "the fixture separates the two forms: the slack is under a band and twice it is over",
+  );
+  for (const orient of ["LR", "TB"] as const)
+    for (const where of ["requirement", "scope"] as const) {
+      const ghost = leaf("a long ghost rung label");
+      const stack = or([ghost, leaf("c")]);
+      const rule =
+        where === "requirement"
+          ? implies(leaf("p"), stack)
+          : implies(stack, leaf("q"));
+      const body = or([leaf("a"), inert("or"), rule]);
+      const grown =
+        sceneOf(body, [ghost], { orient }).size.h -
+        sceneOf(body, [], { orient }).size.h;
+      assert.ok(
+        Math.abs(grown - (k.TAG_BAND - slack)) < 1e-9,
+        `${orient} ${where}: the parent grew by ${grown}, wanted ${k.TAG_BAND - slack}`,
+      );
+    }
+});
+
 /* ------------------------------------- no tag drawn, no band reserved */
 
 test("an eliminable NOT or IMPLIES rung draws no tag, so it reserves no band", () => {
