@@ -71,7 +71,7 @@ Name anything deliberately left out, and why.⟩
 This is the compiler that has to read the deposit, and it is not the compiler you run: running an `unstable` binary does not license `unstable` syntax.
 `main` rejects, or reads differently, much of what the authoring skill teaches, so read `references/dialects.md` in the `writing-l4-rules` skill first, and use only what it says `main` reads.
 Where this brief asks for something that page lists as unavailable on `main`, use its "write instead" column, or leave the provision out and say which in `NOTES.md`.
-`check.sh` runs every module with a main build as well as with yours (the newest `main` build; for target `main` run it with `L4_MAIN_BUILD=98` as well), and a module that reads differently on main is red.
+`check.sh` runs every module with a main build as well as with yours (the newest `main` build; for target `main` run it with `L4_MAIN_BUILD=98` as well, and no `L4_MAIN`), and a module that reads differently on main is red.
 `L4_BIN --version` tells you what you run: a leading version number is `main`, `unstable-` with a date is `unstable`, and `dev` does not say (step 0 of `writing-l4-rules` has the test for it).
 
 The binary is `L4_BIN`, built from ⟨commit or release tag⟩.

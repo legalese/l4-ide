@@ -110,7 +110,7 @@ So the first build run that reads a language tag is 99, the build after 98, and 
 Of the 51 numbered probes `main` 1.6.112 still rejects, 50 give the same first error as on build 98; probe 11 now says `The first argument of TIMES is expected to be of type NUMBER but is here of type …`.
 This page's minimum for a `main` target is still build 98, so the "write instead" spellings of the seven rows stay the portable ones; the four that name a probe (`alt-maybe-nothing`, `alt-date`, `alt-date-compared`, `alt-inline-bracket`) pass `l4 check` on build 98, on build 112 and on the shelf build.
 `check.sh` compares with the newest `main` build by default, and that build reads the seven constructs, so it no longer goes red on them.
-To hold a module to this page's minimum, run it with `L4_MAIN_BUILD=98`.
+To hold a module to this page's minimum, run it with `L4_MAIN_BUILD=98` and no `L4_MAIN`.
 Measured 2026-11-28 with the module below, `check.sh` with target `main`, and a `dev` build as `l4`; the module was the only `.l4` file in its directory:
 
 ```l4
@@ -149,7 +149,7 @@ Each row gives one of three words for what `main` does with the construct.
 2. Before you call a module done, run `check.sh` in the encoding directory.
    The target is `main` unless you set `L4_TARGET=unstable`.
    It fetches the newest main build with `fetch-main-l4.sh` (cached), runs every module with both binaries, and compares the four counts.
-   The newest build reads the seven constructs of "Build 98 to build 112", so to hold the module to this page's minimum, run it with `L4_MAIN_BUILD=98` as well.
+   The newest build reads the seven constructs of "Build 98 to build 112", so to hold the module to this page's minimum, run it with `L4_MAIN_BUILD=98` as well, and no `L4_MAIN`.
    A line that says `reads differently on main` is a module `main` cannot read as it stands, because its counts differ or because `main` did not finish it in `L4_MAIN_TIMEOUT` seconds (300 unless set).
    Exit status 2 means the main step could not run (no main build for this platform, no network, no `fetch-main-l4.sh` beside `check.sh`), and then the check is not done.
 3. Know what the check cannot see.
