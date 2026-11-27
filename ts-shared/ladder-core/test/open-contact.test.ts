@@ -43,6 +43,12 @@ const not = (id: NodeId, negand: IRExpr): IRExpr => ({
   id,
   negand,
 });
+const implies = (id: NodeId, scope: IRExpr, requirement: IRExpr): IRExpr => ({
+  $type: "Implies",
+  id,
+  scope,
+  requirement,
+});
 
 const sceneOf = (
   body: IRExpr,
@@ -187,6 +193,27 @@ test("a NOT rung that is DEAD (negand true) draws no break on the OR fan — the
   assert.ok(fan, "the rung's fan curve is still drawn in the dead state");
 });
 
+test("a dead IMPLIES rung (scope true, requirement false) inside an OR draws no break — neither the leaf's nor the fan's", () => {
+  // `measureImplies` reports `renderState` like a NOT does, so an IMPLIES rung that is
+  // false reached the fan site with state `dead` and no `ownBreak`: before the change this
+  // drew TWO breaks, one at the requirement leaf and one on the fan.
+  const disj = or(2, [implies(5, leaf(6, "a"), leaf(7, "b")), leaf(4, "c")]);
+  const s = sceneOf(disj, [
+    [6, "TrueV"],
+    [7, "FalseV"],
+  ]);
+  assert.equal(breaks(s.prims).length, 0);
+  assert.equal(
+    box(s, 7).state,
+    "dead",
+    "the requirement leaf is still drawn dead",
+  );
+  assert.ok(
+    s.prims.some((p) => p.kind === "curve" && p.state === "dead"),
+    "the IMPLIES rung's fan curve is dead, so this fixture does reach the fan site",
+  );
+});
+
 test("a NOT over a group, itself a rung of an OR, draws no break whether the group is false or true", () => {
   const rung = (id: NodeId) =>
     or(2, [not(5, and(6, [leaf(id, "x"), leaf(8, "y")])), leaf(4, "b")]);
@@ -205,6 +232,53 @@ test("a NOT over a group, itself a rung of an OR, draws no break whether the gro
     0,
     "group true, so the NOT is dead",
   );
+});
+
+/* ------------------------------------ …and in both orientations, not only LR */
+
+test("no dead element draws a break in the TB orientation either", () => {
+  // Both emission sites sit in code that is written in (main, cross) and projected by
+  // `Axis`, so a change that reinstated a break for one orientation alone would pass every
+  // LR assertion above. (In TB only a series is turned; an OR is still drawn LR, but its
+  // `ctx.axis` says TB, which is what a TB-only mutation would key on.)
+  const fixtures: Array<[string, IRExpr, Array<[NodeId, UBoolValue]>]> = [
+    [
+      "dead leaf in a series",
+      and(2, [leaf(3, "a"), leaf(4, "b")]),
+      [[4, "FalseV"]],
+    ],
+    [
+      "OR of two false leaves",
+      or(2, [leaf(3, "a"), leaf(4, "b")]),
+      [
+        [3, "FalseV"],
+        [4, "FalseV"],
+      ],
+    ],
+    [
+      "dead NOT rung on the fan",
+      or(2, [not(5, leaf(6, "x")), leaf(4, "b")]),
+      [[6, "TrueV"]],
+    ],
+    [
+      "dead IMPLIES rung on the fan",
+      or(2, [implies(5, leaf(6, "a"), leaf(7, "b")), leaf(4, "c")]),
+      [
+        [6, "TrueV"],
+        [7, "FalseV"],
+      ],
+    ],
+  ];
+  for (const orient of ["LR", "TB"] as const)
+    for (const [name, body, vals] of fixtures) {
+      const s = sceneOf(body, vals, { orient });
+      assert.ok(
+        s.prims.some((p) => p.kind === "box" && p.state === "dead") ||
+          s.prims.some((p) => p.kind === "curve" && p.state === "dead"),
+        `${orient} ${name}: the fixture really has a dead element`,
+      );
+      assert.equal(breaks(s.prims).length, 0, `${orient}: ${name}`);
+    }
 });
 
 /* ------------------------- the ELIMINABLE ghost break is the one that is kept */
