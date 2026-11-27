@@ -2118,7 +2118,7 @@ pushFrame frame = do
       liftIO (writeIORef stackRef (MkStack (s.size + 1) (frame : s.frames)))
 
 -- | 'pushFrame' for a frame the trace must not see: the run boundary of the
--- norm log ('EndNormRun'). Review of P2b, second gate: with the writer on, that
+-- norm log ('EndNormRun'). Review of P2b, third gate: with the writer on, that
 -- frame's 'Push', its 'Exit' and its 'Pop' moved the line a trace shows for an
 -- operand of RAND or ROR that raises (the shapes of
 -- @ok/trace-exception-in-operand.l4@, smucclaw/l4-ide#1118), which the writer
@@ -2136,7 +2136,9 @@ pushFrameUntraced frame = do
 -- 'Exit' or a 'Pop', except for a frame pushed by 'pushFrameUntraced': the
 -- trace sees the stack as if that frame were not on it. The stack is looked at
 -- only while a trace is being recorded, so a run that records none pays
--- nothing.
+-- nothing. The one other @traceEval Pop@ ('forceIt', @notForced@) takes off the
+-- 'UpdateThunk' frame pushed on the line before it, which is never an
+-- 'EndNormRun', so it does not use this.
 traceFrameExit :: EvalTraceAction -> Eval ()
 traceFrameExit ta = do
   mtr <- asks (.evalTrace)
