@@ -87,6 +87,7 @@ test("ASCII_GEOMETRY is grid-exact: every length is a whole cell", () => {
     "GAP_PARALLEL",
     "MARGIN",
     "TAG_RISE",
+    "TAG_BAND",
     "HEAD_PAD",
     "NOT_PAD_Y",
     "NOT_LABEL",
