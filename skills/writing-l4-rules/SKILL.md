@@ -58,7 +58,12 @@ Two questions decide what you may write, and they are not the same question.
   `l4 --version` names it.
   A leading number, as in `1.6.98 (main, 7689b0d, 2026-10-19)`, is a `main` build.
   `unstable-` and a date, as in `unstable-20261015-8730d3f (unstable, 8730d3f, 2026-10-15)`, is the prerelease shelf.
-  `dev` is a build from a working tree and does not say, and a build older than 2026-10-14 may not answer `--version` at all; for either, run `l4 check` on [references/dialect-probes/02-refuse.l4](references/dialect-probes/02-refuse.l4), which passes on `unstable` and on `main` fails with `I could not find a definition for the identifier REFUSE`.
+  `dev` is a build from a working tree and does not say, and a build older than 2026-10-14 may not answer `--version` at all.
+  For either, run `l4 check` on [references/main-or-unstable.l4](references/main-or-unstable.l4), a bullet list.
+  `unstable` reads it and prints `Check succeeded.`; `main` stops at the first bullet with `unexpected '•'` and exits 1.
+  Measured on 2026-11-27: `main` builds 98, 99, 102, 108, 109 and 112 stopped there, and the shelf build `unstable-20261126-1be4053` and a `dev` build passed.
+  The test separates the two only while `main` has no bullet lists.
+  If it passes on a build whose `--version` says `main`, believe `--version`.
 - **The dialect you write** is the target, the compiler that has to read the finished file.
   The brief names it.
   If the brief is silent, the target is `main`; it is `unstable` only when the brief says so.
