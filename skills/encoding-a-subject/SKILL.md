@@ -89,8 +89,10 @@ The rules that decide whether a reviewer can trust the result:
   If you keep the source as a text file, quote it and put source locators on the `@ref`, so that a script can check the quotation and the citation against the file: [`references/source-locators.md`](references/source-locators.md).
 - **Vintages are inputs, never merged.** Where the law exists in two versions, use the rule-version (rule-effective-time) mechanism in `writing-l4-rules` (`references/source-patterns/04-dates-and-periods.md`), or take the vintage as an explicit input. A vintage that is silent on something answers with silence — never with a number borrowed from another vintage.
 - **`REFUSE "…"` where the sources do not answer** (target `unstable`) — never `FALSE`, `0` or a plausible default.
-  `main` builds 98, 99, 102 and 108 have no `REFUSE`, and builds 109 and 112 read it (measured 2026-11-27).
+  By a run on 2026-11-27, `main` builds 98, 99, 102 and 108 have no `REFUSE`, and builds 109 and 112 read it.
+  By source (`git grep` at the local build tags), `REFUSE` is absent at builds 100, 104 and 107 and present at build 110.
   A `main` encoding that must run on a build before 109 returns `NOTHING` from a `MAYBE` instead, as `dialects.md` says; the default `main` target, build 98 or later, is such an encoding.
+  `check.sh` compares with the newest `main` build, which reads `REFUSE`, so it will not catch one: run it with `L4_MAIN_BUILD=98` as well.
   `MAYBE` / `NOTHING` where the source itself names an absent case.
   See `references/source-patterns/11-when-the-encoding-cannot-answer.md`.
   Do not invent your own three-valued logic (`Established` / `Rejected` / `Unresolved` enums threaded through every rule): the language already has these, and a home-made version is one more thing a reviewer must learn before they can read a single rule.
@@ -104,7 +106,7 @@ The rules that decide whether a reviewer can trust the result:
   The rules for the copy:
   - **Byte for byte.** Never edit a copied module, not even to add a comment, so that anyone can check it against its source with one `diff`. If it needs a fix, fix it in its own encoding first, then copy it again.
   - **Its imports come too.** Copy every module it imports, other than the libraries that ship with `l4` (`prelude`, `daydate` and the rest).
-  - **It must check under your target.** A module written for `unstable` (one that uses a section `GIVEN` or `SET OF`, say) will not load in an encoding for `main`, and one that uses `REFUSE` loads only on `main` builds 109 and later. Then do not copy it: take its effect as a named input, and say so in the fork register.
+  - **It must check under your target.** A module written for `unstable` (one that uses a section `GIVEN` or `SET OF`, say) will not load in an encoding for `main`, and one that uses `REFUSE` loads on `main` builds 109 and 112 and not on builds 98, 99, 102 or 108 (by a run on 2026-11-27). Then do not copy it: take its effect as a named input, and say so in the fork register.
   - **If it does not answer your question, do not bend it.** Write what you need in your own module, and say in the fork register why the copy was not enough.
   - **Record where it came from** in `NOTES.md` (step 9): the source folder, the commit you copied it at, and its `sha256`. List it in `encoding.json`'s `modules` like any other module.
   - **Refresh it on purpose.** A newer version of the source is not picked up by itself. Copying it again is a change to your encoding: re-run `check.sh`, and record the new commit and `sha256` in `NOTES.md`.
@@ -138,6 +140,7 @@ Run it after every unit you land. Report the numbers it prints, never "it's gree
 **It also makes the target check.**
 Unless you set `L4_TARGET=unstable`, `check.sh` runs every module with a main build as well as with your `l4`, and compares the four counts.
 Copy [`assets/fetch-main-l4.sh`](assets/fetch-main-l4.sh) beside it: `check.sh` calls that to get the newest main build, and caches it.
+`main` 1.6.112 reads `REFUSE`, `@lang` and `YMD`, which build 98 does not, so a check against the newest build does not hold an encoding to the default minimum, build 98: run `check.sh` with `L4_MAIN_BUILD=98` as well.
 A line that ends `reads differently on main` is a module `main` cannot read as it stands; `writing-l4-rules/references/dialects.md` says what to write instead.
 Every module is run twice, once with each build, with your environment (a module that fetches over the network or reads `ENV` does that twice), and the comparison is of counts, not of which assertion fails; the header of `check.sh` says what to do about both.
 Exit status 2 means the main step did not run (no main build for your platform, no network, no `fetch-main-l4.sh`), and that is not a pass.

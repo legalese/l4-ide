@@ -64,13 +64,15 @@ Two questions decide what you may write, and they are not the same question.
   Measured on 2026-11-27: `main` builds 98, 99, 102, 108, 109 and 112 stopped there, and the shelf build `unstable-20261126-1be4053` and a `dev` build passed.
   The test separates the two only while `main` has no bullet lists.
   If it passes on a build whose `--version` says `main`, believe `--version`.
+  A `dev` build that passes reads bullet lists, and its version string still does not say which track it came from.
+  Run the test again when a `main` build newer than 112 is cached, because `main` may have gained bullet lists by then.
 - **The dialect you write** is the target, the compiler that has to read the finished file.
   The brief names it.
   If the brief is silent, the target is `main`; it is `unstable` only when the brief says so.
   With no brief at all, assume `main` and say that you did.
 
 Running an `unstable` binary does not license `unstable` syntax.
-For a `main` target, write only what [references/dialects.md](references/dialects.md) says `main` reads, follow its "write instead" column for the rest, and run `check.sh` from the `encoding-a-subject` skill before you call a module done: it runs the module with a main build too, and goes red when `main` reads it differently.
+For a `main` target, write only what [references/dialects.md](references/dialects.md) says `main` reads, follow its "write instead" column for the rest, and run `check.sh` from the `encoding-a-subject` skill before you call a module done: it runs the module with a main build too (the newest `main`, unless you set `L4_MAIN_BUILD`), and goes red when `main` reads it differently.
 
 ### 1. Analyse the source
 

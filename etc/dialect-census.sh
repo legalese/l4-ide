@@ -17,6 +17,8 @@
 # WHAT IT DOES
 #   For every *.l4 under dir it runs `<l4 binary> check <file>` with the file's own directory as the working directory
 #   and JL4_LIBRARY_PATH unset, so the binary resolves the prelude it carries itself and the prelude cannot be newer than the binary.
+#   It also sets XDG_DATA_HOME to an empty folder that it makes and removes, because the user's data folder is one of the places a module is looked up,
+#   so a library there could change what a binary says (an `import` probe's first error, for one).
 #   For each file that fails it prints one tab-separated line:
 #
 #       <path relative to dir>  <kind>  <line:col>  <first error, on one line>
@@ -61,6 +63,11 @@ elif command -v gtimeout >/dev/null 2>&1; then TIMEOUT_CMD="gtimeout 120"
 fi
 
 VERSION="$("$BIN" --version 2>&1 | tr -d '\000' | head -n 1)"
+
+# An empty XDG_DATA_HOME for every run (see WHAT IT DOES). The folder lives only as long as this script does.
+XDG_PIN="$(mktemp -d)" || { echo "dialect-census: cannot make a scratch folder for XDG_DATA_HOME" >&2; exit 2; }
+trap 'rm -rf -- "$XDG_PIN"' EXIT
+export XDG_DATA_HOME="$XDG_PIN"
 
 total=0
 failing=0
