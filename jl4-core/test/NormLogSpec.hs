@@ -30,6 +30,7 @@
 module NormLogSpec (spec) where
 
 import qualified Data.Text as Text
+import Base (Uri (..), toNormalizedUri)
 
 import L4.API.VirtualFS (VFS, vfsFromList, checkWithImports)
 import L4.Import.Resolution (ResolvedImport (..), TypeCheckWithDepsResult (..))
@@ -42,16 +43,20 @@ import L4.EvaluateLazy
   ( EvalConfig (..)
   , EvalDirectiveResult (..)
   , NormLogMutant (..)
+  , evalDirectiveCode
   , execEvalModuleWithEnv
   , prettyEvalDirectiveResult
   , resolveEvalConfig
   )
-import L4.Syntax (DeonticModal (..))
-import L4.TypeCheck.Types (AnchorRefusal (..), CheckResult (..), CheckErrorWithContext (..), CheckError (..), CheckWarning (..))
+import L4.Parser (execProgramParserWithHintPass)
+import L4.Print (prettyLayout)
+import L4.Syntax (DeonticModal (..), RawName (..), moduleReadsNormLog)
+import L4.TypeCheck.Types (AnchorRefusal (..), CheckResult (..), CheckErrorWithContext (..), CheckError (..), CheckWarning (..), ReadRefusal (..))
 import L4.TracePolicy (apiDefaultPolicy)
 
 import qualified Data.Text.IO as TextIO
 import Control.Exception (evaluate)
+import Control.DeepSeq (rnf)
 import Control.Monad (forM, when)
 import Data.Foldable (for_, toList)
 import Data.Int (Int32)
@@ -1249,6 +1254,536 @@ spec = describe "the norm log writer (NORM-LOG-SPEC, P1)" do
         -- the last of each is the edge of its half
         originCarrierAddress (originCarrierLimit - 1) `shouldBe` Just (-1073741823)
         instantCarrierAddress (instantCarrierLimit - 1) `shouldBe` Just (-2147483647)
+
+    -- NORM-LOG-SPEC N4b: the read as written. Built by Claude 2026-11-24 as the
+    -- fallback of the card's option A, decided pending Meng's review.
+    describe "N4b: the read as written (the fallback spelling)" do
+      let tracePrologue = prologue4 <> ["GIVETH DEONTIC Person Action"]
+          src body = Text.unlines (tracePrologue <> body)
+          errorsOf body = case checkWithImports (vfsFromList []) (src body) of
+            Left _  -> Nothing
+            Right r -> Just r.tcdErrors
+          checked body = fmap null (errorsOf body) == Just True
+          refusals body = case errorsOf body of
+            Just es -> [ r | e <- es, ReadNormRefused r _ <- [e.kind] ]
+            Nothing -> []
+          performed rs i = not (null [ () | e <- fatesOf i rs, e.neFate == FatePerformed, e.neActionHead == Just "pay" ])
+          -- does the guard hold at the event of trace 0?
+          -- and was it answered: a read that is refused (a party never forced,
+          -- a clock not reached) is a directive that came to an error, which
+          -- writes no fate, so without the second assertion every
+          -- `holds ... shouldReturn False` would pass on a refusal (review of
+          -- P2b, second review, finding 4)
+          holds body = do
+            rs <- run False (src body)
+            map (evalDirectiveCode . (.result)) rs `shouldBe` ["eval/result"]
+            pure (performed rs 0)
+          lestPay g =
+            [ "c MEANS"
+            , "  PARTY Alice MUST deliver WITHIN 3"
+            , "  LEST (PARTY Alice MUST pay n PROVIDED " <> g <> " WITHIN 10)"
+            , "#TRACE c AT 0 WITH"
+            , "  PARTY Alice DOES pay 1 AT 5"
+            ]
+
+      it "R1: EVER FAILED, read in a guard, is true once the norm failed, and the guard decides the event" do
+        checked (lestPay "EVER FAILED (PARTY Alice MUST deliver)") `shouldBe` True
+        holds (lestPay "EVER FAILED (PARTY Alice MUST deliver)") `shouldReturn` True
+        holds (lestPay "NOT EVER FAILED (PARTY Alice MUST deliver)") `shouldReturn` False
+
+      it "R2: PARTY _ matches any party, a named party only its own norms, and UNDER LEST narrows to the reparation's branch" do
+        holds (lestPay "EVER FAILED (PARTY _ MUST deliver)") `shouldReturn` True
+        holds (lestPay "EVER FAILED (PARTY Bob MUST deliver)") `shouldReturn` False
+        -- deliver was armed from the top level, so under LEST there is none
+        holds (lestPay "EVER FAILED (PARTY Alice MUST deliver UNDER LEST)") `shouldReturn` False
+        -- a MAY read of a norm that is only ever a MUST is a check error (R9), not a run
+        refusals (lestPay "EVER FAILED (PARTY Alice MAY deliver)") `shouldBe` [ReadMatchesNoSite (NormalName "deliver")]
+
+      it "R3: AS OF reads the past: a norm performed at 4 was still outstanding as of 2, and not as of 5" do
+        let asOf t =
+              [ "c MEANS"
+              , "  PARTY Alice MUST deliver WITHIN 10"
+              , "  HENCE (PARTY Alice MUST pay n PROVIDED OUTSTANDING (PARTY Alice MUST deliver) AS OF " <> t <> " WITHIN 10)"
+              , "#TRACE c AT 0 WITH"
+              , "  PARTY Alice DOES deliver AT 4"
+              , "  PARTY Alice DOES pay 1 AT 6"
+              ]
+        holds (asOf "2") `shouldReturn` True
+        holds (asOf "5") `shouldReturn` False
+
+      it "R4: from inside a reparation's own continuation a failure is not yet cured, because the continuation includes the rule asking" do
+        let inside w =
+              [ "c MEANS"
+              , "  PARTY Alice MUST deliver WITHIN 3"
+              , "  LEST (PARTY Alice MUST pay n WITHIN 10"
+              , "        HENCE (PARTY Alice MUST pay m PROVIDED " <> w <> " (PARTY Alice MUST deliver) WITHIN 10))"
+              , "#TRACE c AT 0 WITH"
+              , "  PARTY Alice DOES pay 1 AT 5"
+              , "  PARTY Alice DOES pay 2 AT 6"
+              ]
+            both rs = (length [ () | e <- fatesOf 0 rs, e.neFate == FatePerformed ])
+        rsA <- run False (src (inside "FAILED AND NOT CURED"))
+        rsB <- run False (src (inside "CURED BY REPARATION"))
+        -- the first pay is performed in either; the second only where the read holds
+        both rsA `shouldBe` 2
+        both rsB `shouldBe` 1
+
+      it "R5: a read where it has no answer is a check error that says why" do
+        refusals (lestPay "TRUE") `shouldBe` []
+        -- outside a guard, with no AS OF
+        let aSite = "c MEANS PARTY Alice MUST deliver WITHIN 3"
+        refusals [ aSite, "x MEANS OUTSTANDING (PARTY Alice MUST deliver)" ] `shouldBe` [ReadNoInstant]
+        -- with AS OF it has an instant
+        refusals [ aSite, "x MEANS OUTSTANDING (PARTY Alice MUST deliver) AS OF 3" ] `shouldBe` []
+        -- inside a RAND operand
+        refusals
+          [ "c MEANS"
+          , "  (PARTY Alice MUST deliver WITHIN 3)"
+          , "  RAND (PARTY Bob MUST pay n PROVIDED OUTSTANDING (PARTY Alice MUST deliver) WITHIN 10)"
+          ] `shouldBe` [ReadInOperand]
+        -- the wrong number of _ for the constructor's fields
+        refusals (lestPay "OUTSTANDING (PARTY Alice MUST pay _ _)") `shouldBe` [ReadArity (NormalName "pay") 1 2]
+        refusals (lestPay "OUTSTANDING (PARTY Alice MUST pay)") `shouldBe` [ReadArity (NormalName "pay") 1 0]
+
+      it "R7: a wildcard outside a read is refused by name, not left to a bare 'unexpected'" do
+        let wild = src [ "x MEANS _" ]
+        case checkWithImports (vfsFromList []) wild of
+          Left msgs -> Text.unlines msgs `shouldSatisfy` Text.isInfixOf "wildcard of a norm-log read pattern"
+          Right _   -> expectationFailure "a lone _ was accepted"
+
+      it "R9: a read whose pattern matches no norm of the module is a check error, and one that might match is not" do
+        let site = [ "c MEANS PARTY Alice MUST deliver WITHIN 3"
+                   , "d MEANS PARTY Alice MUST pay n PROVIDED OUTSTANDING (PARTY Alice MAY deliver) AS OF 1 WITHIN 3"
+                   ]
+        -- the modal differs: deliver is only ever MUST
+        refusals site `shouldBe` [ReadMatchesNoSite (NormalName "deliver")]
+        -- the same modal matches
+        refusals [ "c MEANS PARTY Alice MUST deliver WITHIN 3"
+                 , "d MEANS PARTY Alice MUST pay n PROVIDED OUTSTANDING (PARTY Alice MUST deliver) AS OF 1 WITHIN 3" ] `shouldBe` []
+        -- a norm armed in a continuation is a site too
+        refusals [ "c MEANS PARTY Alice MUST pay n WITHIN 3 HENCE (PARTY Bob MAY deliver)"
+                 , "d MEANS PARTY Alice MUST pay n PROVIDED OUTSTANDING (PARTY Bob MAY deliver) AS OF 1 WITHIN 3" ] `shouldBe` []
+        -- a norm whose action is not a constructor is taken to match any pattern
+        refusals [ "GIVEN a IS AN Action"
+                 , "c MEANS PARTY Alice MAY a WITHIN 3"
+                 , "d MEANS PARTY Alice MUST pay n PROVIDED OUTSTANDING (PARTY Alice MAY deliver) AS OF 1 WITHIN 3" ] `shouldBe` []
+
+      it "R10: a read in an imported module does not switch the record on, and stops with a named error, not an answer from an empty log" do
+        let lib = Text.unlines $ prologue4 <>
+              [ "GIVETH DEONTIC Person Action"
+              , "c MEANS PARTY Alice MUST deliver WITHIN 3"
+              , ""
+              , "GIVETH A BOOLEAN"
+              , "failedAlready MEANS EVER FAILED (PARTY Alice MUST deliver) AS OF 10"
+              ]
+            user = Text.unlines
+              [ "IMPORT rlib"
+              , "GIVETH DEONTIC Person Action"
+              , "d MEANS"
+              , "  PARTY Alice MUST deliver WITHIN 3"
+              , "  LEST (PARTY Alice MUST pay n PROVIDED failedAlready WITHIN 10)"
+              , "#TRACE d AT 0 WITH"
+              , "  PARTY Alice DOES pay 1 AT 5"
+              ]
+        rs <- runIn (vfsFromList [("rlib", lib)]) id user
+        Text.pack (show (map (.result) rs)) `shouldSatisfy` Text.isInfixOf "switched off"
+
+      it "R11: a phrase applied to a bracketed event is still an application; applied to a bracketed regulative it is a read" do
+        -- Nothing: the text did not parse; Just b: it parsed, and b says whether it holds a read
+        let isRead body = case execProgramParserWithHintPass uri (Text.unlines body) of
+              Left _ -> Nothing
+              Right (m, _, _) -> Just ("ReadNorm" `Text.isInfixOf` Text.pack (show m))
+            uri = toNormalizedUri (Uri "file:///norm-log-r11")
+            -- an event has a party and an action, and no modal
+            event w = [ "x MEANS " <> w <> " (PARTY Tenant DOES pay AT 30)" ]
+            -- with a modal in the same place the text is a regulative
+            regulative w = [ "x MEANS " <> w <> " (PARTY Tenant MUST pay)" ]
+        -- CURED BY REPARATION is not in this list: BY is a keyword, so
+        -- that text was never an application, with or without a read
+        for_ [ "OUTSTANDING", "EVER FAILED", "FAILED AND NOT CURED" ] \ w ->
+          (w, isRead (event w)) `shouldBe` (w, Just False)
+        -- the control: each of the four is a read of a bracketed regulative
+        for_ [ "OUTSTANDING", "EVER FAILED", "FAILED AND NOT CURED", "CURED BY REPARATION" ] \ w ->
+          (w, isRead (regulative w)) `shouldBe` (w, Just True)
+
+      it "R13: an argument other than _ in a read pattern is a parse error (loud, and it does not say why)" do
+        let parses body = case execProgramParserWithHintPass (toNormalizedUri (Uri "file:///norm-log-r13")) (Text.unlines body) of
+              Left _ -> False
+              Right _ -> True
+        -- the control: the same read with _ for the argument parses
+        parses [ "x MEANS OUTSTANDING (PARTY Tenant MUST pay _)" ] `shouldBe` True
+        parses [ "x MEANS OUTSTANDING (PARTY Tenant MUST pay 3)" ] `shouldBe` False
+
+      it "R22: AS after a read, not followed by OF, is not a parse error at OF (review of P2b, N2)" do
+        let parses body = case execProgramParserWithHintPass (toNormalizedUri (Uri "file:///norm-log-r22")) (Text.unlines body) of
+              Left _ -> False
+              Right _ -> True
+        -- the control: the read with its own AS OF parses
+        parses [ "x MEANS OUTSTANDING (PARTY Tenant MUST pay _) AS OF 3" ] `shouldBe` True
+        -- AS STRING is the postfix operator of as-string.l4, applied to the
+        -- read's answer; the AS OF option used to take the AS and fail at STRING
+        parses [ "x MEANS OUTSTANDING (PARTY Tenant MUST pay _) AS STRING" ] `shouldBe` True
+
+      it "R23: a bracketed bearer is printed in brackets, so the printed read parses again and prints the same (review of P2b, N1)" do
+        let parse text = execProgramParserWithHintPass (toNormalizedUri (Uri "file:///norm-log-r23")) text
+        case parse "x MEANS OUTSTANDING (PARTY (a PLUS b) MUST pay _)\n" of
+          Left _ -> expectationFailure "the read with a bracketed bearer did not parse"
+          Right (m1, _, _) -> do
+            let printed = prettyLayout m1
+            printed `shouldSatisfy` Text.isInfixOf "PARTY ("
+            case parse printed of
+              Left _ -> expectationFailure ("the printed read did not parse again: " <> Text.unpack printed)
+              Right (m2, _, _) -> prettyLayout m2 `shouldBe` printed
+
+      it "R12: a read named once and used in two guards is read again at the second, not served from the first" do
+        -- the shared-thunk probe (NORM-LOG-SPEC N4): `pending` is one rule
+        -- used in two guards, and its answer at the first, where deliver is
+        -- outstanding, must not be the answer at the second, where it is not
+        -- (Carol's payment arms Alice's delivery, so Alice's norm is armed at a
+        -- forced clock when her own guard reads it; R14 is the root case). The
+        -- rule takes the instant as an input and each guard passes THE INSTANT:
+        -- a rule cannot reach THE INSTANT itself, and an AS OF later than the
+        -- clock is refused (R18)
+        let shared =
+              [ "c MEANS"
+              , "  PARTY Carol MUST pay m WITHIN 10"
+              , "  HENCE (PARTY Alice MUST deliver PROVIDED pending (THE INSTANT) WITHIN 10"
+              , "         HENCE (PARTY Bob MUST pay n PROVIDED NOT pending (THE INSTANT) WITHIN 10))"
+              , "GIVEN t IS A NUMBER"
+              , "GIVETH A BOOLEAN"
+              , "pending t MEANS OUTSTANDING (PARTY _ MUST deliver) AS OF t"
+              , "#TRACE c AT 0 WITH"
+              , "  PARTY Carol DOES pay 1 AT 1"
+              , "  PARTY Alice DOES deliver AT 2"
+              , "  PARTY Bob DOES pay 1 AT 3"
+              ]
+        checked shared `shouldBe` True
+        rs <- run False (src shared)
+        -- Carol's payment and Bob's: Bob's guard is NOT pending, true only if pending was read again
+        length [ () | e <- fatesOf 0 rs, e.neFate == FatePerformed, e.neActionHead == Just "pay" ] `shouldBe` 2
+
+      it "R12b: a read in a rule with no input, shared by two guards at two instants, is read again at the second (the shared thunk of N4; review of P2b, second review, finding 3)" do
+        -- R12 now passes the instant in, so no thunk is shared between its two
+        -- guards, and the mutant "the read does not set crNormRead" survived
+        -- it. Here `pending` is one thunk: at Alice's guard, at 2, her
+        -- delivery is outstanding as of 2; at Bob's, at 3, it was performed at
+        -- 2 and is not (the reader compares with <=), so Bob's `NOT pending`
+        -- holds only if the read was made again
+        let shared =
+              [ "c MEANS"
+              , "  PARTY Carol MUST pay m WITHIN 10"
+              , "  HENCE (PARTY Alice MUST deliver PROVIDED pending WITHIN 10"
+              , "         HENCE (PARTY Bob MUST pay n PROVIDED NOT pending WITHIN 10))"
+              , "GIVETH A BOOLEAN"
+              , "pending MEANS OUTSTANDING (PARTY _ MUST deliver) AS OF 2"
+              , "#TRACE c AT 0 WITH"
+              , "  PARTY Carol DOES pay 1 AT 1"
+              , "  PARTY Alice DOES deliver AT 2"
+              , "  PARTY Bob DOES pay 1 AT 3"
+              ]
+        checked shared `shouldBe` True
+        rs <- run False (src shared)
+        map (evalDirectiveCode . (.result)) rs `shouldBe` ["eval/result"]
+        length [ () | e <- fatesOf 0 rs, e.neFate == FatePerformed, e.neActionHead == Just "pay" ] `shouldBe` 2
+
+      it "R14: a norm's own guard can read the norm, as outstanding, at its first event" do
+        -- a root norm's arming clock is not forced until its first event, and the
+        -- writer waits for it (tellArmed); the read must not see the log without it
+        let own =
+              [ "c MEANS"
+              , "  PARTY Alice MUST deliver PROVIDED OUTSTANDING (PARTY _ MUST deliver) WITHIN 10"
+              , "#TRACE c AT 0 WITH"
+              , "  PARTY Alice DOES deliver AT 2"
+              ]
+        checked own `shouldBe` True
+        rs <- run False (src own)
+        length [ () | e <- fatesOf 0 rs, e.neFate == FatePerformed, e.neActionHead == Just "deliver" ] `shouldBe` 1
+
+      it "R16: a read in an event's own time, before the norm's clock has been used, still sees the norm as outstanding" do
+        -- the forcing in 'readNormForcing': a root norm's clock is forced when its
+        -- first event is taken, after the event's own time is evaluated, so a read
+        -- in that time meets the norm's Armed entry while its clock is unevaluated
+        -- (`start` has not been used). R14 does not reach this: a guard comes after
+        -- the clock is forced, and flushing is enough there.
+        let own =
+              [ "c MEANS"
+              , "  PARTY Alice MUST deliver WITHIN 10"
+              , "GIVETH A NUMBER"
+              , "start MEANS 1 - 1"
+              , "GIVETH A NUMBER"
+              , "arrival MEANS IF OUTSTANDING (PARTY _ MUST deliver) AS OF 0 THEN 2 ELSE 70"
+              , "#TRACE c AT start WITH"
+              , "  PARTY Alice DOES deliver AT arrival"
+              ]
+        checked own `shouldBe` True
+        rs <- run False (src own)
+        -- seen as outstanding the delivery is at 2 and performed; not seen, it is at 70 and late
+        length [ () | e <- fatesOf 0 rs, e.neFate == FatePerformed, e.neActionHead == Just "deliver" ] `shouldBe` 1
+
+      it "R15: the same read with the party named is refused at the first event, by name, and does not answer no" do
+        -- the norm has not met its party yet: the log knows the bearer only as written (N7 rule 4, rule 3 not built)
+        let own =
+              [ "c MEANS"
+              , "  PARTY Alice MUST deliver PROVIDED OUTSTANDING (PARTY Alice MUST deliver) WITHIN 10"
+              , "#TRACE c AT 0 WITH"
+              , "  PARTY Alice DOES deliver AT 2"
+              ]
+        checked own `shouldBe` True
+        rs <- run False (src own)
+        Text.pack (show (map (.result) rs)) `shouldSatisfy` Text.isInfixOf "only known as written"
+
+      it "R17: a MUST pattern reads a norm written with DO, as the checker already takes it to (review of P2b, B3)" do
+        -- the checker maps DO to MUST when it looks for a site, so a read of
+        -- `MUST deliver` against a DO site passes the check; it must also be
+        -- answered, not false on every trace
+        let doSite g =
+              [ "c MEANS"
+              , "  PARTY Alice DO deliver WITHIN 3"
+              , "  HENCE FULFILLED"
+              , "  LEST (PARTY Alice MUST pay n PROVIDED " <> g <> " WITHIN 10)"
+              , "#TRACE c AT 0 WITH"
+              , "  PARTY Alice DOES pay 1 AT 5"
+              ]
+        checked (doSite "EVER FAILED (PARTY _ MUST deliver)") `shouldBe` True
+        holds (doSite "EVER FAILED (PARTY _ MUST deliver)") `shouldReturn` True
+        holds (doSite "NOT EVER FAILED (PARTY _ MUST deliver)") `shouldReturn` False
+
+      it "R18: an AS OF later than the clock is refused by name, not answered from the log written so far (review of P2b, B1; decided by Claude 2026-11-26, pending Meng's review)" do
+        let refusedWith needle body = do
+              rs <- run False (src body)
+              Text.pack (show (map (.result) rs)) `shouldSatisfy` Text.isInfixOf needle
+            -- in the event's own time, before any event: the run is at 0
+            inTime t =
+              [ "c MEANS"
+              , "  PARTY Alice MUST deliver WITHIN 10"
+              , "GIVETH A NUMBER"
+              , "start MEANS 1 - 1"
+              , "GIVETH A NUMBER"
+              , "arrival MEANS IF OUTSTANDING (PARTY _ MUST deliver) AS OF " <> t <> " THEN 2 ELSE 70"
+              , "#TRACE c AT start WITH"
+              , "  PARTY Alice DOES deliver AT arrival"
+              ]
+            -- in a guard at the event at 2
+            inGuard t =
+              [ "c MEANS"
+              , "  PARTY Alice MUST deliver PROVIDED OUTSTANDING (PARTY _ MUST deliver) AS OF " <> t <> " WITHIN 10"
+              , "#TRACE c AT 0 WITH"
+              , "  PARTY Alice DOES deliver AT 2"
+              ]
+        refusedWith "has only reached 0" (inTime "5")
+        refusedWith "has only reached 2" (inGuard "10")
+        -- the clock itself and the past are answered
+        checked (inGuard "2") `shouldBe` True
+        rsNow <- run False (src (inGuard "2"))
+        length [ () | e <- fatesOf 0 rsNow, e.neFate == FatePerformed, e.neActionHead == Just "deliver" ] `shouldBe` 1
+        -- with nothing run yet there is no clock: a read outside a contract run is refused,
+        -- not answered "no" from an empty log
+        refusedWith "no contract has run yet"
+          [ "c MEANS PARTY Alice MUST deliver WITHIN 10"
+          , "GIVETH A BOOLEAN"
+          , "x MEANS OUTSTANDING (PARTY _ MUST deliver) AS OF 0"
+          , "#EVAL x"
+          ]
+
+      it "R19: a second contract run in one directive does not read the first's norms (review of P2b, B2)" do
+        -- c's delivery fails in the first run; g's guard asks whether any
+        -- delivery ever failed, and g's own run has none
+        let two =
+              [ "c MEANS PARTY Alice MUST deliver WITHIN 3"
+              , "GIVETH DEONTIC Person Action"
+              , "g MEANS PARTY Bob MUST pay n PROVIDED NOT EVER FAILED (PARTY _ MUST deliver) WITHIN 10"
+              , "#EVAL LIST (EVALTRACE c 0 (LIST EVENT Bob (pay 50) 5)), (EVALTRACE g 0 (LIST EVENT Bob (pay 1) 7))"
+              ]
+        checked two `shouldBe` True
+        rs <- run False (src two)
+        length [ () | e <- fatesOf 0 rs, e.neFate == FatePerformed, e.neActionHead == Just "pay" ] `shouldBe` 1
+        length [ () | e <- fatesOf 0 rs, e.neFate == FateArmed, e.neActionHead == Just "deliver" ] `shouldBe` 1
+
+      it "R19b: a run that saw no event leaves nothing for the next run to read (review of P2b, second review, finding 1)" do
+        -- a root norm's arming clock is forced at its first event, so a run
+        -- with no event leaves its root norm waiting for a clock; the next
+        -- run's first read forced and wrote it after that run had begun, and
+        -- g's guard counted c's delivery as outstanding
+        let noEvent =
+              [ "c MEANS PARTY Alice MUST deliver WITHIN 10"
+              , "GIVETH DEONTIC Person Action"
+              , "g MEANS PARTY Bob MUST pay n PROVIDED NOT OUTSTANDING (PARTY _ MUST deliver) WITHIN 10"
+              , "#EVAL LIST (EVALTRACE c 0 (LIST)), (EVALTRACE g 0 (LIST EVENT Bob (pay 1) 5))"
+              ]
+        checked noEvent `shouldBe` True
+        rs <- run False (src noEvent)
+        map (evalDirectiveCode . (.result)) rs `shouldBe` ["eval/result"]
+        -- g alone is fulfilled by Bob's payment; with c before it, so is g
+        length [ () | e <- fatesOf 0 rs, e.neFate == FatePerformed, e.neActionHead == Just "pay" ] `shouldBe` 1
+        length [ () | e <- fatesOf 0 rs, e.neFate == FateArmed, e.neActionHead == Just "deliver" ] `shouldBe` 1
+
+      it "R19c: after the last run of a directive, a root norm that saw no event is written by a read outside any run, or by the end of the directive (GM's question on the fix of finding 1)" do
+        -- the fix writes a run's waiting rows at the start of the next run; the
+        -- last run has no next one. A read made after it forces the clock and
+        -- writes the row inside the last run's window, so it answers from it;
+        -- with no read, the end of the directive writes it with no instant.
+        -- The two branches differ, so the answer is seen and not only the row
+        -- (a third review's item A: with equal branches "answered from the
+        -- last run's norms", nit 8, was untested)
+        let lone read' =
+              [ "c MEANS PARTY Alice MUST deliver WITHIN 10"
+              , "GIVETH A BOOLEAN"
+              , "still MEANS OUTSTANDING (PARTY _ MUST deliver) AS OF 0"
+              , "GIVETH DEONTIC Person Action"
+              , "yes MEANS PARTY Bob MUST pay n WITHIN 5"
+              , "GIVETH DEONTIC Person Action"
+              , "no MEANS PARTY Carol MUST pay n WITHIN 5"
+              , "#EVAL LIST (EVALTRACE c 0 (LIST))" <> read'
+              ]
+            observedOfDeliver rs = [ e.neObserved | e <- fatesOf 0 rs, e.neFate == FateArmed, e.neActionHead == Just "deliver" ]
+            shown rs = prettyEvalDirectiveResult (rs !! 0)
+        withRead <- run False (src (lone ", (IF still THEN yes ELSE no)"))
+        map (evalDirectiveCode . (.result)) withRead `shouldBe` ["eval/result"]
+        observedOfDeliver withRead `shouldBe` [Just 0]
+        -- the read saw c's delivery, so it is outstanding and `yes` is chosen
+        shown withRead `shouldSatisfy` Text.isInfixOf "Bob"
+        shown withRead `shouldSatisfy` (not . Text.isInfixOf "Carol")
+        withoutRead <- run False (src (lone ""))
+        map (evalDirectiveCode . (.result)) withoutRead `shouldBe` ["eval/result"]
+        observedOfDeliver withoutRead `shouldBe` [Nothing]
+
+      it "R19d: a read outside any run, after a run in the same directive, is answered from that run's norms and clock (review of P2b, second review, nit 8)" do
+        -- the run's window and clock are kept after it, so the read sees what
+        -- the run wrote: c's delivery was armed at 0 and performed at 2, so it
+        -- was outstanding as at 1. A window that closed with the run would
+        -- answer "no" (the log it reads is empty). This test does not pin
+        -- the clock: with the clock reset at the end of a run it stays green,
+        -- because the latest instant in the norms the run wrote (2) already
+        -- reaches 1; the clock half is pinned by R19e alone
+        let afterRun =
+              [ "c MEANS PARTY Alice MUST deliver WITHIN 10"
+              , "GIVETH A BOOLEAN"
+              , "still MEANS OUTSTANDING (PARTY _ MUST deliver) AS OF 1"
+              , "GIVETH DEONTIC Person Action"
+              , "yes MEANS PARTY Bob MUST pay n WITHIN 5"
+              , "GIVETH DEONTIC Person Action"
+              , "no MEANS PARTY Carol MUST pay n WITHIN 5"
+              , "#EVAL LIST (EVALTRACE c 0 (LIST EVENT Alice deliver 2)), (IF still THEN yes ELSE no)"
+              ]
+        checked afterRun `shouldBe` True
+        rs <- run False (src afterRun)
+        map (evalDirectiveCode . (.result)) rs `shouldBe` ["eval/result"]
+        prettyEvalDirectiveResult (rs !! 0) `shouldSatisfy` Text.isInfixOf "Bob"
+        prettyEvalDirectiveResult (rs !! 0) `shouldSatisfy` (not . Text.isInfixOf "Carol")
+
+      it "R19e: the clock is kept after a run, so a read outside any run may ask as at an event's instant that no norm was recorded at (review of P2b, second review, nit 8)" do
+        -- c's guard is false at the event (Alice's delivery at 8), so the run
+        -- records nothing at 8, and the latest instant in the norms it
+        -- recorded is 0; the event's own stamp is what makes 6 an instant the
+        -- run has been at. A clock that did not last would refuse the read
+        let afterGuard =
+              [ "c MEANS PARTY Alice MUST deliver PROVIDED FALSE WITHIN 20"
+              , "GIVETH A BOOLEAN"
+              , "still MEANS OUTSTANDING (PARTY _ MUST deliver) AS OF 6"
+              , "GIVETH DEONTIC Person Action"
+              , "yes MEANS PARTY Bob MUST pay n WITHIN 5"
+              , "GIVETH DEONTIC Person Action"
+              , "no MEANS PARTY Carol MUST pay n WITHIN 5"
+              , "#EVAL LIST (EVALTRACE c 0 (LIST EVENT Alice deliver 8)), (IF still THEN yes ELSE no)"
+              ]
+        checked afterGuard `shouldBe` True
+        rs <- run False (src afterGuard)
+        map (evalDirectiveCode . (.result)) rs `shouldBe` ["eval/result"]
+        prettyEvalDirectiveResult (rs !! 0) `shouldSatisfy` Text.isInfixOf "Bob"
+        prettyEvalDirectiveResult (rs !! 0) `shouldSatisfy` (not . Text.isInfixOf "Carol")
+
+      it "R20: a run named once and used twice is run once, though it holds a read (review of P2b, S2)" do
+        -- the run's value does not depend on the log it read as it ran; a
+        -- force span marked as a read of the log was never cached, so the
+        -- second use ran the contract again and wrote every fate again
+        let twice =
+              [ "c MEANS PARTY Alice MUST deliver PROVIDED OUTSTANDING (PARTY _ MUST deliver) WITHIN 10"
+              , "GIVETH DEONTIC Person Action"
+              , "r MEANS EVALTRACE c 0 (LIST EVENT Alice deliver 2)"
+              , "#EVAL LIST r, r"
+              ]
+        checked twice `shouldBe` True
+        rs <- run False (src twice)
+        length [ () | e <- fatesOf 0 rs, e.neFate == FateArmed, e.neActionHead == Just "deliver" ] `shouldBe` 1
+
+      it "R24: a limit: a named run that reads, started inside an outer run, is run again by each outer run that uses it (review of P2b, third review, item E)" do
+        -- S2's restore of crNormRead is in endNormRun, and a run started
+        -- inside another pushes no EndNormRun, so the span of the named inner
+        -- run stays marked as a read of the log and is not served again: the
+        -- inner run is run again, and writes its norms again, for each outer
+        -- run that uses it. Pinned as found (probed on lhs 2026-11-27: 1 and
+        -- 2, where a run named once and used twice at the top is run once,
+        -- R20). Not established: that the crNormRead mark is the cause (no
+        -- mutant isolates it; it is inferred from where the restore sits), and
+        -- what two uses inside ONE outer run do (a read in an operand is
+        -- refused, I thought of no other form of two uses in one run, and I
+        -- ran none)
+        let nested =
+              [ "inner MEANS PARTY Alice MUST deliver PROVIDED OUTSTANDING (PARTY _ MUST deliver) WITHIN 10"
+              , "GIVETH DEONTIC Person Action"
+              , "r MEANS EVALTRACE inner 0 (LIST EVENT Alice deliver 2)"
+              , "GIVETH DEONTIC Person Action"
+              , "o MEANS PARTY Bob MUST pay n WITHIN 5 HENCE r"
+              , "#EVAL LIST (EVALTRACE o 0 (LIST EVENT Bob (pay 1) 1))"
+              , "#EVAL LIST (EVALTRACE o 0 (LIST EVENT Bob (pay 1) 1)), (EVALTRACE o 0 (LIST EVENT Bob (pay 1) 1))"
+              ]
+        checked nested `shouldBe` True
+        rs <- run False (src nested)
+        map (evalDirectiveCode . (.result)) rs `shouldBe` ["eval/result", "eval/result"]
+        let delivers i = length [ () | e <- fatesOf i rs, e.neFate == FateArmed, e.neActionHead == Just "deliver" ]
+        -- one outer run: the inner run's norm is written once; two outer
+        -- runs: once for each, where one run named once would write it once
+        (delivers 0, delivers 1) `shouldBe` (1, 2)
+
+      it "R21: a read behind a rule an operand of RAND uses is refused when it is reached, by name (review of P2b, S1)" do
+        -- the checker refuses a read written inside an operand; one written
+        -- in a rule the operand names was not seen, and answered by whichever
+        -- sibling ran first
+        let behind =
+              [ "a MEANS PARTY Alice MUST pay n PROVIDED helper WITHIN 10"
+              , "GIVETH A BOOLEAN"
+              , "helper MEANS EVER FAILED (PARTY _ MUST deliver) AS OF 0"
+              , "GIVETH DEONTIC Person Action"
+              , "b MEANS PARTY Bob MUST deliver WITHIN 10"
+              , "GIVETH DEONTIC Person Action"
+              , "c MEANS a RAND b"
+              , "#TRACE c AT 0 WITH"
+              , "  PARTY Alice DOES pay 1 AT 1"
+              ]
+        checked behind `shouldBe` True
+        rs <- run False (src behind)
+        Text.pack (show (map (.result) rs)) `shouldSatisfy` Text.isInfixOf "inside an operand of RAND"
+
+      it "R8: a module's reads are found from its names, and the pass costs a fraction of one evaluation" do
+        let readsLog body = case checkWithImports (vfsFromList []) (src body) of
+              Right r -> moduleReadsNormLog r.tcdModule
+              Left es -> error ("the module failed to check: " <> show es)
+        readsLog (lestPay "OUTSTANDING (PARTY Alice MUST deliver)") `shouldBe` True
+        readsLog (lestPay "TRUE") `shouldBe` False
+        -- measured with the module forced: a walk over every expression
+        -- allocated 12.0 MB for the module below and its evaluation 10.7 MB,
+        -- a names walk through gplate 0.6 MB, and this question 24 bytes
+        case checkWithImports (vfsFromList []) (everyEmptySrc 400) of
+          Left es -> expectationFailure ("the module failed to check: " <> show es)
+          Right r -> do
+            (off, _, _) <- evalAllocated (everyEmptySrc 400)
+            -- what the checked module holds lazily is computed once, and not by the question
+            _ <- evaluate (rnf r.tcdModule)
+            a0 <- getAllocationCounter
+            found <- evaluate (moduleReadsNormLog r.tcdModule)
+            a1 <- getAllocationCounter
+            found `shouldBe` False
+            (fromIntegral (a0 - a1) :: Double) `shouldSatisfy` (< off / 20)
+
+      it "R6: the phrases are not reserved: a program may still name a value OUTSTANDING" do
+        -- no prologue: its dangling GIVETH would swallow the first line
+        let named = Text.unlines
+              [ "GIVETH A NUMBER"
+              , "OUTSTANDING MEANS 3"
+              , "#EVAL OUTSTANDING PLUS 1"
+              ]
+        either (const Nothing) (Just . (.tcdErrors)) (checkWithImports (vfsFromList []) named)
+          `shouldSatisfy` maybe False null
 
     describe "the reader on real traces (review of P2, first half)" do
       let tracePrologue = prologue4 <> ["GIVETH DEONTIC Person Action"]

@@ -109,6 +109,7 @@ Match it with `^\s*Code:\s+(\S+)$`.
 | `check/opened-field-collision-at-opening`   | An input opens a field name an earlier input already opens.                              |
 | `check/opened-field-collision-at-read`      | A bare field name that several opened inputs have, at the read.                          |
 | `check/opening-not-an-instant`              | The value after AFTER is neither a NUMBER nor a DATE.                                    |
+| `check/read-refused`                        | A norm-log read with no instant, in an operand, of wrong arity, or matching no norm.     |
 | `check/regulative-actor-mismatch`           | A party performs an action that belongs to another actor.                                |
 | `check/restated-section-binder`             | A definition's GIVEN restates a name a section GIVEN binds.                              |
 | `check/typically-on-computed-field`         | A TYPICALLY default on a computed field.                                                 |

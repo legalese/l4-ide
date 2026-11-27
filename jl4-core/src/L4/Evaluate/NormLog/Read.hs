@@ -72,16 +72,20 @@ module L4.Evaluate.NormLog.Read
   , Refusal (..)
   , prettyRefusal
   , readNorms
+  , readHorizon
+  , answerRead
+  , readPattern
   , isCured
   ) where
 
 import Base
 import qualified Data.Map.Strict as Map
+import Data.Ratio (denominator, numerator)
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import L4.Evaluate.NormLog
 import L4.Parser.SrcSpan (SrcPos (..), SrcRange (..))
-import L4.Syntax (DeonticModal (..))
+import L4.Syntax (DeonticModal (..), ReadBranch (..), ReadWord (..))
 
 -- | Whose norm (N2).
 data BearerPattern
@@ -146,6 +150,9 @@ data Refusal
   = BearerNotKnown !NormRef !NormBearer
   | NoInstant !NormRef !Fate
   | CompoundNoInstant !NormRef
+  | FutureInstant !Rational !(Maybe Rational)
+    -- ^ asked as at an instant the contract has not reached: the instant, and
+    -- the latest instant the run has been at ('Nothing': it has not started)
   deriving stock (Eq, Show)
 
 prettyRefusal :: Refusal -> Text
@@ -163,6 +170,16 @@ prettyRefusal = \case
   CompoundNoInstant c ->
     "the compound at " <> siteText c
       <> " was fulfilled, and a fulfilment carries no time, so a read at an instant cannot say whether it had decided yet"
+  FutureInstant d horizon ->
+    "the read asks as at " <> ratText d <> ", "
+      <> (case horizon of
+            Just h  -> "but the contract has only reached " <> ratText h
+            Nothing -> "but no contract has run yet")
+      <> ": an instant after the clock cannot be answered, because what happens between is not in the log yet"
+  where
+    ratText r
+      | denominator r == 1 = Text.pack (show (numerator r))
+      | otherwise          = Text.pack (show (numerator r) <> "/" <> show (denominator r))
 
 siteText :: NormRef -> Text
 siteText r =
@@ -271,13 +288,21 @@ armedOf g grp = fromMaybe g (find (\ e -> e.neFate == FateArmed) grp)
 
 shapeMatches :: NormPattern -> NormEntry -> Bool
 shapeMatches p e =
-  maybe True (\ m -> e.neModal == Just m) p.npModal
+  maybe True (\ m -> modalMatches m e.neModal) p.npModal
     && maybe True (\ a -> e.neActionHead == Just a) p.npAction
     && case p.npBranch of
          AnyBranch    -> True
          TopLevel     -> isNothing e.neOrigin
          ArmedByHence -> ((.noBranch) <$> e.neOrigin) == Just ViaHence
          ArmedByLest  -> ((.noBranch) <$> e.neOrigin) == Just ViaLest
+
+-- | A pattern's modal against an entry's. A @DO@ norm is an obligation like a
+-- @MUST@ one (it fails on the same terms, 'L4.EvaluateLazy.Fates'), and the
+-- checker already takes a @MUST@ pattern to match its site
+-- ('L4.TypeCheck', @readsMatchingNoSite@); the reader must agree, or a read
+-- the checker passes is false on every trace.
+modalMatches :: DeonticModal -> Maybe DeonticModal -> Bool
+modalMatches m entry = entry == Just m || (m == DMust && entry == Just DDo)
 
 -- | The party of a norm instance, as well as any of its entries knew it: the
 -- machine forces a party when the norm meets an event, so a later entry can
@@ -535,6 +560,47 @@ isCured d es v = case v.nvState of
       FateBreached         -> True
       FateJoinedBreached _ -> True
       _                    -> False
+
+-- | The pattern a written read means (NORM-LOG-SPEC N4b): the bearer, the
+-- modal and the action's constructor, and the branch. A bare pattern matches
+-- every branch; @UNDER LEST@ and @UNDER HENCE@ narrow it.
+readPattern :: BearerPattern -> DeonticModal -> Text -> ReadBranch -> NormPattern
+readPattern who modal con branch = MkNormPattern
+  { npBearer = who
+  , npAction = Just con
+  , npModal  = Just modal
+  , npBranch = case branch of
+      ReadAnyBranch  -> AnyBranch
+      ReadUnderLest  -> ArmedByLest
+      ReadUnderHence -> ArmedByHence
+  }
+
+-- | The latest instant the entries show the run to have reached: the greatest
+-- observed instant of any entry. A read asks at an instant no later than this
+-- and the clock the machine adds (the stamp of the event a guard is matched
+-- against, which no entry carries yet); one later is the read of a future the
+-- log has not written, and 'FutureInstant' refuses it.
+readHorizon :: [NormEntry] -> Maybe Rational
+readHorizon es = case mapMaybe (.neObserved) es of
+  [] -> Nothing
+  ts -> Just (maximum ts)
+
+-- | The answer to one of the four phrases (N4b), as at an instant: true when
+-- ANY norm the pattern matches is in the state the phrase names (card
+-- condition 2). @EVER FAILED@ is the spec's FAILED: a @MUST@'s @LEST@ fired
+-- at or before the instant, cured or not; a lapsed @MAY@ and a violated
+-- @SHANT@ are not failures (N13, N1). A refusal of 'readNorms' or 'isCured'
+-- is the answer's refusal: it never turns into @False@.
+answerRead :: ReadWord -> Rational -> NormPattern -> [NormEntry] -> Either Refusal Bool
+answerRead word d pat es = do
+  vs <- readNorms d pat es
+  case word of
+    ReadOutstanding       -> Right (any (\ v -> v.nvState == Outstanding) vs)
+    ReadEverFailed        -> Right (any failed vs)
+    ReadFailedNotCured    -> anyM (\ v -> if failed v then not <$> isCured d es v else Right False) vs
+    ReadCuredByReparation -> anyM (\ v -> if failed v then isCured d es v else Right False) vs
+  where
+    failed v = case v.nvState of { Failed _ -> True; _ -> False }
 
 -- | Short-circuiting over 'Either', so a refusal in a branch that another
 -- branch has already settled does not stop the read.

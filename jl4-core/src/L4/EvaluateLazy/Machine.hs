@@ -15,6 +15,7 @@ module L4.EvaluateLazy.Machine
 , runEval
 , tryEval
 , traceEval
+, traceFrameExit
 , raiseException
 -- * The step counter and the unknowns a directive reached (UNKNOWN-EVALUATION-SPEC §4.5, build step 3)
 , tickUnknownSteps
@@ -151,6 +152,8 @@ import qualified L4.TypeCheck as TypeCheck
 import L4.TypeCheck.Types (EntityInfo)
 import L4.EvaluateLazy.ContractFrame
 import L4.Evaluate.NormLog
+import L4.Evaluate.NormLog.Read (BearerPattern (..), answerRead, readPattern)
+import qualified L4.Evaluate.NormLog.Read as NormRead
 import L4.EvaluateLazy.DeonticStep hiding (Branch)
 import L4.EvaluateLazy.Fates
 import qualified L4.EvaluateLazy.DeonticStep as DS
@@ -227,6 +230,23 @@ data Frame =
   -- too: the cross-party branch pushes 'ReadCell2' before reaching 'finishRead',
   -- so without it @RECALL ALL <party>'s@ would silently fall back to last-write-wins.
   | ReadCell2 WHNF RecallMode {- -} (Maybe SrcRange)
+  -- NORM-LOG-SPEC N4b (built by Claude 2026-11-24, pending Meng's review): a
+  -- read of the norm log. 'ReadNorm1' waits for the instant it is asked at
+  -- (its @AS OF@, or @THE INSTANT@), holding the rest of the read; 'ReadNorm2'
+  -- waits for the bearer's party, holding the instant. Neither forces
+  -- anything the read does not name.
+  | ReadNorm1 ReadWord (Maybe (Expr Resolved)) DeonticModal Resolved ReadBranch Environment (Maybe SrcRange)
+  | ReadNorm2 ReadWord Rational DeonticModal Resolved ReadBranch (Maybe SrcRange)
+  -- 'ReadNorm3' waits for the arming clock of a norm the writer has not yet
+  -- written (a root norm's clock is forced at its first event), holding the
+  -- whole read; it asks again, so every such clock is forced before the log
+  -- is read (R14).
+  | ReadNorm3 ReadWord Rational BearerPattern DeonticModal Resolved ReadBranch (Maybe SrcRange)
+  -- Review of P2b, B2 and S2: closes a contract run that started at the top
+  -- ('beginNormRun'). Carries whether the enclosing force span had read the
+  -- norm log before the run began: the reads the run made are its own, and
+  -- the run's value does not depend on them ('endNormRun').
+  | EndNormRun Bool
   -- STATE-AS-LEDGER M4: restore the acting party once a HENCE/LEST body (and its
   -- App1 continuation) has fully evaluated. Pushed by 'continueWithFollowup'
   -- BEFORE the followup runs (so it is processed LAST, after the whole subtree),
@@ -1494,7 +1514,7 @@ raiseException e0 = loop e0
   -- What a frame turns the exception into ('rewriteUnwinding') goes on to the
   -- next frame, so the exception thrown at the bottom is the rewritten one.
   loop e = do
-    traceEval (Exit (Left e))
+    traceFrameExit (Exit (Left e))
     r <- case unwindOne e of MkEval g -> MkEval (uninterruptibleMask_ . g)
     case r of
       Nothing -> liftIO (Control.Exception.throwIO e)
@@ -1614,6 +1634,7 @@ unwindFrame = \ case
     when scoped leaveRelookScope
   RestoreSibling path clock              -> restoreSibling path clock
   RestoreBehind n                        -> restoreBehind n
+  EndNormRun _                           -> whenDeonticLog \ l -> liftIO (writeIORef l.dlRunDepth 0)
   Lockstep ls                            -> unwindLockstep ls
   UpdateThunk rf saved displaced         -> do
     -- Close this force's read span exactly as the success path does (the
@@ -1633,6 +1654,9 @@ unwindFrame = \ case
   Record2 {}                    -> pure ()
   ReadCell1 {}                  -> pure ()
   ReadCell2 {}                  -> pure ()
+  ReadNorm1 {}                  -> pure ()
+  ReadNorm2 {}                  -> pure ()
+  ReadNorm3 {}                  -> pure ()
   App1 {}                       -> pure ()
   App1Operand {}                -> pure ()
   ConnectiveLeft {}             -> pure ()
@@ -2093,10 +2117,44 @@ pushFrame frame = do
       traceEval Push
       liftIO (writeIORef stackRef (MkStack (s.size + 1) (frame : s.frames)))
 
+-- | 'pushFrame' for a frame the trace must not see: the run boundary of the
+-- norm log ('EndNormRun'). Review of P2b, third gate: with the writer on, that
+-- frame's 'Push', its 'Exit' and its 'Pop' moved the line a trace shows for an
+-- operand of RAND or ROR that raises (the shapes of
+-- @ok/trace-exception-in-operand.l4@, smucclaw/l4-ide#1118), which the writer
+-- must never do: it is an observer. 'traceFrameExit' is the other half.
+pushFrameUntraced :: Frame -> Eval ()
+pushFrameUntraced frame = do
+  stackRef <- asks (.stack)
+  limit <- asks (.maxFrameDepth)
+  s <- liftIO (readIORef stackRef)
+  if s.size >= limit
+    then userException (StackOverflow limit)
+    else liftIO (writeIORef stackRef (MkStack (s.size + 1) (frame : s.frames)))
+
+-- | 'traceEval' of an action that closes the frame on top of the stack, an
+-- 'Exit' or a 'Pop', except for a frame pushed by 'pushFrameUntraced': the
+-- trace sees the stack as if that frame were not on it. The stack is looked at
+-- only while a trace is being recorded, so a run that records none pays
+-- nothing. The one other @traceEval Pop@ ('forceIt', @notForced@) takes off the
+-- 'UpdateThunk' frame pushed on the line before it, which is never an
+-- 'EndNormRun', so it does not use this.
+traceFrameExit :: EvalTraceAction -> Eval ()
+traceFrameExit ta = do
+  mtr <- asks (.evalTrace)
+  case mtr of
+    Nothing -> pure ()
+    Just _  -> do
+      stackRef <- asks (.stack)
+      s <- liftIO (readIORef stackRef)
+      case s.frames of
+        EndNormRun {} : _ -> pure ()
+        _                 -> traceEval ta
+
 -- | Pops a stack frame (if any are left) and calls the continuation on it.
 withPoppedFrame :: (Maybe Frame -> Eval a) -> Eval a
 withPoppedFrame k = do
-  traceEval Pop
+  traceFrameExit Pop
   stackRef <- asks (.stack)
   s <- liftIO (readIORef stackRef)
   case s.frames of
@@ -2115,7 +2173,7 @@ withPoppedFrame k = do
 -- value if it comes after.
 withPoppedFrameKeepingUpdate :: (Maybe Frame -> Eval a) -> Eval a
 withPoppedFrameKeepingUpdate k = do
-  traceEval Pop
+  traceFrameExit Pop
   stackRef <- asks (.stack)
   s <- liftIO (readIORef stackRef)
   case s.frames of
@@ -2273,6 +2331,132 @@ tellEventRouted route ev = do
     -- we simply pass the recipient key instead of the acting party.
     RouteNotify recipientKey ->
       liftIO (modifyIORef' store (storeAppendOwn recipientKey ev))
+
+-- | Review of P2b, B1: note the event stamp a guard is about to be matched
+-- at, so the horizon of a read reaches it (the entry for the event is not
+-- written until the event is decided).
+noteHorizon :: WHNF -> Eval ()
+noteHorizon = \ case
+  ValNumber t -> whenDeonticLog \ l -> when l.dlWriteFates $
+    liftIO (modifyIORef' l.dlHorizon (Just . maybe t (max t)))
+  _ -> pure ()
+
+-- | Review of P2b, B2 and S2: a contract value applied to its time and events
+-- while no run is on the stack starts a run. The run's reads see the norms
+-- the run writes from here on (not those of an earlier run in the same
+-- directive), and 'EndNormRun' closes it. An operand or a continuation is
+-- applied inside a run, at depth 1, and starts nothing.
+beginNormRun :: WHNF -> [Reference] -> Eval ()
+beginNormRun val rs = when (startsRun val) $ whenDeonticLog \ l -> when l.dlWriteFates do
+  depth <- liftIO (readIORef l.dlRunDepth)
+  when (depth == 0) do
+    -- review of P2b, second review, finding 1: the run before this one has
+    -- ended, and a root norm of it that saw no event is still waiting for its
+    -- clock (the writer never forces one). Written now, as the end of the
+    -- directive writes it, it is in the log before this run's window begins;
+    -- left waiting, this run's first read forced and wrote it inside the
+    -- window, and the read counted another run's norm
+    flushArmedFinal l
+    liftIO (writeIORef l.dlRunDepth 1)
+    store <- readEvalRef (.envLedger)
+    liftIO (writeIORef l.dlRunStart (length (toList store.normLedger)))
+    liftIO (writeIORef l.dlHorizon Nothing)
+    accRef <- asks (.ctxReads)
+    before <- liftIO ((.crNormRead) <$> readIORef accRef)
+    -- not 'pushFrame': the trace does not see this frame ('pushFrameUntraced')
+    pushFrameUntraced (EndNormRun before)
+  where
+    startsRun = \ case
+      ValObligation {} -> twoArgs
+      ValQuantified {} -> twoArgs
+      ValROp {}        -> twoArgs
+      _                -> False
+    twoArgs = length rs == 2
+
+-- | The run is over: the entries it wrote that were waiting for a clock are
+-- written, the next run starts at depth 0, and the force span that holds the
+-- run is no longer marked as having read the norm log, because the run's
+-- value is a function of the contract, the time and the events, not of the
+-- log it read as it ran (a marked span was never cached, and a run asked
+-- twice ran twice and wrote every fate twice: review of P2b, S2).
+endNormRun :: Bool -> Eval ()
+endNormRun before = do
+  whenDeonticLog \ l -> when l.dlWriteFates do
+    flushArmed l
+    liftIO (writeIORef l.dlRunDepth 0)
+  accRef <- asks (.ctxReads)
+  liftIO (modifyIORef' accRef \ r -> r { crNormRead = before })
+
+-- | NORM-LOG-SPEC N4b: before the log is read, write what the writer holds
+-- back, forcing the arming clock of every norm whose @Armed@ entry still waits
+-- for it. The writer never forces ('tellArmed'), and a root norm's clock is
+-- forced when its first event is taken: after the event's own time is
+-- evaluated, and before any guard of the event is. So a read in a guard needs
+-- only the flush (R14), and a read in the event's time needs the forcing
+-- (R16); either would otherwise see a log without the norm and answer "no".
+-- A read is the one place that may force: its answer is the log as it is now.
+readNormForcing :: ReadWord -> Rational -> BearerPattern -> DeonticModal -> Resolved -> ReadBranch -> Maybe SrcRange -> Machine Config
+readNormForcing word d who modal con branch site = do
+  mlog <- asks (.deonticLog)
+  case mlog of
+    Just l | l.dlWriteFates -> do
+      pending <- liftIO (readIORef l.dlPendingArmed)
+      unforced <- firstUnforced (reverse pending)
+      case unforced of
+        Just time -> do
+          pushFrame (ReadNorm3 word d who modal con branch site)
+          continueRef time
+        Nothing -> flushArmed l >> finishNormRead word d who modal con branch site
+    _ -> finishNormRead word d who modal con branch site
+  where
+    firstUnforced [] = pure Nothing
+    firstUnforced ((_, time, _) : rest) = peekWHNF time >>= \ case
+      Nothing -> pure (Just time)
+      Just _  -> firstUnforced rest
+
+-- | Finish a read of the norm log (NORM-LOG-SPEC N4b): the pure reader over
+-- the entries written so far, as at the instant. A read is only meaningful
+-- when the writer is on, so a run that reaches one without it says so, by
+-- name, instead of answering "nothing is outstanding" from an empty log (the
+-- checker's switch, 'L4.EvaluateLazy.moduleReadsNormLog', is the first line
+-- of defence; this is the second). A refusal of the reader (a party the
+-- machine never forced, an entry with no instant) is a run-time error naming
+-- the norm, never a smaller answer (N7 rule 4).
+finishNormRead :: ReadWord -> Rational -> BearerPattern -> DeonticModal -> Resolved -> ReadBranch -> Maybe SrcRange -> Machine Config
+finishNormRead word d who modal con branch _site = do
+  mlog <- asks (.deonticLog)
+  case mlog of
+    Just l | l.dlWriteFates -> do
+      -- the value of a read depends on the norm log as it is now, and the log
+      -- grows between two guards at one instant: a thunk that holds a read
+      -- must not be served at a later guard (R12; 'crNormRead' vetoes 'validFor')
+      noteCtxRead noReads { crNormRead = True }
+      -- review of P2b, S1: a read inside an operand of RAND, ROR or EVERY
+      -- depends on which sibling ran first. The checker refuses the read
+      -- written there; this one is reached through a rule the operand uses
+      sref <- asks (.siblings)
+      sibs <- liftIO (readIORef sref)
+      when (inCompound sibs) $ userException $ UserError $
+        "a norm-log read (" <> readWordText word <> ") ran inside an operand of RAND, ROR or EVERY (reached from an operand, not written in one: through a rule it uses or the time of an event it takes): the operands run side by side, so what it saw would depend on which sibling ran first"
+      store <- readEvalRef (.envLedger)
+      -- review of P2b, B2: the entries of this run only; a second run in one
+      -- directive (EVALTRACE twice) has its own norms
+      start <- liftIO (readIORef l.dlRunStart)
+      let entries = [ e | Fate e <- drop start (toList store.normLedger) ]
+          pat = readPattern who modal (nameToText (getOriginal con)) branch
+      -- review of P2b, B1: an instant the run has not reached is not in the
+      -- log yet. The latest instant the run has been at is the later of the
+      -- entries' and the event a guard is being matched at
+      stamp <- liftIO (readIORef l.dlHorizon)
+      let horizon = case catMaybes [stamp, NormRead.readHorizon entries] of
+            [] -> Nothing
+            ts -> Just (maximum ts)
+      when (maybe True (d >) horizon) $ userException $ UserError $
+        "a norm-log read (" <> readWordText word <> ") cannot be answered: " <> NormRead.prettyRefusal (NormRead.FutureInstant d horizon)
+      case answerRead word d pat entries of
+        Left r  -> userException (UserError ("a norm-log read (" <> readWordText word <> ") cannot be answered: " <> NormRead.prettyRefusal r))
+        Right b -> continueBackward (ValBool b)
+    _ -> userException (UserError ("a norm-log read (" <> readWordText word <> ") ran with the norm log switched off, so it would see no norms"))
 
 -- | Read the /current acting party's/ own ledger (M1.5 @RECALL@ semantics).
 currentLedgerEval :: Eval Ledger
@@ -3135,6 +3319,12 @@ forwardExpr env = \ case
     -- yielding MAYBE (RecallLast) or a LIST (RecallAll).
     pushFrame (ReadCell1 mParty isOfficial mode env (rangeOf ann))
     continueExpr env cell
+  -- NORM-LOG-SPEC N4b: evaluate the instant first (the @AS OF@ expression, or
+  -- @THE INSTANT@, the stamp of the event a guard is matched against: the
+  -- checker admits a read with neither only inside a guard), then the bearer.
+  ReadNorm ann word _ mParty modal con _ branch asOf -> do
+    pushFrame (ReadNorm1 word mParty modal con branch env (rangeOf ann))
+    continueExpr env (fromMaybe (Lifecycle emptyAnno LifecycleInstant) asOf)
   Concat _ann [] ->
     continueBackward (ValString "")
   Concat _ann (e : es) -> do
@@ -3255,6 +3445,20 @@ backward val = withPoppedFrameKeepingUpdate $ \ popped -> case asApp1 <$> popped
     let key = partyKeyWHNF val
     ledger <- partyLedgerEval key
     finishRead mode cellVal (OwnKey key) site ledger
+  Just (ReadNorm1 word mParty modal con branch env site) -> case val of
+    ValNumber d -> case mParty of
+      Nothing -> readNormForcing word d AnyBearer modal con branch site
+      Just p  -> do
+        pushFrame (ReadNorm2 word d modal con branch site)
+        continueExpr env p
+    _ -> userException (UserError "the instant of a norm-log read did not evaluate to a number")
+  Just (ReadNorm2 word d modal con branch site) ->
+    readNormForcing word d (BearerIs (partyKeyWHNF val)) modal con branch site
+  Just (ReadNorm3 word d who modal con branch site) ->
+    readNormForcing word d who modal con branch site
+  Just (EndNormRun before) -> do
+    endNormRun before
+    continueBackward val
   Just (RestoreSibling path clock) -> do
     restoreSibling path clock
     continueBackward val
@@ -3275,6 +3479,7 @@ backward val = withPoppedFrameKeepingUpdate $ \ popped -> case asApp1 <$> popped
   Just (BinBuiltin2 binOp val1) ->
     runBinOp binOp val1 val
   Just f@(App1 rs mTy) -> do
+    beginNormRun val rs
     case val of
       ValClosure givens e env' -> do
         noteApplication givens e
@@ -4172,6 +4377,7 @@ backwardContractFrame val = \ case
         -- smucclaw/l4-ide#1069: a RECALL in the PROVIDED is read at the
         -- event's stamp
         noteClockWHNF time
+        noteHorizon time
         pushCFrame $ Contract10 ScrutinizeActions {..}
         -- N4 (P2): THE INSTANT in the guard is the stamp of this event
         guardEnv <- case act.provided of

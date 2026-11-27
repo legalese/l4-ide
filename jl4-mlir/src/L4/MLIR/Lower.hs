@@ -2233,6 +2233,7 @@ lowerExprCases expr expectedTy = case expr of
   Env{}        -> markUnsupported "ENV not supported by the WASM backend"
   Record{}     -> markUnsupported "RECORD/COMMIT (ledger write) not supported by the WASM backend"
   ReadCell{}   -> markUnsupported "RECALL (ledger read) not supported by the WASM backend"
+  ReadNorm{}   -> markUnsupported "a norm-log read is not supported by the WASM backend"
 
   -- RAnd/ROr (regulative and/or — same as boolean for compiled code)
   RAnd _ lhs rhs -> lowerBoolop arithAndi lhs rhs
@@ -3371,6 +3372,7 @@ freeVarsOfExpr expr0 bound0 = go bound0 expr0
       Post _ a b c -> Set.unions [go bound a, go bound b, go bound c]
       Record _ mParty cell val _ mHence -> Set.unions ([go bound cell, go bound val] <> maybe [] (\p -> [go bound p]) mParty <> maybe [] (\k -> [go bound k]) mHence)
       ReadCell _ mParty _ _ cell -> Set.unions ([go bound cell] <> maybe [] (\p -> [go bound p]) mParty)
+      ReadNorm _ _ _ mParty _ _ _ _ asOf -> Set.unions (maybe [] (\p -> [go bound p]) mParty <> maybe [] (\e -> [go bound e]) asOf)
       Breach _ ma mb -> Set.unions (maybe Set.empty (go bound) ma : [maybe Set.empty (go bound) mb])
 
     stepLocal (bnd, frees) (LocalDecide _ (MkDecide _ _ af bdy)) =

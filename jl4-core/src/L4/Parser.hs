@@ -2946,6 +2946,7 @@ baseExpr' =
   <|> postExpr
   <|> recordOrCommitExpr
   <|> recallExpr
+  <|> readNormExpr
   <|> concatExpr
   <|> ifthenelse
   <|> multiWayIf
@@ -2963,6 +2964,7 @@ baseExpr' =
   <|> list
   <|> letInExpr
   <|> parenExprOrProjection  -- (e), and (e)'s f: see 'projection'
+  <|> wildcardOutsideRead
 
 event :: Parser (Expr Name)
 event = attachAnno $ Event emptyAnno <$> annoHole parseEvent
@@ -3404,6 +3406,111 @@ recallExpr =
     _    <- annoHole (pure mode)                -- mode placeholder hole (field 3)
     cell <- annoHole cellExpr                   -- cell hole (field 4)
     pure (ReadCell emptyAnno mParty isOff mode cell)
+
+-- | A read of the norm log (NORM-LOG-SPEC N4b, option A, built by Claude
+-- 2026-11-24 as the card's fallback, pending Meng's review):
+--
+-- > OUTSTANDING (PARTY patron MUST `return` _) [AS OF e]
+-- > EVER FAILED (PARTY _ MUST pay _ UNDER LEST)
+-- > FAILED AND NOT CURED (...)  |  CURED BY REPARATION (...)
+--
+-- The phrases are not reserved words: they are matched by SPELLING, as the
+-- lifecycle nouns are ('lifecycleWords'), so a program may still name a value
+-- @OUTSTANDING@. The read is entered only when the words are followed by
+-- @( PARTY@, a bearer and a modal ('readHead'); once entered, a mistake in the
+-- pattern is an error of its own and not a retreat to application. A text that
+-- parsed before parses as it did, except one that names a function like a
+-- phrase and applies it to a bracketed regulative (@PARTY x MUST ...@), which
+-- is now a read.
+--
+-- Hole order is the field order of 'ReadNorm': phrase, its marker name, bearer, modal, the
+-- action's constructor, the count of @_@, the branch, the @AS OF@ instant.
+-- The phrase, the modal, the count and the branch are placeholders, and the
+-- words and the @_@s are tokens of the node's own 'Anno'.
+readNormExpr :: Parser (Expr Name)
+readNormExpr = do
+  -- hidden: the four phrases are spelled as identifiers and are a read only
+  -- before @( PARTY@, so they must not join the "expecting" list of every
+  -- parse error that stops where an expression could start (the corpus's
+  -- parse-error goldens record that list).
+  hidden (try (lookAhead readHead))
+  attachAnno do
+    word <- readWordTokens
+    _    <- annoHole (pure word)
+    phrase <- annoHole (pure (MkName emptyAnno (NormalName (readWordText word))))
+    _    <- annoLexeme (spacedSymbol_ TPOpen)
+    _    <- annoLexeme (spacedKeyword_ TKParty)
+    mParty <-
+          (Nothing <$ annoLexeme (spacedSymbol_ TUnderscore) <* annoHole (pure (Nothing :: Maybe (Expr Name))))
+      <|> (Just <$> annoHole (try partyAtom <|> parenExpr))
+    modal <- readModal
+    _    <- annoHole (pure modal)
+    con  <- annoHole name
+    ws   <- many (annoLexeme (spacedSymbol_ TUnderscore))
+    _    <- annoHole (pure (length ws))
+    narrowed <- readBranchTokens
+    _    <- annoHole (pure narrowed)
+    _    <- annoLexeme (spacedSymbol_ TPClose)
+    asOf <- optionalWithHole
+      (tryParser (annoLexeme (spacedKeyword_ TKAs) *> annoLexeme (spacedKeyword_ TKOf)) *> annoHole atomicExpr')
+    pure (ReadNorm emptyAnno word phrase mParty modal con (length ws) narrowed asOf)
+
+-- | A @_@ where an expression is expected. The lexer makes it a token only for
+-- the read pattern (NORM-LOG-SPEC N4b, condition 1; built by Claude 2026-11-24,
+-- pending Meng's review), so anywhere else it is refused here by name, and
+-- not left to a bare "unexpected". It is the last alternative of 'baseExpr'',
+-- so it fires only where nothing else can take the token.
+wildcardOutsideRead :: Parser (Expr Name)
+wildcardOutsideRead = do
+  -- hidden, for the same reason: @_@ is refused here, so it is not something
+  -- the parser "expects", and naming it in the list would invite it.
+  void (hidden (try (lookAhead (spacedSymbol_ TUnderscore))))
+  fancyFailure $ Set.singleton $ ErrorFail $ Text.unpack $ Text.unlines
+    [ "A bare _ is the wildcard of a norm-log read pattern, and it means nothing anywhere else."
+    , "Write it inside a read, as in  OUTSTANDING (PARTY patron MUST `return` _);"
+    , "to leave an input unused, give it a name."
+    ]
+
+-- | What makes a text a read: a phrase, @(@, @PARTY@, the bearer, a modal.
+-- The modal is part of it so that a function a program has named like a phrase,
+-- applied to a bracketed event (@PARTY x DOES y AT 1@), is still an
+-- application: an event has no modal.
+readHead :: Parser ()
+readHead = do
+  _ <- unwrapAnnoParser readWordTokens
+  _ <- spacedSymbol_ TPOpen
+  _ <- spacedKeyword_ TKParty
+  _ <- void (spacedSymbol_ TUnderscore) <|> void (try partyAtom <|> parenExpr)
+  void (unwrapAnnoParser readModal)
+
+-- | The four phrases, as the tokens they are spelled with.
+readWordTokens :: AnnoParser ReadWord
+readWordTokens =
+      tryParser (ReadFailedNotCured <$ (word "FAILED" *> kw TKAnd *> kw TKNot *> word "CURED"))
+  <|> tryParser (ReadEverFailed <$ (word "EVER" *> word "FAILED"))
+  <|> tryParser (ReadCuredByReparation <$ (word "CURED" *> kw TKBy *> word "REPARATION"))
+  <|> ReadOutstanding <$ word "OUTSTANDING"
+  where
+    word = annoLexeme . spacedToken_ . TIdentifiers . TIdentifier
+    kw = annoLexeme . spacedKeyword_
+
+-- | The modal of a read pattern. @SHANT@ and @MUST NOT@ are one modal, as
+-- they are in a rule.
+readModal :: AnnoParser DeonticModal
+readModal = asum
+  [ annoLexeme (spacedKeyword_ TKMust) *>
+      (DMustNot <$ annoLexeme (spacedKeyword_ TKNot) <|> pure DMust)
+  , DMay     <$ annoLexeme (spacedKeyword_ TKMay)
+  , DMustNot <$ annoLexeme (spacedKeyword_ TKShant)
+  ]
+
+-- | @UNDER LEST@, @UNDER HENCE@, or neither.
+readBranchTokens :: AnnoParser ReadBranch
+readBranchTokens =
+      tryParser (annoLexeme (spacedToken_ (TIdentifiers (TIdentifier "UNDER")))
+                  *> (ReadUnderLest  <$ annoLexeme (spacedKeyword_ TKLest)
+                      <|> ReadUnderHence <$ annoLexeme (spacedKeyword_ TKHence)))
+  <|> pure ReadAnyBranch
 
 -- | The optional @ALL@ collect-all marker — emits ONLY the ALL keyword token
 -- (no hole). Mode field hole is emitted in field order by 'recallExpr'.

@@ -95,6 +95,7 @@ ctxReadsSpec = describe "CtxReads pointwise Monoid" $ do
         , crRuleValidTime = NotRead
         , crLedgerWrite = False
         , crLedgerRead = False
+        , crNormRead = False
         }
 
   it "hasReads distinguishes empty from non-empty" $ do
@@ -140,6 +141,14 @@ validForSpec = describe "validFor" $ do
     validFor ambient fp `shouldBe` False
     validFor (applyEvalClauses [AsOfSystemTime t2] ambient) fp `shouldBe` False
 
+  it "crNormRead vetoes: a force that read the norm log is never served again, on any axes" $ do
+    let fp = noReads { crNormRead = True, crSystemTime = ReadEq t1 }
+    validFor (applyEvalClauses [AsOfSystemTime t1] ambient) fp `shouldBe` False
+    validFor ambient (noReads { crNormRead = True }) `shouldBe` False
+    -- and it merges as OR, so a thunk that consumed such a read inherits it
+    (noReads { crSystemTime = ReadEq t1 } <> noReads { crNormRead = True }).crNormRead `shouldBe` True
+    (noReads <> noReads).crNormRead `shouldBe` False
+
   it "crLedgerRead does NOT veto: a read-only ledger fingerprint validates on its axes (#914 snapshot-per-scope)" $ do
     let fp = noReads { crLedgerRead = True, crSystemTime = ReadEq t1 }
     -- same scope: re-served
@@ -156,6 +165,7 @@ validForSpec = describe "validFor" $ do
             , crRuleValidTime = NotRead
             , crLedgerWrite = False
             , crLedgerRead = False
+            , crNormRead = False
             }
         withTz = ambient { tcDocumentTimezone = Just "Etc/UTC" }
     validFor withTz fp `shouldBe` True

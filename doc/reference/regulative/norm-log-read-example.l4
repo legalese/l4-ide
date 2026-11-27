@@ -1,0 +1,33 @@
+-- Reading what became of a norm. See norm-log-read.md.
+-- The spelling of the read is decided by Claude 2026-11-24, pending Meng's review.
+
+DECLARE Person IS ONE OF Alice, Bob
+DECLARE Action IS ONE OF
+  deliver
+  pay HAS amount IS A NUMBER
+
+-- The fee is owed only because the delivery failed, and counts from 5 up.
+-- The payment of 1 does not count; the payment of 7 does.
+GIVETH A DEONTIC Person Action
+`late fee` MEANS
+  PARTY Alice MUST deliver WITHIN 3
+  LEST (PARTY Alice MUST pay fee
+          PROVIDED EVER FAILED (PARTY Alice MUST deliver) AND fee >= 5
+          WITHIN 10)
+
+#TRACE `late fee` AT 0 WITH
+  PARTY Alice DOES pay 1 AT 5
+  PARTY Alice DOES pay 7 AT 6
+
+-- Asked as of an earlier instant: the delivery was made at 4, so it was still
+-- outstanding as of 2, and the payment counts.
+GIVETH A DEONTIC Person Action
+`pay while undelivered` MEANS
+  PARTY Alice MUST deliver WITHIN 10
+  HENCE (PARTY Bob MUST pay amount
+           PROVIDED OUTSTANDING (PARTY Alice MUST deliver) AS OF 2
+           WITHIN 10)
+
+#TRACE `pay while undelivered` AT 0 WITH
+  PARTY Alice DOES deliver AT 4
+  PARTY Bob DOES pay 1 AT 6

@@ -96,6 +96,7 @@ carameliseExprWithContext ctx = carameliseNode >>> \ case
   Post       ann e1 e2 e3 -> Post ann (carameliseExprWithContext InertCtxNone e1) (carameliseExprWithContext InertCtxNone e2) (carameliseExprWithContext InertCtxNone e3)
   Record     ann mParty cell val isOfficial mHence -> Record ann (fmap (carameliseExprWithContext InertCtxNone) mParty) (carameliseExprWithContext InertCtxNone cell) (carameliseExprWithContext InertCtxNone val) isOfficial (fmap (carameliseExprWithContext InertCtxNone) mHence)
   ReadCell   ann mParty isOfficial mode cell -> ReadCell ann (fmap (carameliseExprWithContext InertCtxNone) mParty) isOfficial mode (carameliseExprWithContext InertCtxNone cell)
+  ReadNorm   ann w mk mParty m con n b asOf -> ReadNorm ann w mk (fmap (carameliseExprWithContext InertCtxNone) mParty) m con n b (fmap (carameliseExprWithContext InertCtxNone) asOf)
   Concat     ann es -> Concat ann (fmap (carameliseExprWithContext InertCtxNone) es)
   AsString   ann e -> AsString ann (carameliseExprWithContext InertCtxNone e)
   Breach     ann mParty mReason -> Breach ann (fmap (carameliseExprWithContext InertCtxNone) mParty) (fmap (carameliseExprWithContext InertCtxNone) mReason)
@@ -752,6 +753,8 @@ openFields table shadowed (MkModule mAnn uri sect) =
       Record ann <$> traverse (go frames) mp <*> go frames c <*> go frames v <*> pure off <*> traverse (go frames) mh
     ReadCell ann mp off mode c ->
       (\ mp' c' -> ReadCell ann mp' off mode c') <$> traverse (go frames) mp <*> go frames c
+    ReadNorm ann w mk mp m con n b asOf ->
+      (\ mp' asOf' -> ReadNorm ann w mk mp' m con n b asOf') <$> traverse (go frames) mp <*> traverse (go frames) asOf
     Breach ann mp mr    -> Breach ann <$> traverse (go frames) mp <*> traverse (go frames) mr
     Refuse ann msg      -> Refuse ann <$> go frames msg
     Event {}            -> pure expr  -- regulative events are complex; leave as-is

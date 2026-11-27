@@ -178,6 +178,7 @@ data TSymbols
   | TDot
   | TEllipsis    -- ... for asyndetic conjunction (implicit AND)
   | TEllipsisOr  -- .. for asyndetic disjunction (implicit OR)
+  | TUnderscore  -- _ the wildcard of a norm-log read pattern (NORM-LOG-SPEC N4b); the parser refuses it anywhere else
   | TColon
   | TPercent
   | TCopy (Maybe TokenType)
@@ -203,6 +204,7 @@ symbols = Map.fromList
   , ("." , TDot)
   , ("...", TEllipsis)    -- three dots = implicit AND (must be before .. due to prefix)
   , (".." , TEllipsisOr)  -- two dots = implicit OR
+  , ("_" , TUnderscore)   -- only inside a read pattern; the parser says so by name elsewhere
   , ("%" , TPercent)
   , (":" , TColon)
   ]
@@ -1547,6 +1549,7 @@ tokenKindSlug tt = case tt of
     TDot             -> "dot"
     TEllipsis        -> "ellipsis"
     TEllipsisOr      -> "ellipsis-or"
+    TUnderscore      -> "underscore"
     TColon           -> "colon"
     TPercent         -> "percent"
     TCopy (Just tt') -> tokenKindSlug tt'

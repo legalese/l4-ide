@@ -2253,6 +2253,9 @@ refuse = \case
   ReadCell {} -> LFBlocked "DA-LEDGER"
     "RECALL ledger read has no docassemble form"
     "the state-as-a-ledger layer"
+  ReadNorm {} -> LFBlocked "DA-NORM-LOG"
+    "a norm-log read has no docassemble form"
+    "the norm log"
   Lam {}      -> LFFatal "lambda outside a directly-applied WHERE binding or an `all`/`any` call cannot be emitted (this backend emits no Python module)"
   -- M4 gathers a LIST OF input; it does not CONSTRUCT list values. A gathered
   -- DAList is what the interview asks for, and there is no widget — and no

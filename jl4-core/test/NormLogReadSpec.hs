@@ -22,7 +22,7 @@ import Data.List (find)
 
 import L4.Evaluate.NormLog
 import L4.Evaluate.NormLog.Read
-import L4.Syntax (DeonticModal (..))
+import L4.Syntax (DeonticModal (..), ReadBranch (..), ReadWord (..))
 import Test.Hspec
 
 ref :: Int -> NormRef
@@ -385,3 +385,42 @@ spec = describe "NormLogRead, the pure read of the norm log (NORM-LOG-SPEC P2)" 
       cured 11 (ofNorm 3 (bearer "Bob") tied) 1 `shouldBe` Left (CompoundNoInstant (ref 9))
       cured 11 tied 1 `shouldBe` Right True
       cured 11 (ofNorm 2 (bearer "Bob") (ofNorm 3 (bearer "Bob") tied)) 1 `shouldBe` Right False
+
+  describe "N4b: the four phrases over the entries (answerRead)" do
+    -- every norm here is a MUST pay by Alice, so a pattern for it matches them all
+    let pay = readPattern AnyBearer DMust "pay" ReadAnyBranch
+        ask w d es = answerRead w d pay es
+    it "OUTSTANDING is true while some matching norm has no fate, as at the instant" do
+      ask ReadOutstanding 5 [ armedAt 1 1 ] `shouldBe` Right True
+      let done = [ armedAt 1 1, fateAt FatePerformed 3 1 ]
+      ask ReadOutstanding 2 done `shouldBe` Right True
+      ask ReadOutstanding 5 done `shouldBe` Right False
+    it "any matching norm is enough: one outstanding among others that are not" do
+      ask ReadOutstanding 5 [ armedAt 1 1, fateAt FatePerformed 3 1, armedAt 1 2 ] `shouldBe` Right True
+    it "EVER FAILED is true from the instant a MUST's LEST fired, cured or not, and a violated SHANT is not a failure" do
+      ask ReadEverFailed 9 failedAt10 `shouldBe` Right False
+      ask ReadEverFailed 10 failedAt10 `shouldBe` Right True
+      ask ReadEverFailed 30 (failedAt10 <> [ fateAt FatePerformed 12 2 ]) `shouldBe` Right True
+      let violated = [ modalled DMustNot (armedAt 1 1), modalled DMustNot (fateAt FateViolated 3 1) ]
+      answerRead ReadEverFailed 9 (readPattern AnyBearer DMustNot "pay" ReadAnyBranch) violated `shouldBe` Right False
+    it "FAILED AND NOT CURED, and CURED BY REPARATION, follow N8's cure" do
+      let repaired = failedAt10 <> [ fateAt FatePerformed 12 2 ]
+      ask ReadFailedNotCured 11 repaired `shouldBe` Right True
+      ask ReadCuredByReparation 11 repaired `shouldBe` Right False
+      ask ReadFailedNotCured 12 repaired `shouldBe` Right False
+      ask ReadCuredByReparation 12 repaired `shouldBe` Right True
+      -- a norm that never failed is neither
+      ask ReadFailedNotCured 30 [ armedAt 1 1, fateAt FatePerformed 3 1 ] `shouldBe` Right False
+      ask ReadCuredByReparation 30 [ armedAt 1 1, fateAt FatePerformed 3 1 ] `shouldBe` Right False
+    it "UNDER LEST and UNDER HENCE narrow the pattern to the norms armed that way" do
+      let reparation = readPattern AnyBearer DMust "pay" ReadUnderLest
+          fresh = readPattern AnyBearer DMust "pay" ReadUnderHence
+      -- norm 1 is outstanding, norm 2 (armed by a LEST) is performed
+      let es = [ armedAt 1 1, child ViaLest 3 (armedAt 1 2), fateAt FatePerformed 4 2 ]
+      answerRead ReadOutstanding 5 reparation es `shouldBe` Right False
+      answerRead ReadOutstanding 5 pay es `shouldBe` Right True
+      answerRead ReadOutstanding 5 fresh es `shouldBe` Right False
+    it "a refusal of the reader is the answer's refusal, never False" do
+      let written = [ (armedAt 1 1) {neBearer = WrittenBearer "Alice"} ]
+      answerRead ReadOutstanding 5 (readPattern (BearerIs "Alice") DMust "pay" ReadAnyBranch) written
+        `shouldBe` Left (BearerNotKnown (ref 1) (WrittenBearer "Alice"))

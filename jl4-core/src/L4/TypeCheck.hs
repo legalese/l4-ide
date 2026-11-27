@@ -183,6 +183,7 @@ mkInitialCheckEnv moduleUri environment entityInfo =
     , enclosingObligation = Nothing
     , onJoinLine = False
     , inGuard = False
+    , inOperand = False
     , inOwnSlots = False
     , moduleUri
     , sectionStack = []
@@ -379,7 +380,11 @@ doCheckProgramWithDependencies checkState checkEnv program =
                 -- or left as it was (its type is unsolved).
                 typeParams = moduleTypeParameters s'.substitution rprog
                 decodeErrs = decodesAtTypeParameters s'.substitution typeParams rprog
-                others = substErrs ++ moreErrs ++ exportErrs ++ implicitErrs ++ siblingWarns ++ decodeErrs
+                -- NORM-LOG-SPEC N4b, condition 2. Asked only of a module that
+                -- reads the norm log (a names-only question), because the
+                -- answer takes a walk over every expression.
+                readSiteErrs = readsMatchingNoSite checkEnv.moduleUri rprog
+                others = substErrs ++ moreErrs ++ exportErrs ++ implicitErrs ++ siblingWarns ++ decodeErrs ++ readSiteErrs
                 -- smucclaw/l4-ide#1075: the rules that start themselves again
                 -- ('L4.Cycles.cycleNotices'). Only on a module with no error:
                 -- the cycles of one that does not check are not worth a
@@ -412,6 +417,39 @@ doCheckProgramWithDependencies checkState checkEnv program =
               , mixfixRegistry = combinedMixfixRegistry
               , sectionPaths = s'.sectionPaths
               }
+
+-- | The reads of the norm log whose pattern matches no norm of the module
+-- (NORM-LOG-SPEC N4b, condition 2; built by Claude 2026-11-24, pending Meng's
+-- review). A read matches a norm by its modal and the constructor of its
+-- action; a norm whose action is not written as a constructor is taken to
+-- match any pattern, so that the error is raised only when it is certain.
+--
+-- Only a pattern whose constructor this module declares is asked: a norm that
+-- names it can be written in this module alone, because no module this one
+-- imports can name what it has not yet declared. A pattern naming a
+-- constructor an import declares is not asked, since the checker does not
+-- carry an import's norms, and the read is then simply not checked (the
+-- reader answers "no" for it, which is the silent case NORM-LOG-SPEC §6.5
+-- lists).
+readsMatchingNoSite :: NormalizedUri -> Module Resolved -> [CheckErrorWithContext]
+readsMatchingNoSite uri m
+  | not (moduleReadsNormLog m) = []
+  | otherwise =
+      [ MkCheckErrorWithContext (ReadNormRefused (ReadMatchesNoSite (rawName (getOriginal con))) (fmap getActual e)) None
+      | e@(ReadNorm _ _ _ _ modal con _ _ _) <- exprs
+      , (getUnique con).moduleUri == uri
+      , not (any (matches modal con) sites)
+      ]
+  where
+    exprs = Optics.toListOf (gplate @(Expr Resolved) Optics.% cosmosExpr) m
+    sites = [ (a.modal, siteHead a.action) | Regulative _ d <- exprs, let a = d.action ]
+    siteHead = \ case
+      PatApp _ n _ -> Just (rawName (getOriginal n))
+      _            -> Nothing
+    matches modal con (siteModal, siteCon) =
+      sameModal modal siteModal && maybe True (== rawName (getOriginal con)) siteCon
+    sameModal a b = norm a == norm b
+    norm = \ case { DDo -> DMust; other -> other }
 
 -- | Resolve the type each JSONDECODE node decodes into, with this module's
 -- final substitution, wherever that type comes out concrete
@@ -883,8 +921,8 @@ withExtraMixfix mixfixAdds =
     -- positional match: 'mixfixRegistry' is a duplicated field name, so a
     -- record update here would be ambiguous under DuplicateRecordFields
     updateMixfix :: MixfixRegistry -> CheckEnv -> CheckEnv
-    updateMixfix adds (MkCheckEnv a b c d e f g reg cf sb sd idf ir ne eo jl ig os h i lb apos uo) =
-      MkCheckEnv a b c d e f g (unionMixfixRegistry adds reg) cf sb sd idf ir ne eo jl ig os h i lb apos uo
+    updateMixfix adds (MkCheckEnv a b c d e f g reg cf sb sd idf ir ne eo jl io ig os h i lb apos uo) =
+      MkCheckEnv a b c d e f g (unionMixfixRegistry adds reg) cf sb sd idf ir ne eo jl io ig os h i lb apos uo
 
 -- | Make the input defaults of a @WHERE@ or @LET@'s own rules visible to the
 -- expression the bindings scope over, which is checked after the bindings'
@@ -1109,8 +1147,11 @@ regulativeBinOpAt ::
   -> Expr Name
   -> Check (Expr Resolved, Type' Resolved)
 regulativeBinOpAt contractT opname op ctx ann e1 e2 =
-  checkBinOp contractT contractT contractT opname op ann
-    (setInertContext ctx e1) (setInertContext ctx e2)
+  -- the operands run side by side: a norm-log read inside one is refused
+  -- ('ReadInOperand', NORM-LOG-SPEC N4b)
+  local (\ env -> env {inOperand = True}) $
+    checkBinOp contractT contractT contractT opname op ann
+      (setInertContext ctx e1) (setInertContext ctx e2)
 
 -- | A regulative @RAND@\/@ROR@ checked against an expected type: unify the
 -- expected type with a @DEONTIC party action@ FIRST, then check both operands
@@ -3370,7 +3411,7 @@ checkDeonton ann subject action opens due mjoin hence lest partyT actionT = do
       (actionR, opensR, dueR, henceR, lestR) <-
         checkDeontonBody (Just partyR) partyT actionT action opens due (hasJoinDeadline mjoin) hence lest
       pure (MkDeonton ann (Party sann partyR) actionR opensR dueR joinR henceR lestR)
-    Every sann mCast v mRoll mFilter -> do
+    Every sann mCast v mRoll mFilter -> local (\ env -> env {inOperand = True}) do
       -- EVERY-EACH-QUANTIFIER-SPEC §2.1/§2.4: the bound variable has the
       -- contract's party type (from @GIVETH DEONTIC Party Action@, or inferred
       -- from the action and the events) and scopes over the WHO filter, the
@@ -5817,6 +5858,28 @@ inferExpr' g =
             RecallLast -> maybeType a
             RecallAll  -> list a
       pure (ReadCell ann mParty' isOfficial mode cell', resultT)
+    ReadNorm ann word phrase mParty modal con wild branch asOf -> do
+      -- NORM-LOG-SPEC N4b (built by Claude 2026-11-24, pending Meng's review):
+      -- a BOOLEAN, true when a norm the pattern matches is in the state the
+      -- phrase names. Where it may stand is refused here, because there it has
+      -- no answer ('ReadRefusal'). A party is checked as a PARTY clause's is.
+      guarded <- asks (.inGuard)
+      operand <- asks (.inOperand)
+      let refuse r = addError (ReadNormRefused r g)
+      when operand (refuse ReadInOperand)
+      when (not guarded && isNothing asOf) (refuse ReadNoInstant)
+      mParty' <- traverse (\ p -> do
+                   partyT <- fresh (NormalName "party")
+                   checkExpr ExpectRegulativePartyContext p partyT) mParty
+      asOf' <- traverse (\ t -> checkExpr ExpectRegulativeTimestampContext t number) asOf
+      (con', conT) <- resolveConstructor con
+      let fields = case conT of
+            Fun _ args _ -> length args
+            _            -> 0
+      when (fields /= wild) (refuse (ReadArity (rawName con) fields wild))
+      -- the marker: resolved to the unique no definition has, so that the
+      -- module's reads are found from its names ('moduleReadsNormLog')
+      pure (ReadNorm ann word (Ref phrase normLogReadUnique phrase) mParty' modal con' wild branch asOf', boolean)
     Concat ann es -> do
       res <- traverse (\ e -> checkExpr ExpectConcatArgumentContext e string) es
       pure (Concat ann res, string)
@@ -8653,6 +8716,7 @@ setInertContext = go True  -- True = we're at top level or direct boolean operan
       Post ann e1 e2 e3 -> Post ann (go False ctx e1) (go False ctx e2) (go False ctx e3)
       Record ann mParty cell val off mHence -> Record ann (fmap (go False ctx) mParty) (go False ctx cell) (go False ctx val) off (fmap (go False ctx) mHence)
       ReadCell ann mParty off mode cell -> ReadCell ann (fmap (go False ctx) mParty) off mode (go False ctx cell)
+      ReadNorm ann w mk mParty m con n b asOf -> ReadNorm ann w mk (fmap (go False ctx) mParty) m con n b (fmap (go False ctx) asOf)
       Concat ann es -> Concat ann (map (go False ctx) es)
       AsString ann e -> AsString ann (go False ctx e)
       Breach ann mp mr -> Breach ann (fmap (go False ctx) mp) (fmap (go False ctx) mr)
@@ -9676,6 +9740,42 @@ prettyCheckError (AnchorUnavailable edge a reason) =
       AnchorDeadline{} -> "deadline"
       AnchorArming{}   -> "arming"
       AnchorAt{}       -> "anchor"
+prettyCheckError (ReadNormRefused reason _) =
+  case reason of
+    ReadNoInstant ->
+      [ "This read of the norm log has no instant to be true at."
+      , ""
+      , "OUTSTANDING, EVER FAILED, FAILED AND NOT CURED and CURED BY REPARATION are"
+      , "true or false as at an instant, and only a PROVIDED guard has one: the"
+      , "event it is matched against (THE INSTANT)."
+      , ""
+      , "Write it in a PROVIDED, or say when it is asked: AS OF <a NUMBER>."
+      ]
+    ReadInOperand ->
+      [ "A read of the norm log cannot stand inside an operand of RAND, ROR or EVERY."
+      , ""
+      , "Those operands run side by side, so what such a read sees would depend on"
+      , "which sibling the machine happened to run first, and the check that makes"
+      , "that safe is not built (NORM-LOG-SPEC N10, N19, N20)."
+      , ""
+      , "Move the read out of the operand, or write the rule it reads first and the"
+      , "rule that reads it after, as separate rules joined by HENCE."
+      ]
+    ReadMatchesNoSite con ->
+      [ "No norm in this module has this modal and the action " <> rawNameToText con <> ","
+      , "so this read matches nothing, and its answer would be \"no\" for every trace."
+      , ""
+      , "Check the spelling of the action and the modal (MUST, MAY, SHANT) against the"
+      , "rule it is meant to read. A norm whose action is not written as a constructor"
+      , "is taken to match any pattern, so the mistake is not there."
+      ]
+    ReadArity con fields wild ->
+      [ "The pattern writes " <> Text.pack (show wild) <> " _ for the arguments of " <> rawNameToText con <> ","
+      , "which has " <> Text.pack (show fields) <> " field" <> (if fields == 1 then "" else "s") <> "."
+      , ""
+      , "Write one _ for each field: a read matches a norm by the constructor of its"
+      , "action, and does not yet compare the arguments."
+      ]
 prettyCheckError (LifecycleUnavailable p _ reason) =
   case reason of
     NoEnclosingObligation ->

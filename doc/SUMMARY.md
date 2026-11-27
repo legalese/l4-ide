@@ -20,6 +20,7 @@
   - [Every position a contract can reach: `l4 explore`](reference/regulative/explore.md)
   - [State graph and `--dominators`](reference/regulative/STATE-GRAPH.md)
   - [The instance ledger](reference/regulative/ledger.md)
+  - [Reading what became of a norm](reference/regulative/norm-log-read.md)
   - [Rules that start themselves again](reference/regulative/rules-that-start-themselves-again.md)
 - [Built-ins](reference/builtins/README.md)
 - [Libraries](reference/libraries/README.md)

@@ -519,6 +519,7 @@ What to know about it:
 - **It is the event's time, not the obligation's.** The obligation above was entered at 0, and the event came at 12; `THE INSTANT` is 12. For the time the obligation was entered, use `THE ARMING` (see [The anchor words as values](#the-anchor-words-as-values) above).
 - **It is only available inside a `PROVIDED`.** Written anywhere else, at the top level, in a `WHERE` of the rule (a `WHERE` inside the condition itself is part of it, and is fine), in a `HENCE` or `LEST`, as an anchor after `OF`, or in the body of a function, it is a check error that says so, because there is no event there for it to be the time of. To use it in a function, pass it in: `PROVIDED late THE INSTANT`, where `late` takes a number.
 - **It is not `NOW`.** `NOW` is the computer's own clock at the moment the program runs, and so are `TODAY` and `CURRENTTIME`; a `PROVIDED` that reads any of them gets a warning. `THE INSTANT` is a time in the contract's own timeline, so the same trace gives the same answer however and whenever it is run.
+- **It is the instant a read of the norm log is asked at.** Inside a `PROVIDED`, `OUTSTANDING (...)`, `EVER FAILED (...)` and the other phrases of [Reading what became of a norm](norm-log-read.md) are asked as at `THE INSTANT`.
 
 ## Action patterns: reference or wildcard
 

@@ -34,6 +34,9 @@ export function monarchTokensProvider(): object {
         [/•/, 'operator'],
         // Operators
         [/>=|<=|==|!=|&&|\|\||=>|[+\-*/<>=]/, 'operator'],
+        // The wildcard of a norm-log read pattern (CSymbol → LSP Operator);
+        // only when it stands alone, so `_x` stays an identifier
+        [/_(?![A-Za-z0-9_])/, 'operator'],
         // Identifiers and keywords: uppercase words checked against keyword list
         [
           /[A-Z][A-Za-z0-9_]*/,

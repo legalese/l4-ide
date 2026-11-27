@@ -10,6 +10,7 @@ import {
   L4_KEYWORDS,
   L4_DIRECTIVES,
   L4_OPERATORS,
+  L4_SYMBOLS,
   type L4TokenType,
 } from './tokens.js'
 
@@ -69,7 +70,7 @@ export function colorize(text: string): string {
     if (!matched) {
       // Check for operator characters that weren't caught by the regex
       const ch = text[i]
-      if (L4_OPERATORS.has(ch)) {
+      if (L4_OPERATORS.has(ch) || L4_SYMBOLS.has(ch)) {
         out += `<span class="tok-operator">${escapeHtml(ch)}</span>`
       } else {
         out += escapeHtml(ch)

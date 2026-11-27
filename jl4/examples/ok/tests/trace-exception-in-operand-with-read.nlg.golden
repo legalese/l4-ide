@@ -1,0 +1,8 @@
+`EVALTRACE` with `refuse then fulfilled`, 0 and list of `EVENT` with `Bob`, `deliver` and 9
+`EVALTRACE` with `fulfilled then refuse`, 0 and list of `EVENT` with `Bob`, `deliver` and 9
+`EVALTRACE` with `refuse and del`, 0 and list of `EVENT` with `Bob`, `deliver` and 9
+`EVALTRACE` with `del and refuse`, 0 and list of `EVENT` with `Bob`, `deliver` and 9
+`EVALTRACE` with `div then fulfilled`, 0 and list of `EVENT` with `Bob`, `deliver` and 9
+`EVALTRACE` with `nonex then fulfilled`, 0 and list of `EVENT` with `Bob`, `deliver` and 9
+`EVALTRACE` with `stuck then fulfilled`, 0 and list of `EVENT` with `Bob`, `deliver` and 9
+`EVALTRACE` with `nested`, 0 and list of `EVENT` with `Bob`, `deliver` and 9

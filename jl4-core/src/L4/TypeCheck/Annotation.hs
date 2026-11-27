@@ -236,6 +236,10 @@ nlgExpr = \ case
       mParty' <- traverse nlgExpr mParty
       cell' <- nlgExpr cell
       pure $ ReadCell ann mParty' isOfficial mode cell'
+    ReadNorm ann w mk mParty m con n b asOf -> do
+      mParty' <- traverse nlgExpr mParty
+      asOf' <- traverse nlgExpr asOf
+      pure $ ReadNorm ann w mk mParty' m con n b asOf'
     Concat ann es -> do
       es' <- traverse nlgExpr es
       pure $ Concat ann es'
