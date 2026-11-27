@@ -1651,8 +1651,10 @@ spec = describe "the norm log writer (NORM-LOG-SPEC, P1)" do
         -- the run's window and clock are kept after it, so the read sees what
         -- the run wrote: c's delivery was armed at 0 and performed at 2, so it
         -- was outstanding as at 1. A window that closed with the run would
-        -- answer "no" (the log it reads is empty), and a clock that did not
-        -- last would refuse the read
+        -- answer "no" (the log it reads is empty). This test does not pin
+        -- the clock: with the clock reset at the end of a run it stays green,
+        -- because the latest instant in the norms the run wrote (2) already
+        -- reaches 1; the clock half is pinned by R19e alone
         let afterRun =
               [ "c MEANS PARTY Alice MUST deliver WITHIN 10"
               , "GIVETH A BOOLEAN"
@@ -1708,11 +1710,14 @@ spec = describe "the norm log writer (NORM-LOG-SPEC, P1)" do
         -- S2's restore of crNormRead is in endNormRun, and a run started
         -- inside another pushes no EndNormRun, so the span of the named inner
         -- run stays marked as a read of the log and is not served again: the
-        -- inner run is run again, and writes its norms again, at each use.
-        -- Pinned as found (probed on lhs 2026-11-27: 1 and 2, where a run
-        -- named once and used twice at the top is run once, R20). Two uses
-        -- inside ONE outer run were not probed: a read in an operand is
-        -- refused, and no other form of two uses in one run was found
+        -- inner run is run again, and writes its norms again, for each outer
+        -- run that uses it. Pinned as found (probed on lhs 2026-11-27: 1 and
+        -- 2, where a run named once and used twice at the top is run once,
+        -- R20). Not established: that the crNormRead mark is the cause (no
+        -- mutant isolates it; it is inferred from where the restore sits), and
+        -- what two uses inside ONE outer run do (a read in an operand is
+        -- refused, I thought of no other form of two uses in one run, and I
+        -- ran none)
         let nested =
               [ "inner MEANS PARTY Alice MUST deliver PROVIDED OUTSTANDING (PARTY _ MUST deliver) WITHIN 10"
               , "GIVETH DEONTIC Person Action"

@@ -1273,10 +1273,10 @@ Its report is not in the repository, so its non-blocking items are restated, eac
   This section said `traceFrameExit` is "the one place" that records an `Exit` or a `Pop`; `forceIt` records a `Pop` too, for the `UpdateThunk` frame it pushed on the line before, which is never `EndNormRun`, and the sentence and the comment say so.
   B1's paragraph cited R12b for the refused half, and the refusal is R18.
   "Eight files under `.github/` and `etc/`" was seven there and one under `specs/todo/`; this file and the pull request say so.
-- **E: a named run that reads, started inside an outer run, is run again at each use.**
+- **E: a named run that reads, started inside an outer run, is run again by each outer run that uses it.**
   The review inferred it from where S2's restore of `crNormRead` sits (in `endNormRun`, which a run started inside another never reaches).
   Probed on lhs (job 20261127T110603-norm-log-p2b-67509): the inner run of a module with one `r MEANS EVALTRACE inner 0 …` used by an outer contract's `HENCE`, run by two outer runs of one directive, wrote its `deliver` norm twice (counts 1 and 2); a run named once and used twice at the top writes it once (R20).
-  Two uses inside one outer run were not probed, because a read inside an operand is refused and I found no other form that uses a run twice in one run.
+  Not established: that the `crNormRead` mark is the cause of the second write (no mutant isolates it; it is inferred from where the restore sits), and what two uses inside one outer run do (a read inside an operand is refused, I thought of no other form that uses a run twice in one run, and I ran none).
   R24 pins the counts as found, as a limit (`ad186ab2b`), and the reference page says so where it says a nested run belongs to its outer one.
   It is not fixed, and I have not worked out a fix: a stack of runs (finding 2 of the second review) needs a ruling first.
 
