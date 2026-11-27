@@ -326,21 +326,27 @@ test("the inverter in a real panel follows the term it negates (joint)", () => {
   assert.deepEqual(values, ["TrueV", "?", "TrueV"]);
 });
 
-test("a FALSE term's break clears the NOT bubble it feeds (no tick through the bubble)", () => {
-  // The break is drawn BREAK_CLEAR (9) past the box as two bars at ±7; the bubble sat 16
-  // past the box, so the right bar went through its centre and poked out above and below
-  // (review 2026-10-05, visual-attack/bubble-zoom.png).
+test("a FALSE term feeding a NOT draws no break, and the bubble sits NOT_PAD_X past its box", () => {
+  // The break (bars at ±7, BREAK_CLEAR 9 past the box) once poked out above and below the
+  // bubble, which sat 16 past the box (review 2026-10-05, visual-attack/bubble-zoom.png);
+  // the frame grew `NOT_BREAK_ROOM` to clear it. Meng ruled the break away on 2026-11-27
+  // ("the colour should be sufficient to indicate that the current stops"), and the room
+  // went with it: nothing is drawn between the term and the bubble but wire.
   const s = draw(notOf(leaf(2, "p")), { valuation: new Map([[2, "FalseV"]]) });
   const tick = s.prims.find(
     (q): q is Glyph => q.kind === "glyph" && q.role === "open-contact",
   );
+  const term = s.prims.find(
+    (q): q is Extract<ScenePrim, { kind: "box" }> =>
+      q.kind === "box" && q.id === 2,
+  )!;
   const b = bubble(s)!;
-  assert.ok(tick, "a false leaf draws its break");
-  const tickRight = tick.at.x + 7 + 1; // bar and half its stroke
-  const bubbleLeft = b.at.x - PIXEL_GEOMETRY.NOT_R - 0.75;
-  assert.ok(
-    tickRight < bubbleLeft,
-    `tick ends at ${tickRight}, bubble starts at ${bubbleLeft}`,
+  assert.equal(tick, undefined, "a false leaf draws no break");
+  assert.equal(term.state, "dead", "…and is drawn in the dead ink instead");
+  assert.equal(
+    b.at.x - (term.rect.x + term.rect.w),
+    PIXEL_GEOMETRY.NOT_PAD_X,
+    "the frame's right padding is the plain NOT_PAD_X",
   );
 });
 

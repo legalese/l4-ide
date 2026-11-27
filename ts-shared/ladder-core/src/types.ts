@@ -187,9 +187,9 @@ export type State = "live" | "inert" | "dead" | "eliminable";
  * are load-bearing:
  *
  * 1. **Collapse at the eliminator, never in the data.** The grounded reading drives
- *    CONDUCTION (energize / lamps / `complete`) only. Render state — box ink, the
- *    open-contact break — keeps reading the honest three-valued evaluation, so an
- *    assumed atom still draws grey-and-unbroken, never as a tested-and-false contact.
+ *    CONDUCTION (energize / lamps / `complete`) only. Render state — box ink — keeps
+ *    reading the honest three-valued evaluation, so an assumed atom still draws grey,
+ *    never as a tested-and-false contact.
  *    §25.4 reads N/A off exactly that ink, and a grounding switch must not forge it.
  * 2. **It defaults for silence; it never overrules speech.** Grounding applies only
  *    where the source said nothing. An L4 author who wrote `holds p` in one clause and
@@ -406,15 +406,16 @@ export type ScenePrim =
       kind: "glyph";
       at: Pt;
       role: "open-contact" | "power-terminal" | "inverter" | "changeover";
-      /** For `open-contact` only: whose break is this? A `dead` break is a settled fact
-       *  and draws in the firm dead ink; an `eliminable` one is a ghost (DESIGN §15.1).
-       *  Absent ⇒ ghost, the pre-existing behaviour. */
+      /** For `open-contact` only: whose break is this? `layout` emits one for an
+       *  `eliminable` rung alone, a ghost (DESIGN §15.1); it no longer emits one for a
+       *  `dead` element, a leaf or a parent node (Meng, 2026-11-27: "the colour should be
+       *  sufficient to indicate that the current stops"). A renderer still draws a `dead`
+       *  one in the firm dead ink if a hand-built scene carries it. Absent ⇒ ghost. */
       state?: State;
-      /** …and is the FALSITY itself only presumed (DESIGN §22)? A `TYPICALLY FALSE` leaf
-       *  really is false and really does break the circuit, so it earns a break — but a
-       *  rebuttable one. Takes §22's fine dash, matching the box it hangs off: the closure
-       *  side is already softened this way, and a break is just closure with the sign
-       *  flipped. Without this, a presumed-false contact reports as firmly as a tested one. */
+      /** …and is the FALSITY itself only presumed (DESIGN §22)? Nothing in `layout` sets
+       *  this since the dead break went: a `TYPICALLY FALSE` leaf keeps §22's fine dash on
+       *  its box and its wires, and has no break to dash. A renderer still dashes a hand-built
+       *  break that carries it. */
       tentative?: boolean;
       /** For `inverter` only: the NOT's OUTPUT value, so the bubble can be filled with it —
        *  green when the negand is false (the NOT conducts), the mild red when the negand is
