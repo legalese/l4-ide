@@ -894,7 +894,7 @@ A scan of the first half's Haskell diff for any other literal of nine or more di
 
 ### 6.5 What P2's second half builds: the read as written (N4b, option A as a fallback; decided by Claude 2026-11-24, pending Meng's review)
 
-**Status, 2026-11-27: built on the branch `feat/norm-log-read-syntax`, a draft pull request (legalese/l4-ide#893); an independent review of it on 2026-11-26 found three blockers, six faults to fix and six nits, a second review of the pushed draft on 2026-11-27 found one blocker, five faults to fix and five nits, and the branch fixes or answers each (see "What the independent review of 2026-11-26 found" and "What the second review of 2026-11-27 found"); gated on `lhs` before the first review and again after it and after the second (the figures are under "What the gate measured", "What the gate measured again" and "What the gate measured the third time"); not landed.**
+**Status, 2026-11-27: built on the branch `feat/norm-log-read-syntax`, a draft pull request (legalese/l4-ide#893); an independent review of it on 2026-11-26 found three blockers, six faults to fix and six nits, a second review of the pushed draft on 2026-11-27 found one blocker, five faults to fix and five nits, and the branch fixes or answers each (see "What the independent review of 2026-11-26 found" and "What the second review of 2026-11-27 found"), and a third read of the head after those fixes found no blocker and five small items, answered under "What the third review of 2026-11-27 found"; gated on `lhs` before the first review and again after it and after the second (the figures are under "What the gate measured", "What the gate measured again" and "What the gate measured the third time"); not landed.**
 Nothing in this section is in `unstable`, and a sentence below that says what the read does describes what that branch does, not what a released `l4` does.
 A claim below is checked by the test or command named beside it, or is listed as not checked.
 
@@ -1064,7 +1064,7 @@ The five tests R17 to R21 were written first and ran red against the code under 
   The contract's clock is the later of the greatest observed instant among this run's entries and the stamp of the latest event a guard has been matched at (`dlHorizon`, set at `Contract9` before the guard).
   A read at a later instant stops with "the contract has only reached N", and with "no contract has run yet" before any run (the review's N6, which used to answer "no" from an empty log with exit 0).
   I chose refusing over answering at the clock because a refusal says what is wrong, and an answer at the clock would be a different question from the one written, answered with exit 0.
-  The price: a rule cannot reach `THE INSTANT`, so a read shared by two guards either takes the instant as an input (R12) or holds a constant `AS OF`, which is refused wherever the contract has not yet reached that instant when the rule is read (R12b); R12, R14, R15 and R16 were rewritten to ask at the event's own instant or earlier.
+  The price: a rule cannot reach `THE INSTANT`, so a read shared by two guards either takes the instant as an input (R12) or holds a constant `AS OF`, which is refused wherever the contract has not yet reached that instant when the rule is read (R18); R12, R14, R15 and R16 were rewritten to ask at the event's own instant or earlier.
   The first version of this paragraph, and of the pull request's body, said a constant `AS OF` in a shared rule is refused; that is false, and the second review found it (finding 6).
   The branch as it stood before that commit (`8bff3a319`) builds and passes the two norm-log suites and the `TemporalContext` suite, 333 examples, 0 failures (`lhs` job 20261126T210127-norm-log-p2b-c2-76509).
   Reverted alone from the branch head (`242cee837`), the commit applies with no conflict, and the three suites pass on the reverted tree: 335 examples, 0 failures, one fewer than the head's 336 because the revert takes R18 out (`lhs` job 20261127T004251-norm-log-p2b-revert-33603).
@@ -1220,7 +1220,7 @@ The same step and the same test name fail at plain `unstable` (`513721995`), whi
   The expected side of the failure has seven lines of the form `│• ↯ …` (refused: not modelled, division by zero, non-exhaustive patterns, stuck) and the actual side has none of them: the leaf that stood for the operand was gone.
   It shows only when the writer is on, and `beginNormRun` runs only then, which is why `jl4-test` with the writer off passed.
   The second gate did not see it because it ran at `8d0bf0f49`, before #889, and the file did not exist there (`git log 8d0bf0f49 -- jl4/examples/ok/trace-exception-in-operand.l4` is empty).
-  Fix, in `89b805fe9`: `pushFrameUntraced` pushes the frame without a `Push`, and `traceFrameExit` is the one place that records an `Exit` or a `Pop`, and it records nothing when the frame on top is `EndNormRun`.
+  Fix, in `89b805fe9`: `pushFrameUntraced` pushes the frame without a `Push`, and `traceFrameExit` records every `Exit` and `Pop` of a frame that can be `EndNormRun`, and records nothing when the frame on top is `EndNormRun` (the one other `traceEval Pop`, in `forceIt`, takes off the `UpdateThunk` frame pushed on the line before it, which never is).
   It looks at the stack only when a trace is being recorded.
 - **The harness's, at plain `unstable` too: `stripNormLogBlock` removed two blank lines.**
   The harness removes the `Norm log:` block, and the blank line before it, from the output of a forced run.
@@ -1254,7 +1254,31 @@ The script does not run `jl4-lsp-test`, `jl4-mlir-test` and `jl4-websessions-tes
 At `08d1e099b`, the harness's fix (job 20261127T095459-norm-log-p2b-46633): build exit 0; the two trace files (`ok/trace-exception-in-operand.l4` and the new one), 14 examples, 0 failures with the writer off and 14, 0 with it forced on; the whole of `jl4-test`, 5495 examples, 0 failures with the writer off (1,533 s) and 5495, 0 with it forced on (1,547 s).
 The only file that differs between `89b805fe9` and `08d1e099b` is `jl4/tests/Main.hs`, so the rest of the gate above stands for it.
 The evaluation differential of `CLAUDE.md` §3.2.1 was not run again: `L4/Print.hs` has not changed since the binary it ran with (`git diff 242cee837 HEAD -- jl4-core/src/L4/Print.hs` is empty), and what changed since is the evaluator and a test file.
-`unstable` has moved to `142aab0e0` (#894), which changes eight files under `.github/` and `etc/` and none under `jl4-core/`, `jl4/` or `jl4-lsp/`; `git merge-tree --write-tree origin/unstable HEAD` has no conflict, and the gate was not run on that merge.
+`unstable` has moved to `142aab0e0` (#894), which changes eight files, seven under `.github/` and `etc/` and one under `specs/todo/`, and none under `jl4-core/`, `jl4/` or `jl4-lsp/`; `git merge-tree --write-tree origin/unstable HEAD` has no conflict, and the gate was not run on that merge.
+
+**What the third review of 2026-11-27 found, and what the branch did.**
+A third read of the pushed head `85ca0f133` stood the second review's fixes and the nits against the code and found no blocker: the red-first order holds, the trace fix is right and no other consumer sees the run-boundary frame, the harness commit is test-only, R19c matches the pull request, the merge with `unstable` is clean and every new commit carries `Claude-Session`.
+Its report is not in the repository, so its non-blocking items are restated, each fixed in a commit of its own.
+
+- **A: R19c pinned the row and not the answer.**
+  Both branches of `IF still THEN FULFILLED ELSE FULFILLED` were `FULFILLED`, so "answered from the last run's norms" (nit 8) was untested.
+  `f4a33ae86`: the branches name different parties and R19c asserts which one the result holds; R19d asks outside any run, after a run that performed a delivery, as at an instant that needs the run's window kept; R19e asks as at an instant that only the event's own stamp makes reachable, which needs the clock kept (the run's guard was false, so no norm was recorded at that instant).
+  Each of the three mutants below turns the tests red that it should (job 20261127T111144-norm-log-p2b-5452, which also ran the head: 4 examples, 0 failures).
+- **B: two rules were stated in the present tense with no label.**
+  The clock and the norms of a run are kept after it, and a contract run started inside another is part of it.
+  Both are "decided by Claude 2026-11-27, pending Meng's review" on the reference page, in its status line and where each stands (`2ac24d342`), and in the pull request's list.
+- **C: the S3 sentence on the page** said "left as it is by a decision of Claude" and now has the house form, so that a grep for it finds it.
+- **D: four slips.**
+  The comment on `pushFrameUntraced` said "second gate" (third; `1f57dcc90`, comment only).
+  This section said `traceFrameExit` is "the one place" that records an `Exit` or a `Pop`; `forceIt` records a `Pop` too, for the `UpdateThunk` frame it pushed on the line before, which is never `EndNormRun`, and the sentence and the comment say so.
+  B1's paragraph cited R12b for the refused half, and the refusal is R18.
+  "Eight files under `.github/` and `etc/`" was seven there and one under `specs/todo/`; this file and the pull request say so.
+- **E: a named run that reads, started inside an outer run, is run again at each use.**
+  The review inferred it from where S2's restore of `crNormRead` sits (in `endNormRun`, which a run started inside another never reaches).
+  Probed on lhs (job 20261127T110603-norm-log-p2b-67509): the inner run of a module with one `r MEANS EVALTRACE inner 0 …` used by an outer contract's `HENCE`, run by two outer runs of one directive, wrote its `deliver` norm twice (counts 1 and 2); a run named once and used twice at the top writes it once (R20).
+  Two uses inside one outer run were not probed, because a read inside an operand is refused and I found no other form that uses a run twice in one run.
+  R24 pins the counts as found, as a limit (`ad186ab2b`), and the reference page says so where it says a nested run belongs to its outer one.
+  It is not fixed, and I have not worked out a fix: a stack of runs (finding 2 of the second review) needs a ruling first.
 
 **Mutants after the review.**
 Three were run, at `0c86a3daa` and again at `89b805fe9`, each applied to the source of the head, the norm-log and `TemporalContext` suites run, and the source restored: 317 examples each.
@@ -1262,6 +1286,7 @@ Three were run, at `0c86a3daa` and again at `89b805fe9`, each applied to the sou
 `veto-dropped` (`validFor` no longer refuses a force that read the log): 2 failures, R12b and the `TemporalContext` test "validFor crNormRead vetoes".
 `run-start-no-settle` (the `flushArmedFinal` at the start of a run is deleted): 1 failure, R19b.
 R19c and the stronger `holds` were not mutated: R19c pins what the code already did, as said under finding 1, and I did not measure that the stronger `holds` fails on a refusal beyond reading its assertion.
+Three more were run after the third review's item A, at the head of that round (job 20261127T111144-norm-log-p2b-5452, the norm-log suites, 259 examples each): the window of a run closed at the end of the run (`dlRunStart` set to the end of the ledger in `endNormRun`) turns R19d and R19e red, by value (the result holds Carol's contract and not Bob's); the clock reset at the end of a run (`dlHorizon` set to `Nothing` there) turns R19e red, the read being refused (`eval/user-error` where `eval/result` was expected); and a read that does not force the arming clock of a root norm turns R16, R18 and R19c red, R19c at its `eval/result` assertion.
 For the code the first review added, the evidence that R17 to R23 test what they name is their red runs, above (R17 to R21: 334 examples, 5 failures; R17 to R23: 336 examples, 7 failures), and for B1 the revert above.
 
 ## 7. Probe — what a crude projection shows
@@ -1396,3 +1421,9 @@ A second independent review of P2b, on 2026-11-27, read the pushed draft with no
 - The gate's forced-writer run of `jl4-test` exists to show that the writer changes nothing a golden prints except its own block.
   At the third gate it showed that the run boundary changed a trace, and `EndNormRun` is now a frame the trace does not see; the same run showed a harness defect older than the branch, in `stripNormLogBlock`, fixed in a commit of its own.
   What is new in the corpus is `ok/trace-exception-in-operand-with-read.l4`, so that an ordinary run, which switches the writer on only for a module that reads, covers the case (§6.5, "What the third gate found").
+
+A third review of P2b, on 2026-11-27, read the head after those fixes, found no blocker, and asked for five small things; each is in §6.5 under "What the third review of 2026-11-27 found", and it changed these:
+
+- R19c now asserts the answer, and R19d and R19e pin that a read outside any run, after a run, is answered from that run's norms and clock (nit 8 of the second review had no test).
+- The clock after a run and the nesting of runs are marked on the reference page as decided by Claude 2026-11-27, pending Meng's review.
+- A named run that reads and is started inside an outer run is run again by each outer run that uses it; probed, pinned as a limit by R24, stated on the page, not fixed.
