@@ -318,7 +318,7 @@ type Default = Either (Maybe Bool) (Maybe Bool)
 Leaf rendering as a relay contact:
 
 - **known true** → raised bump / closed contact (current flows through)
-- **known false** → gap / open contact (current stopped)
+- **known false** → the dead ink (current stopped); drawn with no break glyph since 2026-11-27, see the ruling in §15.1
 - **unknown** → plain pass-through box (grey)
 
 Combinator highlighting: when one branch of an OR is true while siblings are unknown/false, show the circuit **closed over** the true element and **stopped** by false ones. True/false lines are drawn against the _inner_ element (margins-aware), per §5.7.
@@ -535,11 +535,13 @@ Orthogonal to T/F/U:
 | state                  | contact                         | meaning                                                                               |
 | ---------------------- | ------------------------------- | ------------------------------------------------------------------------------------- |
 | known-true             | closed bump                     | current flows                                                                         |
-| known-false            | open gap                        | current stopped _here, now_                                                           |
+| known-false            | dead ink, no break glyph        | current stopped _here, now_                                                           |
 | unknown                | grey passthrough                | value not yet supplied — **may still matter**                                         |
 | **eliminable** _(new)_ | ghosted/dashed box, broken rail | value **cannot matter**: flipping it never changes the output over the region in view |
 
 `eliminable ≠ known-false`: a false leaf could flip and change the result; an eliminable leaf is a don't-care — the function's **Boolean difference** w.r.t. it is identically zero. Render: dashed ghost box, reduced opacity, an open-contact break on the rail, optional "otiose" tag.
+
+**Ruling (Meng, 2026-11-27, typed to the general manager):** open-contact break dropped for FALSE leaves and for dead parent nodes; note verbatim: "i wonder if we can do without the open-contact break; the colour should be sufficient to indicate that the current stops.", and, relayed by the general manager as the same breath, "Do you reckon we could get rid of open contacts over parent nodes as well?"; condition kept: an ELIMINABLE rung on an OR fan still draws its ghost break (a leaf, a folded group, a NOT or an IMPLIES; an open AND or OR reports no state of its own and draws none), because the ruling was about FALSE, and no shipped app can produce that state today (the webview and `jl4-web` mount `LadderFlow`, which has no such glyph; `charge-generator` and `regcf-wizard` pass no `states`), so it is reachable only from the demos, the playground, `ladder-svg`'s API and the visualizer's dev route, and is open for Meng to drop as well.
 
 ### 15.2 Source of the flag (both respect the pure-core boundary, §3.2)
 
@@ -720,9 +722,9 @@ stay linear). One reading: boxes + spine are rigid structure, curves are flow.
   builds it (tangent `t = clamp(max(0.6·|dx|, 0.35·|dy|), 22, 60)`); svg emits a
   `<path>` (class `lad-wire`, so it still fades on FLIP).
 - An eliminable rung's in-curve is dashed/ghosted with the open-contact break glyph at
-  the curve's parametric midpoint (`cubicMid`). **A dead rung no longer takes its break
-  here** — see §26: the break is drawn at the leaf that actually failed, and the fan
-  suppresses its own when the rung already drew one.
+  the curve's parametric midpoint (`cubicMid`). **A dead rung takes no break here, and
+  no break anywhere** — see the 2026-11-27 ruling in §15.1; it took one at the leaf that
+  actually failed until then (§26.1).
 - Curves carry the rung's `state` colour. This bullet used to read "green live / grey
   unknown / ghost dead", which was **wrong in two directions at once** and is corrected
   in §26: `dead` had no colour of its own at all (it fell through to the unknown grey),
@@ -763,7 +765,7 @@ stay unknown.
 
 **Next (P1): current flow.** The energization pass (DESIGN discussion): propagate
 current from the source — closed paths drawn **thick + dark**, open ones thin + light,
-the FALSE break-glyph at the stop — so cycling values visibly closes the circuit, and
+the FALSE break-glyph at the stop (dropped 2026-11-27, §15.1) — so cycling values visibly closes the circuit, and
 satisfied-OR siblings ghost as don't-cares. Binary closed/open (UNKNOWN = open) per the
 box-model spec.
 
@@ -1339,12 +1341,12 @@ One source on the left. **Two sinks** on the right. The requirement's verdict th
 **And now count the lamps.** Every outcome the rule has is legible from which lamp is lit, with
 no extra ink and — crucially — **no bypass**:
 
-| Scope     | Requirement   | Green   | Red     | Reading                                                          |
-| --------- | ------------- | ------- | ------- | ---------------------------------------------------------------- |
-| ✗ open    | _not reached_ | dark    | dark    | **N/A** — the rule never bit. The break is visible IN THE SCOPE. |
-| ? unknown | ?             | dark    | dark    | **undetermined** — nothing is asserted yet                       |
-| ✓ closed  | ✓ closed      | **LIT** | dark    | **complies**                                                     |
-| ✓ closed  | ✗ open        | dark    | **LIT** | **IN BREACH**                                                    |
+| Scope     | Requirement   | Green   | Red     | Reading                                                           |
+| --------- | ------------- | ------- | ------- | ----------------------------------------------------------------- |
+| ✗ open    | _not reached_ | dark    | dark    | **N/A** — the rule never bit. The scope is drawn in the dead ink. |
+| ? unknown | ?             | dark    | dark    | **undetermined** — nothing is asserted yet                        |
+| ✓ closed  | ✓ closed      | **LIT** | dark    | **complies**                                                      |
+| ✓ closed  | ✗ open        | dark    | **LIT** | **IN BREACH**                                                     |
 
 This is the whole reason the two-sink form is better than anything above it. §25.3 had to
 _special-case_ vacuity — grey the panel, stamp `N/A`. Here **N/A is simply "no current left the
@@ -1352,8 +1354,9 @@ scope"**, and the reader sees exactly _where_ it stopped. Nothing has to be draw
 nothing has to be suppressed either. The pedantry problem dissolves rather than being managed.
 
 _(N/A and "undetermined" are both dark lamps, and they are distinguished the same way a lawyer
-distinguishes them: by looking at **where the break is**. A scope that is definitively `✗` shows a
-clean open contact — tested, and it did not bite. A scope that is `?` is grey — not yet asked.)_
+distinguishes them: by looking at **the ink of the scope**. A scope that is definitively `✗` is drawn
+in the dead ink — tested, and it did not bite. A scope that is `?` is grey — not yet asked. Until
+2026-11-27 the first also showed a clean open-contact break; the ruling in §15.1 dropped it.)_
 
 **The polarity toggle is no longer needed.** The first draft made the citizen and the Bad Man
 read _different diagrams_. They now read the **same** diagram and simply care about different
@@ -1593,9 +1596,9 @@ question faintly, a don't-care fainter still. **On screen `dead` is a mild red**
 slate, with red withheld because red belongs to the breach lamp and a false atom is very often
 the _good_ outcome — an exception that did not apply. The mild red keeps that distinction: it
 is paler and browner than `coilRed`, so a false box does not read as a breach. Print
-(`INK_PALETTE`) and dark (`DARK_PALETTE`) are unchanged. And a dead leaf draws the §15.1 **open gap** at its own out-port, offset clear of
-the box, so the break sits where the current actually stopped rather than on some enclosing
-group. `Measured.ownBreak` stops the OR fan double-reporting the same failure.
+(`INK_PALETTE`) and dark (`DARK_PALETTE`) are unchanged. A dead leaf also drew the §15.1 **open gap** at its own out-port, offset clear of
+the box, with `Measured.ownBreak` stopping the OR fan double-reporting the same failure.
+That gap was dropped on 2026-11-27 (§15.1): the ink above is now the whole cue, and `ownBreak` and `NOT_BREAK_ROOM` went with it.
 
 ### 26.2 `ViewSpec.grounding` — choosing the epistemics, visibly and reversibly
 
@@ -1606,9 +1609,9 @@ library's own `holds` / `presumed` eliminators. Two invariants keep it from dege
 a global truth-value hack:
 
 1. **Collapse at the eliminator, never in the data.** `layout` computes the honest Kleene
-   values _and_ a second grounded map. Honest values drive **render state** — box ink, the
-   open-contact break; grounded values drive **conduction** — energize, lamps, `complete`. An
-   assumed atom therefore still draws grey and unbroken, and §25.4's read-off survives.
+   values _and_ a second grounded map. Honest values drive **render state** — box ink; grounded
+   values drive **conduction** — energize, lamps, `complete`. An assumed atom therefore still
+   draws grey, and §25.4's read-off survives.
 2. **It defaults for silence; it never overrules speech.** Grounding fills only atoms with no
    stated value. An author who wrote `holds p` here and `presumed q` there has chosen per use
    site, and this knob cannot reach that. (The spec assigns them by polarity — `presumed` for
@@ -1634,8 +1637,8 @@ answers), an answer always wins, and withdrawing presumptions touches no answer.
 
 A circuit can be complete on atoms nobody answered. `provisional` reports that, and renderers
 soften accordingly: a made circuit goes **muted** green rather than the §20 made-green, a lit
-lamp goes **hollow and dashed** rather than filled and bold, and a presumed-FALSE break takes
-§22's fine dash. The lamp case is not optional polish — an `Implies` body is never `complete`
+lamp goes **hollow and dashed** rather than filled and bold. (A presumed-FALSE break used to take
+§22's fine dash too; no break is drawn for a FALSE element since 2026-11-27, §15.1, and the box keeps the dash.) The lamp case is not optional polish — an `Implies` body is never `complete`
 (it has two sinks), so the wire treatment can never fire on a _rule_, which is exactly the
 diagram where a knob can carry a reader from "undetermined" to a lit IN BREACH lamp with no
 new facts.
