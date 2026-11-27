@@ -406,7 +406,7 @@ The lexer still reads it and the parser stores nothing from it (`refAdditionalP`
 Measured: `@ref-src this-file-does-not-exist.csv` passes `l4 check` with `Check succeeded` and no diagnostic.
 To tie an `@ref` to lines of a raw source text with `src:` locators that a script can check, see [source-locators.md](../../encoding-a-subject/references/source-locators.md) in the `encoding-a-subject` skill.
 
-### `@nlg` placement: a rule takes it on the line above, a name takes it trailing — and one leak
+### `@nlg` placement: a rule takes it on the line above or trailing its head, a name takes it trailing — and one leak
 
 Fuller treatment of what to put IN a herald — `%param%` slots, when a sentence replaces the
 implementation, and the three levers before you reach for one — is in
@@ -438,7 +438,7 @@ An earlier version of this paragraph, measured 2026-09-21, had this head-line fo
 **Trailing the END of the definition line does NOT reach the rule**, and this is the trap, because it
 looks like it should. `DECIDE f n IS n TIMES 2 @nlg …` and the same with `MEANS` do not label the
 rule: the herald goes to whatever follows it. What happens to the herald depends on what
-comes next, and only the first of the three outcomes is loud:
+comes next. These are the cases measured, not every possible follower, and only the first is loud:
 
 - nothing annotatable follows → `Not attached to any valid syntax node`, a parser diagnostic
   pointing at the herald. Loud, and correct. Measured 2026-11-28 on the dev build with another rule's `GIVEN` after a `DECIDE` and after a `MEANS`, and with the file ending after a `DECIDE`.
@@ -451,6 +451,11 @@ comes next, and only the first of the three outcomes is loud:
   typecheck and no diagnostic.
   The tell is the slot: with `@nlg twice %n%` in that position the first directive prints ``twice `n` with 21``,
   the input's name where a herald that had reached the rule prints its value, `twice 21`.
+- an `#ASSERT` follows → the same, silently. Measured 2026-11-28: ``DECIDE `doubled` IS n TIMES 2 @nlg SHOULD-BE-ON-RULE``
+  followed by ``#ASSERT `doubled` 2 EQUALS 4`` prints `SHOULD-BE-ON-RULE with 2 is equal to 4`, with a clean typecheck and no diagnostic.
+- another rule follows → the herald silently becomes THAT rule's herald. Measured 2026-11-28:
+  `DECIDE a IS 1 @nlg SHOULD-BE-ON-A`, then `DECIDE b IS 2`, then `#EVAL a` and `#EVAL b`, prints `a` and then
+  `SHOULD-BE-ON-A`: the herald is on `b`, `a` is bare, and `l4 check` says `Check succeeded`.
 
 **"Immediately above the definition" means after `GIVETH`, not above `GIVEN` — and the trap here
 is silent, not loud.** `GIVEN`/`GIVETH` read like part of the rule, so `@nlg` above `GIVEN` looks
