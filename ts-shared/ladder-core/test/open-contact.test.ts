@@ -25,6 +25,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { layout, defaultViewSpec, estimateMetrics } from "../src/index.js";
+import { unknownGlyphs } from "./glyph-roles.js";
 import type {
   FunDecl,
   IRExpr,
@@ -69,17 +70,7 @@ const sceneOf = (
     estimateMetrics,
   );
 
-/** The glyph roles `layout` still emits. Anything else is a break, however it is named. */
-const KNOWN_ROLES: readonly string[] = [
-  "power-terminal",
-  "inverter",
-  "changeover",
-];
-const breaks = (prims: ScenePrim[]) =>
-  prims.filter(
-    (p): p is Extract<ScenePrim, { kind: "glyph" }> =>
-      p.kind === "glyph" && !KNOWN_ROLES.includes(p.role),
-  );
+const breaks = (prims: ScenePrim[]) => unknownGlyphs(prims);
 const glyphs = (prims: ScenePrim[]) => prims.filter((p) => p.kind === "glyph");
 const box = (s: Scene, id: NodeId) =>
   s.prims.find(

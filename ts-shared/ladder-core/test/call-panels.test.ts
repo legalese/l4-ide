@@ -18,6 +18,7 @@ import { fromVizFunDecl } from "../src/viz-adapter.js";
 import { layout, estimateMetrics, PIXEL_GEOMETRY } from "../src/layout.js";
 import { ASCII_GEOMETRY, monoMetrics, sceneToAscii } from "../src/ascii.js";
 import { defaultViewSpec } from "../src/types.js";
+import { unknownGlyphs } from "./glyph-roles.js";
 import type {
   FunDecl,
   IRExpr,
@@ -333,15 +334,12 @@ test("a FALSE term feeding a NOT draws no break, and the bubble sits NOT_PAD_X p
   // ("the colour should be sufficient to indicate that the current stops"), and the room
   // went with it: nothing is drawn between the term and the bubble but wire.
   const s = draw(notOf(leaf(2, "p")), { valuation: new Map([[2, "FalseV"]]) });
-  const tick = s.prims.find(
-    (q): q is Glyph => q.kind === "glyph" && String(q.role) === "open-contact", // the role is gone; see open-contact.test.ts
-  );
   const term = s.prims.find(
     (q): q is Extract<ScenePrim, { kind: "box" }> =>
       q.kind === "box" && q.id === 2,
   )!;
   const b = bubble(s)!;
-  assert.equal(tick, undefined, "a false leaf draws no break");
+  assert.equal(unknownGlyphs(s.prims).length, 0, "a false leaf draws no break");
   assert.equal(term.state, "dead", "…and is drawn in the dead ink instead");
   assert.equal(
     b.at.x - (term.rect.x + term.rect.w),

@@ -39,6 +39,7 @@ import type {
   Scene,
   ScenePrim,
   State,
+  UBoolValue,
 } from "../src/index.js";
 
 type Text = Extract<ScenePrim, { kind: "text" }>;
@@ -356,6 +357,62 @@ test("a ghost leaf deep inside an IMPLIES rung reserves no band: the rule is tal
   }
 });
 
+/* ------------------------- the band is for ELIMINABLE rungs, and for the first child only */
+
+test("only an ELIMINABLE rung gets a band: dead, live and unknown rungs under an 'or' do not", () => {
+  const b = leaf("a long second rung");
+  const body = or([leaf("a long first rung"), inert("or"), b]);
+  const at = (vals: Array<[NodeId, UBoolValue]>, states: IRExpr[] = []) =>
+    sceneOf(body, states, { valuation: new Map(vals) }).size.h;
+  const unknown = at([]);
+  assert.equal(at([[b.id, "FalseV"]]), unknown, "a dead rung (known false)");
+  assert.equal(at([[b.id, "TrueV"]]), unknown, "a live rung (known true)");
+  assert.equal(
+    at([], [b]),
+    unknown + PIXEL_GEOMETRY.TAG_BAND,
+    "an eliminable rung: exactly one band",
+  );
+});
+
+test("LR: a series passes up only what its tallest sibling leaves uncovered", () => {
+  const stacked = (extra: IRExpr[]) => or([...extra, leaf("c"), leaf("d")]);
+  // equal heights: the ghost's top is the series' top, so the whole band passes up
+  const g1 = leaf("a long ghost rung label");
+  const level = or([leaf("b"), inert("or"), and([g1, leaf("a")])]);
+  assert.equal(
+    sceneOf(level, [g1]).size.h,
+    sceneOf(level, []).size.h + PIXEL_GEOMETRY.TAG_BAND,
+    "level siblings: exactly one band",
+  );
+  // a sibling far taller than the ghost: the ghost sits well below the series' top and its
+  // tag is inside the row, so nothing is reserved
+  const g2 = leaf("a long ghost rung label");
+  const tall = or([leaf("b"), inert("or"), and([g2, stacked([leaf("x")])])]);
+  const s = sceneOf(tall, [g2]);
+  assertTagsClear(s, 1, "LR ghost beside a tall sibling");
+  assert.equal(s.size.h, sceneOf(tall, []).size.h, "not a pixel taller");
+});
+
+test("TB: a series passes up the band of its FIRST child only", () => {
+  const first = leaf("a long ghost rung label");
+  const second = leaf("a long ghost rung label");
+  const ghostFirst = or([leaf("b"), inert("or"), and([first, leaf("a")])]);
+  const ghostSecond = or([leaf("b"), inert("or"), and([leaf("a"), second])]);
+  const orient = "TB";
+  assert.equal(
+    sceneOf(ghostFirst, [first], { orient }).size.h,
+    sceneOf(ghostFirst, [], { orient }).size.h + PIXEL_GEOMETRY.TAG_BAND,
+    "first in the column: its tag is above the series, one band",
+  );
+  const s = sceneOf(ghostSecond, [second], { orient });
+  assertTagsClear(s, 1, "TB ghost second in a column");
+  assert.equal(
+    s.size.h,
+    sceneOf(ghostSecond, [], { orient }).size.h,
+    "second in the column: its tag is between the children, nothing passes up",
+  );
+});
+
 /* ------------------------------------- no tag drawn, no band reserved */
 
 test("an eliminable NOT or IMPLIES rung draws no tag, so it reserves no band", () => {
@@ -401,13 +458,22 @@ test("ASCII: the tag and the 'or' sit on different rows, and the band is whole r
   assert.ok(tag && medial);
   // `sceneToAscii` puts a baseline on row `round(y / CELL_H)`
   const rowOf = (y: number) => Math.round(y / CELL_H);
-  assert.ok(
-    rowOf(tag.at.y) - rowOf(medial.at.y) >= 2,
+  assert.equal(
+    rowOf(tag.at.y) - rowOf(medial.at.y),
+    2,
     `the tag is on row ${rowOf(tag.at.y)} and the 'or' on row ${rowOf(medial.at.y)}`,
   );
+  // …and the band is exactly two rows: the same OR with no ghost is two rows shorter
+  const plain = layout(
+    { id: nid(), name: "r", params: [], body } satisfies FunDecl,
+    defaultViewSpec({}),
+    monoMetrics(),
+    ASCII_GEOMETRY,
+  );
+  assert.equal(s.size.h - plain.size.h, 2 * CELL_H);
   const art = sceneToAscii(s);
   assert.ok(art.includes("otiose — always open"), "the tag survives whole");
   assert.ok(!/orways/.test(art), "…and is not overprinted by the 'or'");
   // the band is whole rows, and an EVEN number of them: the stack's centre must stay on a row
-  assert.equal(ASCII_GEOMETRY.TAG_BAND % (2 * CELL_H), 0);
+  assert.equal(ASCII_GEOMETRY.TAG_BAND, 2 * CELL_H);
 });
