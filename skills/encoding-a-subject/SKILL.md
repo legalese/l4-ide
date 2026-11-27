@@ -88,7 +88,11 @@ The rules that decide whether a reviewer can trust the result:
   One source provision → one recognisable place in the L4, with the source's numbering and an `@ref` citation on every rule.
   If you keep the source as a text file, quote it and put source locators on the `@ref`, so that a script can check the quotation and the citation against the file: [`references/source-locators.md`](references/source-locators.md).
 - **Vintages are inputs, never merged.** Where the law exists in two versions, use the rule-version (rule-effective-time) mechanism in `writing-l4-rules` (`references/source-patterns/04-dates-and-periods.md`), or take the vintage as an explicit input. A vintage that is silent on something answers with silence — never with a number borrowed from another vintage.
-- **`REFUSE "…"` where the sources do not answer** (target `unstable`; `main` has no `REFUSE`, so for target `main` return `NOTHING` from a `MAYBE`, as `dialects.md` says) — never `FALSE`, `0` or a plausible default. `MAYBE` / `NOTHING` where the source itself names an absent case. See `references/source-patterns/11-when-the-encoding-cannot-answer.md`.
+- **`REFUSE "…"` where the sources do not answer** (target `unstable`) — never `FALSE`, `0` or a plausible default.
+  `main` builds 98, 99, 102 and 108 have no `REFUSE`, and builds 109 and 112 read it (measured 2026-11-27).
+  A `main` encoding that must run on a build before 109 returns `NOTHING` from a `MAYBE` instead, as `dialects.md` says; the default `main` target, build 98 or later, is such an encoding.
+  `MAYBE` / `NOTHING` where the source itself names an absent case.
+  See `references/source-patterns/11-when-the-encoding-cannot-answer.md`.
   Do not invent your own three-valued logic (`Established` / `Rejected` / `Unresolved` enums threaded through every rule): the language already has these, and a home-made version is one more thing a reviewer must learn before they can read a single rule.
 - **Inputs as `GIVEN`**, threading a record where there are many facts. `ASSUME` is deprecated for inputs.
 - **`BRANCH IF … IF … OTHERWISE`, not chains of `ELSE IF`.**
@@ -100,7 +104,7 @@ The rules that decide whether a reviewer can trust the result:
   The rules for the copy:
   - **Byte for byte.** Never edit a copied module, not even to add a comment, so that anyone can check it against its source with one `diff`. If it needs a fix, fix it in its own encoding first, then copy it again.
   - **Its imports come too.** Copy every module it imports, other than the libraries that ship with `l4` (`prelude`, `daydate` and the rest).
-  - **It must check under your target.** A module written for `unstable` (one that uses `REFUSE`, say) will not load in an encoding for `main`. Then do not copy it: take its effect as a named input, and say so in the fork register.
+  - **It must check under your target.** A module written for `unstable` (one that uses a section `GIVEN` or `SET OF`, say) will not load in an encoding for `main`, and one that uses `REFUSE` loads only on `main` builds 109 and later. Then do not copy it: take its effect as a named input, and say so in the fork register.
   - **If it does not answer your question, do not bend it.** Write what you need in your own module, and say in the fork register why the copy was not enough.
   - **Record where it came from** in `NOTES.md` (step 9): the source folder, the commit you copied it at, and its `sha256`. List it in `encoding.json`'s `modules` like any other module.
   - **Refresh it on purpose.** A newer version of the source is not picked up by itself. Copying it again is a change to your encoding: re-run `check.sh`, and record the new commit and `sha256` in `NOTES.md`.
