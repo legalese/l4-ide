@@ -414,8 +414,8 @@ export type ScenePrim =
       state?: State;
       /** …and is the FALSITY itself only presumed (DESIGN §22)? Nothing in `layout` sets
        *  this since the dead break went: a `TYPICALLY FALSE` leaf keeps §22's fine dash on
-       *  its box and its wires, and has no break to dash. A renderer still dashes a hand-built
-       *  break that carries it. */
+       *  its box, and has no break to dash. A renderer still dashes a hand-built break that
+       *  carries it. */
       tentative?: boolean;
       /** For `inverter` only: the NOT's OUTPUT value, so the bubble can be filled with it —
        *  green when the negand is false (the NOT conducts), the mild red when the negand is

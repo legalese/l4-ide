@@ -541,7 +541,9 @@ Orthogonal to T/F/U:
 
 `eliminable ≠ known-false`: a false leaf could flip and change the result; an eliminable leaf is a don't-care — the function's **Boolean difference** w.r.t. it is identically zero. Render: dashed ghost box, reduced opacity, an open-contact break on the rail, optional "otiose" tag.
 
-**Ruling (Meng, 2026-11-27, typed to the general manager):** open-contact break dropped for FALSE leaves and for dead parent nodes; note verbatim: "i wonder if we can do without the open-contact break; the colour should be sufficient to indicate that the current stops.", and, relayed by the general manager as the same breath, "Do you reckon we could get rid of open contacts over parent nodes as well?"; condition kept: an ELIMINABLE rung on an OR fan still draws its ghost break (a leaf, a folded group, a NOT or an IMPLIES; an open AND or OR reports no state of its own and draws none), because the ruling was about FALSE, and no shipped app can produce that state today (the webview and `jl4-web` mount `LadderFlow`, which has no such glyph; `charge-generator` and `regcf-wizard` pass no `states`), so it is reachable only from the demos, the playground, `ladder-svg`'s API and the visualizer's dev route, and is open for Meng to drop as well.
+**Ruling (Meng, 2026-11-27, typed in chat), leaf limb:** open-contact break dropped for FALSE leaves; notes verbatim: "i wonder if we can do without the open-contact break; the colour should be sufficient to indicate that the current stops." (typed with a leading "oh. ", dropped here) and, next, "if we need to update the official ladder diagrams codebase to omit the open contacts, please assign that"; condition kept: an ELIMINABLE rung on an OR fan still draws its ghost break (a leaf, a folded group, a NOT or an IMPLIES; an open AND or OR reports no state of its own and draws none), because the ruling was about FALSE, and no shipped app can produce that state today (the webview and `jl4-web` mount `LadderFlow`, which has no such glyph; `charge-generator` and `regcf-wizard` pass no `states`), so it is reachable only from the demos, the playground, `ladder-svg`'s API and the visualizer's dev route, and is open for Meng to drop as well.
+
+**Parent-node limb, decided by Claude 2026-11-27, pending Meng's review (not a ruling):** Meng asked, as a question, "Do you reckon we could get rid of open contacts over parent nodes as well?", and the question was taken as a direction the same day, so a dead parent rung (a NOT whose negand is true, or an IMPLIES) draws no break on the OR fan either; revertible alone: restore the dead branch of the fan-site condition in `layout.ts` (`m.state === "dead" && !m.ownBreak`, with `Measured.ownBreak` set by `leafBox`), which leaves the leaf limb as ruled.
 
 ### 15.2 Source of the flag (both respect the pure-core boundary, §3.2)
 
@@ -1582,10 +1584,10 @@ byte-identical SVG to a never-asked one**. Step 4's seam-S8 palette extraction (
 carried the defect forward faithfully — `DARK_PALETTE`, added there, set `dead` to `inert`'s
 grey too, and `palette.test.ts` gained a test _asserting_ the byte-identity as "a
 pre-existing fact", with a note to whoever wired the state up. This is that. That contradicted §6 ("known false → gap / open contact" vs
-"unknown → plain pass-through box"), §15.1's four-state table, and §18's curve-colour bullet —
-and it broke something load-bearing: §25.4 distinguishes **N/A** from **undetermined** purely
-by _where the break is_ ("a scope that is definitively ✗ shows a clean open contact… a scope
-that is `?` is grey"). With one grey and no break, the two-lamp form had lost its only way to
+"unknown → plain pass-through box"; as then worded, see §15.1), §15.1's four-state table, and §18's curve-colour bullet —
+and it broke something load-bearing: §25.4 distinguished **N/A** from **undetermined** purely
+by _where the break was_ ("a scope that is definitively ✗ shows a clean open contact… a scope
+that is `?` is grey"; as then worded, see §15.1). With one grey and no break, the two-lamp form had lost its only way to
 say which of those a reader was looking at. The ASCII carrier had honoured the design all
 along (`✓ / ✗ / ?`, §24.3); the SVG had not.
 
@@ -1681,7 +1683,7 @@ As built:
 
 - **Shape.** A panel is a filled rounded box measured like the NOT scope frame (§21): padding on every side, a name band at the top mirrored at the bottom so the ports sit on the panel's own axis, and wire stubs from the panel's edge to its contents (`measurePanel`, `ts-shared/ladder-core/src/layout.ts:1072`).
   It is at least as wide as its name.
-  The constants are `PANEL_PAD_X`, `PANEL_PAD_Y`, `PANEL_LABEL` and `PANEL_FONT` in `PIXEL_GEOMETRY` (`layout.ts:110-113`) and `ASCII_GEOMETRY` (`ascii.ts:92-95`); the ASCII carrier draws the panel's outline and name.
+  The constants are `PANEL_PAD_X`, `PANEL_PAD_Y`, `PANEL_LABEL` and `PANEL_FONT` in `PIXEL_GEOMETRY` (`layout.ts:106-109`) and `ASCII_GEOMETRY` (`ascii.ts:91-94`); the ASCII carrier draws the panel's outline and name.
 - **Name.** The call's wire label, prefix-normalised and without backticks, prefixed `▾`: `` `is creditworthy` OF a `` on the wire reads `is creditworthy a` (`callLabel` in `ts-shared/ladder-core/src/viz-adapter.ts`).
   It is not the call as the drafter wrote it; in leaf mode the same call is one box showing its wire label as it is, backticks and `OF` included.
   Clicking the name folds the panel, which is an ordinary `foldSet` fold; folded, it is §16's placeholder, whose `▸` opens it again and whose box takes a value click.
@@ -1692,7 +1694,7 @@ As built:
 - **Open wire on a shaded backdrop.** The plain open-wire ink nearly disappears on the backdrop, so a diagram with panels draws open wire in `wireOpenPanel`, and a diagram without panels is byte for byte as before.
 - **A value on a call is set aside while its panel is open** (`dropOpenPanels`, `layout.ts:1042`).
   A value on a group is an override (§19); on an open panel it would make the circuit conduct through contents that say otherwise, so it holds only while the panel is folded.
-  While it holds, current follows it: a folded call or group carrying a value conducts by that value, as a leaf does, and not by its hidden contents (`energize`, `layout.ts:462-514`; fixed 2026-10-06, when a folded call pinned TRUE drew green while the circuit stopped at it, and one pinned FALSE drew red with the circuit made straight through it).
+  While it holds, current follows it: a folded call or group carrying a value conducts by that value, as a leaf does, and not by its hidden contents (`energize`, `layout.ts:449-501`; fixed 2026-10-06, when a folded call pinned TRUE drew green while the circuit stopped at it, and one pinned FALSE drew red with the circuit made straight through it).
 - **One click, every copy.** A click on a term sets, or clears, the value on every box with the same `atomId` and no other (`spreadValue`, also in `viz-adapter.ts`), so the `a` inside `is creditworthy a` and the caller's own `a` change together, and `b`'s copy does not.
   Which boxes share an `atomId` is `WHERE-INLINING-SPEC.md` §10.1's identity rule.
 - **Wires stay outside panels they do not enter.** An OR whose branches draw panels routes its fan clear of them (`ladder-core/test/call-panels.test.ts`, "no wire runs through a panel it neither starts nor ends at").
@@ -1702,7 +1704,7 @@ As built:
 **Ruled by Meng, 2026-10-05**, in chat: _"When a NOTted term is set to red let’s fill the exit circle with a green and vice versa"_.
 
 As built: the layout puts the NOT's own output value on its inverter glyph, read from the honest three-valued evaluation like box ink and never from a grounding assumption (§26.2), and omits it while unknown (`layout.ts:916-926`).
-The renderer fills the bubble `inverterTrue` when the NOT is TRUE (its term is FALSE), `inverterFalse` when the NOT is FALSE (its term is TRUE), and the old `inverterFill` while unknown (`ladder-svg/src/svg.ts:175`).
+The renderer fills the bubble `inverterTrue` when the NOT is TRUE (its term is FALSE), `inverterFalse` when the NOT is FALSE (its term is TRUE), and the old `inverterFill` while unknown (`ladder-svg/src/svg.ts:176`).
 
 | palette | `inverterTrue`      | `inverterFalse`                 | source               |
 | ------- | ------------------- | ------------------------------- | -------------------- |
