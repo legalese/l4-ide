@@ -1379,9 +1379,14 @@ The option declined: keep U1 everywhere, so a section's route order matters when
 The rule is Plotkin's parallel-or, which §4.1(b) did not propose for the connectives; it is taken here for the section's routes only.
 The precedent is `RAND`/`ROR`, which force neither side eagerly (`doc/reference/control-flow/REFUSE.md`, "Order matters"), and SEESAW (legalese/l4-ide#640, merged 2026-10-13), which made a compound breach's date and blame independent of operand order.
 
-**Not ruled** (decided by Claude 2026-11-02, pending Meng's review; set out in a memo written before this question was put): after "any route met gives yes", the order is any route refused gives the refusal, then any route undetermined gives undetermined, then the section's `closed` or `open` mode gives its no or "not covered".
+**Not ruled** (decided by Claude 2026-11-02, pending Meng's review; set out in a memo written before this question was put, with its order corrected on 2026-11-28, see "What review changed" below): after "any route met gives yes", the order is any route undetermined gives undetermined, even when another route refused; then, with no route undetermined, any route refused gives the refusal; then the section's `closed` or `open` mode gives its no or "not covered".
+Undetermined comes before refused because the refusal is then the answer only if the undetermined route is not met, a position U13 rules on: the directive is undetermined, never a determinate refusal; and the ruling's "let a met route outweigh a refused one" forbids refusing while the undetermined route may yet be met.
 A provision that overrides the section ("subject to", "notwithstanding") is not a route: if it refuses, the section refuses, because whether it overrode cannot be known.
 Whether the section's default mode, absent a marker word, is `open`, `closed`, or set by the kind of question is not ruled here; it is card N1b's.
+
+**What review changed** (review of this record, 2026-11-28): the order above first read "any route refused gives the refusal, then any route undetermined gives undetermined".
+With one route refused and another undetermined on `x`, that gave a determinate refusal, although `x` met would have made the section yes; that contradicted the ruling's "let a met route outweigh a refused one" and U13's clauses 1 to 3, so undetermined now comes before refused.
+The order now gives yes for a refused route with a met one, undetermined for a refused route with an undetermined one, and the refusal for a refused route with one that is not met.
 
 ### D1 — Build the evaluator, buy the solver
 
