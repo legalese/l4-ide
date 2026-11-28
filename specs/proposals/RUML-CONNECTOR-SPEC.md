@@ -3,7 +3,7 @@
 _Status: **proposed, not landed.**
 Written 2026-11-26 on branch `spec/ruml-connector-1126`, from `origin/unstable` at `8f10892e5`; it reached `unstable` as commit `0b8ddc86f`.
 Amended 2026-11-28 on branch `spec/ruml-real-producer`, from `origin/unstable` at `61bd5ba62`: §2.8, R13, §5.5 and M7 are new, and §0, the evidence-marks paragraph, §1, §2.5, §4.8, §5.1, §9, §10 (M3 corrected), §11, §12 and Sources each changed from it.
-A second commit on the same branch rewords what §1, §2.5, §2.8, §5.5, §10 (M3), §11 and §12 say of the tool's output, as observations and not verdicts; it is decided by Claude 2026-11-28, pending Meng's review (§12).
+What §1, §2.5, §2.7, §2.8, §5.5, §6, §10 (M3 and M5), §11, §12 and Sources say of Rulemapping's tool, parsers and package is stated as observation and not as verdict; that wording is decided by Claude 2026-11-28, pending Meng's review (§12).
 Nothing described here is built: `git grep -il ruml` over the `.hs`, `.cabal`, `.mjs`, `.ts`, `.json`, `.yml`, `.sh` and `.l4` files of the 2026-11-26 tree found nothing **[E 2026-11-26]**, and the same command at `61bd5ba62` finds nothing **[E 2026-11-28]**.
 What would make a sentence here true is named where it is written: a Phase 1 PR for the exporter and a Phase 2 PR for the importer (§9), and Meng's rulings on the list in §10._
 
@@ -193,7 +193,7 @@ So the subset an importer needs first is small, and the subset an exporter emits
   The suite's evaluation tests are the only executable statement of the semantics.
 - **The package name.**
   RUML 8.1 names `@law-as-code-institute/ruml-schema` "in the GitHub npm registry"; the repository's head names `@law-as-code/ruml-schema` on public npm, which holds versions `0.0.0-stage` and `1.0.0` **[E, `registry.npmjs.org`, 2026-11-26]**; the old name returns 404 on public npm.
-  The specification text lags the packaging by one commit.
+  The specification text names the package as it was one commit earlier.
 - **Example identifiers.**
   The examples in RUML 4.1 and 4.8 give the root node the same UUID as `metadata.id`, which NODE-08 forbids ("The `id` of a node MUST NOT equal … `metadata.id`").
   Those are page examples and not the validated example files, which I did not check.
@@ -259,7 +259,7 @@ The schema layer (83 rules) is whatever `ruml.schema.json` encodes, in both.
 Of the 55 semantic rules, the reader found about eleven enforced in the Python code and about fifteen in the TypeScript code, seven in both (OP-02, CAP-06, CAP-08, CAP-10, CAP-15, DP-16, MOD-01), and the remainder in neither (the reader did not audit separately the rules that only require a parser to accept something).
 Not enforced by either: NODE-08 (duplicate UUIDs), NODE-10 (a `children` entry naming no node), FMT-05 (first-two-fields order), FMT-12, DP-11 and DP-12, TXT-09 (the content digest), every RUML-EXT rule, and the cross-file TREE rules.
 Python alone checks NODE-05, DP-17, MOD-04, MOD-05 and CAP-04 (for the capabilities it implements); TypeScript alone checks META-03, META-09, META-11 (by string comparison, against the wall clock), OP-04 for custom combiners, CAP-07 for custom roles, DP-18, TXT-12 and CAP-01 (for draft and reverse-domain ids only, and only in its validator); CTX-10 and TXT-19 are checked for a model query's inputs by Python and for node-level references by TypeScript **[delegated read, re-checked by the reviewer against the code; the absence of any JSONata validation in the validator and of CAP-01 in the Python mapping spot-checked by `grep`]**.
-Neither checks every schema and semantic rule, as CAP-28 requires of a validation tool, and the two disagree with each other on files the suite does not test.
+Neither checks every schema and semantic rule, as CAP-28 requires of a validation tool, and from the rules each enforces they would be expected to disagree with each other on files the suite does not test **[U]**.
 Python reports rule codes and JSON Pointers for the structural rules it has; TypeScript reports a message and a coarse dotted path, and never a rule code.
 `ruml-python` raises `NotImplementedError` for a data point whose `binding` is `computed`, so it cannot read the specification's own `bindings.ruml` example nor a file written by Phase 3 of §9 **[delegated read; `mapping.py:420`, spot-checked]**.
 `ruml-js` has an `expressionReads` hook for a caller to inject an exact JSONata-based reader of data point ids; the default is a token scan.
@@ -724,16 +724,16 @@ Three approaches were asked for, plus one more that falls out.
 Putting a RUML parser there serves a browser view and not `l4 export` or `l4 import`, which are Haskell (I1).
 That is a different feature, and it would not change the recommendation.
 
-**Is depending on a third party's parser wise, for a format whose owner also competes with us (R2)?**
-The Pitch deep dive's reading is that Rulemapping is a competitor for the channel to drafting offices and a candidate import and export target **[E, `deep-dives/30-rulemapping-and-ruml.md` §1]**.
-On the product path, a dependency would give that owner four things it need not mean to use, and which we cannot yet price: the pace of our RUML support, the shape of our error messages, the install burden of a second runtime, and a package namespace they control and have already moved once between registries (§2.5).
+**Is depending on a third party's parser wise, for a format whose owner has its own product in the same field (R2)?**
+The Pitch deep dive reads Rulemapping as, among other things, a candidate import and export target for L4 **[E, `deep-dives/30-rulemapping-and-ruml.md` §1]**; its reading of where the two companies meet for drafting offices is in §1 and §7 of that document and is not restated here.
+On the product path, a dependency would tie four things to that owner's choices, which we cannot yet price: the pace of our RUML support, the shape of our error messages, the install burden of a second runtime, and a package namespace they control, which has moved once between registries (§2.5).
 The mitigations are real, since Apache-2.0 lets us fork and RUML 2.3 promises backward compatibility within a major version, but they do not make the case for it, because (a) costs little more than (b) would: the format is small, the schema is public, the rules are numbered, and the suite is data.
 In a test harness the same parsers are a gain without the risk: a second implementation checking our output, run when present, skipped when absent, never a build input (I4).
 So R2: use them as validators, pinned by version, and write the product path ourselves.
 
 **What each costs if it goes wrong.**
 (a) risks us misreading the format, which the suite and the validators exist to catch.
-(b) risks a process we cannot fix, owned by someone with other priorities.
+(b) risks a dependency whose fixes are scheduled by another organisation.
 (c) risks nothing that (a) does not, and delays the importer until the exporter has shown it is wanted.
 
 ## 7. Conformance (R11)
@@ -825,7 +825,7 @@ Each of these changes who is told something, what is published, or the language 
   The recommendation is fetch-at-test-time, pinned by a commit id and two git tree ids, which are the only things committed (R11).
   Vendoring the suite, or quoting its fixtures in our goldens, is a first deposit of third-party text into a public repository and needs Meng's word.
   Whether a CI job may use the network for this, as opposed to a developer's machine, is also his.
-- **M5. Whether a competitor's parsers may be used at all, even to check our output.**
+- **M5. Whether the parsers published with the format may be used at all, even to check our output.**
   The recommendation is yes, as pinned test-time validators.
   If the answer is no, G1 weakens to "valid against the JSON Schema", which a standard validator gives without their code.
 - **M6. Deterministic UUIDs.**
@@ -882,7 +882,7 @@ It found two wrong statements, nine overstated ones, two unsupported ones and ab
   The rule is now stated by node key (name, or child indices under the nearest named ancestor), and the example's identifiers were regenerated by that rule, the file re-validated against the schema and the 24-vector grid re-run (0 disagreements).
   Stating the rule exposed a real limit, added to §4.5: an edit that moves an unnamed sub-expression changes its UUID.
 
-Not changed, with the reason: the reviewer's note that `ruml-js` compares timestamps as strings (META-03, META-09) is a defect in a third party's code that this document does not rely on, so it is reported in the evidence and not acted on; and the claim that `complete` mode agrees with L4's strong Kleene reading is kept marked **[U]**, since today's evaluator is stuck on an unsupplied fact and the agreement is with the specification's target semantics (§2.3, O4).
+Not changed, with the reason: the reviewer's note that `ruml-js` compares timestamps as strings (META-03, META-09) is a behaviour of a third party's parser that this document does not rely on, so it is reported in the evidence and not acted on; and the claim that `complete` mode agrees with L4's strong Kleene reading is kept marked **[U]**, since today's evaluator is stuck on an unsupplied fact and the agreement is with the specification's target semantics (§2.3, O4).
 
 ### The amendment of 2026-11-28
 
@@ -916,10 +916,12 @@ What it changed, from the files of the one producer we could run (§2.8):
 Decided by Claude 2026-11-28, pending Meng's review.
 
 - **What it changed.**
-  The statements of what Rulemapping's tool writes (§1, §2.5, §2.8, §5.5 and §11) now report the output and the rule it is checked against, and do not say whose fault a difference is.
+  The statements of what Rulemapping's tool writes (§1, §2.5, §2.8, §5.5 and §11) now report the output and the rule it is checked against, and do not attribute a difference to anyone.
   M3's record of 2026-11-28 says what was put into the workspace.
   Two items of the amendment's record above, "Added" and "Nits", now use the same wording.
-  The header names this commit.
+  A second pass did the same for older text about the companies behind the format, their parsers and their package: a sentence each in §2.5 and §2.7, the R2 question and the cost of option (b) in §6, the title of M5, the note on the 2026-11-26 review's `ruml-js` finding, and the Sources note.
+  In §6 the Pitch deep dive's own reading of how the two companies relate is not restated; the sentence points to the section of that document where it is.
+  The header says that this wording is decided by Claude.
 - **What it did not change.**
   Every figure, hash, rule identifier and measurement; the marks **[E]** and **[U]**; the strict importer of R13; the refusal of §5.1; the open rulings M1 to M7.
 
@@ -940,4 +942,4 @@ The worked example in §4.7 is our own file and copies nothing from RUML's examp
 The files named in §3.
 
 **Landscape, not re-verified here.**
-`legalese/l4-pitch`, branch `pitch/rulemapping-ruml`, `.claude/skills/l4-pitch/deep-dives/30-rulemapping-and-ruml.md`, read for the competitive framing and cross-checked for the repository, licence, package and rule-count facts above.
+`legalese/l4-pitch`, branch `pitch/rulemapping-ruml`, `.claude/skills/l4-pitch/deep-dives/30-rulemapping-and-ruml.md`, read for its account of how the two companies relate, and cross-checked for the repository, licence, package and rule-count facts above.
