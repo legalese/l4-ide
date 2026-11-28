@@ -237,6 +237,9 @@ An enum answer is its name, without backticks; a constructor named `TRUE` or `FA
 A record is an object keyed by its constructor's name, holding its fields: `{"Pair": {"left": 5, "right": 6}}`.
 A field's name is spelled as declared, spaces included, and not hyphenated as a request's may be: `{"Pair": {"left": 5, "right side": 6}}`.
 A `MAYBE (MAYBE x)` answer cannot tell `NOTHING` from `JUST NOTHING`: both are `null`.
+A `DATETIME` answer is RFC 3339 in UTC, `"2026-01-31T10:30:00Z"`, whatever the value's zone; it was `"2026-01-31 10:30:00 UTC"` before.
+The direct path still reads that older text as the same instant; the wrapper path reads it only once legalese/l4-ide#860 (open on 2026-11-23) lands.
+Ruled: W1, option B, accepted with no note, with the card's conditions (one text written by JSONENCODE, `l4 batch`, jl4-service and the compiled backend; readers keep reading the older text; `main` through a later main-bound PR; release notes name the change), 2026-11-22T23:21Z, JSON Wire Forms bench, https://claude.ai/artifact/GR6QfNiPg734Jqh9Np2SCH (collection `l4-jsonwire-1123`).
 
 The function's published `returnSchema` does not describe two of these shapes yet: it gives a record's fields at the top level, without the constructor's name, and a `MAYBE` as its inner type, without `null` (smucclaw/l4-ide#1010).
 

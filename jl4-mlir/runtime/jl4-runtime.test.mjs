@@ -1349,6 +1349,21 @@ eq("memory cap: default constant", DEFAULT_MAX_HEAP_BYTES, 64 * 1024 * 1024);
   eq("unsupported: which does not respawn the worker", notRun.fatal, false);
 }
 
+// A DATETIME answer is RFC 3339 in UTC, the text jl4-service answers with
+// (W1, JSON Wire Forms bench, option B): 18:30 in Singapore is 10:30Z.
+{
+  const sgDt = env.__l4_datetime_from_dtz(
+    env.__l4_date_from_dmy(num("31"), num("1"), num("2026")),
+    env.__l4_time_from_hms(num("18"), num("30"), num("0")),
+    box("Asia/Singapore"),
+  );
+  eq(
+    "DATETIME answer is RFC 3339 in UTC",
+    rt.unmarshalScalar(sgDt, "DATETIME"),
+    "2026-01-31T10:30:00Z",
+  );
+}
+
 console.log(
   `\n${pass} passed, ${fail} failed, ${xfailPending} xfail (pending), ${xpass} XPASS`,
 );
