@@ -81,14 +81,15 @@ const THICK_STROKE = flowWidth("closed");
  * caller's own `Palette`, even one spread from `INK_PALETTE`, gets `"weight"`; a caller who
  * wants the old look on any palette passes `{ boxState: "outline" }`.
  *
- * Dotted outlines for a presumed value (§22), the dashed ELIMINABLE ghost box and call
- * panels are drawn as before in both looks. Choices made by Claude on 2026-11-27 and
+ * The dashed ELIMINABLE ghost box and call panels are drawn as before in both looks, and a
+ * presumed value (§22) keeps its dotted outline, except that a presumed-TRUE box is now thick
+ * as well as dotted (item 2). Choices made by Claude on 2026-11-27 and
  * 2026-11-28, pending the owner's review, none part of the ruling:
  *  1. The thick border is drawn INSIDE the rect (outer edge = the rect's edge), so ports,
  *     layout and `scene.size` are those of the outline look. A centred 3.4 would spill 1.7
  *     into the wires that meet the box.
  *  2. A TENTATIVE (§22) box keeps its fine dots: a presumed-FALSE box would otherwise lose
- *     the only cue that it is a presumption, so it keeps the dotted 1.5 border it had; a
+ *     a cue that it is a presumption (the tag is the other), so it keeps the dotted 1.5 border it had; a
  *     presumed-TRUE box is thick AND dotted, the dots scaled with the stroke.
  *  3. The border keeps its state ink (live green, unknown grey) so weight and hue agree.
  *  4. A folded placeholder follows the same rule by its value; while unknown it keeps its

@@ -213,7 +213,7 @@ A detail worth having in mind when you review figures: until this weekend each r
 
 **Reading it:** current enters at the left rail; any one conducting path to the right rail makes the exception apply — four parallel rungs, a four-way OR. Conditions in _series_ along one rung would all have to hold (AND). The italic line above is the regulation's own chapeau; the italic `(1)`–`(4)` are the CFR's enumeration, and each box is the corpus's field name in current house style. This is verbatim tool output, regenerated 2026-08-03 — the figure is generated from the L4, so it cannot drift from the law.
 
-**In the interactive form, a box shows its answer by how it is outlined.**
+**In the interactive ladders of the web apps (the Reg CF wizard and the charge generator), a box shows its answer by how it is outlined.**
 A box is drawn with a thick outline when the answer is yes, a thin outline when nobody has answered yet, and no outline when the answer is no.
 A faint tint behind the box says the same thing a second time, and an answer that is only presumed is drawn with a dotted outline.
 The thick outline is as heavy as the wire that carries current, so a path that conducts reads at a glance.
