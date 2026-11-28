@@ -44,7 +44,7 @@ The corpus run writes into `$DMN_CHECK_WORKDIR/corpus`: the exported DMN and the
 
 `run.sh` needs a JDK 21 or later, and it picks one itself: `DMN_CHECK_JAVA_HOME` if set, else the first usable entry of a fixed list (Homebrew `openjdk@21`, Homebrew `openjdk`, two Linux `java-21-openjdk` paths, then `/usr/libexec/java_home -v 21+`).
 **It does not read `JAVA_HOME`, and it does not look for a `java` on `PATH`.**
-This is assumed, not ruled: it copies `etc/camunda-dmn-check`, which does the same, and the reason is that on the machine this was built on the shell's JDK is a 26 chosen for other work, so a result that depended on it would change with the shell it was run from.
+This is decided by Claude 2026-10-30, pending Meng's review: it copies `etc/camunda-dmn-check`, which does the same, and the reason is that the JDK a shell has on `JAVA_HOME` or `PATH` may have been chosen for other work and may be any version, so a result that depended on it would change with the shell it was run from.
 The cost is the other way round: a machine whose only JDK 21+ is `JAVA_HOME` gets `skipped:`, and the skip line says to set `DMN_CHECK_JAVA_HOME`.
 Pin `DMN_CHECK_JAVA_HOME` to a JDK 21 if you want the result to mean what 21 gives and what the Camunda leg's CI gives.
 `run.sh` exports `JAVA_HOME` to that JDK, so Maven runs on it as well.

@@ -32,11 +32,12 @@
 # Environment:
 #   DMN_CHECK_JAVA_HOME     a JDK 21+. Else the first usable candidate below.
 #                           JAVA_HOME and a `java` on PATH are IGNORED, on purpose
-#                           (assumed, not ruled; README, "Which JDK"): on the machine this was
-#                           built on they are a JDK 26 for other work, and a result
-#                           should not change with the shell it was run from. CI for
-#                           the Camunda leg runs 21; pin this to a 21 if you want
-#                           your result to mean what that one means.
+#                           (decided by Claude 2026-10-30, pending Meng's review; README,
+#                           "Which JDK"): they may have been chosen for other work and may be
+#                           any version, and a result should not change with the
+#                           shell it was run from. CI for the Camunda leg runs 21;
+#                           pin this to a 21 if you want your result to mean what
+#                           that one means.
 #   DMN_CHECK_WORKDIR       where the classpath, classes and corpus export go.
 #                           Made absolute before use; a relative one is taken
 #                           relative to the caller's directory.
