@@ -63,7 +63,7 @@ The two that matter most come first.
 - **R7 — time arithmetic as a library**: business days by place, holidays, cut-off hours, time zones, clear days, inclusive and exclusive counting.
 - **R8 — validity is not effectiveness**: wrong form, not signed, wrong address, wrong officer; types carry validators.
 - **R9 — who gives and receives**: agents, registered offices, joint addressees (one or all?) — a notice to a class is an `EVERY` fan-out or barrier.
-- **R10 — evidence and burden**: certificate of posting, registered receipt, tracking, server log, read receipt; candidate homes are a speech-act `ATTEST` (`IN-RELIANCE-ON-SPEC.md` §4.2) and the burden-of-proof module in package `jl4-proleg`, on branch `claude/wave3a-03-proleg` and not on `unstable`.
+- **R10 — evidence and burden**: certificate of posting, registered receipt, tracking, server log, read receipt; candidate homes are a speech-act `ATTEST` (`IN-RELIANCE-ON-SPEC.md` §4.2) and the burden-of-proof module in package `jl4-proleg` (`jl4-proleg/src/L4/Proleg/Burden.hs`, with its note `jl4-proleg/docs/burden-of-proof.md`), which is on `unstable`.
 - **R11–R13** — an acknowledgment is a notice that needs no acknowledgment; withdrawal that arrives no later than the notice (CISG Art 15(2), recalled); change of address redirects later notices; notices to regulators and to the world (publication).
 
 ## 4. Recommendations on `l4-pitch`'s open questions — assumed, not ruled
