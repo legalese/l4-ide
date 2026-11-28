@@ -629,6 +629,82 @@ imports is not a collision, so it is deliberately not searched for. The run prin
 in canon, `is the natural father` wanted a name already taken by a test fixture, and the resolution
 was to rename the fixture first.
 
+### Field opening: drop the `f's` as well (experimental, gated by the `l4` binary)
+
+**What it is.** Inside a rule whose input is a record, the record's fields can be read by their bare names.
+With `` GIVEN f IS A `Theft in Dwelling Facts` ``, a bare `building` means `f's building`.
+The checker rewrites the bare name to the spelled-out read before anything else looks at it, so every check, evaluation and export sees the same rule.
+The user documentation is `doc/reference/syntax/field-opening.md` (ruling R5; it landed on `unstable` in #403 on 2026-09-16).
+
+**Why an isomorphic encoding wants it.** The genitive above already supplies the verb, and field opening removes the genitive itself.
+In inert style, the operative atoms between the quoted fragments then read as the statute's own words.
+Penal Code s 380 reads "in any building, tent or vessel, which building, tent or vessel is used as a human dwelling or for the custody of property".
+Spelled out, as the encoding in commons writes it today:
+
+```l4
+DECIDE `offence under s 380` f IF
+        "Whoever"
+   ...  `commits theft` (f's theft)
+   ...  "in any"
+   ...  (    f's building
+        ..   f's tent
+        OR   f's vessel )
+   ...  ", which building, tent or vessel is used"
+   ...  (    f's `as a human dwelling`
+        OR   f's `for the custody of property` )
+```
+
+With field opening:
+
+```l4
+DECIDE `offence under s 380` f IF
+        "Whoever"
+   ...  `commits theft` theft
+   ...  "in any"
+   ...  (    building
+        ..   tent
+        OR   vessel )
+   ...  ", which building, tent or vessel is used"
+   ...  (    `as a human dwelling`
+        OR   `for the custody of property` )
+```
+
+Measured 2026-10-12 on an `l4` built from `unstable`, on that encoding in commons (`subjects/sg/penal-code-1871/encodings/legalese/theft-378-379.l4`), with only this rule rewritten: the file's own assertions and the charge sheet that imports it run identically.
+A deliberate slip in the rewritten rule (`tent` where it says `building`) makes four of the file's assertions fail, so the comparison could have failed.
+Field opening does work inside the `...` and `..` chains of inert style, although the reference page says that nothing inside "an inert element" opens.
+**So strongly consider it when an encoding aims at isomorphism in inert style**, subject to the gate below.
+Generated output (the printer, the exports and the documents) still shows the spelled-out `f's building`; the gain is in the source that a reviewer reads beside the statute.
+
+**The gate: which `l4` the file's readers run.** Field opening is on `unstable` and not yet on `main`.
+Meng's call (2026-10-12) is to wait for the `main`..`unstable` fixes to land on `main` before relying on it generally, so until then the feature is gated by the binary:
+
+- Prerelease binaries on `legalese/prereleases` have it from `unstable-20260926-c76e6b0` onwards, which is also the release the l4 plugin's `scripts/install-l4.sh` installs.
+- The VS Code extension and its bundled `l4` and `jl4-lsp` are cut from `main` (latest `l4-ide-build-91`, 2026-10-09) and do not have it.
+  There, a file that uses it fails to check, and the error is misleading: a bare field name is read as the field's selector function, so you get a type error ("The type of this definition must match its type signature"), not a word about field opening.
+  Measured with the `l4` bundled in extension 1.6.90, on a small inert-style rule written this way: six errors.
+- `l4` has no `--version`, so test the binary itself. This file checks cleanly only on an `l4` that has field opening:
+
+```l4
+DECLARE Probe HAS answer IS A NUMBER
+
+GIVEN p IS A Probe
+GIVETH A NUMBER
+`read bare` p MEANS answer
+```
+
+Use it where everyone who will open the module runs a prerelease `l4` at or after that tag.
+Where the module must also open in the VS Code extension, keep the `f's` until field opening reaches `main`.
+
+**Where it does not open, loud cases first.**
+
+- Two record inputs whose records share a field name: a bare read of that name is an error naming both, and the fix is to write the one you mean.
+- An input with no written type, a type synonym for a record, a `LIST` or `MAYBE` input, a lambda's inputs, and the body of a regulative (`PARTY … MUST …`) or `EVENT` do not open.
+  A bare name there falls back to whatever else it names, usually the field's selector function, which is then a type error.
+- In an `#EVAL` or `#ASSERT` a bare field name is the selector, which evaluates to a function, not to a section input's field.
+- A field that outranks a top-level definition or constructor of the same name draws a warning naming both.
+- **Silent:** a field opened from the rule's own input beats a same-named section input, and a same-named field opened from a section input, with no message.
+  Before relying on a bare name in a rule that sits under a section `GIVEN`, check that the section declares nothing of the same name.
+
 ### Spell the last connective — `..` … `OR`, and `...` … `AND`
 
 **Ruling (Meng, 2026-08-06).** In a chain, **every rung but the last takes the sugar; the last takes

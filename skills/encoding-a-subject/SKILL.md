@@ -87,6 +87,7 @@ The rules that decide whether a reviewer can trust the result:
 - **Isomorphic.** Someone holding the source beside your module can check it provision by provision.
   One source provision → one recognisable place in the L4, with the source's numbering and an `@ref` citation on every rule.
   If you keep the source as a text file, quote it and put source locators on the `@ref`, so that a script can check the quotation and the citation against the file: [`references/source-locators.md`](references/source-locators.md).
+  In inert style, field opening lets an operative atom read as the source's own words (`building`, not `f's building`). It is experimental and depends on the `l4` binary your readers run: see "Field opening" in `writing-l4-rules`' `references/drafting-patterns.md`.
 - **Vintages are inputs, never merged.** Where the law exists in two versions, use the rule-version (rule-effective-time) mechanism in `writing-l4-rules` (`references/source-patterns/04-dates-and-periods.md`), or take the vintage as an explicit input. A vintage that is silent on something answers with silence — never with a number borrowed from another vintage.
 - **`REFUSE "…"` where the sources do not answer** (target `unstable`) — never `FALSE`, `0` or a plausible default.
   By a run on 2026-11-27, `main` builds 98, 99, 102 and 108 have no `REFUSE`, and builds 109 and 112 read it.
