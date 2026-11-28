@@ -1,0 +1,9 @@
+-- A rule that declines to answer below a threshold. Where L4 refuses at a
+-- witness, the bucket is undecided, and the reason quotes the refusal
+-- (smucclaw/l4-ide#1096).
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE `rate` n IS
+    IF n GREATER THAN 10
+    THEN 5
+    ELSE REFUSE "no rate up to 10"

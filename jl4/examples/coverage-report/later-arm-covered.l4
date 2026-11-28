@@ -1,0 +1,159 @@
+-- Controls for later-arm.l4. In each rule below a later condition raises an
+-- error at an input where an earlier arm already gives the answer, and the
+-- report leaves that input out. But another input it tries takes the same
+-- arm with every condition giving true or false, and agrees with the left-out
+-- input on each condition L4 reaches there that does give one (those of each
+-- arm up to the one that answers), so the combination L4 answers in at the
+-- left-out input is witnessed, and nothing is lost by leaving it out. Each of
+-- these rules is covered at leaf level.
+
+-- At zero the second condition divides by zero, but minus one also takes
+-- the first arm, and there the second condition is false.
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE `guarded ratio` n IS
+    BRANCH
+        IF n AT MOST 0 THEN 0
+        IF 10 DIVIDED BY n GREATER THAN 2 THEN 1
+        OTHERWISE 2
+
+-- With two inputs: where x and y are both zero the second WHEN divides by
+-- zero, but x zero and y one also takes the first WHEN.
+GIVEN x IS A NUMBER, y IS A NUMBER
+GIVETH A NUMBER
+DECIDE `share band` x y IS
+    CONSIDER x
+    WHEN 0 THEN 0
+    WHEN EXACTLY (10 DIVIDED BY y) THEN 1
+    OTHERWISE 2
+
+GIVEN x IS A NUMBER, y IS A NUMBER
+GIVETH A NUMBER
+DECIDE `share band by BRANCH` x y IS
+    BRANCH
+        IF x EQUALS 0 THEN 0
+        IF x EQUALS (10 DIVIDED BY y) THEN 1
+        OTHERWISE 2
+
+-- A proviso: at zero the first condition is false, and so is the whole rule,
+-- but at minus one the second condition is false as well.
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `is eligible` n IS
+    n GREATER THAN 0
+    AND NOT (10 DIVIDED BY n GREATER THAN 5)
+
+-- A first condition that always holds.
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE `always first` n IS
+    BRANCH
+        IF n AT LEAST n THEN 0
+        IF 10 DIVIDED BY n GREATER THAN 2 THEN 1
+        OTHERWISE 2
+
+-- The division inside a rule the second condition calls.
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE `ten over` n IS 10 DIVIDED BY n
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE `guarded via a call` n IS
+    BRANCH
+        IF n AT MOST 0 THEN 0
+        IF `ten over` n GREATER THAN 2 THEN 1
+        OTHERWISE 2
+
+-- A record input: a household with no members divides by zero, but one with
+-- minus one member takes the first arm too.
+DECLARE Household HAS
+    income IS A NUMBER
+    members IS A NUMBER
+
+GIVEN h IS A Household
+GIVETH A NUMBER
+DECIDE `per head band` h IS
+    BRANCH
+        IF h's members AT MOST 0 THEN 0
+        IF h's income DIVIDED BY h's members GREATER THAN 100 THEN 1
+        OTHERWISE 2
+
+-- Only the conditions L4 reaches at the left-out input are compared: those
+-- of each arm up to the one that answers. At zero the third condition holds,
+-- and no other input makes it hold, but L4 never reaches it there, so it is
+-- not compared, and minus one, which takes the first arm, agrees.
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE `dead third arm` n IS
+    BRANCH
+        IF n AT MOST 0 THEN 0
+        IF 10 DIVIDED BY n GREATER THAN 2 THEN 1
+        IF n EQUALS 0 THEN 5
+        OTHERWISE 2
+
+-- The same holds of a condition between the arm that answers and the one that
+-- raises: at zero the second condition holds as well, but L4 does not reach
+-- it there.
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE `true condition between` n IS
+    BRANCH
+        IF n AT MOST 0 THEN 0
+        IF n EQUALS 0 THEN 5
+        IF 10 DIVIDED BY n GREATER THAN 2 THEN 1
+        OTHERWISE 2
+
+-- And a condition L4 does not reach is not evaluated on its own either: at
+-- zero the third condition takes more than a thousand steps, and the test
+-- runs this rule under a limit of 300, which L4's own answer there stays
+-- within.
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+DECIDE `one step` x IS x PLUS 1
+
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+DECIDE `4 steps` x IS `one step` (`one step` (`one step` (`one step` x)))
+
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+DECIDE `16 steps` x IS `4 steps` (`4 steps` (`4 steps` (`4 steps` x)))
+
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+DECIDE `64 steps` x IS `16 steps` (`16 steps` (`16 steps` (`16 steps` x)))
+
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+DECIDE `256 steps` x IS `64 steps` (`64 steps` (`64 steps` (`64 steps` x)))
+
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+DECIDE `1024 steps` x IS `256 steps` (`256 steps` (`256 steps` (`256 steps` x)))
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE `heavy at zero` n IS
+    IF n EQUALS 0 THEN `1024 steps` 0 ELSE 0
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+DECIDE `third arm is heavy` n IS
+    BRANCH
+        IF n AT MOST 0 THEN 0
+        IF 10 DIVIDED BY n GREATER THAN 2 THEN 1
+        IF `heavy at zero` n GREATER THAN 3 THEN 2
+        OTHERWISE 3
+
+-- In an UNLESS chain, L4 reaches what follows the first UNLESS only where
+-- the condition before it holds. At zero it does not, so L4 answers FALSE
+-- without reaching the rest, and the last condition, which only zero makes
+-- true, is not compared: minus one, where the first condition fails too,
+-- agrees.
+GIVEN n IS A NUMBER
+GIVETH A BOOLEAN
+DECIDE `proviso not reached at zero` n IF
+       n GREATER THAN 0
+  UNLESS `ten over` n GREATER THAN 5
+  UNLESS n EQUALS 0

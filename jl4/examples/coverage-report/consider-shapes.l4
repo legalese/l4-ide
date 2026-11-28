@@ -1,0 +1,39 @@
+-- The other CONSIDERs whose every WHEN is one condition: one that lists every
+-- option and has no OTHERWISE, one over numbers, one in a rule that answers
+-- TRUE or FALSE, and one with an EXACTLY arm (smucclaw/l4-ide#1094).
+DECLARE Plan IS ONE OF basic, pro, team
+
+-- Every option is listed, so no plan is none of them, and the solver proves
+-- that combination impossible.
+GIVEN p IS A Plan
+GIVETH A NUMBER
+DECIDE `fee for every plan` p IS
+    CONSIDER p
+    WHEN basic THEN 5
+    WHEN pro THEN 20
+    WHEN team THEN 50
+
+GIVEN seats IS A NUMBER
+GIVETH A NUMBER
+DECIDE `fee for seats` seats IS
+    CONSIDER seats
+    WHEN 1 THEN 5
+    WHEN 2 THEN 9
+    OTHERWISE 20
+
+GIVEN p IS A Plan
+GIVETH A BOOLEAN
+DECIDE `is billed monthly` p IS
+    CONSIDER p
+    WHEN basic THEN TRUE
+    OTHERWISE FALSE
+
+-- An EXACTLY arm is the condition that the scrutinee equals its value, here
+-- another input, so the seats at the cap are free whatever the cap is.
+GIVEN seats IS A NUMBER, cap IS A NUMBER
+GIVETH A NUMBER
+DECIDE `fee up to the cap` seats cap IS
+    CONSIDER seats
+    WHEN EXACTLY cap THEN 0
+    WHEN 1 THEN 5
+    OTHERWISE 20

@@ -1,0 +1,15 @@
+l4 coverage: examples/coverage-report/consider-limits.l4
+
+Decision `fee by seats`
+  NOT COVERED: its body is a CONSIDER whose `WHEN many n` is not one yes-or-no condition; this report covers a CONSIDER only when each WHEN names a number, an option without fields, or EXACTLY a value, and any OTHERWISE comes last.
+
+Decision `fee if any`
+  NOT COVERED: its body is a CONSIDER whose `WHEN JUST basic` is not one yes-or-no condition; this report covers a CONSIDER only when each WHEN names a number, an option without fields, or EXACTLY a value, and any OTHERWISE comes last.
+
+Decision `fee with a new name`
+  NOT COVERED: its body is a CONSIDER whose `WHEN other` is not one yes-or-no condition; this report covers a CONSIDER only when each WHEN names a number, an option without fields, or EXACTLY a value, and any OTHERWISE comes last.
+
+Decision `fee with an early OTHERWISE`
+  NOT COVERED: its body is a CONSIDER whose OTHERWISE is not its last arm, so the arms after it are never reached; this report covers a CONSIDER only when each WHEN names a number, an option without fields, or EXACTLY a value, and any OTHERWISE comes last.
+
+Coverage: NOTHING COVERED; NOT COVERED: `fee by seats`, `fee if any`, `fee with a new name`, `fee with an early OTHERWISE`.

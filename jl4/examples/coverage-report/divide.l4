@@ -1,0 +1,9 @@
+-- No condition reads `salary`, `hours` or `flat`, and the ELSE arm divides by
+-- `hours`, so a witness at which `hours` is zero raises. The report must name
+-- the error and the input it raised at (smucclaw/l4-ide#1096).
+GIVEN casual IS A BOOLEAN, salary IS A NUMBER, hours IS A NUMBER, flat IS A NUMBER
+GIVETH A NUMBER
+DECIDE `hourly pay` casual salary hours flat IS
+    IF casual
+    THEN flat
+    ELSE salary DIVIDED BY hours

@@ -1,7 +1,7 @@
 -- Whether the allowance is paid depends on `resident`, but how much depends
--- on `income`, which no condition reads. The report tries `income` at one
--- value, so it says which input that is rather than let one printed answer
--- stand for every income.
+-- on `income`, which no condition reads. No condition mentions a number, so
+-- the report tries `income` at zero alone, and says which input that is
+-- rather than let one printed answer stand for every income.
 GIVEN income IS A NUMBER
       resident IS A BOOLEAN
 GIVETH A NUMBER

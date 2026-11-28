@@ -255,6 +255,7 @@ data Ctx = Ctx
   , cxNonexh   :: !Bool                       -- ^ the enclosing decision carries @\@nonexhaustive@
   , cxBoolOnly :: !Bool                       -- ^ @--boolean-only@: never emit a ladder (§8.4)
   , cxGates    :: !(Map Unique WitnessGate)   -- ^ §8.4's witness gates, per exported decision
+  , cxVetoes   :: !(Map Unique Text)          -- ^ ladders the caller found unsafe, per exported decision, and why
   }
 
 -- | The name Catala's @optional of@ enumeration answers to in 'cxCases'.
@@ -279,11 +280,18 @@ data LowerOptions = LowerOptions
     -- its ladder checked by test scopes that call the emitted scope itself, and
     -- the exhaustive grid's cap does not apply to it. A decision without one is
     -- lowered exactly as before.
+  , loLadderVetoes :: Map Unique Text
+    -- ^ exported decisions whose ladder must not be shipped, and why, found
+    -- by the caller: the witness search evaluated the rule at an input at
+    -- which L4 answers and a condition after the first one raises, the
+    -- hazard 'strictnessVeto' reads from the syntax, reached here through a
+    -- rule the condition calls, say. Such a decision gets the reference
+    -- rendering, as under 'strictnessVeto', with this reason.
   }
   deriving stock (Eq, Show)
 
 defaultLowerOptions :: LowerOptions
-defaultLowerOptions = LowerOptions { loBooleanOnly = False, loWitnessGates = Map.empty }
+defaultLowerOptions = LowerOptions { loBooleanOnly = False, loWitnessGates = Map.empty, loLadderVetoes = Map.empty }
 
 -- | The witness gate for one exported decision's ladder (§8.4's disclosed-open
 -- item, discharged by VERIFICATION-BACKEND-LOWERING-SPEC R-V10).
@@ -336,6 +344,9 @@ data LadderTarget = LadderTarget
   , ltReadsAssumes :: !Bool
   , ltDecl   :: !(Decide Resolved)
     -- ^ the exported declaration itself, for a caller that draws its rungs
+  , ltVetoed :: !Bool
+    -- ^ 'strictnessVeto' refuses this ladder, so the reference rendering is
+    -- emitted whatever the gate finds
   }
 
 -- | Every exported decision of this module whose body 'modeBClauses' would
@@ -350,6 +361,7 @@ ladderTargets imports mod' =
       , ltAtoms  = atoms
       , ltReadsAssumes = not (null (Map.findWithDefault [] di.diUnique assumeUse))
       , ltDecl   = ef.exportDecide
+      , ltVetoed = isJust (strictnessVeto di.diBody)
       }
   | ef <- getExportedFunctions mod'
   , Just di <- [Map.lookup (getUnique (decideName ef.exportDecide)) decides]
@@ -616,6 +628,7 @@ buildModule opts imports mod' efs =
           , cxNonexh   = False
           , cxBoolOnly = opts.loBooleanOnly
           , cxGates    = opts.loWitnessGates
+          , cxVetoes   = opts.loLadderVetoes
           }
         modTitle = catUpper (dropExt (moduleSource mod'))
     in (\lowered tops ->
@@ -1457,6 +1470,7 @@ lowerExportDi outer assumes assumeUse di ef path =
   assumeUs = Map.findWithDefault [] di.diUnique assumeUse
   assumeVs = mapMaybe (`Map.lookup` assumes) assumeUs
   gate     = Map.lookup di.diUnique outer.cxGates
+  veto     = Map.lookup di.diUnique outer.cxVetoes
 
   -- The scope's own variables share one Catala namespace, and 'catIdent' is not
   -- injective, so the parameters, the ASSUMEd inputs and the output name all go
@@ -1506,7 +1520,7 @@ lowerExportDi outer assumes assumeUse di ef path =
        <$> vList (map scopeInput di.diGivens)
        <*> vList (map assumeInput assumeVs)
        <*> vList (map (typicallyDefault bodyCtx') di.diGivens)
-       <*> lowerRule bodyCtx' (isJust gate) outName outShape di.diBody
+       <*> lowerRule bodyCtx' (isJust gate) veto outName outShape di.diBody
 
   checkGivenShape g = case givenType g of
     Nothing -> vBad [LowerError di.diName di.diRange
@@ -1617,8 +1631,8 @@ lowerHelper outer di = vIn di.diName $ case di.diGiveth of
 -- also carry the equivalence apparatus that re-checks it. Where it cannot, the
 -- boolean reference rendering is emitted and the reason is recorded — as a
 -- comment in the artifact and as a warning on stderr.
-lowerRule :: Ctx -> Bool -> Text -> CatVarShape -> Expr Resolved -> V CatRuleDef
-lowerRule ctx gated var shape body =
+lowerRule :: Ctx -> Bool -> Maybe Text -> Text -> CatVarShape -> Expr Resolved -> V CatRuleDef
+lowerRule ctx gated veto var shape body =
   (\modeA modeB -> withNotes $ case modeB of
       -- No ladder was derivable, so nothing was fallen back /from/: this is an
       -- ordinary definition, and calling it a "Mode A fallback" in the artifact
@@ -1633,7 +1647,9 @@ lowerRule ctx gated var shape body =
         , rdEmitted = ModeA, rdEqv = Nothing, rdNotes = []
         , rdFallback = Just "--boolean-only: the Mode A reference rendering was requested"
         }
-      Just (clauses, _) | Just why <- strictnessVeto body -> CatRuleDef
+      -- the caller's veto ('loLadderVetoes') is the same hazard, found by
+      -- evaluating the rule rather than by reading it
+      Just (clauses, _) | Just why <- strictnessVeto body <|> veto -> CatRuleDef
         { rdVar = var, rdModeA = modeA, rdModeB = Just clauses
         , rdEmitted = ModeA, rdEqv = Nothing, rdNotes = []
         , rdFallback = Just why

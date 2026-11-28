@@ -1,9 +1,9 @@
 # `l4 export catala` exhibits
 
-Fourteen L4 sources and the literate Catala they compile to, plus the
+Sixteen L4 sources and the literate Catala they compile to, plus the
 `--boolean-only` rendering of one of them. The goldens under `expected/` are
-byte-for-byte what `l4 export catala <file>.l4` prints, and `jl4/tests-cli/Main.hs`
-pins them. A fifteenth source, `imported-domain.l4`, is never compiled on its
+byte-for-byte what `l4 export catala <file>.l4` prints, and `jl4/tests-cli/CliTest/Catala.hs`
+pins them. A seventeenth source, `imported-domain.l4`, is never compiled on its
 own — it is what `imports.l4` imports, and `l4 export catala` refuses it correctly for
 carrying no exported decision. `not-ok/` holds eight sources that `l4 export catala`
 **refuses**, each because emitting it would have made the Catala say something
@@ -49,6 +49,8 @@ the third.
 | `fixtures.l4` | directives that test against NAMED fixtures — nullary, unary, and a helper wrapping an exported call — each reached only from a directive (§8.1.3); its last two directives are skipped on purpose, so the golden also pins their numbering |
 | `or-leaves.l4` | an exception `a OR b OR c` beside a twelve-constructor enum: the gate's conditions are the leaves, so dropping `b` or `c` from the shipped rule fails `clerk test` (§8.4) |
 | `guarded-leaf.l4` | a leaf that raises (`10 / instalments` at zero) where its rung is decided by the first leaf: the gate stays at rung level, says why, and still tests zero (§8.4) |
+| `raising-witness.l4` | a rule that raises at an input the gate would test: one gate falls back to the rungs and its note quotes the error and the input, and one cannot be built, which stderr says, quoting the error (§8.4) |
+| `raising-helper.l4` | a ladder whose later condition divides by zero, through a rule it calls, where the first condition already gives the answer: no gate is built, and the reference rendering is emitted instead of the ladder, as for a division written in the condition; a control whose first arm another input reaches keeps its gate; and a rule whose first condition, as written, another input makes hold gets its gate at rung level (§8.4) |
 
 The two ports compile **unchanged** from their OpenFisca originals — the same
 L4 file feeds both backends, and what makes it Catala-clean is R11 rather than

@@ -44,20 +44,19 @@ high-fidelity — and unusually useful as a cross-check.
 - **Every exception ladder is checked against L4 on the scope you ship.** Rewriting an `UNLESS`
   or a `BRANCH` as a ladder is a change of shape, so each ladder carries a _witness gate_: test
   scopes that call the emitted scope at concrete inputs and expect the value L4 computed there.
-  The inputs come from a fixed set of candidates: each number the conditions mention, one either
-  side of it, zero, both truth values, and every option of a choice. The conditions are the
-  separate yes-or-no questions inside the ladder's rungs, so `a OR b` is two of them, not one, and a
-  question that appears in two rungs counts once; a call to another rule counts as one question
-  and its body is not read. Every combination of those questions that some candidate produces is
-  tested at up to eight of the candidates that produce it, so an inequality is tested exactly at
-  its threshold as well as either side of it, and an edit that drops `b` from `a OR b` changes a
-  tested answer.
+  The inputs come from a fixed set of candidates, listed below under [The inputs a gate tries](#the-inputs-a-gate-tries).
+  The conditions are the separate yes-or-no questions inside the ladder's rungs, so `a OR b` is two of them, not one, and a question that appears in two rungs counts once; a call to another rule counts as one question, though the numbers in its body are among the candidates.
+  Every combination of those questions that some candidate produces is tested at up to eight of the candidates that produce it, so an inequality is tested exactly at its threshold as well as either side of it, and an edit that drops `b` from `a OR b` changes a tested answer.
   An edit to the shipped rule that changes its answer at any of those inputs fails `clerk test`;
   that includes changing `>` to `>=` on a threshold the rule compares with. An edit that changes the
   answer only at inputs outside the candidate set is not caught.
   Beyond twelve such questions, or where a question raises an error at an input that an earlier
   question of its rung already decides (`x ≠ 0 AND 10 / x > 2` at zero), the gate takes each rung
   as one question instead, and the emitted file says so and says why.
+  Where a question raises an error at a candidate at which an earlier rung has already given L4's answer, the candidate is left out, which loses nothing if another candidate, at which every question is true or false, agrees with it on the questions L4 reaches there: those of each rung up to the one that gives the answer.
+  If none does, the gate takes each rung as one question instead, checked the same way: in a rule whose first rung is `n EQUALS 0 OR n EQUALS 100` and whose second divides by `n` through another rule, only zero makes `n EQUALS 0` hold, but a hundred makes the first rung hold as zero does, so the gate is built at rung level, and the emitted file says so.
+  Where the rungs lose that candidate too, no gate is built, and the rule is emitted in the plain boolean rendering instead of the ladder, as it is whenever a question after the first divides, takes a modulo or builds a date in its own text: stderr says why.
+  Only the candidates are checked this way: an input outside them at which a question raises is not seen, so a combination it would realise can still be wrongly proved impossible and go untested.
   An SMT solver, [z3](https://github.com/Z3Prover/z3), is used only to show that the remaining
   combinations are impossible (a higher income band without the lower one, say), and to find a
   witness when no candidate produces a combination; the file says so when it does. Unless a
@@ -66,6 +65,17 @@ high-fidelity — and unusually useful as a cross-check.
   `l4 coverage FILE` prints the same combinations, the inputs found for them and the ones proved
   impossible, for any rule, without Catala: see [Which combinations a rule has been tried
   on](../concepts/reviewing/coverage.md).
+
+### The inputs a gate tries
+
+Every input is tried at the same candidates as any other input of its kind:
+
+- a number at zero, at each number the conditions mention and each number in the rules they call, and at one either side of each;
+- a true-or-false input at both values;
+- a choice at every option, with the fields of an option or a record at the candidates of their own kinds, two levels deep.
+
+The gate tries every combination of those, up to 4,096 of them (past that, 4,096 spread across them), the first input changing fastest, and keeps the first eight that produce each combination of the questions.
+If some input's kind has no value two levels deep, such as a record whose field is a record whose field is a record with fields of its own, there are no candidates at all, and every witness comes from the solver.
 
 ## The command
 

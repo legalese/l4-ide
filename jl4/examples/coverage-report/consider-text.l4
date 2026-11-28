@@ -1,0 +1,10 @@
+-- A CONSIDER over text. Each WHEN would be one condition, but the report
+-- writes the conditions for a solver that cannot read text, so the rule is
+-- not covered, the reason says why, and the run exits 3.
+GIVEN colour IS A STRING
+GIVETH A NUMBER
+DECIDE `fee by colour` colour IS
+    CONSIDER colour
+    WHEN "red" THEN 5
+    WHEN "blue" THEN 9
+    OTHERWISE 20

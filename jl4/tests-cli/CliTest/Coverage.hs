@@ -8,8 +8,9 @@ module CliTest.Coverage (spec, fixtures) where
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.KeyMap as KM
 import qualified Data.ByteString.Lazy.Char8 as BSL8
-import Data.List (isInfixOf, isPrefixOf)
+import Data.List (isInfixOf, isPrefixOf, isSuffixOf)
 import Data.Foldable (toList)
+import qualified Data.Text as T
 import System.Exit (ExitCode (..))
 import Test.Hspec
 
@@ -18,15 +19,30 @@ import CliTest.Common
 -- | The files these tests read, checked before hspec runs anything.
 fixtures :: [FilePath]
 fixtures =
-  [ "examples/catala/bands.l4"
+  [ "examples/coverage-report/later-arm.l4"
+  , "examples/coverage-report/later-arm-covered.l4"
+  , "examples/catala/bands.l4"
   , "examples/catala/many-bands.l4"
   , "examples/catala/or-leaves.l4"
   , "examples/catala/guarded-leaf.l4"
   , "examples/coverage-report/expected/bands.txt"
+  , "examples/coverage-report/divide.l4"
+  , "examples/coverage-report/dates.l4"
+  , "examples/coverage-report/refuse.l4"
+  , "examples/coverage-report/witness-inputs.l4"
   , "examples/coverage-report/expected/or-leaves.txt"
   , "examples/coverage-report/no-condition.l4"
+  , "examples/coverage-report/unread-values.l4"
   , "examples/coverage-report/varies.l4"
   , "examples/coverage-report/unread.l4"
+  , "examples/coverage-report/consider.l4"
+  , "examples/coverage-report/consider-shapes.l4"
+  , "examples/coverage-report/consider-limits.l4"
+  , "examples/coverage-report/consider-partial.l4"
+  , "examples/coverage-report/consider-text.l4"
+  , "examples/coverage-report/expected/consider.txt"
+  , "examples/coverage-report/expected/consider-shapes.txt"
+  , "examples/coverage-report/expected/consider-limits.txt"
   ]
 
 spec :: FilePath -> Spec
@@ -95,22 +111,269 @@ spec bin = describe "l4 coverage" $ do
     -- the other bucket has one input and one answer, and says so plainly
     sout `shouldSatisfy` ("witnessed by 1 input; L4 answers 100.1" `isInfixOf`)
 
-  -- An input no condition reads is tried at one value, and the report says
-  -- which, because the answers it prints are only as varied as its inputs.
+  -- No bucket depends on an input that no condition reads, and the report
+  -- says which those are, because the answers it prints are only as varied
+  -- as its inputs. In unread.l4 no condition mentions a number, so `income`
+  -- is tried at zero alone.
   it "names the inputs that no condition reads" $ do
     Output code sout _ <- runL4 bin ["coverage", "examples/coverage-report/unread.l4"]
     code `shouldBe` ExitSuccess
-    sout `shouldSatisfy` ("Inputs no condition reads (tried at one value only, so the answers below may vary with them): income" `isInfixOf`)
+    sout `shouldSatisfy` ("Inputs no condition reads (no bucket depends on them, so the answers below may vary with them): income" `isInfixOf`)
+
+  -- The report's help, its line above and the spec once said that such an
+  -- input "is tried at one value only". It is tried at the same candidates
+  -- as any other input of its kind: a number at each number the conditions
+  -- reach (here 50, inside the rule the condition calls) and one either
+  -- side, as well as zero, and a BOOLEAN at both values.
+  it "tries an input no condition reads at the same values as any other input of its kind" $ do
+    Output code sout _ <- runL4 bin ["coverage", "--all", "--decision", "refund", "examples/coverage-report/unread-values.l4"]
+    code `shouldBe` ExitSuccess
+    sout `shouldSatisfy` ("Inputs no condition reads (no bucket depends on them, so the answers below may vary with them): amount, urgent" `isInfixOf`)
+    mapM_ (\ row -> sout `shouldSatisfy` (row `isInfixOf`))
+      [ "days = 51, amount = 0, urgent = TRUE gives 0", "days = 51, amount = 50, urgent = TRUE gives 50"
+      , "days = 51, amount = 49, urgent = TRUE gives 49", "days = 51, amount = 51, urgent = FALSE gives 51" ]
+    sout `shouldSatisfy` ("L4's answer DIFFERS across them: 4 different values" `isInfixOf`)
+
+  -- smucclaw/l4-ide#1096. When L4 raises an error at a witness, the bucket
+  -- is undecided, and the reason must say what L4 raised and at which input.
+  -- It used to say "no Catala-renderable value", which named neither, and
+  -- mentioned Catala though no export was asked for.
+  it "names the error L4 raises at a witness, and the input, without mentioning Catala" $ do
+    Output code' sout' _ <- runL4 bin ["coverage", "examples/coverage-report/dates.l4"]
+    sout' `shouldNotSatisfy` ("Catala" `isInfixOf`)
+    sout' `shouldSatisfy` ("T    UNDECIDED: L4 raises an error at d = 0, m = 3, y = 0: \"DATE_FROM_DMY produced an invalid date from day=0, month=3, year=0\"" `isInfixOf`)
+    code' `shouldBe` ExitFailure 2
+    Output code sout _ <- runL4 bin ["coverage", "examples/coverage-report/divide.l4"]
+    sout `shouldNotSatisfy` ("Catala" `isInfixOf`)
+    sout `shouldSatisfy` ("F    UNDECIDED: L4 raises an error at casual = FALSE, salary = 0, hours = 0, flat = 0: \"Division by zero in the operation: DIVIDED BY\"" `isInfixOf`)
+    code `shouldBe` ExitFailure 2
+
+  -- The JSON report carries the same reason.
+  it "carries the error L4 raises at a witness in the JSON report" $ do
+    Output code sout _ <- runL4 bin ["coverage", "--json", "examples/coverage-report/divide.l4"]
+    code `shouldBe` ExitFailure 2
+    let whys = case Aeson.decode (BSL8.pack sout) :: Maybe Aeson.Value of
+          Just (Aeson.Object o) | Just (Aeson.Array ds) <- KM.lookup "decisions" o ->
+            [ w | Aeson.Object d <- toList ds, Just (Aeson.Array bs) <- [KM.lookup "buckets" d]
+                , Aeson.Object b <- toList bs, Just w <- [KM.lookup "why" b] ]
+          _ -> []
+    whys `shouldBe` [Aeson.String "L4 raises an error at casual = FALSE, salary = 0, hours = 0, flat = 0: \"Division by zero in the operation: DIVIDED BY\""]
+
+  -- A refusal at a witness has a reason of its own, which quotes it.
+  it "quotes a refusal at a witness, and exits 2" $ do
+    Output code sout _ <- runL4 bin ["coverage", "examples/coverage-report/refuse.l4"]
+    sout `shouldSatisfy` ("F    UNDECIDED: L4 gives no answer at n = 0: it refuses to answer: \"no rate up to 10\"" `isInfixOf`)
+    code `shouldBe` ExitFailure 2
+
+  -- How that reason names the input: a record value in parentheses, so that
+  -- its fields do not read as more inputs, and no input at all for a rule
+  -- that has none (it read "at :" before).
+  it "names a record input in parentheses, and no input for a rule with none, where L4 raises at a witness" $ do
+    Output code sout _ <- runL4 bin ["coverage", "examples/coverage-report/witness-inputs.l4"]
+    sout `shouldSatisfy` ("    T    UNDECIDED: L4 raises an error at a = (Account OF " `isInfixOf`)
+    sout `shouldSatisfy` ("    T    UNDECIDED: L4 raises an error: \"Division by zero in the operation: DIVIDED BY\"" `isInfixOf`)
+    sout `shouldNotSatisfy` (" at :" `isInfixOf`)
+    code `shouldBe` ExitFailure 2
+
+  -- A CONSIDER with no OTHERWISE whose WHENs miss an option raises at that
+  -- option, and the reason says so, plain and @nonexhaustive alike. (This
+  -- reads the fixture of the CONSIDER tests, so it needs that change too.)
+  it "quotes the error a CONSIDER with no branch for an option raises at it" $ do
+    Output code sout _ <- runL4 bin ["coverage", "examples/coverage-report/consider-partial.l4"]
+    length (filter ("    F  F    UNDECIDED: L4 raises an error at p = team: \"The value team reached a CONSIDER that has no branch for it." `isPrefixOf`) (lines sout)) `shouldBe` 2
+    code `shouldBe` ExitFailure 2
 
   it "refuses a --decision that names nothing, exit 1" $ do
     Output code _ serr <- runL4 bin ["coverage", "--decision", "no such rule", "examples/catala/bands.l4"]
     code `shouldBe` ExitFailure 1
     serr `shouldSatisfy` ("no decision named no such rule" `isInfixOf`)
 
+  -- A condition that raises at an input the report tries, where an earlier
+  -- arm gives the answer, and no other input it tries agrees with that one on
+  -- the conditions L4 reaches there that give true or false: no combination
+  -- of the conditions holds the answer L4 gives at that input, and the
+  -- conditions as written are no coarser, so the rule is not covered, and the
+  -- reason names the input and the condition (decided by Claude 2026-11-25,
+  -- pending Meng's review). Before, the input was dropped, the run exited 0,
+  -- and with a solver the combinations L4 answers in were "proved
+  -- impossible". Where only an input the report does not try agrees, the
+  -- rule is not covered either. Where the separate conditions lose the input
+  -- but the conditions as written do not, the rule is covered by those. The
+  -- control raises at that input too, so it loses no answer and is covered
+  -- as before.
+  it "does not cover a rule whose later arm raises where no other input reaches the earlier arm, and names the input" $ do
+    Output code sout _ <- runL4 bin ["coverage", "examples/coverage-report/later-arm.l4"]
+    let notCovered = filter ("  NOT COVERED: L4 answers" `isPrefixOf`) (lines sout)
+    length notCovered `shouldBe` 9
+    length (filter ("at n = 0, but the condition `n EQUALS (1 DIVIDED BY n)` raises an error there" `isInfixOf`) notCovered) `shouldBe` 2
+    length (filter ("at n = 0, but the condition `(twice OF (10 DIVIDED BY n)) GREATER THAN 2` raises an error there" `isInfixOf`) notCovered) `shouldBe` 1
+    length (filter ("at p = team, but the condition " `isInfixOf`) notCovered) `shouldBe` 1
+    -- the rule `price band` calls has no WHEN for team, so its own bucket
+    -- there is undecided, which outranks a decision not covered
+    code `shouldBe` ExitFailure 2
+    Output code' _ _ <- runL4 bin ["coverage", "--decision", "reciprocal band", "examples/coverage-report/later-arm.l4"]
+    code' `shouldBe` ExitFailure 3
+    Output _ jout _ <- runL4 bin ["coverage", "--json", "examples/coverage-report/later-arm.l4"]
+    mapM_ (\ name -> (name, decisionNamed jout name >>= KM.lookup "covered") `shouldBe` (name, Just (Aeson.Bool False)))
+      [ "reciprocal band", "reciprocal band by BRANCH", "in an argument", "two rules deep"
+      , "price band", "usage band", "constant band", "only the solver agrees"
+      , "positive and not large" ]
+    (decisionNamed jout "reciprocal or two" >>= KM.lookup "level") `shouldBe` Just (Aeson.String "leaf")
+    (decisionNamed jout "zero or a hundred" >>= KM.lookup "level") `shouldBe` Just (Aeson.String "rung")
+
+  -- How that reason names things: a record input in parentheses, so that its
+  -- fields do not read as more inputs; no input at all for a rule that has
+  -- none; and a condition whose text already quotes a rule's name in double
+  -- backticks with a space inside, as Markdown quotes a backtick.
+  it "names a record input in parentheses, no input for a rule with none, and a condition with a quoted rule name in double backticks" $ do
+    Output _ sout _ <- runL4 bin ["coverage", "examples/coverage-report/later-arm.l4"]
+    let notCovered = filter ("  NOT COVERED: L4 answers" `isPrefixOf`) (lines sout)
+    length (filter ("  NOT COVERED: L4 answers at a = (Account OF " `isPrefixOf`) notCovered) `shouldBe` 1
+    length (filter ("  NOT COVERED: L4 answers, but the condition `0 EQUALS (1 DIVIDED BY 0)` raises an error (" `isPrefixOf`) notCovered) `shouldBe` 1
+    length (filter ("raises an error (\"Division by zero in the operation: DIVIDED BY\"), so no combination of the conditions holds that answer." `isSuffixOf`) notCovered) `shouldBe` 1
+    length (filter ("at n = 0, but the condition `` (`one more than ten over` OF n) GREATER THAN 2 `` raises an error there" `isInfixOf`) notCovered) `shouldBe` 1
+    length (filter ("at n = 0, but the condition `(twice OF (10 DIVIDED BY n)) GREATER THAN 2` raises" `isInfixOf`) notCovered) `shouldBe` 1
+    sout `shouldNotSatisfy` ("```" `isInfixOf`)
+
+  -- The controls: the same later condition raises at an input where an
+  -- earlier arm answers, but another input the report tries reaches that arm
+  -- with every condition decided, and agrees with the left-out one on each
+  -- condition L4 reaches there that is decided. That combination is
+  -- witnessed, so nothing is lost by leaving the input out, and the rule is
+  -- covered at leaf level, as it always was. A condition L4 does not reach
+  -- there is not compared, even where only the left-out input makes it true
+  -- (`dead third arm`, `true condition between`, and in an UNLESS chain
+  -- whose first condition fails there, `proviso not reached at zero`).
+  -- Checked without a solver:
+  -- the combination that holds the left-out input's answer is witnessed by
+  -- an input the report tried.
+  it "covers a rule whose later arm raises where another input reaches the earlier arm with every condition decided" $ do
+    Output _ sout _ <- runL4 bin ["coverage", "examples/coverage-report/later-arm-covered.l4"]
+    sout `shouldNotSatisfy` ("NOT COVERED" `isInfixOf`)
+    sout `shouldNotSatisfy` ("AT RUNG LEVEL" `isInfixOf`)
+    Output _ jout _ <- runL4 bin ["coverage", "--json", "examples/coverage-report/later-arm-covered.l4"]
+    let witnessedAt name bs = case decisionNamed jout name of
+          Just d | Just (Aeson.Array buckets) <- KM.lookup "buckets" d ->
+            [ (KM.lookup "status" b, solverOf b)
+            | Aeson.Object b <- toList buckets
+            , KM.lookup "assignment" b == Just (Aeson.toJSON bs) ]
+          _ -> []
+        solverOf b = case KM.lookup "witnesses" b of
+          Just (Aeson.Array ws) | Aeson.Object w : _ <- toList ws -> KM.lookup "foundBySolver" w
+          _ -> Nothing
+        witnessedHere = [(Just (Aeson.String "witnessed"), Just (Aeson.Bool False))]
+    mapM_ (\ (name, bs) -> do
+             (name, decisionNamed jout name >>= KM.lookup "level") `shouldBe` (name, Just (Aeson.String "leaf"))
+             (name, bs, witnessedAt name bs) `shouldBe` (name, bs, witnessedHere))
+      [ ("guarded ratio", [True, False]), ("share band", [True, False])
+      , ("share band by BRANCH", [True, False]), ("is eligible", [False, False])
+      , ("always first", [True, False]), ("guarded via a call", [True, False])
+      , ("per head band", [True, False]), ("dead third arm", [True, False, False])
+      , ("true condition between", [True, False, False]), ("third arm is heavy", [True, False, False])
+      , ("proviso not reached at zero", [False, False, False]) ]
+
+  -- Nor is a condition L4 does not reach evaluated on its own there: at zero
+  -- the third condition of `third arm is heavy` takes more than a thousand
+  -- steps, and under a limit of 300 the rule is still covered at leaf level.
+  -- The control shows that the limit bites: `heavy at zero` itself, at zero,
+  -- stops at it.
+  it "does not evaluate a condition L4 does not reach at the left-out input" $ do
+    let file = "examples/coverage-report/later-arm-covered.l4"
+    Output _ jout _ <- runL4 bin ["coverage", "--json", "--max-steps", "300", "--decision", "third arm is heavy", file]
+    (decisionNamed jout "third arm is heavy" >>= KM.lookup "level") `shouldBe` Just (Aeson.String "leaf")
+    Output _ sout _ <- runL4 bin ["coverage", "--max-steps", "300", "--decision", "third arm is heavy", file]
+    sout `shouldNotSatisfy` ("NOT COVERED" `isInfixOf`)
+    Output _ cout _ <- runL4 bin ["coverage", "--max-steps", "300", "--decision", "heavy at zero", file]
+    cout `shouldSatisfy` ("NOT COVERED: the evaluator stopped at a limit" `isInfixOf`)
+
+  -- With a solver, every other combination of the controls is witnessed or
+  -- proved impossible, and the run exits 0.
+  it "decides every combination of those controls with a solver, and exits 0" $ withZ3 $ do
+    Output code sout _ <- runL4 bin ["coverage", "examples/coverage-report/later-arm-covered.l4"]
+    sout `shouldSatisfy` ("nothing undecided" `isInfixOf`)
+    code `shouldBe` ExitSuccess
+
   it "does not call a file with nothing to cover covered: exit 3" $ do
     Output code sout _ <- runL4 bin ["coverage", "examples/coverage-report/no-condition.l4"]
     code `shouldBe` ExitFailure 3
     sout `shouldSatisfy` ("NOTHING COVERED" `isInfixOf`)
+
+  -- smucclaw/l4-ide#1094. Each WHEN of a CONSIDER over the options of a
+  -- choice is a condition the rule branches on, as each IF of the BRANCH it
+  -- stands for is: before, the CONSIDER was counted among the rules with no
+  -- condition to branch on, and the run still exited 0. Both decisions of the
+  -- file must be listed, with the same cover points and the same buckets.
+  -- (The one impossible combination, two options at once, needs a solver.)
+  it "covers each WHEN of a CONSIDER over options, as it covers each IF of the BRANCH twin" $ withZ3 $ do
+    Output code sout _ <- runL4 bin ["coverage", "--json", "examples/coverage-report/consider.l4"]
+    code `shouldBe` ExitSuccess
+    let twin = decisionNamed sout "monthly fee by BRANCH"
+        consider = decisionNamed sout "monthly fee"
+    fmap pointTexts consider `shouldBe` Just ["p EQUALS basic", "p EQUALS pro"]
+    fmap pointTexts consider `shouldBe` fmap pointTexts twin
+    (consider >>= KM.lookup "buckets") `shouldBe` (twin >>= KM.lookup "buckets")
+    (consider >>= KM.lookup "level") `shouldBe` Just (Aeson.String "leaf")
+    expectOutput bin ExitSuccess ["coverage", "examples/coverage-report/consider.l4"]
+                 "examples/coverage-report/expected/consider.txt"
+
+  -- The other CONSIDERs whose every WHEN is one condition: one that lists
+  -- every option and has no OTHERWISE (no plan is none of them, which the
+  -- solver proves), one over numbers, which before was covered only at rung
+  -- level with every cover point spanning the whole CONSIDER, and one in a
+  -- BOOLEAN rule, whose report is the same as before.
+  it "covers a CONSIDER with no OTHERWISE, and a CONSIDER over numbers, at leaf level" $ withZ3 $ do
+    Output code sout _ <- runL4 bin ["coverage", "examples/coverage-report/consider-shapes.l4"]
+    sout `shouldNotSatisfy` ("AT RUNG LEVEL" `isInfixOf`)
+    sout `shouldNotSatisfy` ("no condition to branch on" `isInfixOf`)
+    code `shouldBe` ExitSuccess
+    expectOutput bin ExitSuccess ["coverage", "examples/coverage-report/consider-shapes.l4"]
+                 "examples/coverage-report/expected/consider-shapes.txt"
+
+  -- A WHEN that takes an option apart, a pattern inside a pattern, a new name,
+  -- and an OTHERWISE before the last WHEN are not one yes-or-no condition
+  -- each. Such a rule is named as not covered, with a reason that names
+  -- CONSIDER, and the run exits 3; it is never counted among the rules with
+  -- no condition to branch on.
+  it "names a CONSIDER it cannot cover as not covered, with the reason, and exits 3" $ do
+    Output code sout _ <- runL4 bin ["coverage", "examples/coverage-report/consider-limits.l4"]
+    sout `shouldNotSatisfy` ("no condition to branch on" `isInfixOf`)
+    length (filter ("NOT COVERED: its body is a CONSIDER" `isInfixOf`) (lines sout)) `shouldBe` 4
+    code `shouldBe` ExitFailure 3
+    expectOutput bin (ExitFailure 3) ["coverage", "examples/coverage-report/consider-limits.l4"]
+                 "examples/coverage-report/expected/consider-limits.txt"
+
+  -- A CONSIDER with no OTHERWISE whose WHENs miss an option: the bucket in
+  -- which no WHEN holds is reached only by the option none of them names, at
+  -- which L4 raises, so it is undecided and the run exits 2, whether or not
+  -- the rule is marked @nonexhaustive.
+  it "leaves undecided the bucket of a CONSIDER that no WHEN matches, with or without @nonexhaustive, and exits 2" $ do
+    Output code sout _ <- runL4 bin ["coverage", "examples/coverage-report/consider-partial.l4"]
+    length (filter ("    F  F    UNDECIDED: " `isPrefixOf`) (lines sout)) `shouldBe` 2
+    code `shouldBe` ExitFailure 2
+
+  -- A CONSIDER over text: the report writes the conditions for a solver that
+  -- has no text, so the rule is not covered, and the run exits 3. The help and
+  -- coverage.md once listed text among the shapes covered.
+  it "names a CONSIDER over text as not covered, since the solver cannot read text, and exits 3" $ do
+    Output code sout _ <- runL4 bin ["coverage", "examples/coverage-report/consider-text.l4"]
+    sout `shouldSatisfy` ("NOT COVERED: out of fragment: STRING" `isInfixOf`)
+    code `shouldBe` ExitFailure 3
+
+-- | One decision of a @--json@ report, by name.
+decisionNamed :: String -> String -> Maybe Aeson.Object
+decisionNamed sout name =
+  case Aeson.decode (BSL8.pack sout) :: Maybe Aeson.Value of
+    Just (Aeson.Object o) | Just (Aeson.Array ds) <- KM.lookup "decisions" o ->
+      case [ d | Aeson.Object d <- toList ds, KM.lookup "name" d == Just (Aeson.String (T.pack name)) ] of
+        [d] -> Just d
+        _ -> Nothing
+    _ -> Nothing
+
+-- | The texts of a decision's cover points, in order.
+pointTexts :: Aeson.Object -> [String]
+pointTexts d = case KM.lookup "coverPoints" d of
+  Just (Aeson.Array ps) -> [ T.unpack t | Aeson.Object p <- toList ps, Just (Aeson.String t) <- [KM.lookup "text" p] ]
+  _ -> []
 
 -- | The exit status is part of the claim, so it is asserted, not assumed.
 expectOutput :: FilePath -> ExitCode -> [String] -> FilePath -> IO ()

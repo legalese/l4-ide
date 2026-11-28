@@ -19,12 +19,13 @@
 -- Catala). Each bucket is one of three things, and the report says which:
 --
 -- [witnessed] some input realises it, found among a fixed set of candidates
---   and confirmed by the evaluator, which also gives the decision's answer
---   there;
+--   (or, where none realises it, given by the solver) and confirmed by the
+--   evaluator, which also gives the decision's answer there;
 -- [proved impossible] no input realises it, which the solver (z3, @Z3_EXE@
 --   else @PATH@) proved;
 -- [undecided] neither, with the reason: no solver, a timeout, a solver
---   answer of @unknown@, an input the evaluator could not run.
+--   answer of @unknown@, an input at which L4 raises an error (quoted, with
+--   the input).
 --
 -- A decision whose leaves cannot all be taken separately is covered at rung
 -- level, the conditions as written, and the report says so and says why. A
@@ -59,9 +60,9 @@ import qualified LSP.L4.Rules as Rules
 import Language.LSP.Protocol.Types (normalizedFilePathToUri)
 
 import L4.Annotation (rangeOf)
-import L4.Coverage.Rungs (rungsOf)
+import L4.Coverage.Rungs (considerRungs, rungsOf)
 import L4.Parser.SrcSpan (SrcRange, prettySrcRange)
-import L4.Print (extractConstructorFieldNames, prettyLayoutNF)
+import L4.Print (extractConstructorFieldNames, prettyLayout, prettyLayoutNF)
 import L4.Syntax
 import qualified L4.TypeCheck as TC
 
@@ -80,35 +81,70 @@ coverageBound =
   unlines
     [ "WHAT THIS COVERS, AND WHAT IT DOES NOT"
     , ""
+    -- The WHENs of a CONSIDER, and the sentence about the CONSIDERs that are
+    -- not covered in the last paragraph but one, came after the ruled run
+    -- (smucclaw/l4-ide#1094): decided by Claude 2026-11-25, pending Meng's
+    -- review.
     , "  The cover points of a decision are the separate yes-or-no conditions in"
-    , "  the conditions it branches on (an UNLESS chain, a BRANCH or IF, or the"
-    , "  body of a BOOLEAN decision): `a OR b' is two, a condition used twice is"
-    , "  one. A bucket is one combination of their truth values; with n cover"
-    , "  points there are 2^n buckets, and past 12 the decision is covered by"
-    , "  its conditions as written instead."
+    , "  the conditions it branches on (an UNLESS chain, a BRANCH or IF, the"
+    , "  WHENs of a CONSIDER, or the body of a BOOLEAN decision): `a OR b' is"
+    , "  two, a condition used twice is one. A bucket is one combination of"
+    , "  their truth values; with n cover points there are 2^n buckets, and"
+    , "  past 12 the decision is covered by its conditions as written instead."
     , ""
-    , "  WITNESSED means an input realises the bucket and the evaluator agrees;"
-    , "  the inputs come from a fixed set of candidates (each number the rule"
-    , "  mentions, one either side of it, zero, both truth values, every"
-    , "  constructor), at most 8 per bucket, so the witnesses do not depend on"
-    , "  the solver. PROVED IMPOSSIBLE is the solver's claim alone: nothing"
-    , "  else checks it. UNDECIDED is neither, with its reason, and is never"
-    , "  counted as covered."
+    -- The candidates and the solver's witnesses in the next paragraph, and the
+    -- first sentence of the one after it, were corrected on 2026-11-25 to say
+    -- what the search does, not what was ruled (CATALA-EXPORT-SPEC, "A
+    -- standalone report"): decided by Claude 2026-11-25, pending Meng's review.
+    , "  WITNESSED means an input realises the bucket and the evaluator agrees."
+    , "  Each input is tried at a fixed set of candidates, the same for every"
+    , "  input of its type: for a number, zero and each number in the"
+    , "  conditions or in the rules they call, with one either side of it (so"
+    , "  zero alone where there is none); both truth values; every constructor,"
+    , "  over its fields' candidates, two levels deep. If some input's type has"
+    , "  no value within two levels (a record nested three deep, say), there"
+    , "  are no candidates at all, not even for a BOOLEAN. A bucket keeps the"
+    , "  first 8 inputs that realise it, and only a bucket that no candidate"
+    , "  realises takes its witness from the solver, whose row says so. PROVED"
+    , "  IMPOSSIBLE is the solver's claim alone: nothing else checks it."
+    , "  UNDECIDED is neither, with its reason, and is never counted as"
+    , "  covered."
     , ""
     -- The next paragraph came after the example run that was ruled on, and
     -- was ruled separately (CROSSWORD).
-    , "  An input that no condition reads is tried at one value only (zero, for"
-    , "  a number), so a bucket whose answer varies with such an input shows"
-    , "  one answer; the report names those inputs. When the inputs that"
-    , "  realise one bucket give different answers, the row says so and shows"
-    , "  an input for each answer."
+    , "  An input that no condition reads takes the same candidates, but no"
+    , "  bucket depends on it, so a bucket whose answer varies with such an"
+    , "  input may show one answer; the report names those inputs. When the"
+    , "  inputs that realise one bucket give different answers, the row says"
+    , "  so and shows an input for each answer."
     , ""
-    , "  A call to another rule is one cover point and its body is not read."
+    , "  A call to another rule is one cover point: its conditions are not"
+    , "  cover points, though its numbers are among the candidates."
     , "  A condition inside the result of an arm, or a condition that raises at"
     , "  an input where an earlier condition of its rung already decides it,"
     , "  is not a cover point; the second keeps the decision at rung level."
-    , "  A decision that reads an ASSUME is not covered, since a witness"
-    , "  cannot supply one."
+    -- The next three sentences, on a condition that raises behind an earlier
+    -- arm, came after the ruled run as well (CATALA-EXPORT-SPEC, "Refined for
+    -- a raise behind an earlier arm"): decided by Claude 2026-11-25, pending
+    -- Meng's review.
+    , "  Where an earlier arm decides such an input instead and L4 answers"
+    , "  there, the input is left out, which loses nothing if another"
+    , "  candidate, at which every condition is true or false, agrees with it"
+    , "  on the conditions L4 reaches there: those of each rung up to the one"
+    , "  that settles the answer. If none does, the decision is covered at"
+    , "  rung level instead, checked the same way, and where the rungs lose"
+    , "  that input too it is not covered, and the reason names the input."
+    , "  Only candidates are checked this way: an input outside them at which"
+    , "  a condition raises can still leave a bucket wrongly proved impossible."
+    , "  A decision that is not BOOLEAN and whose body is a CONSIDER is covered"
+    , "  only when each WHEN names a number, an option without fields, or"
+    , "  EXACTLY a value, and any OTHERWISE comes last; any other is named as"
+    , "  not covered. A decision with an input that is text, a date, a list,"
+    , "  a MAYBE or of another type that takes a parameter, read or not, or a"
+    , "  condition that works on text, dates or such types, a CONSIDER over"
+    , "  text or with a WHEN NOTHING among them, is not covered, since the"
+    , "  solver cannot read them. A decision that reads an ASSUME is not"
+    , "  covered, since a witness cannot supply one."
     , ""
     , "  Exit status: 0 every decision covered at leaf level and every bucket"
     , "  witnessed or proved impossible; 1 the file does not type-check or an"
@@ -167,8 +203,9 @@ data Entry = Entry
   , enRange  :: Maybe SrcRange
   , enParams :: [Text]
   , enUnread :: [Text]
-    -- ^ the inputs no cover point mentions: they are tried at one value, so
-    -- the answer can vary with them where the report shows one
+    -- ^ the inputs no cover point mentions: no bucket depends on them, and a
+    -- bucket keeps only its first inputs, so the answer can vary with them
+    -- where the report shows one
   , enResult :: Outcome
   }
 
@@ -205,13 +242,13 @@ coverageWith opts evalConfig = do
           ce = CoverEnv
             { ceEval = evalConfig, ceTc = tc, ceImportEnv = importEnv
             , ceSolver = msolver, ceSolverSecs = opts.covTimeout
-            , ceAnswer = \nf -> Just (Text.strip (prettyLayoutNF fields nf))
+            , ceAnswer = \nf -> Right (Text.strip (prettyLayoutNF fields nf))
             , ceFallbackOnUndecided = False }
       entries <- for chosen \(name, mt) -> case mt of
         Left why -> pure (Entry name Nothing [] [] (NotCovered why))
         Right (rng, params, target) -> do
           r <- coverTarget ce target
-          pure (Entry name rng params (either (const []) (unreadBy target) r) (either NotCovered Covered r))
+          pure (Entry name rng params (either (const []) (unreadBy target) r) (either (NotCovered . (.ucWhy)) Covered r))
       let (silent, shown) = partitionEntries (null wanted) entries
           solverNote = fmap (.solverVersion) msolver
           line = coverageLine solverNote (length silent) shown
@@ -249,6 +286,19 @@ partitionEntries unfiltered es
 noConditionReason :: Text
 noConditionReason = "it branches on no condition"
 
+-- | Why a non-BOOLEAN decision whose body is a @CONSIDER@ is not covered,
+-- given the first arm 'considerRungs' could not read as one condition. It
+-- names the CONSIDER, so that it is never mistaken for a rule that branches
+-- on nothing (smucclaw/l4-ide#1094). Its wording was decided by Claude on
+-- 2026-11-25, pending Meng's review.
+considerRefusal :: BranchLhs Resolved -> Text
+considerRefusal lhs = case lhs of
+  Otherwise _ -> "its body is a CONSIDER whose OTHERWISE is not its last arm, so the arms after it are never reached; " <> covered
+  When _ pat -> "its body is a CONSIDER whose `WHEN " <> oneLine (prettyLayout pat) <> "` is not one yes-or-no condition; " <> covered
+ where
+  covered = "this report covers a CONSIDER only when each WHEN names a number, an option without fields, or EXACTLY a value, and any OTHERWISE comes last"
+  oneLine = Text.unwords . Text.words
+
 -- | Every top-level DECIDE of the module, by name, with what covering it needs
 -- or why it cannot be covered.
 decideTargets
@@ -273,7 +323,8 @@ decideTargets tc =
 
   build d@(MkDecide _ (MkTypeSig _ (MkGivenSig _ givens) mGiveth) (MkAppForm _ fnRes appArgs _) body) =
     case rungsOf (isBoolean mGiveth) body of
-      Nothing | wrapped body -> Left "its body is wrapped in WHERE or LET, which this report does not look inside unless the decision is BOOLEAN"
+      Nothing | not (isBoolean mGiveth), Just (Left lhs) <- considerRungs body -> Left (considerRefusal lhs)
+              | wrapped body -> Left "its body is wrapped in WHERE or LET, which this report does not look inside unless the decision is BOOLEAN"
               | otherwise -> Left noConditionReason
       Just [] -> Left noConditionReason
       Just rungs
@@ -365,7 +416,10 @@ renderEntry opts e = case e.enResult of
   Covered c ->
     [ "Decision `" <> e.enName <> "`" <> at e.enRange ]
     <> [ "  Inputs: " <> Text.intercalate ", " (map name' e.enParams) | not (null e.enParams) ]
-    <> [ "  Inputs no condition reads (tried at one value only, so the answers below may vary with them): "
+    -- The words in brackets were corrected on 2026-11-25 from "tried at one
+    -- value only", which holds only for a number where no condition mentions
+    -- one: decided by Claude 2026-11-25, pending Meng's review.
+    <> [ "  Inputs no condition reads (no bucket depends on them, so the answers below may vary with them): "
            <> Text.intercalate ", " e.enUnread
        | not (null e.enUnread) ]
     <> levelLine c
