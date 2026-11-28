@@ -1367,9 +1367,9 @@ It lands when a construct (or a library operator) for a section's alternative ro
 **The question.** A section that grants something by any of several routes (WA Interpretation Act 1984 s 50(1) and (2); AU Acts Interpretation Act 1901 s 15AB(1)(a), (b)(i), (b)(ii)) is today written as an `OR` of its routes.
 Under U1's left-sequential order and `REFUSE.md`'s "Order matters, and it is left to right", `r OR TRUE` refuses while `TRUE OR r` is `TRUE`, so whether the section answers depends on which route the encoder wrote first.
 A lawyer would answer yes whenever any route is met, whatever another route does.
-The commons negation bench (`commons-negation-1030`, card N1b, option C) proposes a step at the section that turns "no route met" into the section's no or into "not covered"; this asks how that step treats a refused route.
+The commons negation page of questions (`commons-negation-1030`, card N1b, option C) proposes a step at the section that turns "no route met" into the section's no or into "not covered"; this asks how that step treats a refused route.
 **RULED 2026-11-02 (in chat, 02:54Z).** Meng: _"ok, let's take the second."_
-The option taken, as GM printed it:
+The option taken, as printed in the message Meng answered:
 
 > **Make the section operator a separate construct with its own rule:** look at every route, and let a met route outweigh a refused one. This matches how `RAND`/`ROR` avoid committing to an order, and what SEESAW did for blame. Plain `AND`/`OR` would stay left to right.
 
@@ -1379,7 +1379,7 @@ The option declined: keep U1 everywhere, so a section's route order matters when
 The rule is Plotkin's parallel-or, which §4.1(b) did not propose for the connectives; it is taken here for the section's routes only.
 The precedent is `RAND`/`ROR`, which force neither side eagerly (`doc/reference/control-flow/REFUSE.md`, "Order matters"), and SEESAW (legalese/l4-ide#640, merged 2026-10-13), which made a compound breach's date and blame independent of operand order.
 
-**Assumed, not ruled** (GM's memo of 2026-11-02, before this question was put): after "any route met gives yes", the order is any route refused gives the refusal, then any route undetermined gives undetermined, then the section's `closed` or `open` mode gives its no or "not covered".
+**Not ruled** (decided by Claude 2026-11-02, pending Meng's review; set out in a memo written before this question was put): after "any route met gives yes", the order is any route refused gives the refusal, then any route undetermined gives undetermined, then the section's `closed` or `open` mode gives its no or "not covered".
 A provision that overrides the section ("subject to", "notwithstanding") is not a route: if it refuses, the section refuses, because whether it overrode cannot be known.
 Whether the section's default mode, absent a marker word, is `open`, `closed`, or set by the kind of question is not ruled here; it is card N1b's.
 
