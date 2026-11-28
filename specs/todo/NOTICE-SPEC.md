@@ -68,13 +68,13 @@ The two that matter most come first.
 - **R10 — evidence and burden**: certificate of posting, registered receipt, tracking, server log, read receipt; candidate homes are a speech-act `ATTEST` (`IN-RELIANCE-ON-SPEC.md` §4.2) and the burden-of-proof module in package `jl4-proleg` (`jl4-proleg/src/L4/Proleg/Burden.hs`, with its note `jl4-proleg/docs/burden-of-proof.md`), which is on `unstable`.
 - **R11–R13** — an acknowledgment is a notice that needs no acknowledgment; withdrawal that arrives no later than the notice (CISG Art 15(2), recalled); change of address redirects later notices; notices to regulators and to the world (publication).
 
-## 4. Recommendations on `l4-pitch`'s open questions — assumed, not ruled
+## 4. Recommendations on `l4-pitch`'s open questions — decided by Claude 2026-10-10, pending Meng's review
 
 - **`give notice` sits above `NOTIFY`.** Giving notice writes Dispatched to the sender's own ledger; Delivered and Read are separate entries written by the addressee or a carrier, as trace events. v1's `RECORD q's` stays as what it is — a sender writing straight into the recipient's ledger — and is the receipt-on-dispatch special case, not the general mechanism. `give notice` must be library sugar, not a keyword (§1).
 - **Regimes are library data** with a module default and a per-clause override, and every selection is recorded with its provenance so a reviewer sees which rule was assumed.
 - **Effective is computed on read, not stored.** Storing observations and deriving effect keeps deeming defeasible (a later Returned entry rebuts it) and keeps machine conclusions apart from party assertions, as NORM-LOG N5 does for fates. Reads are as of the reader's contract instant, which needs the black-ink instants that N12 holds (§1; not ruled).
 - **Discrete time:** dispatch, delivery and reading may share one tick; ordering on one tick is NORM-LOG N10's tie case and inherits its answer.
-- **An unspecified regime defaults and flags a fork** rather than refusing, because instruments are usually silent (R4); the flag is the same "assumed, not ruled" shape as the presumption work (`specs/todo/presumption-assertion/CONTRACT.md`).
+- **An unspecified regime defaults and flags a fork** rather than refusing, because instruments are usually silent (R4); the flag is the same kind of marker the presumption work puts on a choice made without a ruling (`specs/todo/presumption-assertion/CONTRACT.md`).
 
 ## 5. Golden scenarios to write first
 
@@ -95,5 +95,5 @@ The two that matter most come first.
 
 - NORM-LOG N12 (contract instants on black ink, as-of `RECALL`): needed before any notice clock can be read correctly; answered only in part (§1), and the instants are held until N12 is re-posed with N10's goal A.
 - NORM-LOG N10 (operand order) and its run-time check: channel races inside a compound.
-- The presumption and assertion bench (cards C1–C6, open): deeming as a rebuttable default.
+- The presumption and assertion questions waiting for Meng's rulings (C1–C6, open when this spec was written; `specs/todo/presumption-assertion/CONTRACT.md` §13 lists the rulings it leaves open): deeming as a rebuttable default.
 - `IN-RELIANCE-ON-SPEC.md` §4.2: whether `ATTEST` becomes the speech act that carries evidence of dispatch or receipt.
