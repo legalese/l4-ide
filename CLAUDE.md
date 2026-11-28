@@ -353,9 +353,10 @@ change).
 - **A `.l4` file cannot `IMPORT` a library sharing its own basename.** The failure is a silent
   `GraphException`, not a "not found" error.
 - **Library resolution order** is `JL4_LIBRARY_PATH → root → importer-relative → embedded → XDG → bundle`, and the first copy found wins.
-  **Setting `JL4_LIBRARY_PATH` removes the embedded tier; it does not merely add a tier above it** (`jl4-lsp/src/LSP/L4/Rules.hs:630`, the `cands` line of `resolveLibraryFor`; `specs/as-built/import-resolution.md:104`, "tier 4 is removed from the probe list"; line numbers as of 2026-11-28).
+  **In the `l4` CLI and the language server, setting `JL4_LIBRARY_PATH` removes the embedded tier; it does not merely add a tier above it** (`jl4-lsp/src/LSP/L4/Rules.hs:630`, the `cands` line of `resolveLibraryFor`; `specs/as-built/import-resolution.md:104`, "tier 4 is removed from the probe list"; line numbers as of 2026-11-28).
   A module the directory does not hold, `prelude` included, then resolves from the root, the importer's directory, XDG or the bundle, whatever version is there, or not at all, with the warning `Module not found (JL4_LIBRARY_PATH is set, embedded libs skipped)`.
   So a directory you point it at must hold every library the code imports (checked 2026-11-12 with an empty directory: `IMPORT prelude` failed on a dev build and on 1.6.110).
+  `jl4-service` is outside all of this: it does not read `JL4_LIBRARY_PATH`, resolves a deployment's imports against the bundle's own files and the embedded stdlib only, and, when the variable is set, logs `JL4_LIBRARY_PATH is set and ignored` at start-up (`jl4-service/src/Application.hs:126-128`; `bundleScope` in `jl4-service/src/Backend/Jl4.hs:160`).
   The embedded stdlib is seeded into the VFS under the `jl4-embedded` URI scheme specifically so it cannot collide with a real file path.
 - **`ASSUME` is uninterpreted** — modules in that style typecheck but do not evaluate. Idiomatic L4
   threads a record as one `GIVEN` parameter instead.
