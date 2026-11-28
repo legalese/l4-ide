@@ -60,7 +60,8 @@ The first run downloads dmn-check and its dependencies, 18 jars, from Maven Cent
 - Nothing in `.github/workflows/` runs this, and `etc/verify-branch.sh` does not.
   The Camunda and KIE legs are required CI gates over a closed list of committed goldens; this is not, because over the whole corpus it exits 1 today (the census below), for reasons that are mostly about dmn-check's model and not about the rules.
   `export` makes the same argument about `Blocking` fidelity notes in `jl4/app/L4/Cli/Export.hs`.
-  "Optional evidence" is the contract of the row that asked for this harness; making it a gate would be a separate ruling.
+  This harness was asked for as optional evidence: when its toolchain is missing it prints one `skipped:` line and exits 0.
+  Making it a gate would be a separate ruling.
 - It prints one line starting `skipped:` and exits 0, with no VERDICT banner, in exactly these cases, each tested by `selftest.sh`:
 
   - Maven is not on `PATH`;
