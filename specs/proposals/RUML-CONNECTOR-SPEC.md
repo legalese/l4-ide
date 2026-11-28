@@ -3,6 +3,7 @@
 _Status: **proposed, not landed.**
 Written 2026-11-26 on branch `spec/ruml-connector-1126`, from `origin/unstable` at `8f10892e5`; it reached `unstable` as commit `0b8ddc86f`.
 Amended 2026-11-28 on branch `spec/ruml-real-producer`, from `origin/unstable` at `61bd5ba62`: §2.8, R13, §5.5 and M7 are new, and §0, the evidence-marks paragraph, §1, §2.5, §4.8, §5.1, §9, §10 (M3 corrected), §11, §12 and Sources each changed from it.
+A second commit on the same branch rewords what §1, §2.5, §2.8, §5.5, §10 (M3), §11 and §12 say of the tool's output, as observations and not verdicts; it is decided by Claude 2026-11-28, pending Meng's review (§12).
 Nothing described here is built: `git grep -il ruml` over the `.hs`, `.cabal`, `.mjs`, `.ts`, `.json`, `.yml`, `.sh` and `.l4` files of the 2026-11-26 tree found nothing **[E 2026-11-26]**, and the same command at `61bd5ba62` finds nothing **[E 2026-11-28]**.
 What would make a sentence here true is named where it is written: a Phase 1 PR for the exporter and a Phase 2 PR for the importer (§9), and Meng's rulings on the list in §10._
 
@@ -56,9 +57,9 @@ JSONata's `and` and `or` are two-valued, so a missing fact reads as false.
 Its numbers are IEEE doubles, so `0.07 * 100 = 7` is false.
 RUML's `XOR` is a disjunction and not an exclusive or, and its two evaluation modes can give one file two different statuses.
 
-One producer of RUML files could be run, on 2026-11-28: Rulemapping's own Rulemap Builder (§2.8).
+One producer of RUML files could be run, on 2026-11-28: Rulemapping's Rulemap Builder (§2.8).
 It reads RUML and writes it, and our worked example of §4.7 went through it and came back with no member lost, though the tool put its own `metadata.id` where ours was.
-Its export of a German statute, taken from a copy of the published rulemap in our own workspace (88 nodes, 161,351 bytes, 82 % of it the embedded text in its Akoma Ntoso JSON form), fails the format's own rule `NODE-07` on 13 nodes, because childless nodes carry an operator in a file whose `status` is `inForce`, and the suite's own test `operator--rejects-operator-on-leaf` expects exactly that to be rejected.
+Its export of a German statute, taken from a copy of the published rulemap that we imported into a free workspace on Rulemapping's Builder (88 nodes, 161,351 bytes, 82 % of it the embedded text in its Akoma Ntoso JSON form), has an `operator` on 13 nodes that have no children while `status` is `inForce`; the format's rule `NODE-07` allows an operator on such a node only in a draft, and the suite's test `operator--rejects-operator-on-leaf` expects such a file to be rejected.
 That statute file carries no query and no data point: it is an outline of the statute's structure, and says nothing about its logic.
 
 **Recommendation (§9).**
@@ -198,9 +199,9 @@ So the subset an importer needs first is small, and the subset an exporter emits
   Those are page examples and not the validated example files, which I did not check.
 - **Mode.**
   O3 above: a file cannot declare which evaluation mode it needs.
-- **A defect of the one producer and not a gap in the text; and what it calls the format.**
-  A file exported by Rulemapping's Builder fails `NODE-07` on 13 of its 88 nodes (§2.8).
-  The tool's own RUML dialog expands the acronym as "Rulemapping Language Format" where the specification says "Rulemapping Logic Format" (§2.1) **[E, read off the tool's screen by the session that drove the browser on 2026-11-28; not re-checkable from the files]**.
+- **What one file from the one producer contains, which is not a gap in the text; and what the tool calls the format.**
+  A file exported by Rulemapping's Builder has an operator on 13 of its 68 childless nodes (88 nodes in all), while `status` is `inForce`; `NODE-07` allows that only in a draft (§2.8).
+  The tool's RUML dialog expands the acronym as "Rulemapping Language Format"; the specification's title is "Rulemapping Logic Format" (§2.1) **[E, read off the tool's screen by the session that drove the browser on 2026-11-28; not re-checkable from the files]**.
 
 ### 2.6 The conformance suite
 
@@ -269,19 +270,19 @@ Python 3.14 is a recent runtime to ask of a user, and the TypeScript package has
 A parser written from the schema needs draft 2020-12 with `if`/`then` (about 67 uses in `ruml.schema.json`), `contains` and its counts, `propertyNames`, ECMA-262 regular expressions and format assertion **[delegated keyword count]**, and then the semantic rules and an evaluator on top, none of which the schema or the two parsers supply in full.
 As cross-checks the two are useful exactly where they overlap, and on a file where they disagree the disagreement is itself a finding.
 
-### 2.8 What Rulemapping's own tool writes and reads
+### 2.8 What Rulemapping's tool writes and reads
 
 Sections 2.1 to 2.7 are the specification, its suite and the two parsers.
-This one is the only producer of RUML files that was available to run: the Rulemap Builder, Rulemapping Group's own tool for the format it owns, used in a browser on 2026-11-28 through a free workspace account.
+This one is the only producer of RUML files that was available to run: the Rulemap Builder, Rulemapping Group's tool (the group holds the format's rights, §2.1), used in a browser on 2026-11-28 through a free workspace account.
 It reports no version **[U]**, so what follows is what it did on that day, to one statute it publishes and to one file of ours.
-The statute file is the export of a copy of the published rulemap that we imported into our own workspace (M3), so nothing here shows that the catalogue's own artefact carries the same operators.
+The statute file is the export of a copy of the published rulemap that we imported into a free workspace on Rulemapping's Builder (M3), so nothing here shows that the catalogue's own artefact carries the same operators.
 Facts marked "read off the screen" were read by the session that drove the browser and cannot be re-checked from the files; every other figure was recomputed from the files on 2026-11-28, and the tool's text outline of the statute (`KSchG_1.txt`, a fifth file, 5,115 bytes) was used only to check the 88 labels and the absence of an operator on the 13 leaves.
 None of the files is committed: one of them embeds a statute's text, so M4 applies.
 
 **What the tool offers [E, read off the screen].**
 A catalogue of published "Norm-Rulemaps" lists 51 entries, all of them German federal statutes by title, the largest the Civil Code at 6,657 nodes; its filter for "Decision-Rulemap" returns none.
 A whole rulemap is exported from a panel on the right with three choices, XML, RUML and image or text, and the browser then asks where to save the file; a right-click on a node offers a subtree as PDF, PNG or a text outline.
-The RUML choice has an information dialog titled "RUML (part of our long-term roadmap)", and it writes a file all the same.
+The RUML choice has an information dialog titled "RUML (part of our long-term roadmap)", and choosing it writes a file.
 "Add Rulemap" accepts `.xml` and `.ruml` (the `accept` attribute of its file input).
 
 **One statute, exported as RUML [E].**
@@ -299,16 +300,16 @@ The file is `KSchG.ruml`, the Dismissal Protection Act (Kündigungsschutzgesetz)
 | operators    | the 20 parents are all `OR`; 13 childless nodes have `AND`; the other 55 childless nodes have no operator                                                                                                                                                                                                                                                   |
 | logic        | none: no `ruml:query`, `ruml:ai-query`, `ruml:tree-include` or `ruml:datapoints` anywhere, so none of the 68 leaves has a `decision` capability (the tool's readiness panel agrees: end-node criteria 0 of 68 **[read off the screen]**)                                                                                                                    |
 
-**It fails the format's own rule [E].**
+**What a schema check reports [E].**
 The 13 childless nodes with `AND` are the 13 sections that have no subsections (§§ 2, 3, 4, 6, 7, 8, 11, 12, 16, 21, 25, 25a and 26).
 RUML 3.5.2a says a leaf "MUST NOT have an `operator` unless `metadata.status` is `draft`", and `NODE-07` is a schema-layer rule.
 Run through `ruml.schema.json` (Ajv 8.20.0, draft 2020-12, with `ajv-formats`), the file gives 27 errors on 13 distinct nodes: `operator` forbidden on a childless node (13), the matching `then` branch failing (13), and the enclosing `else` branch failing for the file (1).
-With the operator removed from each of the 13 childless nodes and `status` left at `inForce`, the file validates with no error, so this is its only schema-layer defect; setting `status` to `draft` clears it too, but a draft also excuses other rules (§12), so the first run is the cleaner proof.
+With the operator removed from each of the 13 childless nodes and `status` left at `inForce`, the file validates with no error, so this is the only schema-layer finding; setting `status` to `draft` clears it too, but a draft also excuses other rules (§12), so the first run is the cleaner proof.
 The suite has a test for exactly this shape, `operator--rejects-operator-on-leaf` (layer `schema`, expect `reject`, rule `NODE-07`, in `tests/03-data-model/3-5-node-object.test.yaml`): "leaf `2` of this `inForce` file has `AND`".
-Why the tool writes it is not known **[U]**; a default operator on a section that never received children is the likely cause, and the subsection leaves have none; the tool's own text outline prints an operator on every parent and on none of those 13.
+Why the tool writes it is not known **[U]**; one possibility is a default operator on a section that never received children, and the subsection leaves have none; the tool's own text outline prints an operator on every parent and on none of those 13.
 Neither public parser was run on the file **[U]**; both validate the schema layer from the same schema (§2.7), and each has a test for this rule (`ruml-js/src/ruml.test.ts:221`, `ruml_parser/tests/test_metadata_status_rules.py` in `ruml-python`), so both would be expected to reject it.
 
-**The XML export loses every leaf's decision [E].**
+**The XML export does not carry a leaf's decision [E].**
 `KSchG.xml` (6,471 bytes, SHA-256 `5851a4c73c8a0061…`) is `<rulemap title application="query-action-ai">` over `<node id title alttext logic>`.
 Its 88 nodes carry the same ids as the RUML keys, with `logic` `or` on 20, `and` on 13 and `virtual` on 55, so the 13 childless nodes appear with `and` there too.
 It carries no query and no data point.
@@ -329,7 +330,7 @@ Compared path by path with what we uploaded:
 So for this file the tool reads RUML and rewrites it without changing what it means, and it preserves operators over children, `ruml:query` leaves and `ruml:datapoints`, which the statute file never exercises; whether it evaluates them is not tested.
 
 **Not tested [U].**
-The other 50 statutes of the catalogue; whether the tool's own import rejects a file that breaks a rule (we gave it only valid files); `XOR`, `DELEGATED`, `ruml:ai-query`, `ruml:tree-include` and modular nodes, which neither our file nor the statute uses; whether the tool evaluates a rulemap; the tool's version; and any file larger than the 88 nodes of the Act.
+The other 50 statutes of the catalogue; whether the tool's import rejects a file that does not meet a rule (the one file we uploaded is schema-valid); `XOR`, `DELEGATED`, `ruml:ai-query`, `ruml:tree-include` and modular nodes, which neither our file nor the statute uses; whether the tool evaluates a rulemap; the tool's version; and any file larger than the 88 nodes of the Act.
 
 ## 3. What L4 already has to build on
 
@@ -669,7 +670,7 @@ Names come from the data point's `name` and the node's `label`, never from the i
 Comments carry the RUML identifiers, because the L4 parser does not preserve a comment and a re-export therefore cannot read them back.
 Making round trips keep identity needs either a new annotation (`@ruml …`, which this lexer would warn about and ignore until it is added) or a sidecar file; both are language-surface or format decisions, so they are Meng's (§10, M2).
 
-### 5.5 Reading what Rulemapping's own tool writes (R13)
+### 5.5 Reading what Rulemapping's tool writes (R13)
 
 Measured on 2026-11-28 on the files of §2.8.
 Each paragraph says which part is a measurement and which is a choice.
@@ -678,21 +679,21 @@ Each paragraph says which part is a measurement and which is a choice.
   The suite's test `operator--rejects-operator-on-leaf` expects a reader to reject exactly this file shape, and §5.1 says the importer may not call itself a parser until it passes the suite's validation tests; so the importer is strict: it rejects the file, names `NODE-07` and lists every node it found the operator on **[D]**.
   An opt-in lenient reading is designed here and not recommended until a file needs it.
   It would remove the operator of every childless node, report each removal as `Advisory` (naming the node and the operator), and then validate the result in full; the flag's name is not decided (§11).
-  Removing and then validating is deliberate: the schema reports one error for the whole file besides the 26 on the nodes, so filtering `NODE-07` out of a list of errors cannot show that no other defect of a non-draft file is left, and a plain "ignore" would also forgive `OP-07` and `OP-02` on a leaf.
+  Removing and then validating is deliberate: the schema reports one error for the whole file besides the 26 on the nodes, so filtering `NODE-07` out of a list of errors cannot show that no other rule is left unmet by a non-draft file, and a plain "ignore" would also excuse `OP-07` and `OP-02` on a leaf.
   With the operator removed from each childless node of the Act and `status` still `inForce`, the file validates with no error **[E]**.
   Removal is the reading RUML itself gives a draft ("an evaluator ignores it", 3.5.2a), so the lenient reading gives the file the meaning it would have had as a draft; no result can depend on a childless node's operator **[U, derived from 3.5.2a]**.
   The importer never rewrites the file's `status`.
   Why it is not recommended yet: on the one file seen it changes nothing, because every leaf of the Act has no decision capability and §5.1 refuses the file with the operators removed as well.
   The mode matters only to a file that is not a draft, has operators on its leaves and has leaves that decide; none has been seen, and the file of ours that went through the tool was a draft and came back with no operator on any leaf **[E]**.
-  The cost is a second mode to test and document, and a reader that forgives one producer's habit may be asked to forgive the next's.
-  The case against: the producer is the format's owner, so the habit may recur in files that do decide; the answer is that the opt-in can be added when such a file appears, and that refusing by default is what the suite requires and what keeps "imports a stated subset of RUML" accurate (§5.1).
+  The cost is a second mode to test and document, and a reader that removes one producer's leaf operators may be asked to do the same for the next producer's files.
+  The case against: the producer is the format's owner, so the same output may recur in files that do decide; the answer is that the opt-in can be added when such a file appears, and that refusing by default is what the suite requires and what keeps "imports a stated subset of RUML" accurate (§5.1).
 - **A leaf with no decision capability.**
-  Every leaf of the Act is one (§2.8), and so is the single node of the suite's own law fixture (`accept-law-text-as-ruml-text.ruml`, `inForce`, `documentType: "law"`), so the shape is ordinary and not one producer's habit **[E]**.
+  Every leaf of the Act is one (§2.8), and so is the single node of the suite's own law fixture (`accept-law-text-as-ruml-text.ruml`, `inForce`, `documentType: "law"`), so the shape is ordinary and not peculiar to one producer **[E]**.
   §5.1 refuses it by name and by node **[D]**: the prose of 1.0.0 is silent, its one executable example gives such a leaf the status `undefined`, and the alternative, a `GIVEN` Boolean input as for AI and include leaves, would let the caller decide an outline.
   Reading such an outline as the structure of a document is a different feature from reading a decision, and is not proposed here (§11).
 - **Fields the tool writes.**
   `decisionMode: "fallback"` on every node (parents included), `description: ""` on every node, `sensitive: false` on every data point, `isReferenced` on a text entry, and the uploaded file's name in `metadata.description` are optional fields the schema accepts; `timestamp` on a text entry is required (`TXT-04`) and present.
-  The files that carry them validate, apart from the one `NODE-07` defect **[E]**.
+  The files that carry them validate, apart from the `NODE-07` report on the statute file **[E]**.
   Which of them the tool adds and which it would write anyway is not known: the statute was never uploaded to it, so there is no uploaded version to compare **[U]**.
   The importer does not read `decisionMode`, because the only leaf it applies to, one with more than one decision capability, is refused (§5.1); it does not carry an empty `description`; and it carries `sensitive: true`, which has no L4 reading, as a comment on the `GIVEN` **[D]**.
 - **Size.**
@@ -819,7 +820,7 @@ Each of these changes who is told something, what is published, or the language 
   The trademark permits "supports RUML" only where accurate (§2.1), and conformance is what makes it accurate.
   Whether L4 says "RUML export" in its docs and README, whether the two companies behind the format are told, whether the repository's two open issues are commented on, and whether the `NODE-07` finding of §2.8 is reported to them are outward actions; a draft of that report is kept and has not been sent.
   Through 2026-11-27 nothing had been sent to anyone outside these sessions in the course of this work.
-  On 2026-11-28 Meng opened a free account on Rulemapping's workspace, and at his direction a copy of one published statute rulemap was imported into it and the example of §4.7 was uploaded to it (§2.8); no message was sent to any person.
+  On 2026-11-28 a free workspace account was opened on Rulemapping's Builder, a copy of one published statute rulemap was imported into it and the example of §4.7 was uploaded to it, as the measurement of §2.8; no message was sent to any person.
 - **M4. Whether third-party fixtures may be fetched, and whether any may be committed.**
   The recommendation is fetch-at-test-time, pinned by a commit id and two git tree ids, which are the only things committed (R11).
   Vendoring the suite, or quoting its fixtures in our goldens, is a first deposit of third-party text into a public repository and needs Meng's word.
@@ -847,9 +848,9 @@ Each of these changes who is told something, what is published, or the language 
 - **The format is two weeks old.**
   The two parsers have one commit each and the format repository two; a 1.0.1 or 1.1 may move things.
   The mitigation is the pin.
-- **The one producer breaks the format's own rule, and its files are large.**
-  Rulemapping's tool wrote a statute file that fails `NODE-07` and, in the same file, 82 % embedded text in its Akoma Ntoso JSON form (§2.8).
-  A strict importer refuses that file, and would refuse it for its leaves in any case (§5.1); a lenient one forgives a defect that its authors may fix in the next release, after which the lenient mode is dead weight (R13, M7).
+- **The one producer's statute file has operators on leaves, and it is large.**
+  Rulemapping's tool wrote a statute file in which 13 childless nodes carry an operator, which a schema check rejects under `NODE-07`, and which is 82 % embedded text in its Akoma Ntoso JSON form (§2.8).
+  A strict importer refuses that file, and would refuse it for its leaves in any case (§5.1); a lenient one would remove the operator from each of the 13 leaves, report each removal, validate the result in full and still refuse this file for its leaves; if a later release stops writing those operators, files from that release would not need the mode (R13, M7).
   We have one producer, one statute and one round trip of a five-node file, so none of this says how the tool behaves on `XOR`, `DELEGATED`, modular nodes or AI leaves.
 - **Numbers.**
   `RUML-NUM` is an advisory and not a guarantee; a rule of statute written with decimal rates is where it bites, and Phase 1 should say so in the doc page.
@@ -888,7 +889,7 @@ Not changed, with the reason: the reviewer's note that `ruml-js` compares timest
 What it changed, from the files of the one producer we could run (§2.8):
 
 - **Added.**
-  §2.8 (what the tool offers, the statute file, its `NODE-07` failure, the lossy XML, our file's round trip); R13, §5.5 and M7 (the importer's reading of a leaf operator outside a draft and of the tool's other habits); a row in §5.1 for a leaf with no `decision` capability; a clause in the Phase 2 row of §9; a sentence each in §1, §2.5, §4.8 and §11.
+  §2.8 (what the tool offers, the statute file, what a schema check reports on it (`NODE-07`), the XML export, our file's round trip); R13, §5.5 and M7 (the importer's reading of a leaf operator outside a draft and of the other fields the tool writes); a row in §5.1 for a leaf with no `decision` capability; a clause in the Phase 2 row of §9; a sentence each in §1, §2.5, §4.8 and §11.
 - **Corrected.**
   The sentence of M3 that nothing had been sent outside these sessions was true only through 2026-11-27; it now says what happened on the 28th.
   The header said the file was written on a branch; it now also says it reached `unstable` and when it was amended.
@@ -908,7 +909,19 @@ What it changed, from the files of the one producer we could run (§2.8):
   - **Overstated or unsupported, fixed.**
     "82 % of it the embedded statute text" is now "the embedded text in its Akoma Ntoso JSON form", which is what the 82 % measures (the share that is the statute's own words was not measured); "replaced `metadata.id` on export" and "`modified` is the time of the export" are marked **[U]**; "implements" is "preserves"; "came back as uploaded" now says that member order changed; the date version is RUML 3.3's convention for a law and the file has no `documentType`; the digest paragraph says no JSON numbers were exercised and cites RUML 4.12's actual wording; the lenient reading removes the operators and then validates in full; screen-read facts and the fifth file `KSchG_1.txt` are marked; "creation order" is **[U]**; the caveat that the statute file is an export of a workspace copy is added.
   - **Nits, fixed.**
-    The header lists every changed section; the dating of §5.5; the §2.5 bullet says it is a producer's defect; one anchor per node, not two; "the only schema-layer defect" now rests on the strip-the-operators run; `M4`, not `R11`, applies; `decisionMode` no longer contradicts §5.1; "imports a stated subset of RUML"; the Phase 2 row says the suite's tests run in strict mode; both parsers' tests for `NODE-07` are cited.
+    The header lists every changed section; the dating of §5.5; the §2.5 bullet says it concerns the one producer's output and is not a gap in the text; one anchor per node, not two; "the only schema-layer finding" now rests on the strip-the-operators run; `M4`, not `R11`, applies; `decisionMode` no longer contradicts §5.1; "imports a stated subset of RUML"; the Phase 2 row says the suite's tests run in strict mode; both parsers' tests for `NODE-07` are cited.
+
+### The rewording of 2026-11-28
+
+Decided by Claude 2026-11-28, pending Meng's review.
+
+- **What it changed.**
+  The statements of what Rulemapping's tool writes (§1, §2.5, §2.8, §5.5 and §11) now report the output and the rule it is checked against, and do not say whose fault a difference is.
+  M3's record of 2026-11-28 says what was put into the workspace.
+  Two items of the amendment's record above, "Added" and "Nits", now use the same wording.
+  The header names this commit.
+- **What it did not change.**
+  Every figure, hash, rule identifier and measurement; the marks **[E]** and **[U]**; the strict importer of R13; the refusal of §5.1; the open rulings M1 to M7.
 
 ## Sources
 
