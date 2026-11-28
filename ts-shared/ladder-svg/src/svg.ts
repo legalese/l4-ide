@@ -16,9 +16,18 @@
  * never-asked one. Default screen and print output both move. What did NOT change is the
  * shape of the contract — `sceneToSvg(scene)`, `(scene, "screen")` and `(scene,
  * SCREEN_PALETTE)` are still the same string, character for character.
+ *
+ * A second deliberate move, ruled 2026-11-28 (DESIGN §6): on every palette but `INK_PALETTE`
+ * a box's outline carries its value by weight (see `BoxState`), so the default screen and
+ * dark output moved again. The ink look did not: it is byte-identical to what it was.
  */
 import type { Scene, ScenePrim, State, Theme, Flow } from "@repo/ladder-core";
-import { paletteFor, panelShade, panelBackdrop } from "./palette.js";
+import {
+  paletteFor,
+  panelShade,
+  panelBackdrop,
+  INK_PALETTE,
+} from "./palette.js";
 import type { Palette } from "./palette.js";
 
 // current-flow style (DESIGN §20): closed (leader) thick+dark, streamer (local
@@ -47,6 +56,51 @@ const flowStroke = (
         : p.wireOpen;
 const flowWidth = (f: Flow) =>
   f === "closed" ? 3.4 : f === "streamer" ? 2.3 : 1.1;
+
+/** A box's thin border: every box in the `"outline"` look, and an unknown box in `"weight"`. */
+const BOX_STROKE = 1.5;
+/** The fine dot a tentative box (§22) is drawn with: dash and gap, at BOX_STROKE wide. */
+const TENT_DASH: readonly [number, number] = [1.5, 3];
+/** Corner radius of a box. */
+const BOX_RX = 7;
+/** The border of a TRUE box in the `"weight"` look: as thick as a live current wire, read off the wire. */
+const THICK_STROKE = flowWidth("closed");
+
+/**
+ * What a box's OUTLINE says about its value. Ruled on 2026-11-28 (DESIGN §6): the light and
+ * dark looks draw `"weight"`, and the ink look keeps the outline it had.
+ *
+ *  - `"weight"`   a TRUE box has a border as thick as a lit wire, an UNKNOWN box has the thin
+ *                 border it has always had, a FALSE box has none. The pale washes stay, so a
+ *                 FALSE box is still painted (never `fill="none"`) and still a click target.
+ *  - `"outline"`  every box has a 1.5 border in its state's ink, over the state's wash: the
+ *                 look before 2026-11-28.
+ *
+ * The default is `"outline"` when the palette is `INK_PALETTE` (so the theme name `"ink"`
+ * too) and `"weight"` for every other palette. The test is the palette's identity, so a
+ * caller's own `Palette`, even one spread from `INK_PALETTE`, gets `"weight"`; a caller who
+ * wants the old look on any palette passes `{ boxState: "outline" }`.
+ *
+ * Dotted outlines for a presumed value (§22), the dashed ELIMINABLE ghost box and call
+ * panels are drawn as before in both looks. Choices made by Claude on 2026-11-27 and
+ * 2026-11-28, pending the owner's review, none part of the ruling:
+ *  1. The thick border is drawn INSIDE the rect (outer edge = the rect's edge), so ports,
+ *     layout and `scene.size` are those of the outline look. A centred 3.4 would spill 1.7
+ *     into the wires that meet the box.
+ *  2. A TENTATIVE (§22) box keeps its fine dots: a presumed-FALSE box would otherwise lose
+ *     the only cue that it is a presumption, so it keeps the dotted 1.5 border it had; a
+ *     presumed-TRUE box is thick AND dotted, the dots scaled with the stroke.
+ *  3. The border keeps its state ink (live green, unknown grey) so weight and hue agree.
+ *  4. A folded placeholder follows the same rule by its value; while unknown it keeps its
+ *     bluish `placeholderFill`, which says "this is a fold", not a state.
+ */
+export type BoxState = "weight" | "outline";
+
+/** Options on the emit. Every field defaults as its own comment says. */
+export interface RenderOpts {
+  /** What the box outline says; see `BoxState`. */
+  readonly boxState?: BoxState;
+}
 
 // Four states, four inks. `dead` used to fall through to `p.inert` here, which meant
 // `p.dead` was never read at all — the palette entry existed and the renderer ignored it,
@@ -84,6 +138,7 @@ function prim(
   complete = false,
   provisional = false,
   panelDepth = 0,
+  boxState: BoxState = "outline",
 ): string {
   switch (p.kind) {
     case "panel":
@@ -94,7 +149,7 @@ function prim(
       const { x, y, w, h } = p.rect;
       const a = ` data-fnid="${p.id}"${actAttr(p.act)} class="lad-box${p.act ? " lad-clickable" : ""}"`;
       if (p.state === "eliminable")
-        return `<rect${a} x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="7" fill="${pal.eliminableFill}" stroke="${pal.ghost}" stroke-width="1.5" stroke-dasharray="5 4" opacity="0.9"/>`;
+        return `<rect${a} x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="${BOX_RX}" fill="${pal.eliminableFill}" stroke="${pal.ghost}" stroke-width="${BOX_STROKE}" stroke-dasharray="5 4" opacity="0.9"/>`;
       // A folded placeholder keeps its own bluish neutral ONLY while its value is unknown;
       // once it has one, the state wash wins — a fold must not hide the verdict it stands in
       // for, which is the whole point of being able to pin a folded group (§19).
@@ -102,10 +157,43 @@ function prim(
         p.role === "placeholder" && p.state === "inert"
           ? pal.placeholderFill
           : fillFor(p.state, pal);
-      // tentative (DESIGN §22): fine dots + normal ink — a presumption, not a ghost.
-      // Finer dash (1.5 3) distinguishes it from eliminable's coarser dashes (5 4).
-      const tent = p.tentative ? ' stroke-dasharray="1.5 3"' : "";
-      return `<rect${a} x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="7" fill="${fill}" stroke="${strokeFor(p.state, pal)}" stroke-width="1.5"${tent}/>`;
+      if (boxState === "weight" && p.state !== "inert") {
+        // A tentative box keeps its fine dots in the weight look, scaled with its stroke.
+        const dash = (sw: number) =>
+          p.tentative
+            ? ` stroke-dasharray="${TENT_DASH.map((v) => +((v * sw) / BOX_STROKE).toFixed(1)).join(" ")}"`
+            : "";
+        const rect = (
+          r: { x: number; y: number; w: number; h: number },
+          rx: number,
+          rest: string,
+        ) =>
+          `<rect${a} x="${r.x.toFixed(1)}" y="${r.y.toFixed(1)}" width="${r.w.toFixed(1)}" height="${r.h.toFixed(1)}" rx="${rx}" fill="${fill}"${rest}/>`;
+        if (p.state === "live") {
+          // TRUE: a border as thick as a lit wire, INSET so the outer edge is the rect's own
+          const i = THICK_STROKE / 2;
+          return rect(
+            { x: x + i, y: y + i, w: w - THICK_STROKE, h: h - THICK_STROKE },
+            Math.max(0, BOX_RX - i),
+            ` stroke="${pal.live}" stroke-width="${THICK_STROKE}"${dash(THICK_STROKE)}`,
+          );
+        }
+        // FALSE: no border — unless it is a presumption, which keeps its fine dots
+        return rect(
+          p.rect,
+          BOX_RX,
+          p.tentative
+            ? ` stroke="${pal.dead}" stroke-width="${BOX_STROKE}"${dash(BOX_STROKE)}`
+            : "",
+        );
+      }
+      // UNKNOWN in the weight look, and every state in the outline look: a thin border in the
+      // state's ink. tentative (DESIGN §22): fine dots + normal ink — a presumption, not a
+      // ghost. Finer dash (1.5 3) distinguishes it from eliminable's coarser dashes (5 4).
+      const tent = p.tentative
+        ? ` stroke-dasharray="${TENT_DASH.join(" ")}"`
+        : "";
+      return `<rect${a} x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="${BOX_RX}" fill="${fill}" stroke="${strokeFor(p.state, pal)}" stroke-width="${BOX_STROKE}"${tent}/>`;
     }
     case "wire": {
       const d = p.path
@@ -230,12 +318,16 @@ function actAttr(a?: { t: "value" | "fold"; id: number }): string {
  * The emit. `theme` takes a built-in name (`"screen"` / `"ink"`) or a caller's own
  * `Palette` — seam S8. `sceneToSvg(scene)` and `sceneToSvg(scene, "screen")` and
  * `sceneToSvg(scene, SCREEN_PALETTE)` are the same string, character for character.
+ * `opts.boxState` overrides the box outline the palette would draw (`BoxState`).
  */
 export function sceneToSvg(
   scene: Scene,
   theme: Theme | Palette = "screen",
+  opts: RenderOpts = {},
 ): string {
   const pal = paletteFor(theme);
+  const boxState =
+    opts.boxState ?? (pal === INK_PALETTE ? "outline" : "weight");
   const { w, h } = scene.size;
   const levels = scene.panelDepth ?? 0;
   // Panels go behind everything, in emit order — and the layout emits an outer panel before
@@ -247,7 +339,9 @@ export function sceneToSvg(
       ]
     : scene.prims;
   const body = ordered
-    .map((p) => prim(p, pal, !!scene.complete, !!scene.provisional, levels))
+    .map((p) =>
+      prim(p, pal, !!scene.complete, !!scene.provisional, levels, boxState),
+    )
     .join("\n");
   return [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${w.toFixed(0)}" height="${h.toFixed(0)}" viewBox="0 0 ${w.toFixed(0)} ${h.toFixed(0)}">`,

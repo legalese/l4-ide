@@ -225,7 +225,9 @@ test("the ink theme drops the colour but keeps the geometry", () => {
       state: "live",
     },
   ];
-  const screen = sceneToSvg(scene(...prims), "screen");
+  // Both in the outline look: the weight look insets a TRUE box's thick border, which is a
+  // change of geometry the ink theme does not make (test/border-weight.test.ts pins that).
+  const screen = sceneToSvg(scene(...prims), "screen", { boxState: "outline" });
   const ink = sceneToSvg(scene(...prims), "ink");
 
   assert.match(screen, /stroke="#1a7f37"/); // live green on screen
@@ -327,8 +329,17 @@ test("a FALSE box and an UNKNOWN box do not render the same ink", () => {
     dunno,
     "known-false must not render identically to unknown",
   );
-  assert.match(no, /stroke="#a8483e"/);
+  // The default look on screen is the weight look: a FALSE box has no border and keeps its
+  // rose wash, an unknown box keeps its thin grey border.
+  assert.match(no, /fill="#f9e6e3"/);
+  assert.doesNotMatch(no, /stroke=/);
   assert.match(dunno, /stroke="#9aa0a6"/);
+  // The outline look, which the ink theme draws, tells them apart by the border's ink.
+  const noOutline = sceneToSvg(scene(box("dead")), "screen", {
+    boxState: "outline",
+  });
+  assert.notEqual(noOutline, dunno);
+  assert.match(noOutline, /stroke="#a8483e"/);
 });
 
 test("all four leaf states are mutually distinguishable in both themes", () => {
@@ -345,6 +356,7 @@ test("all four leaf states are mutually distinguishable in both themes", () => {
             state,
           }),
           theme,
+          { boxState: "outline" },
         ).match(/stroke="(#[0-9a-f]{3,6})"/)![1],
     );
     assert.equal(
@@ -353,6 +365,24 @@ test("all four leaf states are mutually distinguishable in both themes", () => {
       `${theme}: states collapsed to ${inks.join(",")}`,
     );
   }
+  // In the default look on screen (the weight look) a FALSE box has no border, so the
+  // border's ink cannot tell the states apart: the box's whole paint can.
+  const paint = (state: (typeof states)[number]) =>
+    /<rect data-fnid="1"[^>]*\/>/
+      .exec(
+        sceneToSvg(
+          scene({
+            kind: "box",
+            id: 1,
+            rect: { x: 0, y: 0, w: 10, h: 10 },
+            role: "leaf",
+            state,
+          }),
+        ),
+      )![0]
+      .match(/ (fill|stroke|stroke-width|stroke-dasharray)="[^"]*"/g)!
+      .join("");
+  assert.equal(new Set(states.map(paint)).size, states.length);
 });
 
 /* ------------------------------- provisionality reaches BOTH kinds of sink */
