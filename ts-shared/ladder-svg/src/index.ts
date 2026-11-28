@@ -17,6 +17,7 @@
 
 /** The emit, and seam S8's palette contract. */
 export { sceneToSvg } from "./svg.js";
+export type { RenderOpts, BoxState } from "./svg.js";
 export {
   paletteFor,
   SCREEN_PALETTE,

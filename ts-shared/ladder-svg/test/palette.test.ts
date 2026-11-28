@@ -324,7 +324,15 @@ test("the palette has exactly the 40 fields the specs quote", () => {
 
 test("every reachable Palette field actually reaches the emit", () => {
   const pal = sentinelPalette();
-  const svg = scenes.map((s) => sceneToSvg(s, pal)).join("\n");
+  // Both box looks: `dead` is a box's border ink, and the weight look (the default on every
+  // palette but `INK_PALETTE`) draws no border on a FALSE box, so that field is reached by
+  // the outline look. A field reached by neither is the defect this test hunts.
+  const svg = scenes
+    .flatMap((s) => [
+      sceneToSvg(s, pal),
+      sceneToSvg(s, pal, { boxState: "outline" }),
+    ])
+    .join("\n");
   const missing = REACHABLE.filter((f) => !svg.includes(pal[f]));
   assert.deepEqual(
     missing,
@@ -354,17 +362,28 @@ test("a FALSE box does not render as an UNKNOWN one — DESIGN §6 / §15.1 / §
     role: "leaf",
     state,
   });
-  const emit = (state: "dead" | "inert") =>
-    sceneToSvg({ size: { w: 10, h: 10 }, prims: [box(state)] }, pal);
+  const emit = (state: "dead" | "inert", boxState?: "outline" | "weight") =>
+    sceneToSvg(
+      { size: { w: 10, h: 10 }, prims: [box(state)] },
+      pal,
+      boxState ? { boxState } : {},
+    );
 
-  assert.notEqual(
-    emit("dead"),
-    emit("inert"),
-    "a false atom and an unanswered one must not be the same picture",
+  // The default look on this palette is the weight look (a FALSE box has no border at all),
+  // so the border ink is read in the outline look, which every box's border carries.
+  for (const look of [undefined, "outline"] as const)
+    assert.notEqual(
+      emit("dead", look),
+      emit("inert", look),
+      `a false atom and an unanswered one must not be the same picture (${look ?? "default"})`,
+    );
+  assert.ok(
+    emit("dead", "outline").includes(pal.dead),
+    "pal.dead must reach the emit",
   );
-  assert.ok(emit("dead").includes(pal.dead), "pal.dead must reach the emit");
   assert.ok(emit("dead").includes(pal.deadFill), "and so must its wash");
   assert.ok(!emit("dead").includes(pal.inert), "and pal.inert must not");
+  assert.ok(!emit("dead", "outline").includes(pal.inert), "in either look");
 });
 
 test("every built-in palette separates dead from inert", () => {
