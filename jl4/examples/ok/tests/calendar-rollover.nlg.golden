@@ -1,0 +1,21 @@
+`Weekday of` with `Sat 31 Oct` is equal to `Saturday`
+executing contract `pay within five days of notice, rolled` at `Mon 26 Oct` with the following events: party `Seller` did `notify` with `Mon 26 Oct` at `Mon 26 Oct` party `Buyer` did `pay` at `Mon 2 Nov`
+executing contract `pay within five days of notice, rolled` at `Mon 26 Oct` with the following events: party `Seller` did `notify` with `Mon 26 Oct` at `Mon 26 Oct` party `Buyer` did `pay` at `Tue 3 Nov`
+executing contract `pay within five days of notice, rolled` at `Mon 26 Oct` with the following events: party `Seller` did `notify` with `Thu 29 Oct` at `Thu 29 Oct` party `Buyer` did `pay` at `Tue 3 Nov`
+executing contract `pay within five days of notice, rolled` at `Mon 26 Oct` with the following events: party `Seller` did `notify` with `Thu 29 Oct` at `Thu 29 Oct` party `Buyer` did `pay` at `Wed 4 Nov`
+executing contract `serve on a business day within ten days` at `Mon 26 Oct` with the following events: party `Landlord` did `serve` with `Sat 31 Oct` at `Sat 31 Oct` party `Landlord` did `serve` with `Mon 2 Nov` at `Mon 2 Nov`
+executing contract `serve on a business day within ten days` at `Mon 26 Oct` with the following events: party `Landlord` did `serve` with `Sat 31 Oct` at `Sat 31 Oct` `WAIT UNTIL` with `Fri 6 Nov`
+executing contract `serve on a business day within ten days` at `Wed 21 Oct` with the following events: party `Landlord` did `serve` with `Sat 31 Oct` at `Sat 31 Oct` party `Landlord` did `serve` with `Mon 2 Nov` at `Mon 2 Nov`
+executing contract `serve on a business day within ten days, rolled` with `Wed 21 Oct` at `Wed 21 Oct` with the following events: party `Landlord` did `serve` with `Sat 31 Oct` at `Sat 31 Oct` party `Landlord` did `serve` with `Mon 2 Nov` at `Mon 2 Nov`
+executing contract `serve on a business day within ten days` at `Mon 26 Oct` with the following events: party `Landlord` did `serve` with `Mon 2 Nov` at `Sat 31 Oct`
+executing contract `no deliveries off a business day` at `Mon 26 Oct` with the following events: party `Seller` did `deliver` with `Fri 30 Oct` at `Fri 30 Oct` `WAIT UNTIL` with `Mon 16 Nov`
+executing contract `no deliveries off a business day` at `Mon 26 Oct` with the following events: party `Seller` did `deliver` with `Sat 31 Oct` at `Sat 31 Oct`
+executing contract `lodge on a day that is not a public holiday` with list of 2 November 2026 at `Mon 26 Oct` with the following events: party `Seller` did `lodge` with `Mon 2 Nov` at `Mon 2 Nov` party `Seller` did `lodge` with `Tue 3 Nov` at `Tue 3 Nov`
+executing contract `lodge on a day that is not a public holiday` with list of 2 November 2026 at `Mon 26 Oct` with the following events: party `Seller` did `lodge` with `Mon 2 Nov` at `Mon 2 Nov` `WAIT UNTIL` with `Mon 16 Nov`
+executing contract `lodge on a day that is not a public holiday` with `EMPTY` at `Mon 26 Oct` with the following events: party `Seller` did `lodge` with `Mon 2 Nov` at `Mon 2 Nov`
+executing contract `lodge on a day that is not a public holiday` with list of 2 November 2026 at `Mon 26 Oct` with the following events: party `Seller` did `lodge` with `Sat 31 Oct` at `Sat 31 Oct`
+executing contract `pay within five days of notice, rolled past holidays` with list of 2 November 2026 at `Mon 26 Oct` with the following events: party `Seller` did `notify` with `Mon 26 Oct` at `Mon 26 Oct` party `Buyer` did `pay` at `Tue 3 Nov`
+executing contract `pay within five days of notice, rolled past holidays` with `EMPTY` at `Mon 26 Oct` with the following events: party `Seller` did `notify` with `Mon 26 Oct` at `Mon 26 Oct` party `Buyer` did `pay` at `Tue 3 Nov`
+executing contract `reply within three business days of deemed receipt` at `Mon 26 Oct` with the following events: party `Tenant` did `send notice` with `Fri 30 Oct` at `Fri 30 Oct` party `Landlord` did `reply` at `Thu 5 Nov`
+executing contract `reply within three business days of deemed receipt` at `Mon 26 Oct` with the following events: party `Tenant` did `send notice` with `Fri 30 Oct` at `Fri 30 Oct` party `Landlord` did `reply` at `Fri 6 Nov`
+executing contract `reply within three business days of deemed receipt` at `Mon 26 Oct` with the following events: party `Tenant` did `send notice` with `Mon 2 Nov` at `Mon 2 Nov` party `Landlord` did `reply` at `Fri 6 Nov`
