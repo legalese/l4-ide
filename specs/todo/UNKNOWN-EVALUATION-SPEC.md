@@ -262,7 +262,7 @@ Evaluate the left operand first.
 If it decides the connective (`FALSE` for `AND`, `TRUE` for `OR`, `FALSE` for `IMPLIES`), stop, as today.
 If it is known and does not decide, the answer is the right operand, as today.
 Only if it is unknown is the right operand evaluated and the K3 table applied.
-This is McCarthy's sequential reading of the connectives; Plotkin's parallel-or, which would make `⊥ ∨ T = T`, is not proposed.
+This is McCarthy's sequential reading of the connectives; Plotkin's parallel-or, which would make `⊥ ∨ T = T`, is not proposed for the connectives; U14 (§9) takes it for a section's alternative routes only (ruled 2026-11-02, not landed).
 
 **(c) Residuals.**
 An undecided result is not a bare `U` but the term it is waiting on: a formula over the atoms it depends on, with `IMPLIES` kept as its own node (§3.7).
