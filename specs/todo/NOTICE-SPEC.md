@@ -3,7 +3,9 @@
 > **Status (2026-10-10): PROPOSED, not landed; nothing here is built and nothing is ruled.**
 > Meng asked, through session `l4-pitch` on 2026-10-10, that sending a notice be a first-class action available by default to any party, plus user-defined notice types.
 > `l4-pitch` wrote the requirements memo this spec condenses, from world knowledge and not a research pass; its case and statute citations are marked as recalled below and must be checked before anything relies on them.
-> Session `ledger` wrote this file and added the parts that touch the ledger and the norm log; every claim about the tree is cited to `origin/unstable` @ `539cad5fd`.
+> Session `ledger` wrote this file and added the parts that touch the ledger and the norm log; every claim about the tree was cited to `origin/unstable` @ `539cad5fd`.
+> A line number drifts as `unstable` moves, so find a site by its symbol.
+> On 2026-11-28 the `file:line` citations in §1 were re-pointed to `origin/unstable` @ `c60023747`, and the claims about where `NORM-LOG-SPEC.md` is and about its N3, N5 and N12, and about the burden-of-proof module, were re-checked there; its N10 and the other claims about the tree were not re-measured.
 > **Companion documents:** `specs/done/STATE-AS-LEDGER-SPEC.md` (the ledger); `specs/todo/IN-RELIANCE-ON-SPEC.md` (§4.2, a speech-act `ATTEST`); `specs/todo/presumption-assertion/CONTRACT.md` (defaults and unknowns); `specs/todo/SUBJECT-TO-NOTWITHSTANDING-SPEC.md`; and `specs/todo/NORM-LOG-SPEC.md`, which is on `unstable` (it landed with legalese/l4-ide#499, merged 2026-11-22; its N3, N5, N10 and N12 recur below, and each is cited by its ruling in that file's §6.1).
 
 ---
@@ -16,13 +18,13 @@ L4 today has one moment: `NOTIFY` v1 makes dispatch and delivery a single write,
 
 ## 1. What exists (measured)
 
-- **`NOTIFY` v1 is a recipient-qualified `RECORD`.** `RECORD q's <cell> IS <v>` is written by the acting party into q's own ledger, routed by `RouteNotify` (`jl4-core/src/L4/Evaluate/Ledger.hs:262`, applied at `jl4-core/src/L4/EvaluateLazy/Machine.hs:1379`, chosen in `runRecord` at `:4325-4331`), stamped with `source = NOTIFY`; demo `jl4/experiments/notify-v1.l4`.
+- **`NOTIFY` v1 is a recipient-qualified `RECORD`.** `RECORD q's <cell> IS <v>` is written by the acting party into q's own ledger, routed by `RouteNotify` (the `EventRoute` constructor, `jl4-core/src/L4/Evaluate/Ledger.hs:273`, applied in `tellEventRouted` at `jl4-core/src/L4/EvaluateLazy/Machine.hs:2274`, chosen in `runRecord` at `:5919-5925`; positions at `origin/unstable` @ `c60023747`), stamped with `source = NOTIFY`; demo `jl4/experiments/notify-v1.l4`.
   The sender writes the recipient's inbox in the same step it acts, so dispatch is delivery: no lost letter, no bounce, no refusal, no interval.
 - **Its 2026-06-22 design review left constraints this spec inherits** (PR #31):
   - `NOTIFY` must not become a reserved keyword, because corpus files already use it as an ordinary name (`jl4/experiments/misleadingPriceLists.l4`, `jl4/experiments/jerseyCharities2-annual-returns.l4`);
   - the inbox is the recipient's own ledger, so a received notice is indistinguishable from a self-written entry (v1 assumed cooperative parties);
   - party identity is keyed on the rendered party value, so two spellings of one party are two inboxes, silently.
-- **The ledger's two time stamps are the wrong axis for notice timing.** `txTime` is one wall-clock value per run and `vtFrom` is a calendar `Day` (`Ledger.hs:69-76`); neither is the contract clock.
+- **The ledger's two time stamps are the wrong axis for notice timing.** `txTime` is one wall-clock value per run and `vtFrom` is a calendar `Day` (the `txTime` and `vtFrom` fields of `Provenance`, `Ledger.hs:71` and `:78` at `origin/unstable` @ `c60023747`); neither is the contract clock.
   The right pair is the norm log's `effective` and `observed` contract instants (NORM-LOG N3, answered 2026-09-27), and black-ink entries do not carry them.
   NORM-LOG N12 would give them to `RECORD`, `COMMIT` and `NOTIFY` entries, and `NORM-LOG-SPEC.md` §6.1 records it as answered only in part on 2026-10-26: the answered part is the key of the ledger read cache, and the instants themselves are held, to be re-posed in the PR that lands N10's goal A.
   **So notices would be the first consumer of the instants N12 holds**: the postal rule is "effective at the dispatch instant, observed by the addressee later, or never".
