@@ -4,7 +4,7 @@
 > Meng asked, through session `l4-pitch` on 2026-10-10, that sending a notice be a first-class action available by default to any party, plus user-defined notice types.
 > `l4-pitch` wrote the requirements memo this spec condenses, from world knowledge and not a research pass; its case and statute citations are marked as recalled below and must be checked before anything relies on them.
 > Session `ledger` wrote this file and added the parts that touch the ledger and the norm log; every claim about the tree is cited to `origin/unstable` @ `539cad5fd`.
-> **Companion documents:** `specs/done/STATE-AS-LEDGER-SPEC.md` (the ledger); `specs/todo/IN-RELIANCE-ON-SPEC.md` (§4.2, a speech-act `ATTEST`); `specs/todo/presumption-assertion/CONTRACT.md` (defaults and unknowns); `specs/todo/SUBJECT-TO-NOTWITHSTANDING-SPEC.md`; and `specs/todo/NORM-LOG-SPEC.md`, which is on draft PR legalese/l4-ide#499 and not on `unstable` (its N3, N5, N10 and N12 recur below).
+> **Companion documents:** `specs/done/STATE-AS-LEDGER-SPEC.md` (the ledger); `specs/todo/IN-RELIANCE-ON-SPEC.md` (§4.2, a speech-act `ATTEST`); `specs/todo/presumption-assertion/CONTRACT.md` (defaults and unknowns); `specs/todo/SUBJECT-TO-NOTWITHSTANDING-SPEC.md`; and `specs/todo/NORM-LOG-SPEC.md`, which is on `unstable` (it landed with legalese/l4-ide#499, merged 2026-11-22; its N3, N5, N10 and N12 recur below, and each is cited by its ruling in that file's §6.1).
 
 ---
 
@@ -23,8 +23,9 @@ L4 today has one moment: `NOTIFY` v1 makes dispatch and delivery a single write,
   - the inbox is the recipient's own ledger, so a received notice is indistinguishable from a self-written entry (v1 assumed cooperative parties);
   - party identity is keyed on the rendered party value, so two spellings of one party are two inboxes, silently.
 - **The ledger's two time stamps are the wrong axis for notice timing.** `txTime` is one wall-clock value per run and `vtFrom` is a calendar `Day` (`Ledger.hs:69-76`); neither is the contract clock.
-  The right pair is the norm log's `effective` and `observed` contract instants (NORM-LOG N3, accepted 2026-09-27), and black-ink entries do not carry them until NORM-LOG N12, which is open.
-  **So notices are N12's first consumer**: the postal rule is "effective at the dispatch instant, observed by the addressee later, or never".
+  The right pair is the norm log's `effective` and `observed` contract instants (NORM-LOG N3, answered 2026-09-27), and black-ink entries do not carry them.
+  NORM-LOG N12 would give them to `RECORD`, `COMMIT` and `NOTIFY` entries, and `NORM-LOG-SPEC.md` §6.1 records it as answered only in part on 2026-10-26: the answered part is the key of the ledger read cache, and the instants themselves are held, to be re-posed in the PR that lands N10's goal A.
+  **So notices would be the first consumer of the instants N12 holds**: the postal rule is "effective at the dispatch instant, observed by the addressee later, or never".
 - `ATTEST` is a pure synonym of `COMMIT` today (`IN-RELIANCE-ON-SPEC.md` §4.2 proposes giving it a speech-act meaning).
 
 ## 2. The moments, and rules that pick among them
@@ -69,7 +70,7 @@ The two that matter most come first.
 
 - **`give notice` sits above `NOTIFY`.** Giving notice writes Dispatched to the sender's own ledger; Delivered and Read are separate entries written by the addressee or a carrier, as trace events. v1's `RECORD q's` stays as what it is — a sender writing straight into the recipient's ledger — and is the receipt-on-dispatch special case, not the general mechanism. `give notice` must be library sugar, not a keyword (§1).
 - **Regimes are library data** with a module default and a per-clause override, and every selection is recorded with its provenance so a reviewer sees which rule was assumed.
-- **Effective is computed on read, not stored.** Storing observations and deriving effect keeps deeming defeasible (a later Returned entry rebuts it) and keeps machine conclusions apart from party assertions, as NORM-LOG N5 does for fates. Reads are as of the reader's contract instant, which needs N12.
+- **Effective is computed on read, not stored.** Storing observations and deriving effect keeps deeming defeasible (a later Returned entry rebuts it) and keeps machine conclusions apart from party assertions, as NORM-LOG N5 does for fates. Reads are as of the reader's contract instant, which needs the black-ink instants that N12 holds (§1; not ruled).
 - **Discrete time:** dispatch, delivery and reading may share one tick; ordering on one tick is NORM-LOG N10's tie case and inherits its answer.
 - **An unspecified regime defaults and flags a fork** rather than refusing, because instruments are usually silent (R4); the flag is the same "assumed, not ruled" shape as the presumption work (`specs/todo/presumption-assertion/CONTRACT.md`).
 
@@ -90,7 +91,7 @@ The two that matter most come first.
 
 ## 6. Dependencies
 
-- NORM-LOG N12 (contract instants on black ink, as-of `RECALL`): needed before any notice clock can be read correctly.
+- NORM-LOG N12 (contract instants on black ink, as-of `RECALL`): needed before any notice clock can be read correctly; answered only in part (§1), and the instants are held until N12 is re-posed with N10's goal A.
 - NORM-LOG N10 (operand order) and its run-time check: channel races inside a compound.
 - The presumption and assertion bench (cards C1–C6, open): deeming as a rebuttable default.
 - `IN-RELIANCE-ON-SPEC.md` §4.2: whether `ATTEST` becomes the speech act that carries evidence of dispatch or receipt.
