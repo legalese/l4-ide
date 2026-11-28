@@ -6,9 +6,12 @@ dmn-check reads a file's structure and never executes anything.
 
 ## What dmn-check is
 
-Facts below were checked on 2026-10-30 against Maven Central and the 1.4.0 source jars.
+Facts below were checked on 2026-10-30 against Maven Central and the 1.4.0 source jars, except the version line, which was measured again on 2026-11-28.
 
-- Coordinates `de.redsix:dmn-check-cli:1.4.0`. `maven-metadata.xml` at `https://repo1.maven.org/maven2/de/redsix/dmn-check/` lists 1.4.0 as both `latest` and `release` (`lastUpdated` 2026-07-15).
+- Coordinates `de.redsix:dmn-check-cli:1.4.0`. The harness pins 1.4.0 (see "The pin"); it is not the newest release.
+  On 2026-10-30, `maven-metadata.xml` at `https://repo1.maven.org/maven2/de/redsix/dmn-check/` listed 1.4.0 as both `latest` and `release` (`lastUpdated` 2026-07-15).
+  On 2026-11-28 the same file, and the one beside it at `https://repo1.maven.org/maven2/de/redsix/dmn-check-cli/maven-metadata.xml`, list 1.5.0 as both (`lastUpdated` 2026-11-09).
+  Nothing on this page was measured against 1.5.0.
 - Licence Apache-2.0, from the licence block of `dmn-check-1.4.0.pom`.
 - Needs Java 21: the parent pom sets `<java.version>21</java.version>`, and a compiled validator class is class file version 65.
 - It reads files with Camunda 7's `camunda-dmn-model` 7.24.0, so it sees DMN through Camunda 7's vocabulary.

@@ -16,10 +16,12 @@
 
   VERSION IS PINNED, and so is every transitive jar: jars.sha256 holds the
   SHA-256 of each file on the resolved classpath, and run.sh refuses to run if
-  one differs. 1.4.0 is the latest release on Maven Central (maven-metadata.xml,
-  lastUpdated 2026-07-15) and its parent pom sets java.version to 21, so the
-  harness needs JDK 21+. Bumping the version means regenerating jars.sha256
-  (README, "Bumping the pin").
+  one differs. 1.4.0 was the latest release on Maven Central when this was
+  written (maven-metadata.xml, 2026-10-30) and is pinned, not tracked: on
+  2026-11-28 maven-metadata.xml lists 1.5.0 as latest (lastUpdated 2026-11-09),
+  and this harness has not been run against it. 1.4.0's parent pom sets
+  java.version to 21, so the harness needs JDK 21+. Bumping the version means
+  regenerating jars.sha256 (README, "Bumping the pin").
 
   dmn-check-cli is the artifact the project ships as a command line; it pulls in
   dmn-check-plugin-base, -validators and -core. The harness drives the validators
