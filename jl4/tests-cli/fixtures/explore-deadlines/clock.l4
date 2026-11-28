@@ -1,0 +1,26 @@
+-- smucclaw/l4-ide#1107, after review: a deadline that reads the clock, or
+-- the world outside the file, is not worked out, written in the WITHIN or
+-- reached through a rule. Worked out in the module, `clock duty` comes out 8
+-- under one fixed clock and 5 under another, so the answer is the day the
+-- command ran on, not the contract's; `env duty` comes out of the
+-- environment the command ran in.
+
+IMPORT prelude
+
+TIMEZONE IS "Asia/Singapore"
+
+DECLARE Actor IS ONE OF Alice
+DECLARE Act IS ONE OF pay
+
+`clocky` MEANS ((DATE_SERIAL TODAY) MODULO 7) PLUS 3
+
+`env period` MEANS fromMaybe 10 (TONUMBER (fromMaybe "3" (ENV "PERIOD_DAYS")))
+
+GIVETH A DEONTIC Actor Act
+`clock duty` MEANS PARTY Alice MUST pay WITHIN `clocky` LEST BREACH BY Alice BECAUSE "late"
+
+GIVETH A DEONTIC Actor Act
+`today duty` MEANS PARTY Alice MUST pay WITHIN ((DATE_SERIAL TODAY) MODULO 7) PLUS 3 LEST BREACH BY Alice BECAUSE "late"
+
+GIVETH A DEONTIC Actor Act
+`env duty` MEANS PARTY Alice MUST pay WITHIN `env period` LEST BREACH BY Alice BECAUSE "late"

@@ -1,0 +1,30 @@
+-- smucclaw/l4-ide#1107, after review: a rule that reads a ledger is not
+-- worked out however the WITHIN names it: with WITH, through a rule that
+-- names it so, or as a genitive. Worked out outside a run, against an empty
+-- ledger, each deadline would be 50, the fallback, whatever the run had
+-- recorded.
+
+IMPORT prelude
+
+DECLARE Actor IS ONE OF Alice, Bob
+DECLARE Act IS ONE OF pay
+
+GIVEN fallback IS A NUMBER
+GIVETH A NUMBER
+`recorded period` fallback MEANS fromMaybe fallback (RECALL `period`)
+
+GIVETH A NUMBER
+`wrapper` MEANS `recorded period` WITH fallback IS 50
+
+GIVEN who IS AN Actor
+GIVETH A NUMBER
+`period for` who MEANS fromMaybe 50 (RECALL `period`)
+
+GIVETH A DEONTIC Actor Act
+`named call` MEANS PARTY Alice MUST pay WITHIN (`recorded period` WITH fallback IS 50) LEST BREACH BY Alice BECAUSE "late"
+
+GIVETH A DEONTIC Actor Act
+`wrapped` MEANS PARTY Alice MUST pay WITHIN `wrapper` LEST BREACH BY Alice BECAUSE "late"
+
+GIVETH A DEONTIC Actor Act
+`genitive` MEANS PARTY Alice MUST pay WITHIN Bob's `period for` LEST BREACH BY Alice BECAUSE "late"

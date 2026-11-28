@@ -65,6 +65,7 @@ module L4.Cli.Explore
   ( ExploreCliOptions (..)
   , exploreOptionsParser
   , exploreCmd
+  , importedModules
   ) where
 
 import Base (catMaybes, for, for_, unless, when)

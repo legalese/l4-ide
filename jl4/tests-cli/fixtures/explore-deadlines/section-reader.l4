@@ -1,0 +1,23 @@
+-- smucclaw/l4-ide#1107, after review: a WITHIN that names a rule reading a
+-- section GIVEN. Evaluated outside a run as the contract holds it, with
+-- the GIVEN already passed, the call stops with the evaluator's "Internal
+-- error ... given signatures' values' lengths do not match"; it is not
+-- worked out, and the reason says what it reads.
+
+DECLARE Actor IS ONE OF Alice
+DECLARE Act IS ONE OF pay
+
+GIVETH A DEONTIC Actor Act
+`supplied` MEANS `the duty` WITH rate IS 4 PLUS 4
+
+GIVETH A DEONTIC Actor Act
+`plain` MEANS `the duty`
+
+§ `Terms`
+    GIVEN rate IS A NUMBER TYPICALLY 3
+
+GIVETH A NUMBER
+`the window` MEANS rate TIMES 10
+
+GIVETH A DEONTIC Actor Act
+`the duty` MEANS PARTY Alice MUST pay WITHIN `the window` LEST BREACH BY Alice BECAUSE "late"

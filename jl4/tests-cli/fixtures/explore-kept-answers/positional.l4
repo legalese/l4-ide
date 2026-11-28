@@ -1,0 +1,48 @@
+-- l4 explore keys a state on the answer a zero-input rule that reads a
+-- ledger was forced to, because the evaluator keeps a rule's first answer.
+-- `go peek` forces `taken now` to FALSE before `taken` is committed, and
+-- `go skip` does not, so after `go peek` Bob may buy again (the kept FALSE)
+-- and after `go skip` he may not (forced now, TRUE): two states. This file
+-- calls the ledger reader positionally; named.l4, genitive.l4 and wrapper.l4
+-- spell the same call with WITH, as a genitive, and through a wrapper, and
+-- each must explore to the same graph (smucclaw/l4-ide#1107, after review:
+-- on unstable they merged the two states into one).
+
+IMPORT prelude
+
+DECLARE Actor IS ONE OF Bob
+DECLARE Mode IS ONE OF peek, skip
+DECLARE Act IS ONE OF
+    go HAS mode IS A Mode
+    buy
+
+GIVEN dflt IS A BOOLEAN
+GIVETH A BOOLEAN
+`is taken` dflt MEANS fromMaybe dflt (RECALL OFFICIAL's `taken`)
+
+GIVETH A BOOLEAN
+`taken now` MEANS `is taken` FALSE
+
+GIVETH A DEONTIC Actor Act
+`shop` MEANS
+    PARTY Bob
+    MAY buy PROVIDED NOT `taken now`
+    WITHIN 10
+    HENCE COMMIT `taken` IS TRUE HENCE `shop`
+    LEST FULFILLED
+
+GIVETH A DEONTIC Actor Act
+`start` MEANS
+    PARTY Bob
+    MAY go m
+    WITHIN 10
+    HENCE COMMIT `taken` IS (IF m EQUALS peek THEN NOT `taken now` ELSE TRUE) HENCE `shop`
+    LEST FULFILLED
+
+#TRACE `start` AT 0 WITH
+    PARTY Bob DOES go peek AT 1
+    PARTY Bob DOES buy AT 2
+
+#TRACE `start` AT 0 WITH
+    PARTY Bob DOES go skip AT 1
+    PARTY Bob DOES buy AT 2

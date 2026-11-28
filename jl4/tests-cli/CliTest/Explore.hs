@@ -12,6 +12,7 @@
 module CliTest.Explore (spec, fixtures) where
 
 import Control.Monad (forM_)
+import Data.Char (isDigit)
 import Data.List (isInfixOf, isPrefixOf, isSuffixOf, sort, tails)
 import System.Directory (copyFile, listDirectory)
 import System.Exit (ExitCode (..))
@@ -36,11 +37,45 @@ breached = "tests-cli" </> "fixtures" </> "explore-breached"
 startFixtures :: FilePath
 startFixtures = "tests-cli" </> "fixtures" </> "explore-start"
 
+-- | The fixtures of smucclaw/l4-ide#1106, a rule under a § heading.
+sections :: FilePath
+sections = "tests-cli" </> "fixtures" </> "lts-sections"
+
+-- | The fixtures of smucclaw/l4-ide#1107, a deadline written as a name or an
+-- expression.
+deadlines :: FilePath
+deadlines = "tests-cli" </> "fixtures" </> "explore-deadlines"
+
+-- | Review of smucclaw/l4-ide#1107: the kept answer of a constant that reads
+-- a ledger, called four ways.
+keptAnswers :: FilePath
+keptAnswers = "tests-cli" </> "fixtures" </> "explore-kept-answers"
+
+-- | Review of smucclaw/l4-ide#1107: rules that read the run, in an imported
+-- file.
+imported :: FilePath
+imported = "tests-cli" </> "fixtures" </> "explore-imported"
+
+-- | Review of smucclaw/l4-ide#1107: properties that read a ledger through a
+-- rule, called three ways.
+propertyReaders :: FilePath
+propertyReaders = "tests-cli" </> "fixtures" </> "explore-property-readers"
+
+-- | Review of smucclaw/l4-ide#1107: acts the what-if cannot replay.
+actions :: FilePath
+actions = "tests-cli" </> "fixtures" </> "explore-actions"
+
 fixtures :: [FilePath]
 fixtures =
   [ brief </> f | f <- ["d1-naive.l4", "d2-reread.l4", "d3-atomic.l4", "refused-number.l4", "properties.l4"] ]
   <> [ instants </> f | f <- ["clocks.l4", "window.l4", "half.l4", "adjacent.l4", "open.l4", "flip3.l4", "room.l4", "lapse.l4", "merged.l4", "lapse-fixed.l4", "cap-re.l4", "own-lapse.l4", "frac-re.l4", "fx-fork.l4", "fx-barrier.l4", "succ2.l4", "hidden.l4", "succ4.l4", "cap-shift.l4", "frac-start.l4", "frac-wait.l4", "frac-stamp.l4"] ]
   <> [ breached </> f | f <- ["sale.l4", "resell.l4", "continuation.l4"] ]
+  <> [ sections </> f | f <- ["sectioned.l4", "two-sections.l4"] ]
+  <> [ deadlines </> f | f <- ["shapes.l4", "given.l4", "carried.l4", "armed.l4", "ledger.l4", "called.l4", "section-given.l4", "section-reader.l4", "clock.l4", "locals.l4", "slow.l4", "dated.l4"] ]
+  <> [ keptAnswers </> f | f <- ["positional.l4", "named.l4", "genitive.l4", "wrapper.l4"] ]
+  <> [ imported </> f | f <- ["readers.l4", "deadlines.l4", "kept.l4", "property.l4", "taken.l4", "taken-via.l4", "hop1.l4", "hop2.l4", "section-act.l4", "replay.l4"] ]
+  <> [ propertyReaders </> f | f <- ["positional.l4", "with.l4", "genitive.l4"] ]
+  <> [ actions </> f | f <- ["section-given.l4", "section-party.l4", "local-function.l4"] ]
 
 -- | The acceptance run of the fixtures' README: the clock bounded at
 -- closing, the cells the properties read kept.
@@ -778,8 +813,379 @@ spec bin = describe "l4 explore" $ do
       code `shouldBe` ExitFailure 2
       let occurrences needle hay = length [ () | i <- [0 .. length hay - length needle], needle `isPrefixOf` drop i hay ]
       occurrences "PARTY B DOES b at instants that are not whole numbers" (lastLine sout) `shouldBe` 1
+
+  -- smucclaw/l4-ide#1106: `l4 lts --contract` looked only at the top level
+  describe "a rule under a § heading (#1106)" $ do
+    it "sectioned.l4: l4 lts --contract finds the rule, as l4 explore --contract does" $ do
+      Output code sout serr <- runL4 bin ["lts", sections </> "sectioned.l4", "--contract", "pay on time"]
+      code `shouldBe` ExitSuccess
+      serr `shouldNotSatisfy` ("no top-level rule" `isInfixOf`)
+      sout `shouldSatisfy` ("`pay on time` \8212 before anything has happened" `isInfixOf`)
+      sout `shouldSatisfy` ("Next deadline: 10 (Alice: pay)" `isInfixOf`)
+      Output ecode esout _ <- runL4 bin ["explore", sections </> "sectioned.l4", "--contract", "pay on time"]
+      ecode `shouldBe` ExitSuccess
+      esout `shouldSatisfy` ("3 states, 4 transitions" `isInfixOf`)
+
+    it "two-sections.l4: of two rules called `the duty`, both take the first in the file, and l4 lts finds one two headings down" $ do
+      Output code sout _ <- runL4 bin ["lts", sections </> "two-sections.l4", "--contract", "the duty"]
+      code `shouldBe` ExitSuccess
+      sout `shouldSatisfy` ("Alice MUST pay \8212 due by 10 (10 from now)" `isInfixOf`)
+      sout `shouldNotSatisfy` ("ship" `isInfixOf`)
+      Output ecode esout _ <- runL4 bin ["explore", sections </> "two-sections.l4", "--contract", "the duty"]
+      ecode `shouldBe` ExitSuccess
+      esout `shouldSatisfy` ("time passes the deadline 10 (WAITUNTIL 11)" `isInfixOf`)
+      esout `shouldNotSatisfy` ("ship" `isInfixOf`)
+      Output ncode nsout _ <- runL4 bin ["lts", sections </> "two-sections.l4", "--contract", "the nested duty"]
+      ncode `shouldBe` ExitSuccess
+      nsout `shouldSatisfy` ("Alice MUST ship \8212 due by 30 (30 from now)" `isInfixOf`)
+
+    it "a name no section defines: both refuse it in the same words, and exit 1" $ do
+      Output code _ serr <- runL4 bin ["lts", sections </> "two-sections.l4", "--contract", "no such duty"]
+      code `shouldBe` ExitFailure 1
+      serr `shouldSatisfy` ("--contract: no rule named `no such duty` that takes no inputs" `isInfixOf`)
+      Output ecode _ eserr <- runL4 bin ["explore", sections </> "two-sections.l4", "--contract", "no such duty"]
+      ecode `shouldBe` ExitFailure 1
+      eserr `shouldSatisfy` ("--contract: no rule named `no such duty` that takes no inputs" `isInfixOf`)
+
+  -- smucclaw/l4-ide#1107: a WITHIN written as a name or an expression was
+  -- never worked out, so its breach was never explored and the list could not
+  -- name its deadline. Each spelling is held to its literal twin: the same
+  -- text, but for the contract's name and the WITHIN as written.
+  describe "a deadline written as a name or an expression (#1107)" $ do
+    let explored c f = runL4 bin ["explore", deadlines </> f, "--contract", c]
+        listed c f = runL4 bin ["lts", deadlines </> f, "--contract", c]
+        twins f lit c = do
+          Output lcode lout _ <- explored lit f
+          Output code out _ <- explored c f
+          lcode `shouldBe` ExitSuccess
+          code `shouldBe` ExitSuccess
+          exploreTwin out `shouldBe` exploreTwin lout
+          Output llcode llout _ <- listed lit f
+          Output lscode lsout _ <- listed c f
+          llcode `shouldBe` ExitSuccess
+          lscode `shouldBe` ExitSuccess
+          ltsTwin lsout `shouldBe` ltsTwin llout
+          pure (out, lsout)
+    it "shapes.l4: a named constant, arithmetic on literals, and a name for arithmetic explore and list as the literal does" $
+      forM_ ["named", "sum", "named sum"] \ c -> do
+        (out, lsout) <- twins "shapes.l4" "literal" c
+        out `shouldSatisfy` ("3 states, 4 transitions" `isInfixOf`)
+        out `shouldSatisfy` ("time passes the deadline 10 (WAITUNTIL 11)" `isInfixOf`)
+        lsout `shouldSatisfy` ("Alice MUST pay \8212 due by 10 (" `isInfixOf`)
+        lsout `shouldSatisfy` ("Next deadline: 10 (Alice: pay)" `isInfixOf`)
+
+    it "shapes.l4: a deadline whose working out divides by zero is not known, and neither tool crashes" $ do
+      let why = "working out the WITHIN failed (Division by zero in the operation: DIVIDED BY), so its deadline is not known here"
+      Output code out _ <- explored "raises" "shapes.l4"
+      code `shouldBe` ExitFailure 2
+      out `shouldSatisfy` (("time runs out on pay, in 1 state: " <> why) `isInfixOf`)
+      Output lcode lout _ <- listed "raises" "shapes.l4"
+      lcode `shouldBe` ExitSuccess
+      lout `shouldSatisfy` (("time runs out on Alice MUST pay \8212 " <> why) `isInfixOf`)
+      lout `shouldSatisfy` ("Next deadline: not known here" `isInfixOf`)
+
+    it "given.l4: a WITHIN that reads the rule's own input is not worked out" $ do
+      let why = "the WITHIN reads `period`, an input of the rule, which the contract has not worked out yet, so its deadline is not known here"
+      Output code out _ <- runL4 bin ["explore", deadlines </> "given.l4"]
+      code `shouldBe` ExitFailure 2
+      out `shouldSatisfy` (why `isInfixOf`)
+      Output lcode lout _ <- runL4 bin ["lts", deadlines </> "given.l4"]
+      lcode `shouldBe` ExitSuccess
+      lout `shouldSatisfy` (why `isInfixOf`)
+
+    it "carried.l4: a named deadline carried past a breach explores as the literal does" $ do
+      Output lcode lout _ <- explored "sale literal" "carried.l4"
+      Output code out _ <- explored "sale named" "carried.l4"
+      lcode `shouldBe` ExitSuccess
+      code `shouldBe` ExitSuccess
+      exploreTwin out `shouldBe` exploreTwin lout
+      out `shouldSatisfy` ("12 states, 26 transitions" `isInfixOf`)
+      out `shouldSatisfy` ("[still waiting on: Seller MUST deliver WITHIN 2]" `isInfixOf`)
+
+    it "armed.l4: armed by HENCE, beside an AFTER, and counted OF a named instant, each as its literal twin" $ do
+      _ <- twins "armed.l4" "then literal" "then named"
+      (_, opened) <- twins "armed.l4" "after literal" "after named"
+      opened `shouldSatisfy` ("Next deadline: 15 (Alice: ship)" `isInfixOf`)
+      (_, anchored) <- twins "armed.l4" "of literal" "of named"
+      anchored `shouldSatisfy` ("Next deadline: 8 (Alice: ship)" `isInfixOf`)
+      Output code out _ <- runL4 bin ["lts", deadlines </> "armed.l4"]
+      code `shouldBe` ExitSuccess
+      out `shouldSatisfy` ("Bob MUST ship \8212 due by 12 (`ten days` from now)" `isInfixOf`)
+      out `shouldSatisfy` ("Next deadline: 12 (Bob: ship)" `isInfixOf`)
+
+    it "armed.l4 and ledger.l4: a named AFTER, and a name that reads a ledger, are not worked out" $ do
+      Output code out _ <- explored "named after" "armed.l4"
+      code `shouldBe` ExitFailure 2
+      out `shouldSatisfy` ("time runs out on ship, in 1 state: the AFTER was never evaluated and is not a literal" `isInfixOf`)
+      Output lcode lout _ <- explored "ledger read" "ledger.l4"
+      lcode `shouldBe` ExitFailure 2
+      lout `shouldSatisfy` ("the WITHIN reads `recorded period`, which reads a ledger, so it is worked out only in a run and its deadline is not known here" `isInfixOf`)
+
+    it "ledger.l4: a RECALL written in the WITHIN, or in its OF anchor, is not worked out either" $ do
+      forM_ [("direct read", "the WITHIN"), ("direct anchor", "the anchor of the WITHIN")] \ (c, what) -> do
+        let why = what <> " reads a ledger with RECALL, so it is worked out only in a run and its deadline is not known here"
+        Output code out _ <- explored c "ledger.l4"
+        code `shouldBe` ExitFailure 2
+        out `shouldSatisfy` (why `isInfixOf`)
+        Output lcode lout _ <- listed c "ledger.l4"
+        lcode `shouldBe` ExitSuccess
+        lout `shouldSatisfy` (why `isInfixOf`)
+        lout `shouldSatisfy` ("Next deadline: not known here" `isInfixOf`)
+
+    -- review of #1107: a name the check met only as a variable or the head
+    -- of a positional application missed a ledger read reached any other way
+    it "called.l4: a rule that reads a ledger, named with WITH, through a wrapper, or as a genitive, is not worked out" $
+      forM_ [("named call", "recorded period"), ("wrapped", "wrapper"), ("genitive", "period for")] \ (c, rule) -> do
+        let why = "the WITHIN reads `" <> rule <> "`, which reads a ledger, so it is worked out only in a run and its deadline is not known here"
+        Output code out _ <- explored c "called.l4"
+        code `shouldBe` ExitFailure 2
+        out `shouldSatisfy` (("time runs out on pay, in 1 state: " <> why) `isInfixOf`)
+        out `shouldNotSatisfy` ("time passes the deadline 50" `isInfixOf`)
+        Output lcode lout _ <- listed c "called.l4"
+        lcode `shouldBe` ExitSuccess
+        lout `shouldSatisfy` (why `isInfixOf`)
+        lout `shouldSatisfy` ("Next deadline: not known here" `isInfixOf`)
+
+    -- review of #1107: a section GIVEN supplied by a WITH was read at its
+    -- TYPICALLY default (30, and 35 through the OF anchor, where the run's
+    -- deadline is 20 for both)
+    it "section-given.l4: a WITHIN or an OF anchor that reads a section GIVEN is not worked out, supplied or not" $
+      forM_ [ ("the deal", "the WITHIN", "the period", "30")
+            , ("the plain deal", "the WITHIN", "the period", "30")
+            , ("anchored deal", "the anchor of the WITHIN", "the start", "35") ] \ (c, what, given, wrong) -> do
+        let why = what <> " reads `" <> given <> "`, a section GIVEN, which a WITH can supply, so it is worked out only in a run and its deadline is not known here"
+        Output code out _ <- explored c "section-given.l4"
+        code `shouldBe` ExitFailure 2
+        out `shouldSatisfy` (("time runs out on pay, in 1 state: " <> why) `isInfixOf`)
+        out `shouldNotSatisfy` (("time passes the deadline " <> wrong) `isInfixOf`)
+        Output lcode lout _ <- listed c "section-given.l4"
+        lcode `shouldBe` ExitSuccess
+        lout `shouldSatisfy` (why `isInfixOf`)
+        lout `shouldSatisfy` ("Next deadline: not known here" `isInfixOf`)
+
+    -- review of #1107: worked out in the module, a rule that reads a section
+    -- GIVEN stopped with the evaluator's internal error
+    it "section-reader.l4: a WITHIN naming a rule that reads a section GIVEN is untried with a reason, not an internal error" $
+      forM_ ["supplied", "plain"] \ c -> do
+        let why = "the WITHIN reads `the window`, which reads `rate`, a section GIVEN, which a WITH can supply, so it is worked out only in a run and its deadline is not known here"
+        Output code out err <- explored c "section-reader.l4"
+        code `shouldBe` ExitFailure 2
+        out `shouldSatisfy` (("time runs out on pay, in 1 state: " <> why) `isInfixOf`)
+        (out <> err) `shouldNotSatisfy` ("Internal error" `isInfixOf`)
+        Output lcode lout lerr <- listed c "section-reader.l4"
+        lcode `shouldBe` ExitSuccess
+        lout `shouldSatisfy` (why `isInfixOf`)
+        (lout <> lerr) `shouldNotSatisfy` ("Internal error" `isInfixOf`)
+
+    -- review of #1107: worked out outside a run, a deadline that reads the
+    -- clock comes out 8 under one --fixed-now and 5 under another
+    it "clock.l4: a WITHIN that reads the clock or the environment, itself or through a rule, is not worked out, under any --fixed-now" $
+      forM_ [ ("clock duty", "the WITHIN reads `clocky`, which reads the clock (TODAY)")
+            , ("today duty", "the WITHIN reads the clock (TODAY)")
+            , ("env duty", "the WITHIN reads `env period`, which reads the world outside the file (ENV)") ] \ (c, reads') ->
+        forM_ ["2025-01-31T15:45:30Z", "2025-02-04T15:45:30Z"] \ now -> do
+          let why = reads' <> ", so it is worked out only in a run and its deadline is not known here"
+          Output code out _ <- runL4 bin ["explore", deadlines </> "clock.l4", "--contract", c, "--fixed-now", now]
+          code `shouldBe` ExitFailure 2
+          out `shouldSatisfy` (("time runs out on pay, in 1 state: " <> why) `isInfixOf`)
+          out `shouldNotSatisfy` ("time passes the deadline" `isInfixOf`)
+          Output lcode lout _ <- runL4 bin ["lts", deadlines </> "clock.l4", "--contract", c, "--fixed-now", now]
+          lcode `shouldBe` ExitSuccess
+          lout `shouldSatisfy` (why `isInfixOf`)
+          lout `shouldSatisfy` ("Next deadline: not known here" `isInfixOf`)
+
+    -- review of #1107: the reason called every such name "an input of the
+    -- rule, or a name local to it"; it now says which it is
+    it "locals.l4: a WITHIN that reads a WHERE name, or a value an event carried, is not worked out, and the reason names which" $ do
+      let whereWhy = "the WITHIN reads `period`, a name the rule defines with WHERE or LET, which the contract has not worked out yet, so its deadline is not known here"
+          eventWhy = "the WITHIN reads `n`, a value an event carried, which the contract has not worked out yet, so its deadline is not known here"
+      Output code out _ <- explored "where local" "locals.l4"
+      code `shouldBe` ExitFailure 2
+      out `shouldSatisfy` (("time runs out on ship, in 1 state: " <> whereWhy) `isInfixOf`)
+      Output lcode lout _ <- listed "where local" "locals.l4"
+      lcode `shouldBe` ExitSuccess
+      lout `shouldSatisfy` (whereWhy `isInfixOf`)
+      Output tcode tout _ <- runL4 bin ["lts", deadlines </> "locals.l4"]
+      tcode `shouldBe` ExitSuccess
+      tout `shouldSatisfy` (("time runs out on Bob MUST ship \8212 " <> eventWhy) `isInfixOf`)
+      tout `shouldSatisfy` ("Next deadline: not known here" `isInfixOf`)
+
+    it "ledger.l4: a rule that reads a ledger through another rule is not worked out" $ do
+      let why = "the WITHIN reads `via another`, which reads a ledger, so it is worked out only in a run and its deadline is not known here"
+      Output code out _ <- explored "through another" "ledger.l4"
+      code `shouldBe` ExitFailure 2
+      out `shouldSatisfy` (("time runs out on pay, in 1 state: " <> why) `isInfixOf`)
+      Output lcode lout _ <- listed "through another" "ledger.l4"
+      lcode `shouldBe` ExitSuccess
+      lout `shouldSatisfy` (why `isInfixOf`)
+
+    it "slow.l4: working out a deadline stopped at a limit refuses the exploration (exit 1), and l4 lts lists it (exit 0)" $ do
+      let stopped = "I stopped evaluating: it took more than 500 steps"
+      Output code out err <- runL4 bin ["explore", deadlines </> "slow.l4", "--contract", "slow", "--max-steps", "500"]
+      code `shouldBe` ExitFailure 1
+      (out <> err) `shouldSatisfy` (("the evaluator stopped at a limit working out a deadline: " <> stopped) `isInfixOf`)
+      Output lcode lout _ <- runL4 bin ["lts", deadlines </> "slow.l4", "--contract", "slow", "--max-steps", "500"]
+      lcode `shouldBe` ExitSuccess
+      lout `shouldSatisfy` (("time runs out on Alice MUST pay \8212 working out the WITHIN failed (" <> stopped) `isInfixOf`)
+      lout `shouldSatisfy` ("Next deadline: not known here" `isInfixOf`)
+
+    it "dated.l4: a WITHIN counted OF a named date is worked out as its literal twin is" $ do
+      Output code out _ <- runL4 bin ["explore", deadlines </> "dated.l4"]
+      code `shouldBe` ExitSuccess
+      length (filter ("time passes the deadline 740176 (WAITUNTIL 740177)" `isInfixOf`) (lines out)) `shouldBe` 2
+      Output lcode lout _ <- runL4 bin ["lts", deadlines </> "dated.l4"]
+      lcode `shouldBe` ExitSuccess
+      lout `shouldSatisfy` ("Alice MUST pay \8212 due by 740176 (WITHIN 14 OF `the kickoff`)" `isInfixOf`)
+      lout `shouldSatisfy` ("Alice MUST pay \8212 due by 740176 (WITHIN 14 OF (YMD OF 2026, 7, 1))" `isInfixOf`)
+      length (filter ("Next deadline: 740176 (Alice: pay)" `isInfixOf`) (lines lout)) `shouldBe` 2
+
+  describe "a silent wrong graph that unstable has too (review of #1107)" $ do
+    forM_ ["positional.l4", "named.l4", "genitive.l4", "wrapper.l4"] \ f ->
+      it (f <> ": a constant that reads a ledger is keyed by its kept answer however it calls the reader") $ do
+        Output code out _ <- runL4 bin ["explore", keptAnswers </> f, "--contract", "start"]
+        code `shouldBe` ExitSuccess
+        out `shouldSatisfy` ("start, explored from its outset at 0: 5 states, 8 transitions" `isInfixOf`)
+        out `shouldSatisfy` ("  s0 -> s2  PARTY Bob DOES go OF skip" `isInfixOf`)
+        out `shouldSatisfy` ("1 act passed over" `isInfixOf`)
+
+    let readsItself = "--always never taken: `never taken` reads a ledger itself (a RECALL in it, or in a rule it names); a property is evaluated outside any run"
+    forM_ ([ (propertyReaders </> f, "explore-property-readers/" <> f) | f <- ["positional.l4", "with.l4", "genitive.l4"] ]
+           <> [ (imported </> "property.l4", "explore-imported/property.l4") ]) \ (path, f) ->
+      it (f <> ": a property that reads a ledger through a rule is refused however it calls the rule") $ do
+        Output code out err <- runL4 bin ["explore", path, "--contract", "start", "--always", "never taken"]
+        code `shouldBe` ExitFailure 1
+        (out <> err) `shouldSatisfy` (readsItself `isInfixOf`)
+        (out <> err) `shouldNotSatisfy` ("holds in every one" `isInfixOf`)
+
+    it "explore-imported/kept.l4: a constant that calls an imported ledger reader is keyed too" $ do
+      Output code out _ <- runL4 bin ["explore", imported </> "kept.l4", "--contract", "start"]
+      code `shouldBe` ExitSuccess
+      out `shouldSatisfy` ("start, explored from its outset at 0: 5 states, 8 transitions" `isInfixOf`)
+      out `shouldSatisfy` ("  s0 -> s2  PARTY Bob DOES go OF skip" `isInfixOf`)
+
+    -- the expected graph is the one each path gives run alone: the file's one
+    -- #TRACE is the skip path, whose buy l4 run passes over (WITHIN 9 left)
+    forM_ [("hop1.l4", "one import away"), ("hop2.l4", "two imports away")] \ (f, away) ->
+      it ("explore-imported/" <> f <> ": a constant that reads a ledger, " <> away <> ", is keyed, and each path forces its own") $
+        forM_ [[], ["--fixed-now", "2025-01-31T15:45:30Z"]] \ now -> do
+          Output code out _ <- runL4 bin (["explore", imported </> f, "--contract", "start"] <> now)
+          code `shouldBe` ExitSuccess
+          out `shouldSatisfy` ("start, explored from its outset at 0: 5 states, 8 transitions" `isInfixOf`)
+          out `shouldSatisfy` ("  s0 -> s2  PARTY Bob DOES go OF skip" `isInfixOf`)
+          out `shouldSatisfy` ("1 act passed over" `isInfixOf`)
+          Output rcode rout _ <- runL4 bin (["run", imported </> f] <> now)
+          rcode `shouldBe` ExitSuccess
+          rout `shouldSatisfy` ("PARTY Bob MAY buy PROVIDED (NOT `taken now`) WITHIN 9 HENCE" `isInfixOf`)
+
+    -- the counterexample replay ("L4.Lts.Explore.Check") has its own copy of
+    -- the imported constant too: on one shared copy the second property's
+    -- replay reads the first one's answer, whichever is checked first
+    it "explore-imported/replay.l4: each counterexample replays with its own copy of an imported constant that reads a ledger" $
+      forM_ [("nothing seen", "never seen false"), ("never seen false", "nothing seen")] \ (p1, p2) -> do
+        Output code out _ <- runL4 bin ["explore", imported </> "replay.l4", "--contract", "start", "--always", p1, "--always", p2, "--fixed-now", "2025-01-31T15:45:30Z"]
+        code `shouldBe` ExitFailure 4
+        out `shouldSatisfy` ("Checks (2): 2 violated" `isInfixOf`)
+        out `shouldSatisfy` ("always `nothing seen`: violated after 2 events (state s6)" `isInfixOf`)
+        out `shouldSatisfy` ("always `never seen false`: violated after 2 events (state s4)" `isInfixOf`)
+        out `shouldNotSatisfy` ("did not replay" `isInfixOf`)
+
+    forM_
+      [ ("ledger duty","the WITHIN reads `recorded period`, which reads a ledger, so it is worked out only in a run and its deadline is not known here")
+      , ("clock duty", "the WITHIN reads `clocky`, which reads the clock (TODAY), so it is worked out only in a run and its deadline is not known here")
+      , ("library clock duty", "the WITHIN reads `Today serial`, which reads the clock (TODAY), so it is worked out only in a run and its deadline is not known here")
+      , ("env duty", "the WITHIN reads `env period`, which reads the world outside the file (ENV), so it is worked out only in a run and its deadline is not known here")
+      , ("window duty", "the WITHIN reads `the window`, which reads `rate`, a section GIVEN of readers.l4, which a WITH can supply only inside that file, so it is worked out only in a run and its deadline is not known here")
+      ] \ (contract, why) ->
+        it ("explore-imported/deadlines.l4: " <> contract <> ", a WITHIN naming an imported rule that reads the run, is not worked out") $
+          forM_ ["2025-01-31T15:45:30Z", "2025-02-04T15:45:30Z"] \ now -> do
+            Output code out _ <- runL4 bin ["explore", imported </> "deadlines.l4", "--contract", contract, "--fixed-now", now]
+            code `shouldBe` ExitFailure 2
+            out `shouldSatisfy` (("time runs out on pay, in 1 state: " <> why) `isInfixOf`)
+            Output lcode lout _ <- runL4 bin ["lts", imported </> "deadlines.l4", "--contract", contract, "--fixed-now", now]
+            lcode `shouldBe` ExitSuccess
+            lout `shouldSatisfy` (("time runs out on Alice MUST pay \8212 " <> why) `isInfixOf`)
+
+    let sectionWhy = "the action reads `the price`, a section GIVEN, which a WITH can supply, so the act is known only in a run and the what-if cannot try it"
+        ruleWhy = "the action reads `the total`, which reads `the price`, a section GIVEN, which a WITH can supply, so the act is known only in a run and the what-if cannot try it"
+    forM_
+      [ ("the deal", "PARTY Alice MUST pay `the price`", "pay OF `the price`", sectionWhy)
+      , ("the deal through a rule", "PARTY Alice MUST pay (`the total` OF `the price`)", "pay OF (`the total` OF `the price`)", ruleWhy)
+      , ("the plain deal", "PARTY Alice MUST pay `the price`", "pay OF `the price`", sectionWhy)
+      ] \ (contract, residual, act, why) ->
+        it ("explore-actions/section-given.l4: " <> contract <> ", an act reading a section GIVEN, is untried and not replayed at its default") $ do
+          Output code out _ <- runL4 bin ["explore", actions </> "section-given.l4", "--contract", contract]
+          code `shouldBe` ExitFailure 2
+          out `shouldSatisfy` (("UNTRIED 1: " <> residual <> " (" <> why <> ")") `isInfixOf`)
+          out `shouldSatisfy` ("0 acts passed over" `isInfixOf`)
+          out `shouldNotSatisfy` ("Internal error" `isInfixOf`)
+          Output lcode lout _ <- runL4 bin ["lts", actions </> "section-given.l4", "--contract", contract]
+          lcode `shouldBe` ExitSuccess
+          lout `shouldSatisfy` (("Alice does " <> act <> " \8212 " <> why) `isInfixOf`)
+          lout `shouldNotSatisfy` ("it is not the act awaited" `isInfixOf`)
+          lout `shouldNotSatisfy` ("Internal error" `isInfixOf`)
+
+    -- the importing file cannot supply an imported section GIVEN, so the
+    -- reason says whose it is
+    forM_
+      [ ("direct", "PARTY Alice MUST pay rate", "the action reads `rate`, a section GIVEN of readers.l4, which a WITH can supply only inside that file, so the act is known only in a run and the what-if cannot try it")
+      , ("via rule", "PARTY Alice MUST pay `the window`", "the action reads `the window`, which reads `rate`, a section GIVEN of readers.l4, which a WITH can supply only inside that file, so the act is known only in a run and the what-if cannot try it")
+      ] \ (contract, residual, why) ->
+        it ("explore-imported/section-act.l4: " <> contract <> ", an act reading an imported section GIVEN, is untried, and the reason names its file") $ do
+          Output code out _ <- runL4 bin ["explore", imported </> "section-act.l4", "--contract", contract]
+          code `shouldBe` ExitFailure 2
+          out `shouldSatisfy` (("UNTRIED 1: " <> residual <> " (" <> why <> ")") `isInfixOf`)
+          out `shouldNotSatisfy` ("Internal error" `isInfixOf`)
+
+    forM_
+      [ ("applied", "PARTY Alice MUST pay (f OF 3)", "pay OF (f OF 3)", "the action applies `f`, a function local to the rule, which the what-if cannot supply")
+      , ("where positional", "PARTY Alice MUST pay (twice OF 3)", "pay OF (twice OF 3)", "the action applies `twice`, a function local to the rule, which the what-if cannot supply")
+      , ("where named", "PARTY Alice MUST pay (twice WITH y IS 3)", "pay OF (twice WITH y IS 3)", "the action applies `twice`, a function local to the rule, which the what-if cannot supply")
+      , ("plain", "PARTY Alice MUST pay n", "pay OF n", "the action binds `n`, which the what-if cannot choose")
+      , ("where plain", "PARTY Alice MUST pay six", "pay OF six", "the action binds `six`, which the what-if cannot choose")
+      ] \ (contract, residual, act, why) ->
+        it ("explore-actions/local-function.l4: " <> contract <> ", an act naming a local, is untried with the what-if's own reason") $ do
+          Output code out _ <- runL4 bin ["explore", actions </> "local-function.l4", "--contract", contract]
+          code `shouldBe` ExitFailure 2
+          out `shouldSatisfy` (("UNTRIED 1: " <> residual <> " (" <> why <> ")") `isInfixOf`)
+          out `shouldNotSatisfy` ("Internal error" `isInfixOf`)
+          Output lcode lout _ <- runL4 bin ["lts", actions </> "local-function.l4", "--contract", contract]
+          lcode `shouldBe` ExitSuccess
+          lout `shouldSatisfy` (("Alice does " <> act <> " \8212 " <> why) `isInfixOf`)
+          lout `shouldNotSatisfy` ("Internal error" `isInfixOf`)
+
+    it "explore-actions/section-party.l4: a party a section GIVEN names, supplied by a WITH, still explores to the act the run takes" $ do
+      Output code out _ <- runL4 bin ["explore", actions </> "section-party.l4", "--contract", "the deal"]
+      code `shouldBe` ExitSuccess
+      out `shouldSatisfy` ("the deal, explored from its outset at 0: 3 states, 4 transitions" `isInfixOf`)
+      out `shouldSatisfy` ("  s0 -> s1  PARTY Bob DOES pay" `isInfixOf`)
   where
     liveness =
       [ "--eventually", "Alice has bought or stopped"
       , "--eventually", "one dinner is bought", "--if-always", "the ledger is open"
       , "--eventually", "Bob has bought" ]
+
+-- | An exploration's text with what spells the deadline left out: the
+-- contract's name on the first line, and the residuals, which print the
+-- WITHIN as written.
+exploreTwin :: String -> [String]
+exploreTwin out = case lines out of
+  (h : rest) -> dropWhile (/= ',') h : filter (not . residualLine) rest
+  []         -> []
+  where
+    residualLine = \ case
+      ' ' : ' ' : 'r' : d : _ -> isDigit d
+      _                       -> False
+
+-- | A list's text with what spells the deadline left out: the header, which
+-- names the contract, and what follows the due date on an owed line.
+ltsTwin :: String -> [String]
+ltsTwin out = map dueLine (drop 1 (lines out))
+  where
+    dueLine l = case breakOn "\8212 due by " l of
+      Just (pre, post) -> pre <> "\8212 due by " <> takeWhile (/= ' ') post
+      Nothing -> case breakOn "\8212 due " l of
+        Just (pre, _) -> pre <> "\8212 due"
+        Nothing       -> l
+    breakOn pat s = case [ (take i s, drop (i + length pat) s) | (i, t) <- zip [0 :: Int ..] (tails s), pat `isPrefixOf` t ] of
+      (x : _) -> Just x
+      []      -> Nothing

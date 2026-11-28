@@ -36,7 +36,8 @@ The day it starts is read as the clock, whatever it is: negative (`AT -5`), a su
 A start that is neither a number nor a date is refused with exit 1 and says so.
 (Before 2026-11-23 the explorer read only a literal number, and took any other start for 0, and a start below 0 for 0 too: its clock began later than the contract's and every deadline was measured from the wrong place; one file among the 78 in the repository's examples and docs that carry a `#TRACE` explores a different graph for it, `every/run-anchors.l4` at `AT DATE_SERIAL (YMD 2026 7 1)`, from 2 states to 3.)
 (One exploration is made for each distinct contract and starting day among the file's traces.
-To explore a rule no trace names, give `--contract NAME`, with `--at T` for the day it starts, 0 if left out.)
+To explore a rule no trace names, give `--contract NAME`, with `--at T` for the day it starts, 0 if left out.
+The rule can be at the top level or under a `§` heading, and it is found as [`l4 lts --contract`](lts-list.md) finds it.)
 
 `l4 explore` does not read the time stamps of a trace's events.
 From a `#TRACE` it takes the contract and the start, as above, and it chooses the instants it tries itself.
@@ -142,6 +143,10 @@ Two positions are **the same state** when four things agree:
    A cell nothing reads is dropped from the state and named on the coverage line.
 3. **The answer of any rule with no inputs that reads a ledger**, if it has been asked.
    L4 keeps such a rule's first answer, so it is part of where the run stands.
+   A rule counts wherever it is defined, in the file or in a file it imports, however many imports away, and however it reaches the `RECALL`: itself, or by calling a rule that does, of the file or of a file it imports, with its inputs in order, with `WITH`, as a genitive (``Bob's `taken by` ``), or through another rule that does any of these.
+   Each path asks such a rule afresh, an imported one too, as a run of that path alone asks it.
+   On `unstable` only a rule of the file called with its inputs in order counts: a constant that calls its reader with `WITH`, as a genitive, through such a wrapper, or in a file it imports is left out, and so is a constant that a file it imports defines, so two positions that differ only in its kept answer are merged, and the graph gives one of them the other's acts with nothing on the coverage line to say so (`jl4/tests-cli/fixtures/explore-kept-answers/`, and `kept.l4`, `hop1.l4` and `hop2.l4` in `explore-imported/`: 4 states where there are 5, and after `go skip` a `buy` the run passes over, measured 2026-11-25).
+   On `unstable`, with the clock fixed (`--fixed-now`), such an imported constant also keeps from one path to the next the answer it gave the first path that asked it.
 4. **Which of the live deadlines the clock has already passed, and which of the live deadlines and window openings comes first.** The clock itself is not kept (unless you ask for `--grid`, below), and a clock at a deadline is the same state as one before it.
    The order of the deadlines and openings is kept because the printed contract does not always say it: a deadline anchored to another (`WITHIN 3 OF THE DEADLINE`) prints the same wherever it falls.
 
@@ -278,6 +283,47 @@ Exploration is breadth first and every move is a full re-run of the contract, so
 `--until T` bounds the clock: no event later than T, and a tick past T is not taken.
 `--max-depth N` (default 100) stops expanding states reached by more than N events, and `--max-states N` (default 10000) stops adding states.
 
+### A deadline written as a name
+
+A `WITHIN` written as a name or as arithmetic is worked out by the evaluator, as a run of the contract would work it out, whenever it is _closed_: when it reads nothing that only a run decides, which is no input of the rule, no name local to it, no value an event carried, no anchor word such as `THE JOIN`, no ledger, no section's `GIVEN`, no clock (`TODAY`, `NOW`, `CURRENTTIME`, `RULES EFFECTIVE DATE`) and nothing outside the file (`ENV`, `FETCH`, `POST`), either itself or through a rule it names, of the file or of a file it imports.
+Numbers are closed, and so are rules of the file or its imports applied to numbers, when the rules read none of these.
+A statutory period written once and named is the usual case:
+
+```
+DECLARE Person IS ONE OF Buyer, Seller
+DECLARE Action IS ONE OF refund
+
+`the refund period` MEANS 14
+
+GIVETH A DEONTIC Person Action
+`the refund duty` MEANS
+  PARTY Seller MUST refund WITHIN `the refund period`
+  HENCE FULFILLED
+  LEST BREACH BY Seller BECAUSE "refund late"
+```
+
+`l4 explore --contract "the refund duty"` explores it as it explores `WITHIN 14`: 3 states and 4 transitions, among them `time passes the deadline 14 (WAITUNTIL 15)`, and exit 0 (measured 2026-11-25).
+The same holds for `WITHIN 5 PLUS 5`, for a name for `5 PLUS 5`, for a constant an imported file defines, for an `OF` anchor that is a name, for a deadline beside a literal `AFTER`, and for one armed by a `HENCE` or carried past a breach: each explores to the graph of its literal twin (`jl4/tests-cli/fixtures/explore-deadlines/`).
+Before smucclaw/l4-ide#1107 the explorer worked out a `WITHIN` only when it was a literal number (it already worked out a closed `OF` anchor with no `AFTER` beside it), so this contract explored to 2 states, its breach was never reached, and the line said `UNTRIED 1: time runs out on refund (the WITHIN was never evaluated and is not a literal, so its deadline is not known here)`.
+
+What is still not worked out is listed as untried (exit 2), and the reason in brackets says which it is:
+
+- a `WITHIN` that reads an input of the rule (`GIVEN period … WITHIN period`) or a name a `WHERE` or `LET` defines, and the reason says which: ``the WITHIN reads `period`, an input of the rule, which the contract has not worked out yet, so its deadline is not known here``, or ``… reads `period`, a name the rule defines with WHERE or LET, …`` (a name bound any other way, such as a `CONSIDER` pattern's, is called a name local to the rule).
+  A `WITHIN` that reads a value an event carried (`PARTY Alice MUST Pay n … HENCE PARTY Bob MUST ship WITHIN n`) gets a reason of its own, ``… reads `n`, a value an event carried, …``, but only from [`l4 lts`](lts-list.md), which lists the position after an authored `PARTY Alice DOES Pay 4`: the explorer refuses the act `Pay n` itself (``REFUSED 1: `n` of type NUMBER, constructor `Pay` (a NUMBER has no finite set of values)``), so it never reaches the deadline (`jl4/tests-cli/fixtures/explore-deadlines/locals.l4`, measured 2026-11-25);
+- one that reads a ledger with `RECALL`, written in the `WITHIN` itself (`the WITHIN reads a ledger with RECALL, so it is worked out only in a run and its deadline is not known here`) or in a rule it names, of the file or of a file it imports, directly or through another rule (``the WITHIN reads `recorded period`, which reads a ledger, …``), because outside a run the ledger is empty.
+  An `OF` anchor that reads a ledger is not worked out either (`the anchor of the WITHIN reads a ledger with RECALL, …`), and that is a change: on `unstable` the explorer works out ``WITHIN 2 OF fromMaybe 3 (RECALL `start`)`` against the empty ledger, explores to the deadline 5 and exits 0; it is now untried, and the exit status is 2 (`jl4/tests-cli/fixtures/explore-deadlines/ledger.l4`, measured 2026-11-25 on a build of `unstable` and on this change);
+- one that reads the clock or the world outside the file, itself or through a rule of the file or of a file it imports, the standard library's `` `Today serial` `` among them: ``the WITHIN reads `clocky`, which reads the clock (TODAY), so it is worked out only in a run and its deadline is not known here``, or `the WITHIN reads the world outside the file (ENV), …`, because a run on another day, or in another environment, gets another answer: worked out outside a run, `` `clocky` MEANS ((DATE_SERIAL TODAY) MODULO 7) PLUS 3 `` is 8 under one `--fixed-now` and 5 under another (`jl4/tests-cli/fixtures/explore-deadlines/clock.l4`, measured 2026-11-25 as an `#EVAL`);
+- one whose working out fails, such as a name for `10 DIVIDED BY 0`: `working out the WITHIN failed (Division by zero in the operation: DIVIDED BY), so its deadline is not known here`, and the exploration carries on;
+- one that reads a section's `GIVEN`, itself or through a rule of the file or of a file it imports, whether a `WITH` supplies it or its `TYPICALLY` default is left to stand: ``the WITHIN reads `the period`, a section GIVEN, which a WITH can supply, so it is worked out only in a run and its deadline is not known here``, or ``the WITHIN reads `the window`, which reads `rate`, a section GIVEN, …``.
+  Worked out outside a run, the `GIVEN` reads its default and not what the `WITH` supplied: under `` `the duty` WITH `the period` IS 10 PLUS 10 `` the run's deadline is 20, and the default gives 30 (an `#EVAL` of `` `the period` ``).
+  A `GIVEN` that a file it imports declares is named with that file, `a section GIVEN of readers.l4, which a WITH can supply only inside that file`, because the importing file cannot supply it: a `WITH` for it there is refused with `check/not-a-function`.
+  An `OF` anchor that reads a section's `GIVEN` is not worked out either, and that is a change: on `unstable` the explorer works one out, and explores ``WITHIN 5 OF `the start` `` under ``WITH `the start` IS 10 PLUS 5`` to the deadline 35, exit 0, where the run's deadline is 20 (`anchored deal` in the same file).
+  A `WITHIN` naming a rule that reads one has the reason above that names the rule (`jl4/tests-cli/fixtures/explore-deadlines/section-reader.l4`).
+  The cost is a deadline whose `GIVEN` nothing supplies, which a run counts from the default: it is untried as well (`jl4/tests-cli/fixtures/explore-deadlines/section-given.l4`, measured 2026-11-25);
+- an `AFTER` written as a name (``AFTER `five days` WITHIN 10``): the window's opening is not worked out, and so neither is its deadline (`the AFTER was never evaluated and is not a literal (a date, or a computed offset), so its deadline is not known here`).
+
+A deadline whose working out is stopped at a limit is not listed as untried: the explorer refuses the contract and exits 1 (`the evaluator stopped at a limit working out a deadline: I stopped evaluating: it took more than 20000 steps, …` under `--max-steps 20000`, measured 2026-11-25), because a graph without that deadline's tick would be missing positions.
+
 ## The coverage line
 
 Every run ends with one line that says how much of the contract the graph covers.
@@ -309,14 +355,14 @@ It is true with ticks cut by `--until`, and true when write-only cells merged st
 
 The exit status is for scripts, so that a CI job cannot read a partial run as a green one.
 
-| status | means                                                                                                                                                                                                                                                                                                                                    |
-| ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0      | the frontier was exhausted with nothing refused and nothing untried, and every property named holds                                                                                                                                                                                                                                      |
-| 1      | the file does not type-check; an option names nothing (a property, a `--contract`, a `--fair`); a property input named for a cell nothing writes; an `--until` before the outset; a property, `--emit` or `--fair` asked of a file with nothing to explore; a contract cannot be run at its outset; an emitted file could not be written |
-| 2      | an act was refused, or a move could not be tried, or an act could not be tried at an instant the scheme chose (including a tie through a chain of acts, below)                                                                                                                                                                           |
-| 3      | nothing refused or untried, but `--max-depth` or `--max-states` stopped the exploration                                                                                                                                                                                                                                                  |
-| 4      | a property is violated (its counterexample is printed, and is real whatever else the run did)                                                                                                                                                                                                                                            |
-| 5      | the exploration was complete but a property's verdict is unknown (every liveness property)                                                                                                                                                                                                                                               |
+| status | means                                                                                                                                                                                                                                                                                                                                                                                   |
+| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0      | the frontier was exhausted with nothing refused and nothing untried, and every property named holds                                                                                                                                                                                                                                                                                     |
+| 1      | the file does not type-check; an option names nothing (a property, a `--contract`, a `--fair`); a property input named for a cell nothing writes; an `--until` before the outset; a property, `--emit` or `--fair` asked of a file with nothing to explore; a contract cannot be run at its outset; working out a deadline was stopped at a limit; an emitted file could not be written |
+| 2      | an act was refused, or a move could not be tried, or an act could not be tried at an instant the scheme chose (including a tie through a chain of acts, below)                                                                                                                                                                                                                          |
+| 3      | nothing refused or untried, but `--max-depth` or `--max-states` stopped the exploration                                                                                                                                                                                                                                                                                                 |
+| 4      | a property is violated (its counterexample is printed, and is real whatever else the run did)                                                                                                                                                                                                                                                                                           |
+| 5      | the exploration was complete but a property's verdict is unknown (every liveness property)                                                                                                                                                                                                                                                                                              |
 
 When a run has more than one of these, the order of the table is not the order of precedence: 1 wins, then 4, then 2, then 3, then 5.
 A tick past `--until` is the exploration you asked for, not a failure of it, and does not change the status.
@@ -420,6 +466,15 @@ These are sorted by which signal carries them.
   A move whose run stopped because the two sides of a compound read each other's records in an order L4 cannot settle is untried too, and the reason in brackets is that error, naming the record and both sides ([Deadlines and consequences](consequences.md)).
   On `jl4/tests-cli/fixtures/sibling-reads/one-event.l4`, a `RAND` whose two sides take one event, one side making a record and the other reading it at the same instant, `--until 20` gave 2 states, `UNTRIED 3` (three `PARTY P DOES go` moves) and exited 2 (measured 2026-11-13).
   The two sides of a `RAND` that read each other's records at different events are run in step and explored like any other contract: on `jl4/tests-cli/fixtures/sibling-reads/dinner-ab.l4`, Alice and Bob as the two sides of a `RAND`, `--until 100 --always "every dinner was accepted while open"` gave 18 states, `violated after 3 events` with Alice checking, Bob buying and Alice buying, and exited 4 (measured 2026-11-13).
+- **A deadline it cannot work out (exit 2).** A `WITHIN` that reads an input of the rule, a local name, a ledger, a section's `GIVEN`, the clock or the world outside the file, or whose working out fails, has no tick: the line has `UNTRIED` and `time runs out on …`, with the reason in brackets ([A deadline written as a name](#a-deadline-written-as-a-name), above).
+  One whose working out is stopped at a limit refuses the contract instead (exit 1).
+- **An act that reads a section's `GIVEN` (exit 2).** An act such as ``pay `the price` ``, where `the price` is a section's `GIVEN` the contract has not worked out yet, is untried, itself or through a rule (``pay `the total` ``): ``UNTRIED 1: PARTY Alice MUST pay `the price` (the action reads `the price`, a section GIVEN, which a WITH can supply, so the act is known only in a run and the what-if cannot try it)``, or ``(the action reads `the total`, which reads `the price`, …)``.
+  The explorer tries an act outside the run, where the `GIVEN` is its `TYPICALLY` default and not what a `WITH` supplied, so on `unstable` this is a silent wrong graph: under `` `the deal` MEANS `the duty` WITH `the price` IS 10 PLUS 10 ``, with a default of 30, `the deal` explores to 2 states with no pay edge, `nothing untried`, `1 act passed over` and exit 0, where a run is fulfilled by `pay 20`; through a rule the act is untried, with an internal error as its reason (`jl4/tests-cli/fixtures/explore-actions/section-given.l4`, measured 2026-11-25 on a build of `unstable` and on this change).
+  The cost, decided by Claude 2026-11-25, pending Meng's review: an act whose `GIVEN` nothing supplies, which a run takes at the default, is untried as well.
+  An act that reads one through a rule stays untried even in a state where the contract has worked the `GIVEN` out (``pay OF (`the total` OF 20)``), with the same reason, which is then less exact: the rule, called as the contract holds it, cannot be evaluated outside the run, and on `unstable` that act's reason is the evaluator's internal error.
+  A party that a section's `GIVEN` names is not affected, because the explorer reads the party back from the contract: `explore-actions/section-party.l4` explores to Bob's act, as its run has it.
+- **An act that applies a function local to the rule (exit 2).** `pay (f 3)`, with `f` an input of the rule or a function a `WHERE` defines, however it is applied (``pay (`twice` WITH y IS 3)``), is untried with ``the action applies `f`, a function local to the rule, which the what-if cannot supply``.
+  It was untried on `unstable` too, but with the evaluator's `Internal error: f is not in scope. Please report this as a bug.` as its reason, over four lines (`jl4/tests-cli/fixtures/explore-actions/local-function.l4`, measured 2026-11-25).
 - **A norm armed behind a breach (exit 2).** The coverage line has `UNTRIED` and `(unread)`, as above: a part of the contract that the evaluator is still waiting on after a breach, and that the explorer holds no obligation for.
   Nothing was explored from it, and the state is not called terminal.
 - **A bound stopped it (exit 3).** `frontier NOT exhausted`, with the number of states left.
@@ -438,6 +493,8 @@ These are sorted by which signal carries them.
     This is a change to say plainly: the explorer before these changes printed `nothing untried` and exited 0 on that file (244 states, measured 2026-11-23).
 - **A property is violated (exit 4)**, or **unknown (exit 5)**: every liveness property, and any path that fails its replay.
 - **An option names nothing (exit 1).** A property that is not a rule in the file or its imports; one that takes no inputs, or that reads a ledger itself (a `RECALL` inside it would read nothing, outside a run); a `--contract` that is not a rule with no inputs; a `--fair` that names no act; an `--until` earlier than the outset (`--until 0 is before the outset at 64800, so no act could fire`); a property, `--emit` or `--fair` asked of a file with no `#TRACE` and no `--contract`.
+  A property reads a ledger itself if a rule it names does, however it names it: with its inputs in order, with `WITH`, as a genitive, or through another rule, in the file or a file it imports.
+  On `unstable` only a call with its inputs in order is followed, and that is a silent wrong verdict: a property that calls its reader with `WITH` or as a genitive is evaluated outside a run, where the `RECALL` reads nothing, so `--always "never taken"` says it `holds in every one of the 5 states explored` and exits 0, although `taken` is committed in some of them (`jl4/tests-cli/fixtures/explore-property-readers/` and `explore-imported/property.l4`, measured 2026-11-25); it is now refused.
 - **A property input is named for a cell nothing writes (exit 1).**
   The error names the property and the cell, and says to correct the name or to name the cell with `--unwritten`.
   On `jl4/examples/explore/brief/d1-naive.l4`, `dinners cancelled` is such a cell for the properties `at most one dinner is bought` and `one dinner is bought`, because none of the brief's designs cancels a purchase.
@@ -500,6 +557,8 @@ These are all in the output, on the coverage line or the property's own line, an
   Under `l4 run`, a trace in which Bob's purchase is recorded while the payment is pending never records it (`taken` is absent from the official record), and one in which it is recorded after the payment does.
   So the graph of such a contract is the graph of a world in which Bob cannot buy while Alice owes the restaurant, and a property checked on it is checked on that world.
   Keep the recurring permission a `MAY` throughout, as the files on this page do.
+- **Two rules of one name.** When two sections each define a rule called `NAME`, `--contract NAME` explores the first in the file and says nothing about the other; `l4 lts --contract` lists the same one.
+  Give one of them another name to explore it.
 - **No `#TRACE` and no `--contract`.** `Nothing to explore: the file has no #TRACE directive.` is printed on standard output and the exit status is 0, so a script that reads only the status sees a green run in which nothing ran.
   When a property, `--emit` or `--fair` was asked for, the status is 1 instead, because none of them could be answered.
 - **An always-false guard.** An act whose guard never holds is passed over in every state, so it appears in no state and no arrow, and the only trace of it is the `acts passed over` count, which does not say which.

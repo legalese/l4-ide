@@ -5987,10 +5987,12 @@ spec bin = do
       listed.outExit `shouldBe` ExitSuccess
       listed.outStdout `shouldSatisfy` isInfixOf "duty — after 1 event"
       explored <- runL4 bin ["explore", okDir </> "duty.l4"]
-      -- 2, not the refusal's 1: the explorer leaves one act untried, since the
-      -- WITHIN it reads from lib is not a literal
-      explored.outExit `shouldBe` ExitFailure 2
-      explored.outStdout `shouldSatisfy` isInfixOf "2 states, 2 transitions"
+      -- the WITHIN reads `the answer` from lib, which the explorer works out
+      -- as 42 and ticks past (smucclaw/l4-ide#1107; before it, it left
+      -- that tick untried, and exited 2 with 2 states and 2 transitions)
+      explored.outExit `shouldBe` ExitSuccess
+      explored.outStdout `shouldSatisfy` isInfixOf "3 states, 4 transitions"
+      explored.outStdout `shouldSatisfy` isInfixOf "time passes the deadline 42 (WAITUNTIL 43)"
       proved <- runL4 bin ["prove", okDir </> "duty.l4"]
       proved.outExit `shouldBe` ExitSuccess
       proved.outStdout `shouldSatisfy` isInfixOf "by evaluation: assertion satisfied"

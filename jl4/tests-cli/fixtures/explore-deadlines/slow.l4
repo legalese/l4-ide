@@ -1,0 +1,15 @@
+-- smucclaw/l4-ide#1107: working out a deadline that stops at a limit. Run
+-- with --max-steps 500, `count` 200000 takes more steps than that: l4 explore
+-- stops and says so (exit 1), since a graph without the tick would be missing
+-- positions; l4 lts lists the deadline as not known, with the evaluator's
+-- words.
+
+DECLARE Actor IS ONE OF Alice
+DECLARE Act IS ONE OF pay
+
+GIVEN n IS A NUMBER
+GIVETH A NUMBER
+`count` n MEANS IF n EQUALS 0 THEN 10 ELSE `count` (n MINUS 1)
+
+GIVETH A DEONTIC Actor Act
+`slow` MEANS PARTY Alice MUST pay WITHIN `count` 200000 LEST BREACH BY Alice BECAUSE "late"

@@ -46,7 +46,7 @@ import L4.Evaluate.ValueLazy (Environment)
 import L4.EvaluateLazy (EvalConfig, execEvalModuleWithEnv, resolveEvalConfig)
 import L4.Import.Resolution (ResolvedImport (..), extractImportNames)
 import L4.Lts.List
-import L4.Lts.WhatIf (Rig (..), Trace, tracesOf)
+import L4.Lts.WhatIf (Rig (..), Trace, closedInWith, tracesOf)
 import L4.TracePolicy (apiDefaultPolicy)
 import L4.TypeCheck (CheckResult (..))
 
@@ -112,7 +112,10 @@ reportsOf c = do
   (rig, traces) <- case c.csFresh of
     [] -> pure (rig0, tracesOf r.tcdModule)
     names -> pick rig0 names []
-  fmap catMaybes $ for traces \ tr -> reportOf rig tr
+  -- the imported modules too, as `l4 lts` reads a deadline that names an
+  -- imported rule ('closedInWith')
+  let closed = closedInWith [ ri.riTypeChecked.program | ri <- r.tcdResolvedImports ] rig
+  fmap catMaybes $ for traces \ tr -> reportOfWith closed rig tr
 
 -- | The imports' heaps, as `l4 lts` assembles them (jl4-lsp's
 -- @GetLazyEvaluationDependencies@ rule): every resolved import evaluated on

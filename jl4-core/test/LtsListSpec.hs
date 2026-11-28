@@ -7,8 +7,8 @@
 --   1. an act the @PROVIDED@ guard rejects is listed as passed over, not
 --      as moving things along — the candidate set is read off the residual
 --      before the guard is asked (G9), and the replay corrects it;
---   2. 'freshTrace' refuses a name the module does not define at the top
---      level with no inputs, loudly, and finds one it does;
+--   2. 'freshTrace' refuses a name the module does not define as a rule
+--      with no inputs, loudly, and finds one it does;
 --   3. a fresh position lists the same things as an authored empty
 --      @#TRACE@ — it IS that directive, appended;
 --   4. under an @RAND@\/@ROR@ the pass-over reason is the candidate's own
@@ -29,7 +29,14 @@
 --      from the actor's in an EARLIER field is logged with no name (and
 --      printed elided) on that step and on the 'Waiting' after it — and
 --      'confirmAct' still finds the candidate's own step, because the
---      candidate's own comparison matched and a match forces every field.
+--      candidate's own comparison matched and a match forces every field;
+--   8. 'freshTrace' finds a rule under a @§@ heading, at any depth, as
+--      @l4 explore@'s 'startNamed' does, and of two rules of one name in two
+--      sections both take the first (smucclaw/l4-ide#1106);
+--   9. an act that reads a section @GIVEN@ the residual has not forced is
+--      untried in 'enabledSet' too, which reads with 'literalOnly' as the
+--      service's position does ('actionReads'), and not tried at the
+--      @GIVEN@'s default (review of smucclaw/l4-ide#1107).
 module LtsListSpec (spec) where
 
 import Data.Foldable (for_)
@@ -41,6 +48,7 @@ import L4.Import.Resolution (TypeCheckWithDepsResult (..))
 import L4.EvaluateLazy (resolveEvalConfig)
 import L4.EvaluateLazy.Machine (emptyEnvironment)
 import L4.Lts.List
+import L4.Lts.Explore (Start (..), startNamed)
 import L4.EvaluateLazy.DeonticStep (DeonticStep (..), NormKey (..), StepOutcome (..))
 import L4.Lts.Marking (Bearer (..), LiveNorm (..))
 import L4.Lts.WhatIf
@@ -87,6 +95,37 @@ untracedSrc = Text.unlines $ prologue <>
   , "priced MEANS PARTY B MUST payment EXACTLY n WITHIN 3"
   , ""
   , "#TRACE `the sale` AT 0 WITH"
+  ]
+
+-- 8. two sections each define `the duty`, and a third, nested one defines
+--    `the nested duty`
+-- | Review of smucclaw/l4-ide#1107: the act's amount is a section GIVEN
+-- that a WITH supplies; its default, 30, is not what the run is owed.
+sectionGivenActSrc :: Text.Text
+sectionGivenActSrc = Text.unlines $ prologue <>
+  [ "GIVETH A DEONTIC Person Action"
+  , "`the deal` MEANS `the duty` WITH `the price` IS 10 PLUS 10"
+  , ""
+  , "§ `Terms`"
+  , "    GIVEN `the price` IS A NUMBER TYPICALLY 30"
+  , ""
+  , "GIVETH A DEONTIC Person Action"
+  , "`the duty` MEANS PARTY B MUST payment `the price` WITHIN 10 HENCE FULFILLED LEST BREACH BY B BECAUSE \"late\""
+  ]
+
+sectionedSrc :: Text.Text
+sectionedSrc = Text.unlines $ prologue <>
+  [ "§ `First`"
+  , "GIVETH A DEONTIC Person Action"
+  , "`the duty` MEANS PARTY B MUST payment EXACTLY 5 WITHIN 3"
+  , ""
+  , "§ `Second`"
+  , "GIVETH A DEONTIC Person Action"
+  , "`the duty` MEANS PARTY S MUST payment EXACTLY 7 WITHIN 9"
+  , ""
+  , "§§ `Deeper`"
+  , "GIVETH A DEONTIC Person Action"
+  , "`the nested duty` MEANS PARTY B MUST payment EXACTLY 1 WITHIN 2"
   ]
 
 -- 4. the guard-rejected act beside a live obligation of the other side
@@ -163,10 +202,10 @@ spec = describe "LTS-VISUALISER §1.1a / P2a′: the list" $ do
   it "2. freshTrace refuses an unknown name and a rule with inputs, and finds a nullary one" $ do
     rig <- rigOf untracedSrc
     case freshTrace rig.rigModule "nope" of
-      Left why -> why `shouldBe` "no top-level rule named `nope` that takes no inputs"
+      Left why -> why `shouldBe` "no rule named `nope` that takes no inputs"
       Right _  -> expectationFailure "found a rule that does not exist"
     case freshTrace rig.rigModule "priced" of
-      Left why -> why `shouldBe` "no top-level rule named `priced` that takes no inputs"
+      Left why -> why `shouldBe` "no rule named `priced` that takes no inputs"
       Right _  -> expectationFailure "a rule with inputs cannot be traced without them"
     case freshTrace rig.rigModule "the sale" of
       Left why -> expectationFailure (Text.unpack why)
@@ -303,6 +342,34 @@ spec = describe "LTS-VISUALISER §1.1a / P2a′: the list" $ do
     steps `shouldSatisfy` Text.isInfixOf "at 1: Tenant OF \"Alice\", 30 does Sign OF … at 1; Tenant OF \"Alice\", 30 MUST (member 1 of 2) — the act matched but its condition did not hold; passed over"
     steps `shouldSatisfy` Text.isInfixOf "at 1: Tenant OF \"Alice\", 30 does Sign OF … at 1; Tenant OF …, … MUST (member 2 of 2) — not this party's event; passed over"
     steps `shouldSatisfy` Text.isInfixOf "at 1: Tenant OF …, … MUST (member 2 of 2) — no more events; still waiting"
+
+  it "8. freshTrace finds a rule under a § heading, at any depth, and of two rules of one name takes the first, as l4 explore does" $ do
+    rig <- rigOf sectionedSrc
+    let listed name = do
+          (m', tr) <- either (fail . Text.unpack) pure (freshTrace rig.rigModule name)
+          rp <- reportOf rig {rigModule = m'} tr >>= maybe (fail "no report") pure
+          pure (tr, renderReport False rp)
+    (duty, dutyText) <- listed "the duty"
+    -- the first `the duty` in the file, B's, and not S's
+    dutyText `shouldSatisfy` Text.isInfixOf "B MUST payment OF 5 — due by 3 (3 from now)"
+    dutyText `shouldNotSatisfy` Text.isInfixOf "S MUST"
+    -- the rule l4 explore starts from is the same one
+    start <- either (fail . Text.unpack) pure (startNamed rig.rigModule "the duty" 0)
+    start.stContract `shouldBe` duty.trContract
+    (_, nestedText) <- listed "the nested duty"
+    nestedText `shouldSatisfy` Text.isInfixOf "B MUST payment OF 1 — due by 2 (2 from now)"
+    -- and a name no section defines is refused in explore's words
+    either id (const "found") (fst <$> freshTrace rig.rigModule "the missing duty")
+      `shouldBe` "no rule named `the missing duty` that takes no inputs"
+
+  it "9. an act that reads a section GIVEN is untried in the position the service reads too (literalOnly), not tried at its default" $ do
+    rig <- rigOf sectionGivenActSrc
+    (m', tr) <- either (fail . Text.unpack) pure (freshTrace rig.rigModule "the deal")
+    -- 'enabledSet' is what /position reads, with 'literalOnly'
+    es <- enabledSet rig {rigModule = m'} tr >>= maybe (fail "no enabled set") pure
+    [ why | o <- es.esOutcomes, ActBy _ <- [o.ocCandidate.cdKind], Untried why <- [o.ocVerdict] ]
+      `shouldBe` ["the action reads `the price`, a section GIVEN, which a WITH can supply, so the act is known only in a run and the what-if cannot try it"]
+    length (passedOver es) `shouldBe` 0
   where
     bearerText :: LiveNorm -> Text.Text
     bearerText n = case n.lnBearer of

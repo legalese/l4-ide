@@ -1,0 +1,31 @@
+-- smucclaw/l4-ide#1107, after review: a deadline that reads a section GIVEN
+-- is not worked out. `the deal` supplies `the period` with WITH, so its run's
+-- deadline is 20; worked out in the module, the GIVEN reads its TYPICALLY
+-- default, and the deadline comes out 30. `anchored deal` is the same through
+-- an OF anchor (20 in the run, 35 worked out), which l4 explore on unstable
+-- works out so. `the plain deal` supplies nothing, so 30 is its run's
+-- answer too; it is not worked out either.
+
+DECLARE Actor IS ONE OF Alice
+DECLARE Act IS ONE OF pay
+
+GIVETH A DEONTIC Actor Act
+`the deal` MEANS `the duty` WITH `the period` IS 10 PLUS 10
+
+GIVETH A DEONTIC Actor Act
+`the plain deal` MEANS `the duty`
+
+GIVETH A DEONTIC Actor Act
+`anchored deal` MEANS `the anchored duty` WITH `the start` IS 10 PLUS 5
+
+§ `Terms`
+    GIVEN `the period` IS A NUMBER TYPICALLY 30
+
+GIVETH A DEONTIC Actor Act
+`the duty` MEANS PARTY Alice MUST pay WITHIN `the period` LEST BREACH BY Alice BECAUSE "late"
+
+§ `Anchored terms`
+    GIVEN `the start` IS A NUMBER TYPICALLY 30
+
+GIVETH A DEONTIC Actor Act
+`the anchored duty` MEANS PARTY Alice MUST pay WITHIN 5 OF `the start` LEST BREACH BY Alice BECAUSE "late"

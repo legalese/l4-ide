@@ -1,0 +1,8 @@
+-- Imported by hop2.l4: a constant that reads a ledger, `taken now`, through a
+-- reader one more import away (`is taken`, in readers.l4).
+
+IMPORT prelude
+IMPORT readers
+
+GIVETH A BOOLEAN
+`taken now` MEANS `is taken` WITH dflt IS FALSE

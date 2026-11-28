@@ -1,0 +1,18 @@
+-- smucclaw/l4-ide#1107: a named deadline carried past a breach. The buyer's
+-- breach at 3 leaves the seller's duty standing, with 2 of its 5 still to
+-- run; `sale named` should explore as `sale literal` does.
+
+DECLARE Person IS ONE OF Buyer, Seller
+DECLARE Action IS ONE OF pay, deliver
+
+`five days` MEANS 5
+
+GIVETH A DEONTIC Person Action
+`sale literal` MEANS
+        (PARTY Buyer MUST pay WITHIN 2 HENCE FULFILLED LEST BREACH BY Buyer)
+  RAND  (PARTY Seller MUST deliver WITHIN 5 HENCE FULFILLED LEST BREACH BY Seller)
+
+GIVETH A DEONTIC Person Action
+`sale named` MEANS
+        (PARTY Buyer MUST pay WITHIN 2 HENCE FULFILLED LEST BREACH BY Buyer)
+  RAND  (PARTY Seller MUST deliver WITHIN `five days` HENCE FULFILLED LEST BREACH BY Seller)

@@ -1,0 +1,15 @@
+-- smucclaw/l4-ide#1106: a rule under a § heading. `l4 lts --contract` used to
+-- look only at the top level and say "no top-level rule named `pay on time`",
+-- where `l4 explore --contract` found the rule.
+
+§ `Payment`
+
+DECLARE Actor IS ONE OF Alice
+DECLARE Act IS ONE OF pay
+
+GIVETH A DEONTIC Actor Act
+DECIDE `pay on time` IS
+    PARTY Alice
+    MUST  pay
+    WITHIN 10
+    LEST BREACH BY Alice BECAUSE "late"

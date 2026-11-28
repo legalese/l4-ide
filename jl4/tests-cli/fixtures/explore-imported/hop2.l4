@@ -1,0 +1,32 @@
+-- hop1.l4 with `taken now` two imports away: it is in taken-via.l4, and the
+-- reader it calls in readers.l4, which taken-via.l4 imports. The same graph,
+-- and the same run of the skip path alone (review of smucclaw/l4-ide#1107).
+
+IMPORT prelude
+IMPORT `taken-via`
+
+DECLARE Actor IS ONE OF Bob
+DECLARE Mode IS ONE OF peek, skip
+DECLARE Act IS ONE OF
+    go HAS mode IS A Mode
+    buy
+
+GIVETH A DEONTIC Actor Act
+`shop` MEANS
+    PARTY Bob
+    MAY buy PROVIDED NOT `taken now`
+    WITHIN 10
+    HENCE COMMIT `taken` IS TRUE HENCE `shop`
+    LEST FULFILLED
+
+GIVETH A DEONTIC Actor Act
+`start` MEANS
+    PARTY Bob
+    MAY go m
+    WITHIN 10
+    HENCE COMMIT `taken` IS (IF m EQUALS peek THEN NOT `taken now` ELSE TRUE) HENCE `shop`
+    LEST FULFILLED
+
+#TRACE `start` AT 0 WITH
+    PARTY Bob DOES go skip AT 1
+    PARTY Bob DOES buy AT 2

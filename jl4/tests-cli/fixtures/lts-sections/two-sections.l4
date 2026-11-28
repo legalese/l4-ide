@@ -1,0 +1,24 @@
+-- smucclaw/l4-ide#1106: two sections each define a rule called `the duty`.
+-- `l4 lts --contract` and `l4 explore --contract` both take the first in the
+-- file (Alice paying within 10), and neither says that there was another.
+
+DECLARE Actor IS ONE OF Alice
+DECLARE Act IS ONE OF pay, ship
+
+§ `First`
+
+GIVETH A DEONTIC Actor Act
+DECIDE `the duty` IS
+    PARTY Alice MUST pay WITHIN 10 LEST BREACH BY Alice BECAUSE "late pay"
+
+§ `Second`
+
+GIVETH A DEONTIC Actor Act
+DECIDE `the duty` IS
+    PARTY Alice MUST ship WITHIN 20 LEST BREACH BY Alice BECAUSE "late ship"
+
+§§ `Deeper`
+
+GIVETH A DEONTIC Actor Act
+DECIDE `the nested duty` IS
+    PARTY Alice MUST ship WITHIN 30 LEST BREACH BY Alice BECAUSE "late ship"

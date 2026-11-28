@@ -35,8 +35,9 @@
 --   §4.1's text ("in recorded order" for every read cell) and was measured
 --   on the dinner fixtures before it was adopted (their README, "What the
 --   explorer must know", point 1);
--- * the answer each top-level rule with no inputs that reads a ledger was
---   forced to in this run, if it was: the evaluator keeps a rule's first
+-- * the answer each rule with no inputs that reads a ledger, of the module
+--   or of one it imports, was forced to in this run, if it was (an imported
+--   one in the replay's own copy, 'freshHeap'): the evaluator keeps a rule's first
 --   answer, so such a rule's answer is part of where the run stands even
 --   though the ledger has moved on (the fixtures' README, "Traps"). It is
 --   read through the environment of an obligation in force, because the
@@ -200,28 +201,19 @@ startsOf m = nubOrdOn (\ s -> (s.stName, prettyLayout s.stAt))
   [ MkStart {stName = prettyLayout tr.trContract, stContract = tr.trContract, stAt = tr.trStart, stClock = Nothing}
   | tr <- tracesOf m ]
 
--- | A top-level rule with no inputs, at this @AT@. Unlike
--- 'L4.Lts.List.freshTrace' this finds a rule under a @§@ heading too, since
--- a contract that is explored is usually written in sections.
+-- | A rule with no inputs, at this @AT@: at the top level or under a @§@
+-- heading, found as 'L4.Lts.List.freshTrace' finds it for @l4 lts@
+-- ('ruleNamed'), since a contract that is explored is usually written in
+-- sections.
 startNamed :: Module Resolved -> Text -> Rational -> Either Text Start
-startNamed (MkModule _ _ section) wanted at =
-  case [ (u, n) | MkDecide _ _ (MkAppForm _ (Def u n) [] _) _ <- decidesOf section, nameToText n == wanted ] of
-    [] -> Left ("no rule named `" <> wanted <> "` that takes no inputs")
-    ((u, n) : _) -> Right MkStart
-      { stName = wanted
-      , stContract = Var emptyAnno (Ref n u n)
-      , stAt = Lit emptyAnno (NumericLit emptyAnno at)
-      , stClock = Just at
-      }
-
--- | Every @DECIDE@ in a section and the sections under it.
-decidesOf :: Section Resolved -> [Decide Resolved]
-decidesOf (MkSection _ _ _ _ decls) = concatMap go decls
-  where
-    go = \ case
-      Decide _ d  -> [d]
-      Section _ s -> decidesOf s
-      _           -> []
+startNamed m wanted at = do
+  contract <- ruleNamed m wanted
+  Right MkStart
+    { stName = wanted
+    , stContract = contract
+    , stAt = Lit emptyAnno (NumericLit emptyAnno at)
+    , stClock = Just at
+    }
 
 ----------------------------------------------------------------------------
 -- Options
@@ -286,44 +278,61 @@ data ReadSites = MkReadSites
     -- ^ the modules use @EVAL AS OF SYSTEM TIME@ or @EVAL UNDER VALID
     -- TIME@, through which a read can see past a cell's latest entry
   , rsLedgerCafs :: !(Map Unique Text)
-    -- ^ the main module's top-level rules with no inputs whose answer
-    -- depends on a ledger read, directly or through another rule
+    -- ^ the rules with no inputs whose answer depends on a ledger read,
+    -- directly or through another rule: the main module's, and those of the
+    -- modules it imports that it reaches by name ('reachableRules')
+  , rsRunHeap    :: !(Set Unique)
+    -- ^ the imported rules, of any inputs, that read a ledger directly or
+    -- through another rule: every replay has its own copy of them
+    -- ('freshHeap'), as it has its own of the main module's rules
+  , rsReads      :: !ModuleReads
+    -- ^ what a deadline is not worked out through ('Closed'), read off the
+    -- module and the modules it imports ('moduleReads')
   }
 
 -- | The read sites of the module explored and of the modules it imports.
--- Only the explored module's own rules can be ledger-reading constants of
--- a run: an imported module's heap is built once, before any replay.
+-- A ledger-reading constant is keyed by its kept answer wherever it is
+-- defined: in the module, or in a module it imports and reaches by name,
+-- however many imports away. Since review of smucclaw/l4-ide#1107 the
+-- imported rules count when 'readers' follows a call. Until a later round of
+-- that review, on unstable too, an imported constant was not keyed at all,
+-- and an imported module's heap was one for every replay, so a constant that
+-- one replay had forced kept that answer in the next ('freshHeap').
 readSitesOf :: Module Resolved -> [Module Resolved] -> ReadSites
 readSitesOf main imported = MkReadSites
   { rsCells = Map.fromListWith (||)
       [ (s, mode == RecallAll) | ReadCell _ _ _ mode (Lit _ (StringLit _ s)) <- everyExpr ]
-  , rsTimeScoped = any timeScoped everyExpr
+  , rsTimeScoped = any scoped (concatMap (Optics.toListOf (Optics.gplate @Resolved)) (main : imported))
   , rsLedgerCafs = Map.fromList
       [ (u, nameToText n)
-      | (Def u n, [], _) <- topDecides
+      | (Def u n, [], _) <- rules
       , Set.member u readers ]
+  , rsRunHeap = Set.fromList
+      [ u | (name, _, _) <- rules, let u = getUnique name, Set.member u readers, not (Set.member u mainRules) ]
+  , rsReads = moduleReads main imported
   }
   where
     everyExpr = concatMap exprsOf (main : imported)
-    timeScoped = \ case
-      Var _ r   -> scoped r
-      App _ r _ -> scoped r
-      _         -> False
+    -- every name in the modules, however it is spelt, as 'readers' below
     scoped r = getUnique r `elem` [TypeCheck.evalAsOfSystemTimeUnique, TypeCheck.evalUnderValidTimeUnique]
     MkModule _ _ mainSection = main
-    topDecides =
-      [ (name, args, body) | MkDecide _ _ (MkAppForm _ name args _) body <- decidesOf mainSection ]
+    mainRules = Set.fromList [ getUnique name | MkDecide _ _ (MkAppForm _ name _ _) _ <- decidesOf mainSection ]
+    -- the rules 'readers' follows a call into: the module's, and those of
+    -- its imports that it reaches by name, each with the names it mentions
+    rules = reachableRules main imported
+    allDecides = [ (name, body, refsOf body) | (name, _, body) <- rules ]
     -- the least set of the module's rules that read a ledger, directly or
-    -- by naming one that does
-    readers = fixpoint (Set.fromList [ getUnique name | (name, _, body) <- topDecides, readsDirectly body ])
+    -- by naming one that does, however it is spelt ('namesIn', every name
+    -- at every node). Until review of smucclaw/l4-ide#1107 only variables
+    -- and positional calls counted, on unstable too, so a constant that
+    -- reached a ledger reader through WITH, as a genitive, or through a
+    -- wrapper of either was not keyed, and two positions that differed only
+    -- in its kept answer were one state.
+    readers = fixpoint (Set.fromList [ getUnique name | (name, body, _) <- allDecides, readsDirectly body ])
     readsDirectly body = not (null [ () | ReadCell {} <- subExprsOf body ])
-    refsOf body = Set.fromList (concat [ heads e | e <- subExprsOf body ])
-    heads = \ case
-      Var _ r   -> [getUnique r]
-      App _ r _ -> [getUnique r]
-      _         -> []
+    refsOf body = Set.fromList (map getUnique (namesIn body))
     fixpoint s =
-      let s' = s <> Set.fromList [ getUnique name | (name, _, body) <- topDecides, not (Set.disjoint (refsOf body) s) ]
+      let s' = s <> Set.fromList [ getUnique name | (name, _, refs) <- allDecides, not (Set.disjoint refs s) ]
       in if s' == s then s else fixpoint s'
 
 -- | Keep these cells although no @RECALL@ in the modules reads them: the
@@ -363,6 +372,9 @@ data Graph = MkGraph
     -- wherever it was written, so positions that differ in it may be one
     -- state ("L4.Lts.Explore.Check" labels nothing by such a cell)
   , gCoverage    :: !Coverage
+  , gRunHeap     :: !(Set Unique)
+    -- ^ the imported rules each replay has its own copy of ('rsRunHeap'),
+    -- which 'replayPath' copies too
   }
 
 data StateNode = MkStateNode
@@ -641,8 +653,9 @@ data Explorer = MkExplorer
     -- own @#TRACE@ back ('rigFor')
   , exStart      :: !Start
   , exActionType :: !(Either Text (Type' Resolved))
-  , exAnchors    :: !(IORef (Map Text (Maybe Rational)))
-    -- ^ closed anchors already evaluated ('resolveAnchor')
+  , exClosed     :: !Closed
+    -- ^ how a deadline written as a name or an expression is worked out
+    -- ('exploreClosed'): WhatIf's reader, cached for the exploration
   , exHint       :: !(Map Text (Set Rational, Set Rational))
     -- ^ per act (as its edge is labelled), what the acts that can FOLLOW it
     -- were found to do in an earlier pass over the same contract: the sums of
@@ -680,15 +693,52 @@ rigFor ex events =
   in ( ex.exRig {rigModule = m'}
      , MkTrace {trDirective = directive, trContract = ex.exStart.stContract, trStart = startExpr ex.exStart, trEvents = events} )
 
--- | A module with no directives: the explorer adds the one it replays.
-withoutDirectives :: Module Resolved -> Module Resolved
-withoutDirectives (MkModule a uri section) = MkModule a uri (go section)
+-- | The rig one replay runs on: 'rigFor''s, with the replay's own copy of
+-- the imported rules that read a ledger ('freshHeap'). Every replay site
+-- takes one, so a replay starts as a run of the path alone starts.
+replayRig :: Explorer -> Rig -> IO Rig
+replayRig ex rig = (\ env -> rig {rigEnv = env}) <$> freshHeap ex.exSites.rsRunHeap rig.rigEnv
+
+-- | The imports' heap with its own copy of these rules ('rsRunHeap'), each
+-- unforced, and each closing over the copies of the others.
+--
+-- The evaluator gives each directive a fresh heap of the module's own rules
+-- ('L4.EvaluateLazy.forEachDirectiveFreshHeap'), so a ledger-reading
+-- constant of the module is forced afresh by every replay. The imports' heap
+-- is built once and shared: forced in one replay, an imported constant kept
+-- that answer in the next whenever the clock was fixed (the evaluator
+-- re-serves a ledger read while the temporal context is unchanged), and its
+-- answer was never part of the state's key either. A file that imported a
+-- ledger-reading constant then explored to a graph that no run of its paths
+-- gives (found in review of smucclaw/l4-ide#1107, the same on unstable): two
+-- positions that differed only in the constant's kept answer were one state.
+--
+-- Only rules that read a ledger, directly or by naming one that does, are
+-- copied: a rule that names none of them cannot reach a copy by name, so it
+-- may stay shared. A copy starts unforced, as the rule was before any
+-- replay; a function already forced keeps its closure, over the copies. A
+-- value forced before the exploration began, which is not a function, is
+-- left shared, since no replay forced it (decided by Claude 2026-11-25,
+-- pending Meng's review).
+freshHeap :: Set Unique -> Environment -> IO Environment
+freshHeap run env
+  | Set.null run = pure env
+  | otherwise = do
+      copies <- for (Map.toList (Map.restrictKeys env run)) \ (u, rf) -> readIORef rf.pointer >>= \ case
+        WHNF v | not (isClosure v) -> pure Nothing
+        t -> Just . (u,) . MkReference rf.address <$> newIORef t
+      let fresh = Map.fromList (catMaybes copies)
+          closeOver = \ case
+            Unevaluated _ e env'          -> Unevaluated Set.empty e (fresh <> env')
+            WHNFWhen _ _ e env'           -> Unevaluated Set.empty e (fresh <> env')
+            WHNF (ValClosure g e env')    -> WHNF (ValClosure g e (fresh <> env'))
+            other                         -> other
+      for_ (Map.elems fresh) \ rf -> modifyIORef' rf.pointer closeOver
+      pure (fresh <> env)
   where
-    go (MkSection sa sn saka sg decls) = MkSection sa sn saka sg (mapMaybe keep decls)
-    keep = \ case
-      Directive _ _ -> Nothing
-      Section sa s  -> Just (Section sa (go s))
-      other         -> Just other
+    isClosure = \ case
+      ValClosure{} -> True
+      _            -> False
 
 stateKey :: Explorer -> Position -> IO (StateKey, KeyNotes)
 stateKey ex pos = do
@@ -698,12 +748,19 @@ stateKey ex pos = do
   (cells, dropped, unspellable) <- projectLedger ex.exSites pos.posResult.ledger
   -- the heap this directive forced, as the obligations in force closed over it
   let heaps = [ raw.roEnv | raw <- maybe [] liveObligations pos.posResidual ]
-  cafs <- for (Map.toList ex.exSites.rsLedgerCafs) \ (u, name) -> (name,) <$> case listToMaybe (mapMaybe (Map.lookup u) heaps) of
-    Nothing -> pure ("no obligation in force reads it", True)
-    Just rf -> readIORef rf.pointer >>= \ case
-      Unevaluated{} -> pure ("not yet asked", True)
-      WHNF v -> answerText v
-      WHNFWhen _ v _ _ -> answerText v
+  -- an obligation of an imported rule that reads no ledger closes over the
+  -- shared heap, whose ledger readers no replay forces ('freshHeap'): the
+  -- answer is the replay's own copy, so a forced one is read first
+  cafs <- for (Map.toList ex.exSites.rsLedgerCafs) \ (u, name) -> (name,) <$> do
+    thunks <- traverse (readIORef . (.pointer)) (mapMaybe (Map.lookup u) heaps)
+    let forced = \ case
+          WHNF v           -> Just v
+          WHNFWhen _ v _ _ -> Just v
+          Unevaluated{}    -> Nothing
+    case (mapMaybe forced thunks, thunks) of
+      (v : _, _)  -> answerText v
+      ([], _ : _) -> pure ("not yet asked", True)
+      ([], [])    -> pure ("no obligation in force reads it", True)
   deadlines <- liveDeadlines ex pos
   openings <- for (obligationsOf pos) (openingOf pos.posClock)
   let (dueRanks, openRanks) = ranksOf [ d | (_, d) <- deadlines ] openings
@@ -944,73 +1001,44 @@ projectLedger sites store = do
 
 -- | Each obligation in force, with its absolute deadline: 'Nothing' when it
 -- has none, 'Left' with the reason when it has one that is not known here.
--- WhatIf's 'deadlineOf' first; an anchor the residual holds unforced is then
--- evaluated, when it is closed in the module ('resolveAnchor').
+-- Read by WhatIf's 'deadlineOf', through the exploration's 'Closed' reader,
+-- which is the one 'candidatesWith' is given too, so a deadline known here is
+-- one a tick is offered for, and the other way round.
 liveDeadlines :: Explorer -> Position -> IO [(RawObligation NF, Maybe (Either Text Rational))]
 liveDeadlines ex pos = for (obligationsOf pos) \ raw -> case raw.roDue of
   Left Nothing -> pure (raw, Nothing)
-  _ -> do
-    d <- deadlineOf pos.posClock raw
-    case d of
-      Right x  -> pure (raw, Just (Right x))
-      Left why -> do
-        resolved <- resolveAnchor ex pos raw
-        pure (raw, Just (maybe (Left why) Right resolved))
+  _ -> (raw,) . Just <$> deadlineOf ex.exClosed pos raw
 
--- | An anchored deadline whose anchor the residual holds UNFORCED — the
--- @WITHIN 0 OF closing@ of an obligation that has met no event yet — is
--- not known to the what-if ('deadlineOf'), which reads only what the
--- machine forced. When the anchor and the duration are closed in the
--- module (they name only top-level rules and builtins), they mean the same
--- in every run, and the evaluator is asked for them: one @#EVAL@ of each,
--- in the module, cached. The tick this offers is then held to
--- 'confirmTick' like any other, so a deadline the machine does not bear
--- out is still reported untried. Only the plain form is read: a window
--- with an opening edge, or a lifecycle anchor, stays unknown.
-resolveAnchor :: Explorer -> Position -> RawObligation NF -> IO (Maybe Rational)
-resolveAnchor ex pos raw = case (raw.roDue, raw.roOpens) of
-  (Left (Just (MkDeadline _ duration (Just (AnchorAt _ anchor)))), opens)
-    | noOpening opens -> do
-        a <- closedNumber anchor
-        d <- closedNumber duration
-        pure ((+) <$> a <*> d)
-  _ -> pure Nothing
+-- | WhatIf's 'Closed' reader for one exploration: a deadline written as a name
+-- or an expression, and closed (@WITHIN `ten days`@, @WITHIN 5 PLUS 5@, an
+-- @OF@ anchor the residual has not forced), is worked out by one @#EVAL@ in
+-- the module ('evalInModule'), and the answer is kept for the rest of the
+-- exploration under the expression's printed form and the names it refers
+-- to. An evaluation stopped at a limit raises 'LimitStopped' rather than
+-- answer: a deadline read as unknown would leave its tick out, and the graph
+-- would be missing positions with nothing to say so. The 2026-11-21 budget
+-- ruling had that for an anchor; that a stop working out a @WITHIN@ refuses
+-- the exploration too is decided by Claude 2026-11-25, pending Meng's review
+-- (@l4 lts@ lists the same stop as the reason, and exits 0). Any other
+-- failure (a division by zero) is the reason the deadline is not known, and
+-- the tick is listed as untried with it.
+exploreClosed :: Rig -> ReadSites -> IORef (Map (Text, [Unique]) (Either Text (Value NF))) -> Closed
+exploreClosed rig sites cache = (closedIn rig) {clEval = Just evalCached, clReads = sites.rsReads}
   where
-    noOpening = \ case
-      Left Nothing  -> True
-      Right Nothing -> True
-      _             -> False
-    closedNumber e = do
-      e' <- reifyExpr raw.roEnv e
-      case e' of
-        Lit _ (NumericLit _ r) -> pure (Just r)
-        _ | null (openLocals pos.posReplayScope raw.roEnv e') -> evaluated e'
-          | otherwise -> pure Nothing
-    evaluated e = do
-      let key = prettyLayout e
-      cache <- readIORef ex.exAnchors
-      case Map.lookup key cache of
-        Just r  -> pure r
+    evalCached e = do
+      let key = (prettyLayout e, map getUnique (namesIn e))
+      known <- Map.lookup key <$> readIORef cache
+      case known of
+        Just v -> pure v
         Nothing -> do
-          r <- evalNumber ex e
-          modifyIORef' ex.exAnchors (Map.insert key r)
-          pure r
-
--- | One @#EVAL@ of a closed expression in the module. An evaluation
--- stopped at a limit raises 'LimitStopped' rather than answer 'Nothing':
--- an anchor read as unknown would leave a deadline out of the instants
--- tried, and the graph would be missing positions with nothing to say so.
-evalNumber :: Explorer -> Expr Resolved -> IO (Maybe Rational)
-evalNumber ex e = do
-  let MkModule a uri (MkSection sa sn saka sg decls) = ex.exRig.rigModule
-      m' = MkModule a uri (MkSection sa sn saka sg (decls <> [Directive emptyAnno (LazyEval emptyAnno e)]))
-  (_, results) <- execEvalModuleWithDeonticLog ex.exRig.rigConfig ex.exRig.rigEntityInfo ex.exRig.rigEnv m'
-  case results of
-    ((res, _) : _)
-      | Reduction (Reduced (MkNF (ValNumber r))) <- res.result -> pure (Just r)
-      | Reduction (ReducedErrored exc) <- res.result, isLimitStop exc ->
-          throwIO (LimitStopped ("working out a deadline's anchor: " <> Text.unwords (prettyEvalException exc)))
-    _ -> pure Nothing
+          r <- evalInModule rig e
+          case r of
+            Just (ReducedErrored exc) | isLimitStop exc ->
+              throwIO (LimitStopped ("working out a deadline: " <> Text.unwords (prettyEvalException exc)))
+            _ -> do
+              let v = outcomeValue r
+              modifyIORef' cache (Map.insert key v)
+              pure v
 
 -- | One @#EVAL@ of a closed expression in the module, read as an instant: a
 -- NUMBER as it is, a DATE by its serial (as the machine lowers an anchor).
@@ -1423,15 +1451,16 @@ newExplorer opts sites rig0 start = newExplorerWith Map.empty opts sites rig0 st
 
 newExplorerWith :: Map Text (Set Rational, Set Rational) -> ExploreOptions -> ReadSites -> Rig -> Start -> IO Explorer
 newExplorerWith hint opts sites rig0 start = do
-  anchors <- newIORef Map.empty
+  cache <- newIORef Map.empty
   records <- newIORef []
+  let rig = rig0 {rigModule = withoutDirectives rig0.rigModule}
   pure MkExplorer
     { exOptions = opts
     , exSites = sites
-    , exRig = rig0 {rigModule = withoutDirectives rig0.rigModule}
+    , exRig = rig
     , exStart = start
     , exActionType = contractActionType rig0.rigEntityInfo start.stContract
-    , exAnchors = anchors
+    , exClosed = exploreClosed rig sites cache
     , exHint = hint
     , exRecords = records
     }
@@ -1570,7 +1599,7 @@ exploreWith :: Explorer -> IO (Either Text Graph)
 exploreWith ex = do
   let opts = ex.exOptions
       (rig, tr) = rigFor ex []
-  mpos <- position rig tr
+  mpos <- replayRig ex rig >>= \ rig' -> position rig' tr
   case mpos of
     Nothing -> pure (Left "the contract produced no result at its outset")
     Just pos0 -> case pos0.posResidual of
@@ -1612,12 +1641,15 @@ exploreWith ex = do
 -- exploration computed: what a counterexample is held to before it is
 -- printed ("L4.Lts.Explore.Check"; spec §6.3, "replay every counterexample
 -- on the evaluator before printing it"). The events are those of a
--- 'StateNode''s 'snPath', or that path and one edge's event after it.
-replayPath :: Rig -> Start -> [Expr Resolved] -> IO (Maybe Position)
-replayPath rig start events = do
+-- 'StateNode''s 'snPath', or that path and one edge's event after it. Afresh
+-- includes the imports: the replay has its own copy of the imported rules
+-- that read a ledger, as the exploration's replays have ('gRunHeap').
+replayPath :: Set Unique -> Rig -> Start -> [Expr Resolved] -> IO (Maybe Position)
+replayPath run rig start events = do
+  env <- freshHeap run rig.rigEnv
   let directive = Contract emptyAnno start.stContract (startExpr start) events
       MkModule a uri (MkSection sa sn saka sg decls) = withoutDirectives rig.rigModule
-      rig' = rig {rigModule = MkModule a uri (MkSection sa sn saka sg (decls <> [Directive emptyAnno directive]))}
+      rig' = rig {rigModule = MkModule a uri (MkSection sa sn saka sg (decls <> [Directive emptyAnno directive])), rigEnv = env}
   position rig' MkTrace {trDirective = directive, trContract = start.stContract, trStart = startExpr start, trEvents = events}
 
 -- | The position a path of events leads to, as the exploration holds it: each
@@ -1629,7 +1661,7 @@ replayPath rig start events = do
 positionAlong :: Explorer -> [Expr Resolved] -> IO (Maybe Position)
 positionAlong ex events = do
   let (rig0, tr0) = rigFor ex []
-  start <- position rig0 tr0
+  start <- replayRig ex rig0 >>= \ rig0' -> position rig0' tr0
   go [] events start
   where
     go _ _ Nothing = pure Nothing
@@ -1637,9 +1669,9 @@ positionAlong ex events = do
     go done (e : es) (Just parent) = do
       let done' = done <> [e]
           (rig, tr) = rigFor ex done'
-      position rig tr >>= \ case
+      replayRig ex rig >>= \ rig' -> position rig' tr >>= \ case
         Nothing    -> pure Nothing
-        Just child -> carryBreach parent child >>= go done' es . Just
+        Just child -> carryBreach ex.exClosed parent child >>= go done' es . Just
 
 loop :: Explorer -> Accum -> IO Accum
 loop ex acc = case acc.acQueue of
@@ -1650,7 +1682,7 @@ loop ex acc = case acc.acQueue of
         -- has nothing the bound kept from it: it is terminal, not cut.
         -- Listing the candidates replays nothing, so asking costs nothing.
         let (rig, tr) = rigFor ex node.ndEvents
-        cands <- candidatesOf rig tr node.ndPos
+        cands <- candidatesWith ex.exClosed rig tr node.ndPos
         loop ex if null cands && null node.ndPos.posUnread
           then terminal node acc {acQueue = rest}
           else acc {acQueue = rest, acDepthCutIds = Set.insert node.ndId acc.acDepthCutIds}
@@ -1789,6 +1821,7 @@ finish ex acc = MkGraph
       , cvAnswersByForm = Set.toList acc.acByForm
       , cvInstants = acc.acInstants
       }
+  , gRunHeap = ex.exSites.rsRunHeap
   }
   where
     -- a state that was cut and then found to be terminal had nothing left to try
@@ -1829,14 +1862,13 @@ expand :: Explorer -> Node -> IO [Tried]
 expand ex node = do
   let (rig, tr) = rigFor ex node.ndEvents
       pos = node.ndPos
-  cands <- candidatesOf rig tr pos
+  cands <- candidatesWith ex.exClosed rig tr pos
   deadlines <- liveDeadlines ex pos
   -- each candidate's obligation, found again by the 'LiveNorm' the what-if
-  -- rendered it to from the very same residual ('candidatesOf')
+  -- rendered it to from the very same residual ('candidatesWith')
   let lives :: [(LiveNorm, (RawObligation NF, Maybe (Either Text Rational)))]
       lives = [ (renderLive pos.posContext raw, (raw, due)) | (raw, due) <- deadlines ]
       known = nubOrd [ d | (_, Just (Right d)) <- deadlines ]
-      offeredTicks = [ d | MkCandidate {cdKind = TickPast d _} <- cands ]
       -- the stamp that reveals deadline d: one unit past it, or, on a grid,
       -- the next point of the grid past it
       -- (never earlier than the clock: a deadline the clock has already passed
@@ -1847,14 +1879,14 @@ expand ex node = do
         Grid n  -> (fromInteger (floor (d / n)) + 1) * n
       retimed d cand = cand {cdHypothetical = Right (Tick (tickTime d))}
       run label kind cand = do
-        (outcome, mpos) <- tryCandidateFrom rig tr pos cand
+        (outcome, mpos) <- replayRig ex rig >>= \ rig' -> tryCandidateFrom rig' tr pos cand
         case outcome.ocVerdict of
           Untried why  -> pure (TriedUntried label why)
           PassedOver r -> pure (TriedPassed label (case r of TooEarly open -> Just open; _ -> Nothing))
           _ -> case (cand.cdHypothetical, mpos) of
             -- what a breach leaves standing is carried to the position it leads to
             (Right hyp, Just pos') | isJust pos'.posResidual -> do
-              carried <- carryBreach pos pos'
+              carried <- carryBreach ex.exClosed pos pos'
               pure (TriedEdge label kind (hypotheticalExpr hyp) carried)
             _ -> pure (TriedUntried label "the replay produced no position")
       -- a tick, and the instants a lapse it reveals arms (see 'tickRecord')
@@ -1899,13 +1931,12 @@ expand ex node = do
         pure [ h.heldAt | h <- new ]
       tickMove cand = case cand.cdKind of
         TickPast d _ -> let cand' = retimed d cand in tick (tickLabel cand' d) d cand'
-        NoTick live -> case snd <$> lookup live lives of
-          Just (Just (Right d))
-            | d `notElem` offeredTicks ->
-                let cand' = cand {cdKind = TickPast d [live], cdHypothetical = Right (Tick (tickTime d))}
-                in tick (tickLabel cand' d) d cand'
-            | otherwise -> pure ([], [])
-          _ -> pure ([TriedUntried ("time runs out on " <> live.lnAction) (either id (const "") cand.cdHypothetical)], [])
+        -- the what-if read the deadline with the exploration's own reader
+        -- ('candidatesWith', 'liveDeadlines'), so one it could not read is not
+        -- known here either; before smucclaw/l4-ide#1107 the two read differently, and a
+        -- NoTick whose anchor this module could work out was turned into a
+        -- tick here
+        NoTick live -> pure ([TriedUntried ("time runs out on " <> live.lnAction) (either id (const "") cand.cdHypothetical)], [])
         ActBy _ -> pure ([], [])
   -- the ticks first, and each in its own place in the result: what a lapse
   -- arms is a fact about this state that the acts tried in it are tied with
@@ -2071,7 +2102,7 @@ actsOf ex pos raw cand = case cand.cdBound of
                 , "they name " <> Text.pack (show size) <> " acts, more than the bound of " <> Text.pack (show ex.exOptions.eoMaxActs)) ])
             else do
               let choices = traverse (\ (v, vals) -> map (v,) vals) domains
-              actions <- traverse (closedAction pos.posReplayScope raw.roEnv . (`fillBinders` shape)) choices
+              actions <- traverse (closedAction ex.exClosed.clReads pos.posReplayScope raw.roEnv . (`fillBinders` shape)) choices
               Right (actions, refusedNested)
   where
     info = ex.exRig.rigEntityInfo

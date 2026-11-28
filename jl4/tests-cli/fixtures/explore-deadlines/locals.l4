@@ -1,0 +1,20 @@
+-- smucclaw/l4-ide#1107: a WITHIN that reads a name the rule defines with
+-- WHERE, or a value an event carried, is not worked out, and the reason says
+-- which it reads. (given.l4 has the rule's own input.)
+
+DECLARE Actor IS ONE OF Alice, Bob
+DECLARE Action IS ONE OF
+    Pay HAS amount IS A NUMBER
+    ship
+
+GIVETH A DEONTIC Actor Action
+`where local` MEANS PARTY Alice MUST ship WITHIN period LEST BREACH BY Alice BECAUSE "late"
+  WHERE period MEANS 20
+
+GIVETH A DEONTIC Actor Action
+`event carried` MEANS
+    PARTY Alice MUST Pay n WITHIN 10
+    HENCE (PARTY Bob MUST ship WITHIN n LEST BREACH BY Bob BECAUSE "late")
+
+#TRACE `event carried` AT 0 WITH
+    PARTY Alice DOES Pay 4 AT 1

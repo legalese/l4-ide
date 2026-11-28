@@ -1,0 +1,19 @@
+-- An act that reads a section GIVEN declared in an imported file, readers.l4,
+-- directly and through a rule of that file. The act is untried, as one
+-- reading the file's own section GIVEN is (explore-actions/section-given.l4),
+-- and the reason names readers.l4: this file cannot supply `rate` with a
+-- WITH, which gets check/not-a-function here (review of
+-- smucclaw/l4-ide#1107).
+
+IMPORT prelude
+IMPORT readers
+
+DECLARE Actor IS ONE OF Alice
+DECLARE Act IS ONE OF
+    pay HAS amount IS A NUMBER
+
+GIVETH A DEONTIC Actor Act
+`direct` MEANS PARTY Alice MUST pay rate WITHIN 10 HENCE FULFILLED LEST BREACH BY Alice BECAUSE "late"
+
+GIVETH A DEONTIC Actor Act
+`via rule` MEANS PARTY Alice MUST pay `the window` WITHIN 10 HENCE FULFILLED LEST BREACH BY Alice BECAUSE "late"

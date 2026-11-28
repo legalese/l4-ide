@@ -1,0 +1,27 @@
+-- smucclaw/l4-ide#1107: a WITHIN written as a name or an expression. Each
+-- rule is `literal` with its deadline spelt another way, so `l4 explore` and
+-- `l4 lts` on it should say what they say of `literal`. `raises` is a name
+-- whose working out divides by zero: neither tool may crash on it, and its
+-- deadline is not known.
+
+DECLARE Actor IS ONE OF Alice
+DECLARE Act IS ONE OF pay
+
+`ten days` MEANS 10
+`five and five` MEANS 5 PLUS 5
+`no period` MEANS 10 DIVIDED BY 0
+
+GIVETH A DEONTIC Actor Act
+`literal` MEANS PARTY Alice MUST pay WITHIN 10 LEST BREACH BY Alice BECAUSE "late"
+
+GIVETH A DEONTIC Actor Act
+`named` MEANS PARTY Alice MUST pay WITHIN `ten days` LEST BREACH BY Alice BECAUSE "late"
+
+GIVETH A DEONTIC Actor Act
+`sum` MEANS PARTY Alice MUST pay WITHIN 5 PLUS 5 LEST BREACH BY Alice BECAUSE "late"
+
+GIVETH A DEONTIC Actor Act
+`named sum` MEANS PARTY Alice MUST pay WITHIN `five and five` LEST BREACH BY Alice BECAUSE "late"
+
+GIVETH A DEONTIC Actor Act
+`raises` MEANS PARTY Alice MUST pay WITHIN `no period` LEST BREACH BY Alice BECAUSE "late"

@@ -1,0 +1,40 @@
+-- Review of smucclaw/l4-ide#1107: an act that reads a section GIVEN the
+-- contract has not worked out yet. The what-if replays an act in the
+-- module's scope, where `the price` is its TYPICALLY default, 30, and not the
+-- 20 the WITH supplies; so on unstable `the deal` explored with no pay edge,
+-- nothing untried and "1 act passed over", and l4 lts said `pay` was not the
+-- act awaited, where the run of the first #TRACE is FULFILLED by pay 20.
+-- Through a rule (`the total`) the replay stopped with an internal error.
+-- The act is now untried, with a reason, and so is `the plain deal`'s,
+-- whose GIVEN nothing supplies: that is the cost.
+
+DECLARE Actor IS ONE OF Alice
+DECLARE Act IS ONE OF
+    pay HAS amount IS A NUMBER
+
+GIVETH A DEONTIC Actor Act
+`the deal` MEANS `the duty` WITH `the price` IS 10 PLUS 10
+
+GIVETH A DEONTIC Actor Act
+`the plain deal` MEANS `the duty`
+
+GIVETH A DEONTIC Actor Act
+`the deal through a rule` MEANS `the duty through a rule` WITH `the price` IS 10 PLUS 10
+
+§ `Terms`
+    GIVEN `the price` IS A NUMBER TYPICALLY 30
+
+GIVETH A NUMBER
+`the total` MEANS `the price` PLUS 0
+
+GIVETH A DEONTIC Actor Act
+`the duty` MEANS PARTY Alice MUST pay `the price` WITHIN 10 HENCE FULFILLED LEST BREACH BY Alice BECAUSE "late"
+
+GIVETH A DEONTIC Actor Act
+`the duty through a rule` MEANS PARTY Alice MUST pay `the total` WITHIN 10 HENCE FULFILLED LEST BREACH BY Alice BECAUSE "late"
+
+#TRACE `the deal` AT 0 WITH
+    PARTY Alice DOES pay 20 AT 1
+
+#TRACE `the deal through a rule` AT 0 WITH
+    PARTY Alice DOES pay 20 AT 1

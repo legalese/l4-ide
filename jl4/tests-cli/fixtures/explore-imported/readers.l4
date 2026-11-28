@@ -1,0 +1,21 @@
+-- Imported by deadlines.l4 and kept.l4: rules that read what a run
+-- supplies, a ledger, the clock, the world outside the file and a section
+-- GIVEN, so that a file importing them is held to what they read.
+
+IMPORT prelude
+
+`recorded period` MEANS fromMaybe 10 (RECALL `period`)
+
+`clocky` MEANS ((DATE_SERIAL TODAY) MODULO 7) PLUS 3
+
+`env period` MEANS fromMaybe 10 (TONUMBER (fromMaybe "3" (ENV "PERIOD_DAYS")))
+
+GIVEN dflt IS A BOOLEAN
+GIVETH A BOOLEAN
+`is taken` dflt MEANS fromMaybe dflt (RECALL OFFICIAL's `taken`)
+
+§ `Terms`
+    GIVEN rate IS A NUMBER TYPICALLY 3
+
+GIVETH A NUMBER
+`the window` MEANS rate TIMES 10

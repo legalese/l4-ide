@@ -1,0 +1,67 @@
+-- Review of smucclaw/l4-ide#1107: an act that applies a function local to
+-- the rule, an input (`applied`) or a WHERE local (`where positional`,
+-- `where named`). The what-if cannot supply a function, and the replay
+-- cannot resolve it, so the act is untried with the what-if's own reason;
+-- on unstable it was untried with "Internal error: f is not in scope.
+-- Please report this as a bug." `plain` and `where plain` are the controls:
+-- a local named as a value keeps "the action binds `n`, which the what-if
+-- cannot choose".
+
+DECLARE Actor IS ONE OF Alice
+DECLARE Act IS ONE OF
+    pay HAS amount IS A NUMBER
+
+GIVEN x IS A NUMBER
+GIVETH A NUMBER
+`double` x MEANS x TIMES 2
+
+GIVEN f IS A FUNCTION FROM NUMBER TO NUMBER
+GIVETH A DEONTIC Actor Act
+`applied duty` f MEANS PARTY Alice MUST pay (f 3) WITHIN 10 LEST BREACH BY Alice BECAUSE "late"
+
+GIVETH A DEONTIC Actor Act
+`applied` MEANS `applied duty` `double`
+
+GIVEN n IS A NUMBER
+GIVETH A DEONTIC Actor Act
+`plain duty` n MEANS PARTY Alice MUST pay n WITHIN 10 LEST BREACH BY Alice BECAUSE "late"
+
+GIVETH A DEONTIC Actor Act
+`plain` MEANS `plain duty` (3 PLUS 3)
+
+GIVETH A DEONTIC Actor Act
+`where positional` MEANS
+    PARTY Alice MUST pay (`twice` 3) WITHIN 10 LEST BREACH BY Alice BECAUSE "late"
+  WHERE
+    GIVEN y IS A NUMBER
+    GIVETH A NUMBER
+    `twice` y MEANS y TIMES 2
+
+GIVETH A DEONTIC Actor Act
+`where named` MEANS
+    PARTY Alice MUST pay (`twice` WITH y IS 3) WITHIN 10 LEST BREACH BY Alice BECAUSE "late"
+  WHERE
+    GIVEN y IS A NUMBER
+    GIVETH A NUMBER
+    `twice` y MEANS y TIMES 2
+
+GIVETH A DEONTIC Actor Act
+`where plain` MEANS
+    PARTY Alice MUST pay six WITHIN 10 LEST BREACH BY Alice BECAUSE "late"
+  WHERE
+    six MEANS 3 TIMES 2
+
+#TRACE `applied` AT 0 WITH
+    PARTY Alice DOES pay 6 AT 1
+
+#TRACE `plain` AT 0 WITH
+    PARTY Alice DOES pay 6 AT 1
+
+#TRACE `where positional` AT 0 WITH
+    PARTY Alice DOES pay 6 AT 1
+
+#TRACE `where named` AT 0 WITH
+    PARTY Alice DOES pay 6 AT 1
+
+#TRACE `where plain` AT 0 WITH
+    PARTY Alice DOES pay 6 AT 1

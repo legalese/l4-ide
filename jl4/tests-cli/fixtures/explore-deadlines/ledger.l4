@@ -1,0 +1,25 @@
+-- smucclaw/l4-ide#1107: a WITHIN that reads a ledger, through a rule (or a
+-- rule that names one), or with a RECALL of its own, and an OF anchor that
+-- does, are not worked out: outside a run the ledger is empty, so the answer
+-- would be the fallback whatever the run had recorded.
+
+IMPORT prelude
+
+DECLARE Actor IS ONE OF Alice
+DECLARE Act IS ONE OF pay
+
+`recorded period` MEANS fromMaybe 10 (RECALL `period`)
+
+`via another` MEANS `recorded period` PLUS 1
+
+GIVETH A DEONTIC Actor Act
+`ledger read` MEANS PARTY Alice MUST pay WITHIN `recorded period` LEST BREACH BY Alice BECAUSE "late"
+
+GIVETH A DEONTIC Actor Act
+`through another` MEANS PARTY Alice MUST pay WITHIN `via another` LEST BREACH BY Alice BECAUSE "late"
+
+GIVETH A DEONTIC Actor Act
+`direct read` MEANS PARTY Alice MUST pay WITHIN fromMaybe 10 (RECALL `period`) LEST BREACH BY Alice BECAUSE "late"
+
+GIVETH A DEONTIC Actor Act
+`direct anchor` MEANS PARTY Alice MUST pay WITHIN 2 OF fromMaybe 3 (RECALL `start`) LEST BREACH BY Alice BECAUSE "late"

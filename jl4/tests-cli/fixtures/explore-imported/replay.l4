@@ -1,0 +1,42 @@
+-- Two --always properties whose counterexamples pass through `taken now`, a
+-- constant that reads a ledger, in an imported file (taken.l4). On the skip
+-- path it is first asked by `look`, after `taken` is committed, and is TRUE;
+-- on the peek path it is asked by `go`, before, and is FALSE. Each
+-- counterexample is replayed before it is printed, and each replay has its
+-- own copy of the constant, as the exploration's do. On a build whose
+-- counterexample replay shared one copy, with the clock fixed, the second
+-- property's replay read the first one's answer and its counterexample did
+-- not replay, in either order (review of smucclaw/l4-ide#1107).
+
+IMPORT prelude
+IMPORT taken
+
+DECLARE Actor IS ONE OF Bob
+DECLARE Mode IS ONE OF peek, skip
+DECLARE Act IS ONE OF
+    go HAS mode IS A Mode
+    look
+
+GIVETH A DEONTIC Actor Act
+`after` MEANS
+    PARTY Bob
+    MAY look
+    WITHIN 10
+    HENCE COMMIT `seen` IS `taken now` HENCE FULFILLED
+    LEST FULFILLED
+
+GIVETH A DEONTIC Actor Act
+`start` MEANS
+    PARTY Bob
+    MAY go m
+    WITHIN 10
+    HENCE COMMIT `taken` IS (IF m EQUALS peek THEN NOT `taken now` ELSE TRUE) HENCE `after`
+    LEST FULFILLED
+
+GIVEN seen IS A MAYBE BOOLEAN
+GIVETH A BOOLEAN
+`nothing seen` seen MEANS NOT (fromMaybe FALSE seen)
+
+GIVEN seen IS A MAYBE BOOLEAN
+GIVETH A BOOLEAN
+`never seen false` seen MEANS fromMaybe TRUE seen

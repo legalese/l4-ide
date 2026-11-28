@@ -77,6 +77,12 @@ The routes exist in the long form only, because a short `/{id}/instances` would 
 | `POST` | `/deployments/{id}/instances/{name}/events`   | Proposes an act. The body has `party`, `action` and `idempotencyKey`, and optionally `decidedAgainst`, `strict`, `cells` and `claimedAt`.         |
 | `GET`  | `/deployments/{id}/instances/{name}/position` | Says the head, whether the contract is finished, the next deadline, and what is owed, would discharge, or would breach, in the words of `l4 lts`. |
 
+The position differs from `l4 lts` in one place.
+A deadline written as a name or as arithmetic (`` WITHIN `ten days` ``, `WITHIN 5 PLUS 5`), which `l4 lts` works out when nothing in it is left to a run, is not worked out here until its obligation has seen an event: until then the reply's `nextDeadline` leaves it out, its `position` lists the obligation under `deadlineNotKnown`, and the ledger does not tick past it, as both did before smucclaw/l4-ide#1107 (decided by Claude 2026-11-25, pending Meng's review).
+Once the obligation has seen an event the contract holds its deadline as a number, and the position dates it as `l4 lts` does: a `` WITHIN `ten days` `` armed by a `HENCE` is not known just after the event that arms it, and is dated after one more event.
+Review measured both on a running service on 2026-11-25: on a fresh instance `nextDeadline` was absent and the obligation was under `deadlineNotKnown`, with no tick; and the `HENCE` case as just described.
+`l4 lts` of `unstable`, which reads deadlines as the position does (read from the code), shows the `HENCE` case too: Bob's ``WITHIN `ten days` `` is not known after the `pay` that arms it, and is due by 10001 after one more event (measured 2026-11-25).
+
 The tool `what-may-I-do-now` takes the `instance`, the `deployment` (left out on a deployment's own endpoint), and optionally a `party` and an `action` to try.
 Given an act, the answer's `ifProposedNow` carries the `commits` the act would make, with `applied` `false`.
 A request that carries `X-Include-Functions: false` or `X-Include-Evaluate: false` is not shown the tool (measured: it is absent from `tools/list` with the second header).
@@ -371,7 +377,7 @@ The silent ones are the ones to build around.
 
 ## See also
 
-- [What is owed now: `l4 lts`](lts-list.md), whose words the position uses.
+- [What is owed now: `l4 lts`](lts-list.md), whose words the position uses, except for a deadline written as a name (above).
 - [Deadlines and consequences](consequences.md), for `WITHIN`, `HENCE` and `LEST`, which the deadlines and verdicts above come from.
 - The routes, flags and limits as the service lists them: [jl4-service README, Instance Ledger](../../../jl4-service/README.md#instance-ledger).
 - The reasons and the open questions behind the design: [OPERATIONAL-LOWERING-SPEC.md](../../../specs/proposals/OPERATIONAL-LOWERING-SPEC.md).

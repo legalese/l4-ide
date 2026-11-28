@@ -61,7 +61,7 @@ import L4.Lts.Explore
 import L4.Lts.Explore.Check
 import L4.Lts.WhatIf
   ( Candidate (..), CandidateKind (..), Hypothetical (..), Outcome (..), Position (..), Rig (..), Verdict (..)
-  , afterCommonPrefix, candidatesOf, carryBreach, eventTaken, hypotheticalExpr, position, tickPast, tryCandidateFrom )
+  , afterCommonPrefix, candidatesWith, carryBreach, closedIn, eventTaken, hypotheticalExpr, position, tickPast, tryCandidateFrom )
 import L4.Parser.SrcSpan (SrcPos (..), SrcRange (..))
 import L4.TracePolicy (apiDefaultPolicy)
 
@@ -815,7 +815,7 @@ enumerated ex depth horizon = do
     liveSuccessors universe ev pos = do
       let (rig, tr) = rigFor ex ev
           c = pos.posClock
-      cands <- candidatesOf rig tr pos
+      cands <- candidatesWith (closedIn rig) rig tr pos
       deadlines <- liveDeadlines ex pos
       let ahead = [ d | (_, Just (Right d)) <- deadlines, d >= c ]
           limit = if null ahead then c + fromInteger horizon else minimum ahead
@@ -825,7 +825,7 @@ enumerated ex depth horizon = do
               (Untried _, _, _)    -> pure []
               (PassedOver _, _, _) -> pure []
               (_, Right hyp, Just pos') | isJust pos'.posResidual -> do
-                carried <- carryBreach pos pos'
+                carried <- carryBreach (closedIn rig) pos pos'
                 pure [(ev <> [hypotheticalExpr hyp], carried)]
               _ -> pure []
       forM_ cands \ cand -> case cand.cdHypothetical of
@@ -858,7 +858,7 @@ enumerated ex depth horizon = do
         -- an act that comes after a deadline only shows the deadline's expiry,
         -- which the clock showing it is already the answer to
         Just child | isJust child.posResidual, eventTaken (afterCommonPrefix pos.posSteps child.posSteps), null (expiries child) -> do
-          carried <- carryBreach pos child
+          carried <- carryBreach (closedIn (fst (rigFor ex ev))) pos child
           pure [(ev <> [e], carried)]
         _ -> pure []
       -- the clock at every whole instant, but only where it first shows an
@@ -870,7 +870,7 @@ enumerated ex depth horizon = do
       let revealed = [ maybe [] expiries m | (_, m) <- ticks ]
           firstShown = [ (e, child) | ((e, Just child), now, prior) <- zip3 ticks revealed ([] : revealed), isJust child.posResidual, not (null now), now /= prior ]
       fromTicks <- forM firstShown \ (e, child) -> do
-        carried <- carryBreach pos child
+        carried <- carryBreach (closedIn (fst (rigFor ex ev))) pos child
         pure (ev <> [e], carried)
       pure (fromActs <> fromTicks)
 
