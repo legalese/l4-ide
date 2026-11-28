@@ -54,6 +54,8 @@ Pin `DMN_CHECK_JAVA_HOME` to a JDK 21 if you want the result to mean what 21 giv
 The work directory is `DMN_CHECK_WORKDIR`, else `$TMPDIR/l4-dmn-check-<uid>` (per user, because `/tmp` is shared on Linux, and refused as `BROKEN` if it exists and you do not own it).
 It is made absolute before use, so a relative `DMN_CHECK_WORKDIR` means a directory under the caller's, and nothing is written beside `run.sh` or into the repo.
 The first run downloads dmn-check and its dependencies, 18 jars, from Maven Central into Maven's local repository, and resolves the classpath into the work directory.
+Inside the work directory `run.sh` deletes and recreates two directories, so give `DMN_CHECK_WORKDIR` a directory that holds nothing else you need: `corpus/` on every `--corpus` run, and `classes/` (with `classes.stamp`) whenever `classes.stamp` is missing or no longer describes `classes/`, which includes the first run.
+It also writes `cp.txt`, `cp.pom.sha256`, `mvn.log`, `jars.actual` and `jars.diff` there, replacing any file of those names.
 
 ## Policy: optional evidence, not a gate
 
