@@ -262,7 +262,7 @@ Evaluate the left operand first.
 If it decides the connective (`FALSE` for `AND`, `TRUE` for `OR`, `FALSE` for `IMPLIES`), stop, as today.
 If it is known and does not decide, the answer is the right operand, as today.
 Only if it is unknown is the right operand evaluated and the K3 table applied.
-This is McCarthy's sequential reading of the connectives; Plotkin's parallel-or, which would make `⊥ ∨ T = T`, is not proposed.
+This is McCarthy's sequential reading of the connectives; Plotkin's parallel-or, which would make `⊥ ∨ T = T`, is not proposed for the connectives; U14 (§9) takes it for a section's alternative routes only (ruled 2026-11-02, not landed).
 
 **(c) Residuals.**
 An undecided result is not a bare `U` but the term it is waiting on: a formula over the atoms it depends on, with `IMPLIES` kept as its own node (§3.7).
@@ -1401,6 +1401,35 @@ The amendment, as stated when the word was fired:
 
 **What U13b changes.** §4.5's agreeing arms and §4.6's identity rule carry the term's guarded leaves, §4.7.2 states the case in which no assignment escapes every guard, rows 78 to 80 of §4.12 are its positive controls and row 82 tests it, and §8 step 4 builds the decision while step 5 builds the leaves.
 Clause (2) narrows U13's clauses 2 and 3 for the case in which no assignment escapes every guard: U13 covers a refusal reached only under an undetermined guard, and option B was declined because it answers "refuses" where the answer is `FALSE` whenever `x` is `FALSE`; when every assignment refuses with one reason, neither holds, and the refusal is the answer.
+
+### U14 — A section's alternative routes are not an `OR`
+
+Proposed, not landed: no such operator exists in the tree, and nothing in §4 or §8 builds it.
+It lands when a construct (or a library operator) for a section's alternative routes is built with the rule below and with the order-swap positive control.
+
+**The question.** A section that grants something by any of several routes (WA Interpretation Act 1984 s 50(1) and (2); AU Acts Interpretation Act 1901 s 15AB(1)(a), (b)(i), (b)(ii)) is today written as an `OR` of its routes.
+Under U1's left-sequential order and `REFUSE.md`'s "Order matters, and it is left to right", `r OR TRUE` refuses while `TRUE OR r` is `TRUE`, so whether the section answers depends on which route the encoder wrote first.
+A lawyer would answer yes whenever any route is met, whatever another route does.
+The commons negation page of questions (`commons-negation-1030`, card N1b, option C) proposes a step at the section that turns "no route met" into the section's no or into "not covered"; this asks how that step treats a refused route.
+**RULED 2026-11-02 (in chat, 02:54Z).** Meng: _"ok, let's take the second."_
+The option taken, as printed in the message Meng answered:
+
+> **Make the section operator a separate construct with its own rule:** look at every route, and let a met route outweigh a refused one. This matches how `RAND`/`ROR` avoid committing to an order, and what SEESAW did for blame. Plain `AND`/`OR` would stay left to right.
+
+The option declined: keep U1 everywhere, so a section's route order matters when one refuses, and the encoder puts the most decisive route first.
+
+**What it does not change.** U1, U1b, U11 and U13 stand: plain `AND`, `OR` and `IMPLIES` keep left-sequential order, and `REFUSE.md`'s order paragraph stays true.
+The rule is Plotkin's parallel-or, which §4.1(b) did not propose for the connectives; it is taken here for the section's routes only.
+The precedent is `RAND`/`ROR`, which force neither side eagerly (`doc/reference/control-flow/REFUSE.md`, "Order matters"), and SEESAW (legalese/l4-ide#640, merged 2026-10-13), which made a compound breach's date and blame independent of operand order.
+
+**Not ruled** (decided by Claude 2026-11-02, pending Meng's review; set out in a memo written before this question was put, with its order corrected on 2026-11-28, see "What review changed" below): after "any route met gives yes", the order is any route undetermined gives undetermined, even when another route refused; then, with no route undetermined, any route refused gives the refusal; then the section's `closed` or `open` mode gives its no or "not covered".
+Undetermined comes before refused because the refusal is then the answer only if the undetermined route is not met, a position U13 rules on: the directive is undetermined, never a determinate refusal; and the ruling's "let a met route outweigh a refused one" forbids refusing while the undetermined route may yet be met.
+A provision that overrides the section ("subject to", "notwithstanding") is not a route: if it refuses, the section refuses, because whether it overrode cannot be known.
+Whether the section's default mode, absent a marker word, is `open`, `closed`, or set by the kind of question is not ruled here; it is card N1b's.
+
+**What review changed** (review of this record, 2026-11-28): the order above first read "any route refused gives the refusal, then any route undetermined gives undetermined".
+With one route refused and another undetermined on `x`, that gave a determinate refusal, although `x` met would have made the section yes; that contradicted the ruling's "let a met route outweigh a refused one" and U13's clauses 1 to 3, so undetermined now comes before refused.
+The order now gives yes for a refused route with a met one, undetermined for a refused route with an undetermined one, and the refusal for a refused route with one that is not met.
 
 ### D1 — Build the evaluator, buy the solver
 
